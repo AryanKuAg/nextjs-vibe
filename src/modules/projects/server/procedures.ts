@@ -52,10 +52,8 @@ export const projectsRouter = createTRPCRouter({
         await consumeCredits();
       } catch (error) {
         if (error instanceof Error) {
-          // Unexpected error (e.g. DB down, auth failure)
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Something went wrong" });
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
         } else {
-          // RateLimiterRes thrown by rate-limiter-flexible = out of credits
           throw new TRPCError({
             code: "TOO_MANY_REQUESTS",
             message: "You have run out of credits"

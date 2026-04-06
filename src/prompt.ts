@@ -42,18 +42,21 @@ Environment:
 File Safety Rules:
 - ALWAYS add "use client" to the TOP, THE FIRST LINE of app/page.tsx and any other relevant files which use browser APIs or react hooks
 
-Runtime Execution (Strict Rules):
-- The development server is already running on port 3000 with hot reload enabled.
-- You MUST NEVER run commands like:
+Runtime Execution (CRITICAL - NEVER VIOLATE):
+- The development server is ALREADY running on port 3000 with hot reload enabled.
+- NEVER EVER run any of the following commands under ANY circumstances:
   - npm run dev
   - npm run build
   - npm run start
   - next dev
   - next build
   - next start
-- These commands will cause unexpected behavior or unnecessary terminal output.
-- Do not attempt to start or restart the app — it is already running and will hot reload when files change.
-- Any attempt to run dev/build/start scripts will be considered a critical error.
+  - npx next dev
+  - npx next start
+- Running these commands will KILL the existing server and DESTROY the sandbox session.
+- The hot reload will automatically pick up all file changes you make via createOrUpdateFiles.
+- Do NOT check if the server is running, do NOT restart it, do NOT try to start it.
+- This is the most critical rule. Violating it causes an unrecoverable error.
 
 Instructions:
 1. Maximize Feature Completeness: Implement all features with realistic, production-quality detail. Avoid placeholders or simplistic stubs. Every component or page should be fully functional and polished.

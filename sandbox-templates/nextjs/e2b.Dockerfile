@@ -18,3 +18,9 @@ RUN npx --yes shadcn@2.6.3 add --all --yes
 
 # Move the Nextjs app to the home directory and remove the nextjs-app directory
 RUN mv /home/user/nextjs-app/* /home/user/ && rm -rf /home/user/nextjs-app
+
+# Ensure lib/utils.ts exists (shadcn sometimes places it inconsistently)
+RUN if [ ! -f /home/user/lib/utils.ts ]; then \
+  mkdir -p /home/user/lib && \
+  echo 'import { clsx, type ClassValue } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs));\n}' > /home/user/lib/utils.ts; \
+fi

@@ -63,9 +63,9 @@ export const codeAgentFunction = inngest.createFunction(
       description: "An expert coding agent",
       system: PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseUrl: "https://openrouter.ai/api/v1/",
+        model: "gemini-3.1-pro-preview",
+        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
         defaultParameters: {
           temperature: 0.1,
         },
@@ -198,9 +198,9 @@ export const codeAgentFunction = inngest.createFunction(
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseUrl: "https://openrouter.ai/api/v1/",
+        model: "gemini-3.1-pro-preview",
+        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
       }),
     })
 
@@ -209,9 +209,9 @@ export const codeAgentFunction = inngest.createFunction(
       description: "A response generator",
       system: RESPONSE_PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseUrl: "https://openrouter.ai/api/v1/",
+        model: "gemini-3.1-pro-preview",
+        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
       }),
     });
 

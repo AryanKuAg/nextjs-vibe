@@ -62,7 +62,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: openai({ 
+      model: openai({
         model: "gpt-4.1",
         apiKey: process.env.OPENROUTER_API_KEY,
         baseUrl: "https://openrouter.ai/api/v1/",
@@ -197,7 +197,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "fragment-title-generator",
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: openai({ 
+      model: openai({
         model: "gpt-4o",
         apiKey: process.env.OPENROUTER_API_KEY,
         baseUrl: "https://openrouter.ai/api/v1/",
@@ -208,17 +208,17 @@ export const codeAgentFunction = inngest.createFunction(
       name: "response-generator",
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: openai({ 
+      model: openai({
         model: "gpt-4o",
         apiKey: process.env.OPENROUTER_API_KEY,
         baseUrl: "https://openrouter.ai/api/v1/",
       }),
     });
 
-    const { 
+    const {
       output: fragmentTitleOuput
     } = await fragmentTitleGenerator.run(result.state.data.summary);
-    const { 
+    const {
       output: responseOutput
     } = await responseGenerator.run(result.state.data.summary);
 
@@ -261,7 +261,7 @@ export const codeAgentFunction = inngest.createFunction(
       })
     });
 
-    return { 
+    return {
       url: sandboxUrl,
       title: "Fragment",
       files: result.state.data.files,

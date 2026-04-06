@@ -64,6 +64,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: PROMPT,
       model: openai({ 
         model: "gpt-4.1",
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseUrl: "https://openrouter.ai/api/v1/",
         defaultParameters: {
           temperature: 0.1,
         },
@@ -197,6 +199,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: FRAGMENT_TITLE_PROMPT,
       model: openai({ 
         model: "gpt-4o",
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseUrl: "https://openrouter.ai/api/v1/",
       }),
     })
 
@@ -206,6 +210,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: RESPONSE_PROMPT,
       model: openai({ 
         model: "gpt-4o",
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseUrl: "https://openrouter.ai/api/v1/",
       }),
     });
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
 import { GoogleAuth } from "google-auth-library";
-import { openai, createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
+import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
 
 import { prisma } from "@/lib/db";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
@@ -73,9 +73,6 @@ export const codeAgentFunction = inngest.createFunction(
       const token = await client.getAccessToken();
       return token.token as string;
     });
-
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT; // e.g., "my-gcp-project"
-    const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 
     const codeAgent = createAgent<AgentState>({
       name: "code-agent",

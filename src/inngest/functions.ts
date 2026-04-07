@@ -64,8 +64,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: PROMPT,
       model: openai({
         model: "gemini-3.1-pro-preview",
-        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: process.env.VERTEX_AI_API_KEY,
+        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/publishers/google/models/",
         defaultParameters: {
           temperature: 0.1,
         },
@@ -199,8 +199,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: FRAGMENT_TITLE_PROMPT,
       model: openai({
         model: "gemini-3.1-pro-preview",
-        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: process.env.VERTEX_AI_API_KEY,
+        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/publishers/google/models/",
       }),
     })
 
@@ -210,8 +210,8 @@ export const codeAgentFunction = inngest.createFunction(
       system: RESPONSE_PROMPT,
       model: openai({
         model: "gemini-3.1-pro-preview",
-        apiKey: process.env.GOOGLES_STUDIO_API_KEY,
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: process.env.VERTEX_AI_API_KEY,
+        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/publishers/google/models/",
       }),
     });
 

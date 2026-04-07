@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
-
+//
 import { prisma } from "@/lib/db";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
@@ -13,7 +13,7 @@ function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
   const apiKey = process.env.GOOGLE_CLOUD_API_KEY! || process.env.GEMINI_API_KEY!;
 
-  return gemini({ 
+  return gemini({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: modelName as any,
     apiKey: apiKey,

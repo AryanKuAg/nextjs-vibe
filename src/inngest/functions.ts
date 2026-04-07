@@ -61,7 +61,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const accessToken = await step.run("get-vertex-token", async () => {
       const auth = new GoogleAuth({
-        scopes: "https://www.googleapis.com/auth/cloud-platform",
+        scopes: ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/generative-language"],
         ...(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && {
           credentials: {
             client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -74,16 +74,17 @@ export const codeAgentFunction = inngest.createFunction(
       return token.token as string;
     });
 
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT; // e.g., "my-gcp-project"
+    const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 
     const codeAgent = createAgent<AgentState>({
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
-        defaultParameters: {
+        model: "gemini-3.1-pro-preview",
+        apiKey: accessToken,
+        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`, defaultParameters: {
           temperature: 1,
           top_p: 0.95,
           max_tokens: 65535,
@@ -99,7 +100,7 @@ export const codeAgentFunction = inngest.createFunction(
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
           ]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       }),
       tools: [
@@ -230,9 +231,10 @@ export const codeAgentFunction = inngest.createFunction(
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
+        model: "gemini-3.1-pro-preview",
+        apiKey: accessToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
         defaultParameters: {
           temperature: 1,
           top_p: 0.95,
@@ -249,7 +251,7 @@ export const codeAgentFunction = inngest.createFunction(
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
           ]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       }),
     })
@@ -259,9 +261,10 @@ export const codeAgentFunction = inngest.createFunction(
       description: "A response generator",
       system: RESPONSE_PROMPT,
       model: openai({
-        model: "google/gemini-3.1-pro-preview",
-        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
+        model: "gemini-3.1-pro-preview",
+        apiKey: accessToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
         defaultParameters: {
           temperature: 1,
           top_p: 0.95,
@@ -278,7 +281,7 @@ export const codeAgentFunction = inngest.createFunction(
             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
           ]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       }),
     });

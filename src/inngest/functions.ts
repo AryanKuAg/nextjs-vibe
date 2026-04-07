@@ -10,6 +10,27 @@ import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, lastAssistantTextMessageContent, parseAgentOutput } from "./utils";
 
+function geminiOAuth(modelName: string, token: string) {
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
+
+  if (!projectId) {
+    throw new Error("GOOGLE_CLOUD_PROJECT environment variable is missing.");
+  }
+
+  const baseModel = gemini({ model: modelName as any });
+  
+  // Point to the Vertex AI endpoint, NOT the AI Studio endpoint
+  baseModel.url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelName}:generateContent`;
+  
+  baseModel.headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json"
+  };
+  
+  return baseModel;
+}
+
 interface AgentState {
   summary: string;
   files: { [path: string]: string };
@@ -78,10 +99,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: gemini({
-        model: "gemini-3.1-pro-preview",
-        apiKey: accessToken,
-      }),
+      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
       tools: [
         createTool({
           name: "terminal",
@@ -209,20 +227,14 @@ export const codeAgentFunction = inngest.createFunction(
       name: "fragment-title-generator",
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: gemini({
-        model: "gemini-3.1-pro-preview",
-        apiKey: accessToken,
-      }),
+      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
     })
 
     const responseGenerator = createAgent({
       name: "response-generator",
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: gemini({
-        model: "gemini-3.1-pro-preview",
-        apiKey: accessToken,
-      }),
+      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
     });
 
     const {

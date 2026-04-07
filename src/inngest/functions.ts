@@ -13,7 +13,7 @@ function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
   const apiKey = process.env.GOOGLE_CLOUD_API_KEY! || process.env.GEMINI_API_KEY!;
 
-  return gemini({
+  const baseModel = gemini({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: modelName as any,
     apiKey: apiKey,
@@ -21,6 +21,35 @@ function geminiVertexKey(modelName: string) {
     // It creates: https://aiplatform.googleapis.com/v1/publishers/google/models/{modelName}:generateContent?key={apiKey}
     baseUrl: "https://aiplatform.googleapis.com/v1/publishers/google/",
   });
+
+  const originalOnCall = baseModel.onCall;
+  baseModel.onCall = (options, body: any) => {
+    if (originalOnCall) {
+      originalOnCall(options, body);
+    }
+    
+    // Gemini 3 preview models enforce cryptographic thoughtSignatures on all past function calls.
+    // Inngest agent-kit drops these signatures when formatting generic messages.
+    // To bypass the 400 ERROR, we flatten all historical function calls into conversational text.
+    if (body.contents) {
+      for (const content of body.contents) {
+        if (content.parts) {
+          for (const part of content.parts) {
+            if (part.functionCall) {
+              part.text = `[Used tool: ${part.functionCall.name} with args: ${JSON.stringify(part.functionCall.args)}]`;
+              delete part.functionCall;
+            }
+            if (part.functionResponse) {
+              part.text = `[Tool ${part.functionResponse.name} returned: ${JSON.stringify(part.functionResponse.response)}]`;
+              delete part.functionResponse;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  return baseModel;
 }
 
 interface AgentState {
@@ -78,7 +107,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: geminiVertexKey("gemini-3.1-pro-preview"),
+      model: geminiVertexKey("gemini-3-flash-preview"),
       tools: [
         createTool({
           name: "terminal",
@@ -206,14 +235,14 @@ export const codeAgentFunction = inngest.createFunction(
       name: "fragment-title-generator",
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: geminiVertexKey("gemini-3.1-pro-preview"),
+      model: geminiVertexKey("gemini-3-flash-preview"),
     })
 
     const responseGenerator = createAgent({
       name: "response-generator",
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: geminiVertexKey("gemini-3.1-pro-preview"),
+      model: geminiVertexKey("gemini-3-flash-preview"),
     });
 
     const {

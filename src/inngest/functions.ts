@@ -10,25 +10,18 @@ import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, lastAssistantTextMessageContent, parseAgentOutput } from "./utils";
 
-function geminiOAuth(modelName: string, token: string) {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
+function geminiVertexKey(modelName: string) {
+  // Use the API key from your environment variable
+  const apiKey = process.env.GOOGLE_CLOUD_API_KEY! || process.env.GEMINI_API_KEY!;
 
-  if (!projectId) {
-    throw new Error("GOOGLE_CLOUD_PROJECT environment variable is missing.");
-  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const baseModel = gemini({ model: modelName as any });
-  
-  // Point to the Vertex AI endpoint, NOT the AI Studio endpoint
-  baseModel.url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelName}:generateContent`;
-  
-  baseModel.headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json"
-  };
-  
-  return baseModel;
+  return gemini({ 
+    model: modelName as any,
+    apiKey: apiKey,
+    // This perfectly matches your working curl:
+    // It creates: https://aiplatform.googleapis.com/v1/publishers/google/models/{modelName}:generateContent?key={apiKey}
+    baseUrl: "https://aiplatform.googleapis.com/v1/publishers/google/",
+  });
 }
 
 interface AgentState {
@@ -80,26 +73,13 @@ export const codeAgentFunction = inngest.createFunction(
       },
     );
 
-    const accessToken = await step.run("get-vertex-token", async () => {
-      const auth = new GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/generative-language"],
-        ...(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && {
-          credentials: {
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-          }
-        })
-      });
-      const client = await auth.getClient();
-      const token = await client.getAccessToken();
-      return token.token as string;
-    });
+    // Removed OAuth Service Account fetching entirely because the curl works with a standard API key!
 
     const codeAgent = createAgent<AgentState>({
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
+      model: geminiVertexKey("gemini-3.1-pro-preview"),
       tools: [
         createTool({
           name: "terminal",
@@ -227,14 +207,14 @@ export const codeAgentFunction = inngest.createFunction(
       name: "fragment-title-generator",
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
+      model: geminiVertexKey("gemini-3.1-pro-preview"),
     })
 
     const responseGenerator = createAgent({
       name: "response-generator",
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: geminiOAuth("gemini-3.1-pro-preview", accessToken),
+      model: geminiVertexKey("gemini-3.1-pro-preview"),
     });
 
     const {

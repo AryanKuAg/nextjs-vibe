@@ -23,6 +23,7 @@ function geminiVertexKey(modelName: string) {
   });
 
   const originalOnCall = baseModel.onCall;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   baseModel.onCall = (options, body: any) => {
     if (originalOnCall) {
       originalOnCall(options, body);

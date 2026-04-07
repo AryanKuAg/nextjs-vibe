@@ -17,7 +17,7 @@ function geminiOAuth(modelName: string, token: string) {
   if (!projectId) {
     throw new Error("GOOGLE_CLOUD_PROJECT environment variable is missing.");
   }
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const baseModel = gemini({ model: modelName as any });
   
   // Point to the Vertex AI endpoint, NOT the AI Studio endpoint

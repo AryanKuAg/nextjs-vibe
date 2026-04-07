@@ -60,9 +60,18 @@ export const codeAgentFunction = inngest.createFunction(
     );
 
     const accessToken = await step.run("get-vertex-token", async () => {
-      const auth = new GoogleAuth({
-        scopes: "https://www.googleapis.com/auth/cloud-platform"
-      });
+      const authOptions: any = {
+        scopes: "https://www.googleapis.com/auth/cloud-platform",
+      };
+
+      if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+        authOptions.credentials = {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+        };
+      }
+
+      const auth = new GoogleAuth(authOptions);
       const client = await auth.getClient();
       const token = await client.getAccessToken();
       return token.token as string;

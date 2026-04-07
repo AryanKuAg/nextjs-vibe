@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
-import { GoogleAuth } from "google-auth-library";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
 
 import { prisma } from "@/lib/db";
@@ -14,8 +13,8 @@ function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
   const apiKey = process.env.GOOGLE_CLOUD_API_KEY! || process.env.GEMINI_API_KEY!;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return gemini({ 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: modelName as any,
     apiKey: apiKey,
     // This perfectly matches your working curl:

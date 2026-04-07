@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
 import { GoogleAuth } from "google-auth-library";
-import { openai, createAgent, createTool, createNetwork, type Tool, type Message, createState } from "@inngest/agent-kit";
+import { openai, createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
 
 import { prisma } from "@/lib/db";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
@@ -81,10 +81,9 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: openai({
+      model: gemini({
         model: "gemini-3.1-pro-preview",
         apiKey: accessToken,
-        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
       }),
       tools: [
         createTool({
@@ -213,11 +212,9 @@ export const codeAgentFunction = inngest.createFunction(
       name: "fragment-title-generator",
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: openai({
+      model: gemini({
         model: "gemini-3.1-pro-preview",
         apiKey: accessToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
       }),
     })
 
@@ -225,12 +222,9 @@ export const codeAgentFunction = inngest.createFunction(
       name: "response-generator",
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: openai({
+      model: gemini({
         model: "gemini-3.1-pro-preview",
         apiKey: accessToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
-
       }),
     });
 

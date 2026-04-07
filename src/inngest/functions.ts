@@ -68,7 +68,7 @@ export const codeAgentFunction = inngest.createFunction(
       return token.token as string;
     });
 
-    //
+
     const codeAgent = createAgent<AgentState>({
       name: "code-agent",
       description: "An expert coding agent",

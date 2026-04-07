@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
+import { GoogleAuth } from "google-auth-library";
 import { openai, createAgent, createTool, createNetwork, type Tool, type Message, createState } from "@inngest/agent-kit";
 
 import { prisma } from "@/lib/db";
@@ -57,6 +58,16 @@ export const codeAgentFunction = inngest.createFunction(
         messages: previousMessages,
       },
     );
+
+    const accessToken = await step.run("get-vertex-token", async () => {
+      const auth = new GoogleAuth({
+        scopes: "https://www.googleapis.com/auth/cloud-platform"
+      });
+      const client = await auth.getClient();
+      const token = await client.getAccessToken();
+      return token.token as string;
+    });
+
     //
     const codeAgent = createAgent<AgentState>({
       name: "code-agent",
@@ -64,7 +75,7 @@ export const codeAgentFunction = inngest.createFunction(
       system: PROMPT,
       model: openai({
         model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.VERTEX_AI_ACCESS_TOKEN,
+        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
         baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
         defaultParameters: {
           temperature: 0.1,
@@ -199,7 +210,7 @@ export const codeAgentFunction = inngest.createFunction(
       system: FRAGMENT_TITLE_PROMPT,
       model: openai({
         model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.VERTEX_AI_ACCESS_TOKEN,
+        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
         baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
       }),
     })
@@ -210,7 +221,7 @@ export const codeAgentFunction = inngest.createFunction(
       system: RESPONSE_PROMPT,
       model: openai({
         model: "google/gemini-3.1-pro-preview",
-        apiKey: process.env.VERTEX_AI_ACCESS_TOKEN,
+        apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
         baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
       }),
     });

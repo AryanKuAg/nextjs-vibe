@@ -84,24 +84,7 @@ export const codeAgentFunction = inngest.createFunction(
       model: openai({
         model: "gemini-3.1-pro-preview",
         apiKey: accessToken,
-        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`, defaultParameters: {
-          temperature: 1,
-          top_p: 0.95,
-          max_tokens: 65535,
-          seed: 0,
-          generationConfig: {
-            thinkingConfig: {
-              thinkingLevel: "HIGH"
-            }
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
-          ]
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
       }),
       tools: [
         createTool({
@@ -235,24 +218,6 @@ export const codeAgentFunction = inngest.createFunction(
         apiKey: accessToken,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
-        defaultParameters: {
-          temperature: 1,
-          top_p: 0.95,
-          max_tokens: 65535,
-          seed: 0,
-          generationConfig: {
-            thinkingConfig: {
-              thinkingLevel: "HIGH"
-            }
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
-          ]
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
       }),
     })
 
@@ -265,24 +230,7 @@ export const codeAgentFunction = inngest.createFunction(
         apiKey: accessToken,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         baseUrl: `https://${location}-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/endpoints/openapi`,
-        defaultParameters: {
-          temperature: 1,
-          top_p: 0.95,
-          max_tokens: 65535,
-          seed: 0,
-          generationConfig: {
-            thinkingConfig: {
-              thinkingLevel: "HIGH"
-            }
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
-          ]
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+
       }),
     });
 

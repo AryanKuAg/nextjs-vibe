@@ -82,10 +82,25 @@ export const codeAgentFunction = inngest.createFunction(
       model: openai({
         model: "google/gemini-3.1-pro-preview",
         apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
+        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
         defaultParameters: {
-          temperature: 0.1,
-        },
+          temperature: 1,
+          top_p: 0.95,
+          max_tokens: 65535,
+          seed: 0,
+          generationConfig: {
+            thinkingConfig: {
+              thinkingLevel: "HIGH"
+            }
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
+          ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
       }),
       tools: [
         createTool({
@@ -217,7 +232,25 @@ export const codeAgentFunction = inngest.createFunction(
       model: openai({
         model: "google/gemini-3.1-pro-preview",
         apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
+        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
+        defaultParameters: {
+          temperature: 1,
+          top_p: 0.95,
+          max_tokens: 65535,
+          seed: 0,
+          generationConfig: {
+            thinkingConfig: {
+              thinkingLevel: "HIGH"
+            }
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
+          ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
       }),
     })
 
@@ -228,7 +261,25 @@ export const codeAgentFunction = inngest.createFunction(
       model: openai({
         model: "google/gemini-3.1-pro-preview",
         apiKey: accessToken || process.env.VERTEX_AI_API_KEY,
-        baseUrl: "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/us-central1/endpoints/openapi",
+        baseUrl: "https://global-aiplatform.googleapis.com/v1beta1/projects/spatial-492511/locations/global/endpoints/openapi",
+        defaultParameters: {
+          temperature: 1,
+          top_p: 0.95,
+          max_tokens: 65535,
+          seed: 0,
+          generationConfig: {
+            thinkingConfig: {
+              thinkingLevel: "HIGH"
+            }
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' }
+          ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
       }),
     });
 

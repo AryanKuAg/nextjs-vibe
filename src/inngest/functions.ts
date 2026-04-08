@@ -175,42 +175,28 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
-          name: "createOrUpdateFiles",
-          description: "Create or update files in the sandbox",
+          name: "createOrUpdateFile",
+          description: "Create or update a single file in the sandbox. You can call this tool multiple times in parallel to create multiple files.",
           parameters: z.object({
-            files: z.array(
-              z.object({
-                path: z.string(),
-                content: z.string(),
-              }),
-            ),
+            path: z.string().describe("The relative path of the file (e.g. app/page.tsx)"),
+            content: z.string().describe("The complete content of the file"),
           }),
           handler: async (
-            { files },
-            { step, network }: Tool.Options<AgentState>
+            { path, content },
+            { network }: Tool.Options<AgentState>
           ) => {
-            const stepId = "createOrUpdateFiles-" + files.map(f => f.path).join("-").replace(/[^a-zA-Z0-9-]/g, "").substring(0, 60);
-            const newFiles = await step?.run(stepId, async () => {
-              try {
-                const updatedFiles: Record<string, string> = {};
-                const sandbox = await getSandbox(sandboxId);
-                for (const file of files) {
-                  await sandbox.files.write(file.path, file.content);
-                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
-                  updatedFiles[file.path] = file.content;
-                }
+            try {
+              const sandbox = await getSandbox(sandboxId);
+              await sandbox.files.write(path, content);
+              await sandbox.commands.run(`touch "${path}"`); // Forces inotify event
 
-                return updatedFiles;
-              } catch (e) {
-                return "Error: " + e;
-              }
-            });
-
-            if (typeof newFiles === "object") {
               network.state.data.files = {
                 ...(network.state.data.files || {}),
-                ...newFiles
+                [path]: content
               };
+              return `Successfully updated ${path}`;
+            } catch (e) {
+              return `Error updating ${path}: ` + e;
             }
           }
         }),

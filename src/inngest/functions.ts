@@ -331,19 +331,41 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
 
-          // EACCES FIX: sudo is unreliable in this sandbox — it silently fails, and
-          // the `exit 0` hides it, so .next (root-owned by the template) is never deleted
-          // before npm run build fires.
-          //
-          // Real fix: point Next.js's build cache to /tmp/nextbuild via `distDir`.
-          // /tmp is always world-writable. No sudo, no chown, no race conditions.
-          await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && printf '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", distDir: "/tmp/nextbuild", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;\n' > next.config.mjs`);
+          // Step 1: Fix npm cache + .next ownership — TARGETED chown only on the two
+          // directories that get root-owned by the E2B template setup.
+          // Scoping to ~/.npm and ~/.next only (not all of /home/user) means this
+          // runs in milliseconds instead of timing out over node_modules.
+          // After chown, user can delete .next normally without sudo.
+          await sandbox.commands.run(
+            "sudo chown -R $(whoami) ~/.npm 2>/dev/null || true; " +
+            "sudo chown -R $(whoami) ~/.next 2>/dev/null || true; " +
+            "rm -rf ~/.next"
+          );
 
-          // Clean any prior /tmp/nextbuild so we always get a fresh cache
+          // Step 2: Delete any conflicting Next.js config files
+          await sandbox.commands.run("rm -f next.config.ts next.config.js next.config.mjs");
+
+          // Step 3: Write next.config.mjs using the E2B file API (reliable, no shell escaping issues)
+          await sandbox.files.write(
+            "next.config.mjs",
+            [
+              `/** @type {import('next').NextConfig} */`,
+              `const nextConfig = {`,
+              `  output: "export",`,
+              `  distDir: "/tmp/nextbuild",`,
+              `  images: { unoptimized: true },`,
+              `  eslint: { ignoreDuringBuilds: true },`,
+              `  typescript: { ignoreBuildErrors: true },`,
+              `};`,
+              `export default nextConfig;`,
+            ].join("\n")
+          );
+
+          // Step 4: Clean any prior /tmp/nextbuild so we always start fresh
           await sandbox.commands.run("rm -rf /tmp/nextbuild");
 
-          // Run the build. If this fails, E2B throws with stderr/stdout attached.
-          await sandbox.commands.run("npm run build");
+          // Step 5: Run the build.
+          await sandbox.commands.run("NEXT_TELEMETRY_DISABLED=1 npm run build");
 
           return { success: true, error: "" };
         } catch (buildErr: unknown) {

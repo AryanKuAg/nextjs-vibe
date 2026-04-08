@@ -142,7 +142,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: geminiVertexKey("gemini-3-flash-preview"),
+      model: geminiVertexKey("gemini-3.1-pro-preview"),
       tools: [
         createTool({
           name: "terminal",
@@ -175,28 +175,36 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
-          name: "createOrUpdateFile",
-          description: "Create or update a single file in the sandbox. You can call this tool multiple times in parallel to create multiple files.",
+          name: "createOrUpdateFiles",
+          description: "Create or update files in the sandbox",
           parameters: z.object({
-            path: z.string().describe("The relative path of the file (e.g. app/page.tsx)"),
-            content: z.string().describe("The complete content of the file"),
+            files: z.array(
+              z.object({
+                path: z.string(),
+                content: z.string(),
+              }),
+            ),
           }),
           handler: async (
-            { path, content },
+            { files },
             { network }: Tool.Options<AgentState>
           ) => {
             try {
+              const updatedFiles: Record<string, string> = {};
               const sandbox = await getSandbox(sandboxId);
-              await sandbox.files.write(path, content);
-              await sandbox.commands.run(`touch "${path}"`); // Forces inotify event
+              for (const file of files) {
+                await sandbox.files.write(file.path, file.content);
+                await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
+                updatedFiles[file.path] = file.content;
+              }
 
               network.state.data.files = {
                 ...(network.state.data.files || {}),
-                [path]: content
+                ...updatedFiles
               };
-              return `Successfully updated ${path}`;
+              return `Successfully updated files`;
             } catch (e) {
-              return `Error updating ${path}: ` + e;
+              return "Error: " + e;
             }
           }
         }),

@@ -62,9 +62,32 @@ export const codeAgentFunction = inngest.createFunction(
   { id: "code-agent" },
   { event: "code-agent/run" },
   async ({ event, step }) => {
+    const project = await step.run("get-project", async () => {
+      return await prisma.project.findUnique({
+        where: { id: event.data.projectId }
+      });
+    });
+
     const sandboxId = await step.run("get-sandbox-id", async () => {
-      const sandbox = await Sandbox.create("vibe-nextjs-alemantrix");
-      await sandbox.setTimeout(SANDBOX_TIMEOUT);
+      let sandbox;
+      if (project?.sandboxId) {
+        try {
+          sandbox = await Sandbox.connect(project.sandboxId);
+        } catch (e) {
+          console.log("Existing sandbox expired, creating new one.");
+        }
+      }
+
+      if (!sandbox) {
+        sandbox = await Sandbox.create("vibe-nextjs-alemantrix");
+        await sandbox.setTimeout(SANDBOX_TIMEOUT);
+        
+        await prisma.project.update({
+          where: { id: event.data.projectId },
+          data: { sandboxId: sandbox.sandboxId }
+        });
+      }
+
       return sandbox.sandboxId;
     });
 
@@ -291,6 +314,40 @@ export const codeAgentFunction = inngest.createFunction(
       output: responseOutput
     } = await responseGenerator.run(finalSummary);
 
+    const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
+      try {
+        const sandbox = await getSandbox(sandboxId);
+        
+        // 1. Inject export config ignoring typical lint/ts errors
+        await sandbox.commands.run(`echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
+        
+        // 2. Build the app
+        await sandbox.commands.run("npm run build");
+        
+        // 3. Zip the output
+        await sandbox.commands.run("cd out && zip -r ../out.zip .");
+        
+        // 4. E2B SDK doesn't natively parse zip files across boundaries cleanly, so we deploy directly from inside the sandbox using curl
+        const cfToken = process.env.CLOUDFLARE_API_TOKEN;
+        const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+        if (!cfToken || !cfAccountId) return null;
+
+        const projectName = `vibe-${event.data.projectId.substring(0, 15)}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
+
+        // Create Project via Curl internally
+        await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
+
+        // Upload Direct to Cloudflare Pages
+        const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@out.zip"`);
+
+        const deploymentData = JSON.parse(uploadResult.stdout);
+        return deploymentData.result?.url || null;
+      } catch (e) {
+        console.error("Cloudflare Deploy err", e);
+        return null; // Gracefully fallback to standard viewer if CF fails
+      }
+    });
+
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
       const sandbox = await getSandbox(sandboxId);
       const host = sandbox.getHost(3000);
@@ -307,6 +364,7 @@ export const codeAgentFunction = inngest.createFunction(
           fragment: {
             create: {
               sandboxUrl: sandboxUrl,
+              deploymentUrl: deploymentUrl,
               title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
               files: result.state.data.files || {},
             },

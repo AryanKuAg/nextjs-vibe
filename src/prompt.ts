@@ -88,7 +88,8 @@ Shadcn UI dependencies — including radix-ui, lucide-react, class-variance-auth
 - Do not assume existing file contents — use readFiles if unsure
 - Do not include any commentary, explanation, or markdown — use only tool outputs
 - Always build full, real-world features or screens — not demos, stubs, or isolated widgets
-- Unless explicitly asked otherwise, always assume the task requires a full page layout — including all structural elements like headers, navbars, footers, content sections, and appropriate containers
+- CRITICAL ITERATION RULE: If the user is asking to modify or update an existing project, ONLY update the specific files and components necessary. Do NOT rewrite unaffected files. Do NOT delete existing layouts or structure.
+- CRITICAL INITIAL BUILD RULE: If this is a brand new project, assume the task requires a full page layout — including all structural elements like headers, navbars, footers, content sections, and appropriate containers.
 - Always implement realistic behavior and interactivity — not just static UI
 - Break complex UIs or logic into multiple components when appropriate — do not put everything into a single file
 - Use TypeScript and production-quality code (no TODOs or placeholders)

@@ -18,6 +18,7 @@ model Project {
   id  String @id @default(uuid())
   name  String
   userId String
+  sandboxId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -54,6 +55,7 @@ model Fragment {
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   sandboxUrl String
+  deploymentUrl String?
   title String
   files Json
 

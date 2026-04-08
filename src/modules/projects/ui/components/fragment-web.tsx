@@ -18,10 +18,13 @@ export function FragmentWeb({ data }: Props) {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(data.sandboxUrl);
+    const urlToCopy = data.deploymentUrl || data.sandboxUrl;
+    navigator.clipboard.writeText(urlToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const displayUrl = data.deploymentUrl || data.sandboxUrl;
 
   return (
     <div className="flex flex-col w-full h-full">
@@ -36,22 +39,25 @@ export function FragmentWeb({ data }: Props) {
             size="sm" 
             variant="outline" 
             onClick={handleCopy}
-            disabled={!data.sandboxUrl || copied}
+            disabled={!displayUrl || copied}
             className="flex-1 justify-start text-start font-normal"
           >
             <span className="truncate">
-              {data.sandboxUrl}
+              {displayUrl}
             </span>
           </Button>
         </Hint>
+        {data.deploymentUrl && (
+            <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full font-medium ml-2">Permanent</span>
+        )}
         <Hint text="Open in a new tab" side="bottom" align="start">
           <Button
             size="sm"
-            disabled={!data.sandboxUrl}
+            disabled={!displayUrl}
             variant="outline"
             onClick={() => {
-              if (!data.sandboxUrl) return;
-              window.open(data.sandboxUrl, "_blank");
+              if (!displayUrl) return;
+              window.open(displayUrl, "_blank");
             }}
           >
             <ExternalLinkIcon />
@@ -63,7 +69,7 @@ export function FragmentWeb({ data }: Props) {
         className="h-full w-full"
         sandbox="allow-forms allow-scripts allow-same-origin"
         loading="lazy"
-        src={data.sandboxUrl}
+        src={displayUrl}
       />
     </div>
   )

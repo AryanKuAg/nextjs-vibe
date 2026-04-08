@@ -320,7 +320,19 @@ export const codeAgentFunction = inngest.createFunction(
 
         console.log("DEBUG: Building app inside sandbox...");
         await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
-        await sandbox.commands.run("npm run build");
+        console.log("DEBUG: Running 'npm run build'...");
+        try {
+          // We wrap the build in its own try/catch to capture the exact Next.js error
+          await sandbox.commands.run("npm run build");
+        } catch (buildErr: any) {
+          console.error("DEBUG: Next.js Build CRASHED!");
+          // E2B attaches the terminal output to the error object. This will tell us exactly what code the AI broke.
+          console.error("DEBUG: Build stdout:", buildErr.stdout || buildErr.results?.stdout);
+          console.error("DEBUG: Build stderr:", buildErr.stderr || buildErr.results?.stderr);
+          return null; // Stop the deployment process
+        }
+
+        console.log("DEBUG: Build successful! Zipping output...");
         await sandbox.commands.run("cd out && zip -r ../out.zip .");
 
         const cfToken = process.env.CLOUDFLARE_API_TOKEN;

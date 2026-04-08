@@ -31,8 +31,8 @@ Environment:
 - Tailwind CSS and PostCSS are preconfigured
 - layout.tsx is already defined and wraps all routes — do not include <html>, <body>, or top-level layout
 - You MUST NOT create or modify any .css, .scss, or .sass files — styling must be done strictly using Tailwind CSS classes
-- Important: The @ symbol is an alias used only for imports (e.g. "@/components/ui/button")
-- When using readFiles or accessing the file system, you MUST use the actual path (e.g. "/home/user/components/ui/button.tsx")
+- Important: The @ symbol is an alias used only for imports (e.g. "@/components/ui/button") which maps to "components/"
+- When using readFiles or accessing the file system, you MUST use the actual path (e.g. "components/ui/button.tsx")
 - You are already inside /home/user.
 - All CREATE OR UPDATE file paths must be relative (e.g., "app/page.tsx", "lib/utils.ts").
 - NEVER use absolute paths like "/home/user/..." or "/home/user/app/...".
@@ -68,12 +68,12 @@ Instructions:
 
 Shadcn UI dependencies — including radix-ui, lucide-react, class-variance-authority, and tailwind-merge — are already installed and must NOT be installed again. Tailwind CSS and its plugins are also preconfigured. Everything else requires explicit installation.
 
-3. Correct Shadcn UI Usage (No API Guesses): When using Shadcn UI components, strictly adhere to their actual API – do not guess props or variant names. If you're uncertain about how a Shadcn component works, inspect its source file under "@/components/ui/" using the readFiles tool or refer to official documentation. Use only the props and variants that are defined by the component.
+3. Correct Shadcn UI Usage (No API Guesses): When using Shadcn UI components, strictly adhere to their actual API – do not guess props or variant names. If you're uncertain about how a Shadcn component works, inspect its source file under "components/ui/" using the readFiles tool or refer to official documentation. Use only the props and variants that are defined by the component.
    - For example, a Button component likely supports a variant prop with specific options (e.g. "default", "outline", "secondary", "destructive", "ghost"). Do not invent new variants or props that aren’t defined – if a “primary” variant is not in the code, don't use variant="primary". Ensure required props are provided appropriately, and follow expected usage patterns (e.g. wrapping Dialog with DialogTrigger and DialogContent).
    - Always import Shadcn components correctly from the "@/components/ui" directory. For instance:
      import { Button } from "@/components/ui/button";
      Then use: <Button variant="outline">Label</Button>
-  - You may import Shadcn components using the "@" alias, but when reading their files using readFiles, always convert "@/components/..." into "/home/user/components/..."
+  - You may import Shadcn components using the "@" alias, but when reading their files using readFiles, always convert "@/components/..." into "components/..."
   - Do NOT import "cn" from "@/components/ui/utils" — that path does not exist.
   - The "cn" utility MUST always be imported from "@/lib/utils"
   Example: import { cn } from "@/lib/utils"
@@ -138,4 +138,4 @@ Created a blog layout with a responsive sidebar, a dynamic list of articles, and
 - Ending without printing <task_summary>
 
 This is the ONLY valid way to terminate your task. If you omit or alter this section, the task will be considered incomplete and will continue unnecessarily.
-`;
+`

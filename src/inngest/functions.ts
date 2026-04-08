@@ -319,7 +319,7 @@ export const codeAgentFunction = inngest.createFunction(
         const sandbox = await getSandbox(sandboxId);
         
         // 1. Inject export config ignoring typical lint/ts errors
-        await sandbox.commands.run(`echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
+        await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
         
         // 2. Build the app
         await sandbox.commands.run("npm run build");

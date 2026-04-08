@@ -68,6 +68,35 @@ export const codeAgentFunction = inngest.createFunction(
       return sandbox.sandboxId;
     });
 
+    const latestFragment = await step.run("get-latest-fragment", async () => {
+      const messageWithFragment = await prisma.message.findFirst({
+        where: { 
+          projectId: event.data.projectId,
+          fragment: { isNot: null }
+        },
+        orderBy: { createdAt: "desc" },
+        include: { fragment: true }
+      });
+      return messageWithFragment?.fragment || null;
+    });
+
+    await step.run("hydrate-sandbox", async () => {
+      if (latestFragment && latestFragment.files) {
+        const sandbox = await getSandbox(sandboxId);
+        const filesObj = latestFragment.files as Record<string, string>;
+        
+        for (const [path, content] of Object.entries(filesObj)) {
+          if (typeof content === "string") {
+            try {
+              await sandbox.files.write(path, content);
+            } catch (e) {
+              console.error(`Failed to hydrate file ${path}`, e);
+            }
+          }
+        }
+      }
+    });
+
     const previousMessages = await step.run("get-previous-messages", async () => {
       const formattedMessages: Message[] = [];
 
@@ -92,10 +121,15 @@ export const codeAgentFunction = inngest.createFunction(
       return formattedMessages.reverse();
     });
 
+    let initialFiles = {};
+    if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
+      initialFiles = latestFragment.files;
+    }
+
     const state = createState<AgentState>(
       {
         summary: "",
-        files: {},
+        files: initialFiles as Record<string, string>,
       },
       {
         messages: previousMessages,
@@ -246,16 +280,17 @@ export const codeAgentFunction = inngest.createFunction(
       model: geminiVertexKey("gemini-3-flash-preview"),
     });
 
+    let finalSummary = result.state.data.summary;
+    if (!finalSummary) {
+      finalSummary = "Action completed specifically.";
+    }
+
     const {
-      output: fragmentTitleOuput
-    } = await fragmentTitleGenerator.run(result.state.data.summary);
+      output: fragmentTitleOutput
+    } = await fragmentTitleGenerator.run(finalSummary);
     const {
       output: responseOutput
-    } = await responseGenerator.run(result.state.data.summary);
-
-    const isError =
-      !result.state.data.summary ||
-      Object.keys(result.state.data.files || {}).length === 0;
+    } = await responseGenerator.run(finalSummary);
 
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
       const sandbox = await getSandbox(sandboxId);
@@ -264,32 +299,21 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     await step.run("save-result", async () => {
-      if (isError) {
-        return await prisma.message.create({
-          data: {
-            projectId: event.data.projectId,
-            content: "Something went wrong. Please try again.",
-            role: "ASSISTANT",
-            type: "ERROR",
-          },
-        });
-      }
-
       return await prisma.message.create({
         data: {
           projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput),
+          content: parseAgentOutput(responseOutput) || finalSummary,
           role: "ASSISTANT",
           type: "RESULT",
           fragment: {
             create: {
               sandboxUrl: sandboxUrl,
-              title: parseAgentOutput(fragmentTitleOuput),
-              files: result.state.data.files,
+              title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
+              files: result.state.data.files || {},
             },
           },
         },
-      })
+      });
     });
 
     return {

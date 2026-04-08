@@ -312,9 +312,13 @@ export const codeAgentFunction = inngest.createFunction(
 
           // Wipe the stale .next cache — if a previous build ran as root (or a different user),
           // the trace file gets locked with EACCES and the next build attempt crashes immediately.
-          await sandbox.commands.run("sudo rm -rf .next");
+          // 1. Force ownership of all files back to the default E2B 'user'
+          await sandbox.commands.run("sudo chown -R user:user /home/user");
 
-          // Run the build. If this fails, E2B will throw an error with the logs.
+          // 2. Wipe the Next cache and the npm cache using absolute paths just to be safe
+          await sandbox.commands.run("sudo rm -rf /home/user/.next /home/user/node_modules/.cache");
+
+          // 3. Run the build. If this fails, E2B will throw an error with the logs.
           await sandbox.commands.run("npm run build");
 
           return { success: true, error: "" };

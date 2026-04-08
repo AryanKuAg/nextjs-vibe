@@ -310,6 +310,10 @@ export const codeAgentFunction = inngest.createFunction(
 
           await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
 
+          // Wipe the stale .next cache — if a previous build ran as root (or a different user),
+          // the trace file gets locked with EACCES and the next build attempt crashes immediately.
+          await sandbox.commands.run("sudo rm -rf .next");
+
           // Run the build. If this fails, E2B will throw an error with the logs.
           await sandbox.commands.run("npm run build");
 

@@ -28,7 +28,7 @@ function geminiVertexKey(modelName: string) {
     if (originalOnCall) {
       originalOnCall(options, body);
     }
-    
+
     // Gemini 3 preview models enforce cryptographic thoughtSignatures on all past function calls.
     // Inngest agent-kit drops these signatures when formatting generic messages.
     // To bypass the 400 ERROR, we flatten all historical function calls into conversational text.
@@ -81,7 +81,7 @@ export const codeAgentFunction = inngest.createFunction(
       if (!sandbox) {
         sandbox = await Sandbox.create("vibe-nextjs-alemantrix");
         await sandbox.setTimeout(SANDBOX_TIMEOUT);
-        
+
         await prisma.project.update({
           where: { id: event.data.projectId },
           data: { sandboxId: sandbox.sandboxId }
@@ -93,7 +93,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const latestFragment = await step.run("get-latest-fragment", async () => {
       const messageWithFragment = await prisma.message.findFirst({
-        where: { 
+        where: {
           projectId: event.data.projectId,
           fragment: { isNot: null }
         },
@@ -107,7 +107,7 @@ export const codeAgentFunction = inngest.createFunction(
       if (latestFragment && latestFragment.files) {
         const sandbox = await getSandbox(sandboxId);
         const filesObj = latestFragment.files as Record<string, string>;
-        
+
         for (const [path, content] of Object.entries(filesObj)) {
           if (typeof content === "string") {
             try {
@@ -165,7 +165,7 @@ export const codeAgentFunction = inngest.createFunction(
       name: "code-agent",
       description: "An expert coding agent",
       system: PROMPT,
-      model: geminiVertexKey("gemini-3.1-pro-preview"),
+      model: geminiVertexKey("gemini-3.1-flash-lite-preview"),
       tools: [
         createTool({
           name: "terminal",
@@ -317,16 +317,16 @@ export const codeAgentFunction = inngest.createFunction(
     const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
       try {
         const sandbox = await getSandbox(sandboxId);
-        
+
         // 1. Inject export config ignoring typical lint/ts errors
         await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
-        
+
         // 2. Build the app
         await sandbox.commands.run("npm run build");
-        
+
         // 3. Zip the output
         await sandbox.commands.run("cd out && zip -r ../out.zip .");
-        
+
         // 4. E2B SDK doesn't natively parse zip files across boundaries cleanly, so we deploy directly from inside the sandbox using curl
         const cfToken = process.env.CLOUDFLARE_API_TOKEN;
         const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -341,7 +341,12 @@ export const codeAgentFunction = inngest.createFunction(
         const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@out.zip"`);
 
         const deploymentData = JSON.parse(uploadResult.stdout);
-        return deploymentData.result?.url || null;
+        if (deploymentData.success) {
+          return `https://${projectName}.pages.dev`;
+        } else {
+          console.error("Cloudflare deploy failed:", deploymentData.errors);
+          return null;
+        }
       } catch (e) {
         console.error("Cloudflare Deploy err", e);
         return null; // Gracefully fallback to standard viewer if CF fails
@@ -374,7 +379,9 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     return {
-      url: sandboxUrl,
+      url: deploymentUrl || sandboxUrl,
+      deploymentUrl: deploymentUrl,
+      sandboxUrl: sandboxUrl,
       title: "Fragment",
       files: result.state.data.files,
       summary: result.state.data.summary,

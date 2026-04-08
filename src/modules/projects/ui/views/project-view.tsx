@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { Suspense, useState } from "react";
-import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
+import { Suspense, useState, useTransition } from "react";
+import { EyeIcon, CodeIcon, CrownIcon, Download } from "lucide-react";
 
 import { Fragment } from "@/generated/prisma";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,33 @@ export const ProjectView = ({ projectId }: Props) => {
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
+  const [isDownloading, startTransition] = useTransition();
+
+  const handleDownloadZip = () => {
+    if (!activeFragment?.files) return;
+    
+    startTransition(async () => {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      const files = activeFragment.files as { [path: string]: string };
+      Object.entries(files).forEach(([path, content]) => {
+        zip.file(path, content);
+      });
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `project-${projectId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  };
 
   return (
     <div className="h-screen">
@@ -75,6 +102,16 @@ export const ProjectView = ({ projectId }: Props) => {
                   <CodeIcon /> <span>Code</span>
                 </TabsTrigger>
               </TabsList>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 rounded-md px-3"
+                onClick={handleDownloadZip}
+                disabled={!activeFragment?.files || isDownloading}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isDownloading ? "Zipping..." : "Download ZIP"}
+              </Button>
               <div className="ml-auto flex items-center gap-x-2">
                 {!hasProAccess && (
                   <Button asChild size="sm" variant="tertiary">

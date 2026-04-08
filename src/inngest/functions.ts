@@ -314,10 +314,14 @@ export const codeAgentFunction = inngest.createFunction(
           await sandbox.commands.run("npm run build");
 
           return { success: true, error: "" };
-        } catch (buildErr: any) {
+        } catch (buildErr: unknown) {
+          // Properly cast the unknown error to an object so TypeScript is happy
+          const err = buildErr as { stderr?: string; stdout?: string; message?: string };
+
           // Extract the exact error message from Next.js
-          const errorLog = buildErr.stderr || buildErr.stdout || buildErr.message || "Unknown build error";
+          const errorLog = err.stderr || err.stdout || err.message || "Unknown build error";
           console.error("DEBUG: Build failed with error:", errorLog.substring(0, 500)); // Log a snippet
+
           return { success: false, error: errorLog };
         }
       });

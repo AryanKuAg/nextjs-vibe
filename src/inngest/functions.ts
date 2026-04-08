@@ -194,15 +194,23 @@ export const codeAgentFunction = inngest.createFunction(
 
               try {
                 const sandbox = await getSandbox(sandboxId);
-                const result = await sandbox.commands.run(command, {
-                  onStdout: (data: string) => {
-                    buffers.stdout += data;
-                  },
-                  onStderr: (data: string) => {
-                    buffers.stderr += data;
+                // timeoutMs: 0 disables the E2B deadline entirely so long-running
+                // commands (npm install, builds, etc.) never get killed mid-flight.
+                // We wrap the command with `yes |` to auto-answer any interactive
+                // prompts (e.g. "overwrite? y/N") so the AI never hangs.
+                const result = await sandbox.commands.run(
+                  `yes 2>/dev/null | (${command})`,
+                  {
+                    timeoutMs: 0,
+                    onStdout: (data: string) => {
+                      buffers.stdout += data;
+                    },
+                    onStderr: (data: string) => {
+                      buffers.stderr += data;
+                    }
                   }
-                });
-                return result.stdout;
+                );
+                return result.stdout || "(done, no output)";
               } catch (e) {
                 console.error(
                   `Command failed: ${e} \nstdout: ${buffers.stdout}\nstderror: ${buffers.stderr}`,

@@ -318,38 +318,42 @@ export const codeAgentFunction = inngest.createFunction(
       try {
         const sandbox = await getSandbox(sandboxId);
 
-        // 1. Inject export config ignoring typical lint/ts errors
+        console.log("DEBUG: Building app inside sandbox...");
         await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
-
-        // 2. Build the app
         await sandbox.commands.run("npm run build");
-
-        // 3. Zip the output
         await sandbox.commands.run("cd out && zip -r ../out.zip .");
 
-        // 4. E2B SDK doesn't natively parse zip files across boundaries cleanly, so we deploy directly from inside the sandbox using curl
         const cfToken = process.env.CLOUDFLARE_API_TOKEN;
         const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-        if (!cfToken || !cfAccountId) return null;
+
+        if (!cfToken || !cfAccountId) {
+          console.error("DEBUG: Missing Cloudflare tokens! Aborting deploy.");
+          return null;
+        }
 
         const projectName = `vibe-${event.data.projectId.substring(0, 15)}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
-        // Create Project via Curl internally
+        console.log(`DEBUG: Creating CF project: ${projectName}`);
         await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
 
-        // Upload Direct to Cloudflare Pages
+        console.log("DEBUG: Uploading zip to CF...");
         const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@out.zip"`);
 
+        console.log("DEBUG: Raw CF Response stdout:", uploadResult.stdout);
+        console.log("DEBUG: Raw CF Response stderr:", uploadResult.stderr);
+
         const deploymentData = JSON.parse(uploadResult.stdout);
+
         if (deploymentData.success) {
+          console.log("DEBUG: Deploy successful!");
           return `https://${projectName}.pages.dev`;
         } else {
-          console.error("Cloudflare deploy failed:", deploymentData.errors);
+          console.error("DEBUG: Cloudflare deploy failed:", deploymentData.errors);
           return null;
         }
       } catch (e) {
-        console.error("Cloudflare Deploy err", e);
-        return null; // Gracefully fallback to standard viewer if CF fails
+        console.error("DEBUG: Cloudflare Deploy catch block err:", e);
+        return null;
       }
     });
 

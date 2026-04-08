@@ -189,13 +189,14 @@ export const codeAgentFunction = inngest.createFunction(
             { files },
             { step, network }: Tool.Options<AgentState>
           ) => {
-            const newFiles = await step?.run("createOrUpdateFiles", async () => {
+            const stepId = "createOrUpdateFiles-" + files.map(f => f.path).join("-").replace(/[^a-zA-Z0-9-]/g, "").substring(0, 60);
+            const newFiles = await step?.run(stepId, async () => {
               try {
-                const updatedFiles = network.state.data.files || {};
+                const updatedFiles: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
                 for (const file of files) {
                   await sandbox.files.write(file.path, file.content);
-                  await sandbox.commands.run(`touch "${file.path}"`);
+                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
                   updatedFiles[file.path] = file.content;
                 }
 
@@ -206,7 +207,10 @@ export const codeAgentFunction = inngest.createFunction(
             });
 
             if (typeof newFiles === "object") {
-              network.state.data.files = newFiles;
+              network.state.data.files = {
+                ...(network.state.data.files || {}),
+                ...newFiles
+              };
             }
           }
         }),

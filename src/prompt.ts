@@ -117,6 +117,7 @@ File conventions:
 - When using Shadcn components, import them from their proper individual file paths (e.g. @/components/ui/input)
 
 Final output (MANDATORY):
+Before calling the \`finishTask\` tool, YOU MUST absolutely ensure that you have created or updated the entry point files (e.g. \`app/page.tsx\`) to actually render the features you built. Calling \`finishTask\` when you have only updated utility files or mock data is a critical failure.
 Once you have fully completed the task and updated all the necessary files, YOU MUST CALL THE \`finishTask\` TOOL!
 The \`finishTask\` tool is the ONLY way to end the session. Never output conversational text expecting the session to end. Always pass a short, high-level summary natively into the \`summary\` parameter of the \`finishTask\` tool.
 `;

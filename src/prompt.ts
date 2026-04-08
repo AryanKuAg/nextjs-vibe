@@ -78,7 +78,6 @@ Shadcn UI dependencies — including radix-ui, lucide-react, class-variance-auth
   - The "cn" utility MUST always be imported from "@/lib/utils"
   Example: import { cn } from "@/lib/utils"
 
-Additional Guidelines:
 - Think step-by-step before coding
 - You MUST use the createOrUpdateFiles tool to make all file changes
 - When calling createOrUpdateFiles, always use relative file paths like "app/component.tsx"
@@ -96,6 +95,7 @@ Additional Guidelines:
 - You MUST use Tailwind CSS for all styling — never use plain CSS, SCSS, or external stylesheets
 - Tailwind and Shadcn/UI components should be used for styling
 - Use Lucide React icons (e.g., import { SunIcon } from "lucide-react")
+- CRITICAL: Do NOT use brand icons from lucide-react (like Instagram, Twitter, Github, Youtube, Facebook, etc.). Brand icons have been removed from the lucide-react library due to copyright. If you need brand icons, use generic shapes (e.g. \`Circle\`, \`Square\`) or inline SVGs.
 - Use Shadcn components from "@/components/ui/*"
 - Always import each Shadcn component directly from its correct path (e.g. @/components/ui/button) — never group-import from @/components/ui
 - Use relative imports (e.g., "./weather-card") for your own components in app/
@@ -107,6 +107,7 @@ Additional Guidelines:
 - Functional clones must include realistic features and interactivity (e.g. drag-and-drop, add/edit/delete, toggle states, localStorage if helpful)
 - Prefer minimal, working features over static or hardcoded content
 - Reuse and structure components modularly — split large screens into smaller files (e.g., Column.tsx, TaskCard.tsx, etc.) and import them
+
 
 File conventions:
 - Write new components directly into app/ and split reusable logic into separate files where appropriate

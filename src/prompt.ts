@@ -41,6 +41,8 @@ Environment:
 
 File Safety Rules:
 - ALWAYS add "use client" to the TOP, THE FIRST LINE of app/page.tsx and any other relevant files which use browser APIs or react hooks
+- PREVENT HYDRATION ERRORS: NEVER render random values (e.g. \`Math.random()\`), current dates (e.g. \`new Date()\`), or browser APIs (e.g. \`window.innerWidth\`) directly in the JSX during the initial render. If you must use dynamic browser values, wait until the component mounts by using a \`useEffect\` hook!
+- DO NOT nest block DOM elements (like \`<div>\`) inside inline elements (like \`<p>\`), as this will immediately trigger a React Hydration error.
 
 Runtime Execution (CRITICAL - NEVER VIOLATE):
 - The development server is ALREADY running on port 3000 with hot reload enabled.

@@ -73,7 +73,7 @@ export const codeAgentFunction = inngest.createFunction(
       if (project?.sandboxId) {
         try {
           sandbox = await Sandbox.connect(project.sandboxId);
-        } catch (e) {
+        } catch {
           console.log("Existing sandbox expired, creating new one.");
         }
       }

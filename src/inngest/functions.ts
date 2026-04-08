@@ -324,11 +324,12 @@ export const codeAgentFunction = inngest.createFunction(
         try {
           // We wrap the build in its own try/catch to capture the exact Next.js error
           await sandbox.commands.run("npm run build");
-        } catch (buildErr: any) {
+        } catch (buildErr) {
           console.error("DEBUG: Next.js Build CRASHED!");
           // E2B attaches the terminal output to the error object. This will tell us exactly what code the AI broke.
-          console.error("DEBUG: Build stdout:", buildErr.stdout || buildErr.results?.stdout);
-          console.error("DEBUG: Build stderr:", buildErr.stderr || buildErr.results?.stderr);
+          const err = buildErr as Record<string, unknown>;
+          console.error("DEBUG: Build stdout:", err.stdout || err.results);
+          console.error("DEBUG: Build stderr:", err.stderr);
           return null; // Stop the deployment process
         }
 

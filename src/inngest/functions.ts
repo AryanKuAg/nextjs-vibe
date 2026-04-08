@@ -286,7 +286,56 @@ export const codeAgentFunction = inngest.createFunction(
       },
     });
 
-    const result = await network.run(event.data.value, { state });
+    // const result = await network.run(event.data.value, { state });
+
+    let isBuildSuccessful = false;
+    const maxRetries = 2; // Allow the AI up to 2 chances to fix its own code
+    let attempt = 0;
+    let currentPrompt = event.data.value; // Starts with the user's initial prompt
+    let finalSummary = "";
+    let finalFiles = state.data.files;
+
+    // --- THE SELF-HEALING LOOP ---
+    while (!isBuildSuccessful && attempt <= maxRetries) {
+      // 1. Let the AI generate or fix the code
+      const result = await network.run(currentPrompt, { state });
+      finalSummary = result.state.data.summary || "Action completed specifically.";
+      finalFiles = result.state.data.files;
+
+      // 2. Verify the build in an isolated step
+      const buildCheck = await step.run(`verify-build-attempt-${attempt}`, async () => {
+        try {
+          const sandbox = await getSandbox(sandboxId);
+          console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
+
+          await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
+
+          // Run the build. If this fails, E2B will throw an error with the logs.
+          await sandbox.commands.run("npm run build");
+
+          return { success: true, error: "" };
+        } catch (buildErr: any) {
+          // Extract the exact error message from Next.js
+          const errorLog = buildErr.stderr || buildErr.stdout || buildErr.message || "Unknown build error";
+          console.error("DEBUG: Build failed with error:", errorLog.substring(0, 500)); // Log a snippet
+          return { success: false, error: errorLog };
+        }
+      });
+
+      if (buildCheck.success) {
+        isBuildSuccessful = true; // The code works! Break out of the loop.
+      } else {
+        attempt++;
+        if (attempt <= maxRetries) {
+          console.log(`DEBUG: Feeding error back to AI for fix (Attempt ${attempt})...`);
+          // Set the prompt for the next iteration to be the error log
+          currentPrompt = `The Next.js build failed with the following error:\n\n${buildCheck.error}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
+
+          // CRITICAL: We must clear the summary from the state, otherwise the router will think the agent is already done and skip the fix!
+          state.data.summary = "";
+        }
+      }
+    }
 
     const fragmentTitleGenerator = createAgent({
       name: "fragment-title-generator",
@@ -302,10 +351,6 @@ export const codeAgentFunction = inngest.createFunction(
       model: geminiVertexKey("gemini-3-flash-preview"),
     });
 
-    let finalSummary = result.state.data.summary;
-    if (!finalSummary) {
-      finalSummary = "Action completed specifically.";
-    }
 
     const {
       output: fragmentTitleOutput
@@ -315,57 +360,42 @@ export const codeAgentFunction = inngest.createFunction(
     } = await responseGenerator.run(finalSummary);
 
     const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
+      // If the AI failed to fix the code after max retries, abort the deployment
+      if (!isBuildSuccessful) {
+        console.error("DEBUG: AI failed to fix the build after max retries. Aborting Cloudflare deploy.");
+        return null;
+      }
+
       try {
         const sandbox = await getSandbox(sandboxId);
 
-        console.log("DEBUG: Building app inside sandbox...");
-        await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
-        console.log("DEBUG: Running 'npm run build'...");
-        try {
-          // We wrap the build in its own try/catch to capture the exact Next.js error
-          await sandbox.commands.run("npm run build");
-        } catch (buildErr) {
-          console.error("DEBUG: Next.js Build CRASHED!");
-          // E2B attaches the terminal output to the error object. This will tell us exactly what code the AI broke.
-          const err = buildErr as Record<string, unknown>;
-          console.error("DEBUG: Build stdout:", err.stdout || err.results);
-          console.error("DEBUG: Build stderr:", err.stderr);
-          return null; // Stop the deployment process
-        }
-
-        console.log("DEBUG: Build successful! Zipping output...");
+        console.log("DEBUG: Zipping out folder...");
+        // Guarantee zip is installed so it doesn't crash here
+        await sandbox.commands.run("sudo apt-get update && sudo apt-get install -y zip");
         await sandbox.commands.run("cd out && zip -r ../out.zip .");
 
         const cfToken = process.env.CLOUDFLARE_API_TOKEN;
         const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
-        if (!cfToken || !cfAccountId) {
-          console.error("DEBUG: Missing Cloudflare tokens! Aborting deploy.");
-          return null;
-        }
+        if (!cfToken || !cfAccountId) return null;
 
         const projectName = `vibe-${event.data.projectId.substring(0, 15)}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
-        console.log(`DEBUG: Creating CF project: ${projectName}`);
         await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
 
-        console.log("DEBUG: Uploading zip to CF...");
         const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@out.zip"`);
-
-        console.log("DEBUG: Raw CF Response stdout:", uploadResult.stdout);
-        console.log("DEBUG: Raw CF Response stderr:", uploadResult.stderr);
 
         const deploymentData = JSON.parse(uploadResult.stdout);
 
         if (deploymentData.success) {
-          console.log("DEBUG: Deploy successful!");
+          console.log("DEBUG: Cloudflare Deploy successful!");
           return `https://${projectName}.pages.dev`;
         } else {
           console.error("DEBUG: Cloudflare deploy failed:", deploymentData.errors);
           return null;
         }
       } catch (e) {
-        console.error("DEBUG: Cloudflare Deploy catch block err:", e);
+        console.error("DEBUG: Cloudflare Deploy infra err:", e);
         return null;
       }
     });
@@ -388,7 +418,7 @@ export const codeAgentFunction = inngest.createFunction(
               sandboxUrl: sandboxUrl,
               deploymentUrl: deploymentUrl,
               title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
-              files: result.state.data.files || {},
+              files: finalFiles || {},
             },
           },
         },
@@ -400,8 +430,8 @@ export const codeAgentFunction = inngest.createFunction(
       deploymentUrl: deploymentUrl,
       sandboxUrl: sandboxUrl,
       title: "Fragment",
-      files: result.state.data.files,
-      summary: result.state.data.summary,
+      files: finalFiles,
+      summary: finalSummary,
     };
   },
 );

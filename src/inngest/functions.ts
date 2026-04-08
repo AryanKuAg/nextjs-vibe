@@ -7,7 +7,7 @@ import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
-import { getSandbox, parseAgentOutput } from "./utils";
+import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
 function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
@@ -221,19 +221,22 @@ export const codeAgentFunction = inngest.createFunction(
               }
             })
           },
-        }),
-        createTool({
-          name: "finishTask",
-          description: "Call this tool IMMEDIATELY after you have finished making all file changes. This marks the task as successfully completed.",
-          parameters: z.object({
-            summary: z.string().describe("A short summary of what was built or changed"),
-          }),
-          handler: async ({ summary }, { network }) => {
-            network.state.data.summary = summary;
-            return "Task marked as finished.";
-          }
         })
       ],
+      lifecycle: {
+        onResponse: async ({ result, network }) => {
+          const lastAssistantMessageText =
+            lastAssistantTextMessageContent(result);
+
+          if (lastAssistantMessageText && network) {
+            if (lastAssistantMessageText.includes("<task_summary>")) {
+              network.state.data.summary = lastAssistantMessageText;
+            }
+          }
+
+          return result;
+        },
+      },
     });
 
     const network = createNetwork<AgentState>({

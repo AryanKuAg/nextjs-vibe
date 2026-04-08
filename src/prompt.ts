@@ -117,7 +117,23 @@ File conventions:
 - When using Shadcn components, import them from their proper individual file paths (e.g. @/components/ui/input)
 
 Final output (MANDATORY):
-Before calling the \`finishTask\` tool, YOU MUST absolutely ensure that you have created or updated the entry point files (e.g. \`app/page.tsx\`) to actually render the features you built. Calling \`finishTask\` when you have only updated utility files or mock data is a critical failure.
-Once you have fully completed the task and updated all the necessary files, YOU MUST CALL THE \`finishTask\` TOOL!
-The \`finishTask\` tool is the ONLY way to end the session. Never output conversational text expecting the session to end. Always pass a short, high-level summary natively into the \`summary\` parameter of the \`finishTask\` tool.
+After ALL tool calls are 100% complete and the task is fully finished, respond with exactly the following format and NOTHING else:
+
+<task_summary>
+A short, high-level summary of what was created or changed.
+</task_summary>
+
+This marks the task as FINISHED. Do not include this early. Do not wrap it in backticks. Do not print it after each step. Print it once, only at the very end — never during or between tool usage.
+
+✅ Example (correct):
+<task_summary>
+Created a blog layout with a responsive sidebar, a dynamic list of articles, and a detail page using Shadcn UI and Tailwind. Integrated the layout in app/page.tsx and added reusable components in app/.
+</task_summary>
+
+❌ Incorrect:
+- Wrapping the summary in backticks
+- Including explanation or code after the summary
+- Ending without printing <task_summary>
+
+This is the ONLY valid way to terminate your task. If you omit or alter this section, the task will be considered incomplete and will continue unnecessarily.
 `;

@@ -323,13 +323,16 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
 
-          await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
+          // EACCES FIX: sudo is unreliable in this sandbox — it silently fails, and
+          // the `exit 0` hides it, so .next (root-owned by the template) is never deleted
+          // before npm run build fires.
+          //
+          // Real fix: point Next.js's build cache to /tmp/nextbuild via `distDir`.
+          // /tmp is always world-writable. No sudo, no chown, no race conditions.
+          await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && printf '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", distDir: "/tmp/nextbuild", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;\n' > next.config.mjs`);
 
-          // EACCES fix: The E2B template pre-creates .next as root during setup.
-          // Chowning all of /home/user (including node_modules) is extremely slow and
-          // often times out before the rm fires, leaving .next still root-owned.
-          // Solution: delete .next directly as root in a single atomic bash command.
-          await sandbox.commands.run("sudo bash -c 'rm -rf /home/user/.next /home/user/out 2>/dev/null; exit 0'");
+          // Clean any prior /tmp/nextbuild so we always get a fresh cache
+          await sandbox.commands.run("rm -rf /tmp/nextbuild");
 
           // Run the build. If this fails, E2B throws with stderr/stdout attached.
           await sandbox.commands.run("npm run build");

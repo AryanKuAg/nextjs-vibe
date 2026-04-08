@@ -195,6 +195,7 @@ export const codeAgentFunction = inngest.createFunction(
                 const sandbox = await getSandbox(sandboxId);
                 for (const file of files) {
                   await sandbox.files.write(file.path, file.content);
+                  await sandbox.commands.run(`touch "${file.path}"`);
                   updatedFiles[file.path] = file.content;
                 }
 

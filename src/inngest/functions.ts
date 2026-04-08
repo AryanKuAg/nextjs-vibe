@@ -100,24 +100,39 @@ export const codeAgentFunction = inngest.createFunction(
         orderBy: { createdAt: "desc" },
         include: { fragment: true }
       });
-      return messageWithFragment?.fragment || null;
+
+      if (!messageWithFragment?.fragment) {
+        console.log("DEBUG: No previous fragment found — this is a first run or all prior runs failed.");
+        return null;
+      }
+
+      return messageWithFragment.fragment;
     });
 
     await step.run("hydrate-sandbox", async () => {
-      if (latestFragment && latestFragment.files) {
-        const sandbox = await getSandbox(sandboxId);
-        const filesObj = latestFragment.files as Record<string, string>;
+      // Skip hydration if there are no previous files (first run or prior failure).
+      // An empty files object {} means nothing useful to seed.
+      const filesObj = latestFragment?.files as Record<string, string> | undefined;
+      const hasFiles = filesObj && typeof filesObj === "object" && Object.keys(filesObj).length > 0;
 
-        for (const [path, content] of Object.entries(filesObj)) {
-          if (typeof content === "string") {
-            try {
-              await sandbox.files.write(path, content);
-            } catch (e) {
-              console.error(`Failed to hydrate file ${path}`, e);
-            }
+      if (!hasFiles) {
+        console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
+        return null;
+      }
+
+      const sandbox = await getSandbox(sandboxId);
+      let written = 0;
+      for (const [path, content] of Object.entries(filesObj)) {
+        if (typeof content === "string") {
+          try {
+            await sandbox.files.write(path, content);
+            written++;
+          } catch (e) {
+            console.error(`Failed to hydrate file ${path}`, e);
           }
         }
       }
+      console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
     });
 
     const previousMessages = await step.run("get-previous-messages", async () => {
@@ -310,15 +325,13 @@ export const codeAgentFunction = inngest.createFunction(
 
           await sandbox.commands.run(`rm -f next.config.ts next.config.js next.config.mjs && echo '/** @type {import("next").NextConfig} */\nconst nextConfig = { output: "export", images: { unoptimized: true }, eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;' > next.config.mjs`);
 
-          // Wipe the stale .next cache — if a previous build ran as root (or a different user),
-          // the trace file gets locked with EACCES and the next build attempt crashes immediately.
-          // 1. Force ownership of all files back to the default E2B 'user'
-          await sandbox.commands.run("sudo chown -R user:user /home/user");
+          // EACCES fix: The E2B template pre-creates .next as root during setup.
+          // Chowning all of /home/user (including node_modules) is extremely slow and
+          // often times out before the rm fires, leaving .next still root-owned.
+          // Solution: delete .next directly as root in a single atomic bash command.
+          await sandbox.commands.run("sudo bash -c 'rm -rf /home/user/.next /home/user/out 2>/dev/null; exit 0'");
 
-          // 2. Wipe the Next cache and the npm cache using absolute paths just to be safe
-          await sandbox.commands.run("sudo rm -rf /home/user/.next /home/user/node_modules/.cache");
-
-          // 3. Run the build. If this fails, E2B will throw an error with the logs.
+          // Run the build. If this fails, E2B throws with stderr/stdout attached.
           await sandbox.commands.run("npm run build");
 
           return { success: true, error: "" };

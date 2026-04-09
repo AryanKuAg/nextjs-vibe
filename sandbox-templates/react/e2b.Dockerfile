@@ -30,9 +30,9 @@ RUN npm install @radix-ui/react-dialog @radix-ui/react-popover @radix-ui/react-t
     @radix-ui/react-dropdown-menu @radix-ui/react-accordion @radix-ui/react-toast @radix-ui/react-label \
     @radix-ui/react-separator @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-radio-group
 
-# Ensure Tailwind is set up in vite.config.ts
-RUN sed -i 's/import react from "@vitejs\/plugin-react"/import react from "@vitejs\/plugin-react";\nimport tailwindcss from "@tailwindcss\/vite";/' vite.config.ts
-RUN sed -i 's/plugins: \[react()\]/plugins: \[react(), tailwindcss()\]/' vite.config.ts
+# Ensure Tailwind is set up in vite.config.ts robustly
+RUN npm install -D @types/node && \
+    echo 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\nimport tailwindcss from "@tailwindcss/vite";\nimport path from "path";\n\nexport default defineConfig({\n  plugins: [react(), tailwindcss()],\n  resolve: {\n    alias: {\n      "@": path.resolve(__dirname, "./src"),\n    },\n  },\n});' > vite.config.ts
 
 # Configure basic Tailwind base layers in index.css
 RUN echo '@import "tailwindcss";\n\n@layer base {\n  :root {\n    --background: 0 0% 100%;\n    --foreground: 222.2 84% 4.9%;\n    --card: 0 0% 100%;\n    --card-foreground: 222.2 84% 4.9%;\n    --popover: 0 0% 100%;\n    --popover-foreground: 222.2 84% 4.9%;\n    --primary: 222.2 47.4% 11.2%;\n    --primary-foreground: 210 40% 98%;\n    --secondary: 210 40% 96.1%;\n    --secondary-foreground: 222.2 47.4% 11.2%;\n    --muted: 210 40% 96.1%;\n    --muted-foreground: 215.4 16.3% 46.9%;\n    --accent: 210 40% 96.1%;\n    --accent-foreground: 222.2 47.4% 11.2%;\n    --destructive: 0 84.2% 60.2%;\n    --destructive-foreground: 210 40% 98%;\n    --border: 214.3 31.8% 91.4%;\n    --input: 214.3 31.8% 91.4%;\n    --ring: 222.2 84% 4.9%;\n    --radius: 0.5rem;\n  }\n}\n\n@layer base {\n  * {\n    border-color: var(--border);\n  }\n  body {\n    background-color: var(--background);\n    color: var(--foreground);\n  }\n}' > src/index.css

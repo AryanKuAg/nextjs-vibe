@@ -320,10 +320,18 @@ export const codeAgentFunction = inngest.createFunction(
 
     // --- THE SELF-HEALING LOOP ---
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      // 1. Let the AI generate or fix the code
-      const result = await network.run(currentPrompt, { state });
-      finalSummary = result.state.data.summary || "Action completed specifically.";
-      finalFiles = result.state.data.files;
+      // 1. Let the AI generate or fix the code in a deterministic step
+      const generationResult = await step.run(`generate-code-attempt-${attempt}`, async () => {
+        let executionPrompt = attempt === 0 ? event.data.value : currentPrompt;
+        const result = await network.run(executionPrompt, { state });
+        return {
+          summary: result.state.data.summary,
+          files: result.state.data.files,
+        };
+      });
+      
+      finalSummary = generationResult.summary || "Action completed specifically.";
+      finalFiles = generationResult.files;
 
       // 2. Verify the build in an isolated step
       const buildCheck = await step.run(`verify-build-attempt-${attempt}`, async () => {

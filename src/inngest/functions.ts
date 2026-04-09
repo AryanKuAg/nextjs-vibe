@@ -331,28 +331,37 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
 
-          // Step 1: Fix npm cache + .next ownership — TARGETED chown only on the two
-          // directories that get root-owned by the E2B template setup.
-          // Scoping to ~/.npm and ~/.next only (not all of /home/user) means this
-          // runs in milliseconds instead of timing out over node_modules.
-          // After chown, user can delete .next normally without sudo.
+          // Step 1: Fix ownership of root-owned directories — targeted only, runs in ms.
+          // ~/.next     → root-owned by template setup
+          // ~/.npm      → root-owned by template npm installs
+          // ~/tmp       → root-owned by our previous bad runs (distDir bug, see below)
+          // After chown, user can delete them all normally.
           await sandbox.commands.run(
             "sudo chown -R $(whoami) ~/.npm 2>/dev/null || true; " +
             "sudo chown -R $(whoami) ~/.next 2>/dev/null || true; " +
-            "rm -rf ~/.next"
+            "sudo chown -R $(whoami) ~/tmp 2>/dev/null || true; " +
+            "rm -rf ~/.next ~/tmp /tmp/nextbuild"
           );
 
           // Step 2: Delete any conflicting Next.js config files
           await sandbox.commands.run("rm -f next.config.ts next.config.js next.config.mjs");
 
-          // Step 3: Write next.config.mjs using the E2B file API (reliable, no shell escaping issues)
+          // Step 3: Write next.config.mjs via E2B file API (reliable, no shell-escaping issues)
+          //
+          // IMPORTANT: Next.js resolves distDir via path.join(projectRoot, distDir).
+          // Using distDir: "/tmp/nextbuild" looks absolute but path.join treats it as
+          // relative → path.join('/home/user', '/tmp/nextbuild') = '/home/user/tmp/nextbuild'
+          // That directory gets root-owned and causes EACCES on next run.
+          //
+          // Fix: Use "../../tmp/nextbuild" — traverses up from /home/user → /tmp/nextbuild
+          // which path.join resolves correctly to the real world-writable /tmp directory.
           await sandbox.files.write(
             "next.config.mjs",
             [
               `/** @type {import('next').NextConfig} */`,
               `const nextConfig = {`,
               `  output: "export",`,
-              `  distDir: "/tmp/nextbuild",`,
+              `  distDir: "../../tmp/nextbuild",`,
               `  images: { unoptimized: true },`,
               `  eslint: { ignoreDuringBuilds: true },`,
               `  typescript: { ignoreBuildErrors: true },`,
@@ -361,10 +370,7 @@ export const codeAgentFunction = inngest.createFunction(
             ].join("\n")
           );
 
-          // Step 4: Clean any prior /tmp/nextbuild so we always start fresh
-          await sandbox.commands.run("rm -rf /tmp/nextbuild");
-
-          // Step 5: Run the build.
+          // Step 4: Run the build. /tmp/nextbuild is world-writable — no EACCES possible.
           await sandbox.commands.run("NEXT_TELEMETRY_DISABLED=1 npm run build");
 
           return { success: true, error: "" };

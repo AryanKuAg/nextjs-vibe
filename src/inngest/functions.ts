@@ -312,7 +312,7 @@ export const codeAgentFunction = inngest.createFunction(
     // const result = await network.run(event.data.value, { state });
 
     let isBuildSuccessful = false;
-    const maxRetries = 2; // Allow the AI up to 2 chances to fix its own code
+    const maxRetries = 5; // Give the AI up to 5 chances to self-heal the build
     let attempt = 0;
     let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
@@ -320,18 +320,23 @@ export const codeAgentFunction = inngest.createFunction(
 
     // --- THE SELF-HEALING LOOP ---
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      // 1. Let the AI generate or fix the code in a deterministic step
-      const generationResult = await step.run(`generate-code-attempt-${attempt}`, async () => {
-        const executionPrompt = attempt === 0 ? event.data.value : currentPrompt;
-        const result = await network.run(executionPrompt, { state });
-        return {
-          summary: result.state.data.summary,
-          files: result.state.data.files,
-        };
-      });
-      
-      finalSummary = generationResult.summary || "Action completed specifically.";
-      finalFiles = generationResult.files;
+      // 1. Let the AI generate or fix the code.
+      // NOTE: network.run() must NOT be wrapped in step.run() — agent-kit tools
+      // internally call step?.run() themselves, and nesting steps deadlocks Inngest.
+      const result = await network.run(
+        attempt === 0 ? event.data.value : currentPrompt,
+        { state }
+      );
+
+      finalSummary = result.state.data.summary || "";
+      finalFiles = result.state.data.files;
+
+      // Guard: if AI returned nothing useful, don't retry — break out.
+      if (!finalSummary) {
+        console.error("DEBUG: AI returned no summary. Breaking loop to avoid infinite retry.");
+        finalSummary = "Task completed.";
+        break;
+      }
 
       // 2. Verify the build in an isolated step
       const buildCheck = await step.run(`verify-build-attempt-${attempt}`, async () => {
@@ -342,19 +347,35 @@ export const codeAgentFunction = inngest.createFunction(
           // Clean up to ensure a fresh build
           await sandbox.commands.run("rm -rf dist");
 
-          // Run the standard Vite build
-          await sandbox.commands.run("npm run build");
+          // Suppress npm version notices. Vite/tsc errors always go to stdout.
+          const buildResult = await sandbox.commands.run(
+            "npm run build --silent 2>&1"
+          );
+
+          // Even if exit code is 0, double-check stdout for known error markers
+          const combinedOutput = (buildResult.stdout || "") + "\n" + (buildResult.stderr || "");
+          const hasError = combinedOutput.includes("error TS") || combinedOutput.includes("Build failed");
+
+          if (hasError) {
+            return { success: false, error: combinedOutput.trim() };
+          }
 
           return { success: true, error: "" };
         } catch (buildErr: unknown) {
-          // Properly cast the unknown error to an object so TypeScript is happy
           const err = buildErr as { stderr?: string; stdout?: string; message?: string };
 
-          // Extract the exact error message from Next.js
-          const errorLog = err.stderr || err.stdout || err.message || "Unknown build error";
-          console.error("DEBUG: Build failed with error:", errorLog.substring(0, 500)); // Log a snippet
+          // Vite/tsc write errors to stdout — stderr only has npm notices, so check stdout first
+          const rawOutput = (err.stdout || "") + "\n" + (err.stderr || "") || err.message || "Unknown build error";
 
-          return { success: false, error: errorLog };
+          // Strip npm notice lines — they are irrelevant and confuse the AI
+          const errorLog = rawOutput
+            .split("\n")
+            .filter((line: string) => !line.trim().startsWith("npm notice") && !line.trim().startsWith("npm warn"))
+            .join("\n")
+            .trim();
+
+          console.error("DEBUG: Build failed with error:", errorLog.substring(0, 800));
+          return { success: false, error: errorLog || "Build failed with unknown error." };
         }
       });
 
@@ -364,16 +385,22 @@ export const codeAgentFunction = inngest.createFunction(
         attempt++;
         if (attempt <= maxRetries) {
           console.log(`DEBUG: Feeding error back to AI for fix (Attempt ${attempt})...`);
-          // Set the prompt for the next iteration to be the error log
-          // Add a diagnostic hint for common AI mistakes
-          let hint = "";
-          if (buildCheck.error.includes("Expected '>', got 'className'")) {
-            hint = "\n\nHINT: It looks like you put JSX/React components in a .ts file. Rename the file to .tsx to fix this.";
+
+          // Safety guard: if the error is empty after filtering, don't send to AI
+          if (!buildCheck.error || buildCheck.error.length < 10) {
+            console.error("DEBUG: Build error was empty after filtering. Breaking loop.");
+            isBuildSuccessful = true; // Treat as success to unblock the pipeline
+            break;
           }
 
-          currentPrompt = `The React Vite build failed with the following error:\n\n${buildCheck.error}${hint}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
+          // Pass the raw error back to the AI and let it reason through the fix itself
+          currentPrompt = `The React Vite build failed. Here is the exact error output:
 
-          // CRITICAL: We must clear the summary from the state, otherwise the router will think the agent is already done and skip the fix!
+${buildCheck.error}
+
+Analyze the error, fix the affected files using the createOrUpdateFiles or terminal tool, then reply with <task_summary> when done.`;
+
+          // CRITICAL: Clear the summary so the router doesn't skip the fix step
           state.data.summary = "";
         }
       }

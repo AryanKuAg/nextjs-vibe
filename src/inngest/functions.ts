@@ -393,7 +393,13 @@ export const codeAgentFunction = inngest.createFunction(
         if (attempt <= maxRetries) {
           console.log(`DEBUG: Feeding error back to AI for fix (Attempt ${attempt})...`);
           // Set the prompt for the next iteration to be the error log
-          currentPrompt = `The Next.js build failed with the following error:\n\n${buildCheck.error}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
+          // Add a diagnostic hint for common AI mistakes
+          let hint = "";
+          if (buildCheck.error.includes("Expected '>', got 'className'")) {
+            hint = "\n\nHINT: It looks like you put JSX/React components (like icons) in a .ts file. Rename the file to .tsx to fix this.";
+          }
+
+          currentPrompt = `The Next.js build failed with the following error:\n\n${buildCheck.error}${hint}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
 
           // CRITICAL: We must clear the summary from the state, otherwise the router will think the agent is already done and skip the fix!
           state.data.summary = "";

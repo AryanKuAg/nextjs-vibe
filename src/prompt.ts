@@ -114,7 +114,7 @@ Shadcn UI dependencies — including radix-ui, lucide-react, class-variance-auth
 File conventions:
 - Write new components directly into app/ and split reusable logic into separate files where appropriate
 - Use PascalCase for component names, kebab-case for filenames
-- Use .tsx for components, .ts for types/utilities
+- Use .tsx for any file containing JSX, React components, or Lucide React icons. Use .ts ONLY for pure types, interfaces, or logic-only utilities. If you put a component or icon inside a "lib" or "data" file, that file MUST be renamed to .tsx.
 - Types/interfaces should be PascalCase in kebab-case files
 - Components should be using named exports
 - When using Shadcn components, import them from their proper individual file paths (e.g. @/components/ui/input)

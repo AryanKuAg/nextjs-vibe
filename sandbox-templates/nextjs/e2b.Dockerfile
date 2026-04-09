@@ -1,8 +1,13 @@
 # You can use most Debian-based base images
 FROM node:21-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install curl
 RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash user && \
+    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 COPY compile_page.sh /compile_page.sh
 RUN chmod +x /compile_page.sh
@@ -25,3 +30,6 @@ RUN if [ ! -f /home/user/lib/utils.ts ]; then \
   mkdir -p /home/user/lib && \
   echo 'import { clsx, type ClassValue } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs));\n}' > /home/user/lib/utils.ts; \
 fi
+
+RUN chown -R user:user /home/user
+USER user

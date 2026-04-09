@@ -332,15 +332,9 @@ export const codeAgentFunction = inngest.createFunction(
           console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
 
           // Step 1: Fix ownership of root-owned directories — targeted only, runs in ms.
-          // ~/.next     → root-owned by template setup
-          // ~/.npm      → root-owned by template npm installs
-          // ~/tmp       → root-owned by our previous bad runs (distDir bug, see below)
-          // After chown, user can delete them all normally.
           await sandbox.commands.run(
-            "sudo chown -R $(whoami) ~/.npm 2>/dev/null || true; " +
-            "sudo chown -R $(whoami) ~/.next 2>/dev/null || true; " +
-            "sudo chown -R $(whoami) ~/tmp 2>/dev/null || true; " +
-            "rm -rf ~/.next ~/tmp /tmp/nextbuild"
+            "sudo chown -R $(whoami) /tmp/nextbuild 2>/dev/null || true && " +
+            "rm -rf /tmp/nextbuild"
           );
 
           // Step 2: Delete any conflicting Next.js config files

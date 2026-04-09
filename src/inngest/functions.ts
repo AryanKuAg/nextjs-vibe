@@ -79,7 +79,7 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       if (!sandbox) {
-        sandbox = await Sandbox.create("vibe-nextjs-alemantrix");
+        sandbox = await Sandbox.create("vibe-nextjs-test-2");
         await sandbox.setTimeout(SANDBOX_TIMEOUT);
 
         await prisma.project.update({
@@ -331,41 +331,11 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
 
-          // Step 1: Fix ownership of root-owned directories — targeted only, runs in ms.
-          await sandbox.commands.run(
-            "sudo chown -R $(whoami) /tmp/nextbuild 2>/dev/null || true && " +
-            "rm -rf /tmp/nextbuild"
-          );
+          // Clean up to ensure a fresh build
+          await sandbox.commands.run("rm -rf dist");
 
-          // Step 2: Delete any conflicting Next.js config files
-          await sandbox.commands.run("rm -f next.config.ts next.config.js next.config.mjs");
-
-          // Step 3: Write next.config.mjs via E2B file API (reliable, no shell-escaping issues)
-          //
-          // IMPORTANT: Next.js resolves distDir via path.join(projectRoot, distDir).
-          // Using distDir: "/tmp/nextbuild" looks absolute but path.join treats it as
-          // relative → path.join('/home/user', '/tmp/nextbuild') = '/home/user/tmp/nextbuild'
-          // That directory gets root-owned and causes EACCES on next run.
-          //
-          // Fix: Use "../../tmp/nextbuild" — traverses up from /home/user → /tmp/nextbuild
-          // which path.join resolves correctly to the real world-writable /tmp directory.
-          await sandbox.files.write(
-            "next.config.mjs",
-            [
-              `/** @type {import('next').NextConfig} */`,
-              `const nextConfig = {`,
-              `  output: "export",`,
-              `  distDir: "../../tmp/nextbuild",`,
-              `  images: { unoptimized: true },`,
-              `  eslint: { ignoreDuringBuilds: true },`,
-              `  typescript: { ignoreBuildErrors: true },`,
-              `};`,
-              `export default nextConfig;`,
-            ].join("\n")
-          );
-
-          // Step 4: Run the build. /tmp/nextbuild is world-writable — no EACCES possible.
-          await sandbox.commands.run("NEXT_TELEMETRY_DISABLED=1 npm run build");
+          // Run the standard Vite build
+          await sandbox.commands.run("npm run build");
 
           return { success: true, error: "" };
         } catch (buildErr: unknown) {
@@ -390,10 +360,10 @@ export const codeAgentFunction = inngest.createFunction(
           // Add a diagnostic hint for common AI mistakes
           let hint = "";
           if (buildCheck.error.includes("Expected '>', got 'className'")) {
-            hint = "\n\nHINT: It looks like you put JSX/React components (like icons) in a .ts file. Rename the file to .tsx to fix this.";
+            hint = "\n\nHINT: It looks like you put JSX/React components in a .ts file. Rename the file to .tsx to fix this.";
           }
 
-          currentPrompt = `The Next.js build failed with the following error:\n\n${buildCheck.error}${hint}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
+          currentPrompt = `The React Vite build failed with the following error:\n\n${buildCheck.error}${hint}\n\nPlease analyze this error, fix the corresponding files using the createOrUpdateFiles or terminal tool, and reply with <task_summary> when finished.`;
 
           // CRITICAL: We must clear the summary from the state, otherwise the router will think the agent is already done and skip the fix!
           state.data.summary = "";
@@ -433,10 +403,10 @@ export const codeAgentFunction = inngest.createFunction(
       try {
         const sandbox = await getSandbox(sandboxId);
 
-        console.log("DEBUG: Zipping out folder...");
+        console.log("DEBUG: Zipping dist folder...");
         // Guarantee zip is installed so it doesn't crash here
         await sandbox.commands.run("sudo apt-get update && sudo apt-get install -y zip");
-        await sandbox.commands.run("cd out && zip -r ../out.zip .");
+        await sandbox.commands.run("cd dist && zip -r ../dist.zip .");
 
         const cfToken = process.env.CLOUDFLARE_API_TOKEN;
         const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -447,7 +417,7 @@ export const codeAgentFunction = inngest.createFunction(
 
         await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
 
-        const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@out.zip"`);
+        const uploadResult = await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects/${projectName}/deployments" -H "Authorization: Bearer ${cfToken}" -F "file=@dist.zip"`);
 
         const deploymentData = JSON.parse(uploadResult.stdout);
 

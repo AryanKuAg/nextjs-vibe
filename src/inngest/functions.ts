@@ -322,7 +322,7 @@ export const codeAgentFunction = inngest.createFunction(
     while (!isBuildSuccessful && attempt <= maxRetries) {
       // 1. Let the AI generate or fix the code in a deterministic step
       const generationResult = await step.run(`generate-code-attempt-${attempt}`, async () => {
-        let executionPrompt = attempt === 0 ? event.data.value : currentPrompt;
+        const executionPrompt = attempt === 0 ? event.data.value : currentPrompt;
         const result = await network.run(executionPrompt, { state });
         return {
           summary: result.state.data.summary,

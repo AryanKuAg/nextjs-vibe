@@ -157,6 +157,7 @@ interface TreeProps {
 };
 
 const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
+  const [isOpen, setIsOpen] = useState(true);
   const [name, ...items] = Array.isArray(item) ? item : [item];
   const currentPath = parentPath ? `${parentPath}/${name}` : name;
 
@@ -174,20 +175,23 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
         )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={iconUrl} alt="" className="w-4 h-4 shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = `${CDN}/file.svg`; }} />
+        <img 
+          src={iconUrl} 
+          alt="" 
+          className="w-4 h-4 shrink-0" 
+          onError={(e) => { (e.target as HTMLImageElement).src = `${CDN}/file.svg`; }} 
+        />
         <span className="truncate">{name}</span>
       </button>
     )
   }
 
   // It's a folder
-  const [isOpen, setIsOpen] = useState(true);
-
   return (
     <div>
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+          <button className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left truncate flex-shrink-0">
             <ChevronDownIcon 
               className={cn(
                 "w-3.5 h-3.5 shrink-0 transition-transform text-muted-foreground",

@@ -287,8 +287,7 @@ export const codeAgentFunction = inngest.createFunction(
     // --- THE SELF-HEALING LOOP ---
     while (!isBuildSuccessful && attempt <= maxRetries) {
       iterCount = 0;
-      // Create a uniquely named agent and network for this attempt.
-      const currentCodeAgent = createCodeAgentForAttempt(attempt);
+      // Create a unique network for this attempt.
       const attemptNetwork = createNetwork<AgentState>({
         name: `coding-agent-network-run-${runId}-attempt-${attempt}`,
         agents: [createCodeAgentForAttempt(attempt, iterCount)],
@@ -333,7 +332,7 @@ export const codeAgentFunction = inngest.createFunction(
           console.log("DEBUG: Running strict TypeScript check...");
           try {
             await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr: any) {
+          } catch (tsErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             // E2B throws CommandExitError on failure. The logs are inside tsErr.stdout / tsErr.stderr
             const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
             console.error("DEBUG: TypeScript check failed:", tsErrorLog.substring(0, 500));
@@ -344,7 +343,7 @@ export const codeAgentFunction = inngest.createFunction(
           console.log("DEBUG: Running Vite build...");
           try {
             await sandbox.commands.run("npm run build --silent");
-          } catch (buildErr: any) {
+          } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
             console.error("DEBUG: Vite build failed:", viteErrorLog.substring(0, 500));
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
@@ -353,7 +352,7 @@ export const codeAgentFunction = inngest.createFunction(
           // If it makes it here without throwing, both passed!
           return { success: true, error: "" };
 
-        } catch (infraErr: any) {
+        } catch (infraErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
           // This outer catch only triggers if the E2B Sandbox completely disconnects or crashes
           console.error("DEBUG: Sandbox infrastructure error:", infraErr);
           return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };

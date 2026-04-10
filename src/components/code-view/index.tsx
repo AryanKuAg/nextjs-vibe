@@ -4,6 +4,11 @@ import "prismjs/components/prism-javascript";
 import "prismjs/components/prism-jsx";
 import "prismjs/components/prism-tsx";
 import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-markup"; // html/xml
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-markdown";
 
 import "./code-theme.css";
 
@@ -22,7 +27,7 @@ export const CodeView = ({
 
   return (
     <pre
-      className="p-2 bg-transparent border-none rounded-none m-0 text-xs"
+      className="p-2 bg-transparent border-none rounded-none m-0 text-xs h-full overflow-auto"
     >
       <code className={`language-${lang}`}>
         {code}

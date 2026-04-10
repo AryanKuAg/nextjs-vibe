@@ -25,7 +25,23 @@ type FileCollection = { [path: string]: string };
 
 function getLanguageFromExtension(filename: string): string {
   const extension = filename.split(".").pop()?.toLowerCase();
-  return extension || "text";
+  const langMap: Record<string, string> = {
+    ts: "typescript",
+    tsx: "tsx",
+    js: "javascript",
+    jsx: "jsx",
+    json: "json",
+    css: "css",
+    html: "markup",
+    xml: "markup",
+    svg: "markup",
+    sh: "bash",
+    md: "markdown",
+    toml: "toml",
+    yaml: "yaml",
+    yml: "yaml",
+  };
+  return langMap[extension || ""] || "text";
 };
 
 interface FileBreadcrumbProps {
@@ -130,8 +146,8 @@ export const FileExplorer = ({
   }, [selectedFile, files]);
 
   return (
-    <ResizablePanelGroup direction="horizontal">
-      <ResizablePanel defaultSize={30} minSize={30} className="bg-sidebar">
+    <ResizablePanelGroup direction="horizontal" className="h-full">
+      <ResizablePanel defaultSize={30} minSize={30} className="bg-sidebar overflow-y-auto">
         <TreeView
           data={treeData}
           value={selectedFile}
@@ -141,7 +157,7 @@ export const FileExplorer = ({
       <ResizableHandle className="hover:bg-primary transition-colors" />
       <ResizablePanel defaultSize={70} minSize={50}>
         {selectedFile && files[selectedFile] ? (
-          <div className="h-full w-full flex flex-col">
+          <div className="h-full w-full flex flex-col overflow-hidden">
             <div className="border-b bg-sidebar px-4 py-2 flex justify-between items-center gap-x-2">
               <FileBreadcrumb filePath={selectedFile} />
               <Hint text="Copy to clipboard" side="bottom">

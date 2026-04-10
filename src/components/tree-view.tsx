@@ -4,19 +4,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarProvider,
-  SidebarRail,
-} from "@/components/ui/sidebar";
 import { ChevronRightIcon, FileIcon, FolderIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TreeViewProps {
   data: TreeItem[];
@@ -30,28 +19,19 @@ export const TreeView = ({
   onSelect,
 }: TreeViewProps) => {
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="none" className="w-full">
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {data.map((item, index) => (
-                  <Tree
-                    key={index}
-                    item={item}
-                    selectedValue={value}
-                    onSelect={onSelect}
-                    parentPath=""
-                  />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarRail />
-      </Sidebar>
-    </SidebarProvider>
+    <div className="h-full overflow-y-auto">
+      <div className="p-2 flex flex-col gap-0.5">
+        {data.map((item, index) => (
+          <Tree
+            key={index}
+            item={item}
+            selectedValue={value}
+            onSelect={onSelect}
+            parentPath=""
+          />
+        ))}
+      </div>
+    </div>
   )
 };
 
@@ -71,37 +51,36 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
     const isSelected = selectedValue === currentPath;
 
     return (
-      <SidebarMenuButton
-        isActive={isSelected}
-        className="data-[active=true]:bg-transparent"
+      <button
         onClick={() => onSelect?.(currentPath)}
+        className={cn(
+          "w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md text-left transition-colors",
+          "hover:bg-accent hover:text-accent-foreground",
+          isSelected && "bg-accent text-accent-foreground font-medium"
+        )}
       >
-        <FileIcon />
-        <span className="truncate">
-          {name}
-        </span>
-      </SidebarMenuButton>
+        <FileIcon className="w-4 h-4 shrink-0 text-muted-foreground" />
+        <span className="truncate">{name}</span>
+      </button>
     )
   }
 
   // It's a folder
   return (
-    <SidebarMenuItem>
+    <div>
       <Collapsible
-        className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+        className="group/collapsible"
         defaultOpen
       >
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton>
-            <ChevronRightIcon className="transition-transform" />
-            <FolderIcon />
-            <span className="truncate">
-              {name}
-            </span>
-          </SidebarMenuButton>
+          <button className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+            <ChevronRightIcon className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+            <FolderIcon className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{name}</span>
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub>
+          <div className="pl-4 flex flex-col gap-0.5 mt-0.5">
             {items.map((subItem, index) => (
               <Tree
                 key={index}
@@ -111,9 +90,10 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
                 parentPath={currentPath}
               />
             ))}
-          </SidebarMenuSub>
+          </div>
         </CollapsibleContent>
       </Collapsible>
-    </SidebarMenuItem>
+    </div>
   );
 };
+

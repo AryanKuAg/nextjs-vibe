@@ -295,8 +295,28 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
+    let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
     let finalFiles = state.data.files;
+
+    // --- CONTEXT INJECTION FOR ITERATIONS ---
+    const hasExistingFiles = Object.keys(initialFiles).length > 0;
+    if (hasExistingFiles) {
+      currentPrompt += `\n\n=== CURRENT PROJECT STATE ===\n`;
+      currentPrompt += `You are modifying an existing project. Here are the current files:\n\n`;
+
+      for (const [path, content] of Object.entries(initialFiles)) {
+        // Skip injecting lockfiles or assets to save tokens and prevent confusion
+        if (path.includes('package-lock.json') || path.includes('node_modules')) continue;
+
+        currentPrompt += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
+      }
+
+      currentPrompt += `=== END PROJECT STATE ===\n\n`;
+      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
+    }
+
+    // --- 1. INITIAL GENERATION (The Creator) ---
 
     // --- 1. INITIAL GENERATION (The Creator) ---
     // Run the main massive agent exactly once to build the features
@@ -315,7 +335,7 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     console.log('DEBUG: Running initial Creator agent...');
-    const result = await initialNetwork.run(event.data.value, { state });
+    const result = await initialNetwork.run(currentPrompt, { state });
 
     finalSummary = result.state.data.summary || "";
     finalFiles = result.state.data.files;
@@ -404,10 +424,32 @@ export const codeAgentFunction = inngest.createFunction(
         defaultModel: geminiVertexKey("gemini-3-flash-preview"),
       });
 
-      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\nThe build failed with these exact errors:\n\n${buildCheck.error}\n\nUse your tools to fix ONLY the broken files, then output <task_summary>.`;
+      // --- CONTEXT INJECTION FOR THE FIXER ---
+      let brokenFilesContext = "";
+      const hasStateFiles = Object.keys(state.data.files).length > 0;
+      if (hasStateFiles) {
+        brokenFilesContext += `\n\n=== CURRENT PROJECT STATE ===\n`;
+        for (const [path, content] of Object.entries(state.data.files)) {
+          if (path.includes('package-lock.json') || path.includes('node_modules')) continue;
+          brokenFilesContext += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
+        }
+        brokenFilesContext += `=== END PROJECT STATE ===\n\n`;
+      }
+
+      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
+The build failed with these exact errors:
+
+${buildCheck.error}
+${brokenFilesContext}
+INSTRUCTIONS TO FIX:
+1. You MUST use the \`createOrUpdateFiles\` tool to fix the broken code. If a module/file is missing (e.g., TS2307), you must either CREATE the missing file with a basic React component, or REMOVE the import from the file that is calling it.
+2. Do NOT chat or explain your plan. Call the tool immediately.
+3. ONLY after the tool call succeeds, output EXACTLY this tag to end your turn:
+<task_summary>
+Fixed build errors.
+</task_summary>`;
 
       const fixResult = await fixerNetwork.run(fixPrompt, { state });
-
       // Update our final state with whatever the fixer changed
       finalFiles = fixResult.state.data.files;
 

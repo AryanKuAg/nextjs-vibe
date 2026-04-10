@@ -329,34 +329,34 @@ export const codeAgentFunction = inngest.createFunction(
 
           await sandbox.commands.run("rm -rf dist");
 
-          // --- 1. THE TYPE CHECK (Catches import/casing/variable errors) ---
+          // --- 1. THE TYPE CHECK ---
           console.log("DEBUG: Running strict TypeScript check...");
-          const typeCheck = await sandbox.commands.run("npx tsc --noEmit");
-
-          // If tsc fails, it returns an exitCode > 0.
-          if (typeCheck.exitCode !== 0) {
-            const tsError = (typeCheck.stdout + "\n" + typeCheck.stderr).trim();
-            console.error("DEBUG: TypeScript check failed:", tsError.substring(0, 500));
-            return { success: false, error: `TypeScript Compilation Error:\n${tsError}` };
+          try {
+            await sandbox.commands.run("npx tsc --noEmit");
+          } catch (tsErr: any) {
+            // E2B throws CommandExitError on failure. The logs are inside tsErr.stdout / tsErr.stderr
+            const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
+            console.error("DEBUG: TypeScript check failed:", tsErrorLog.substring(0, 500));
+            return { success: false, error: `TypeScript Compilation Error:\n${tsErrorLog}` };
           }
 
-          // --- 2. THE VITE BUILD (Catches bundler/Tailwind errors) ---
+          // --- 2. THE VITE BUILD ---
           console.log("DEBUG: Running Vite build...");
-          const buildResult = await sandbox.commands.run("npm run build --silent");
-
-          if (buildResult.exitCode !== 0) {
-            const viteError = (buildResult.stdout + "\n" + buildResult.stderr).trim();
-            console.error("DEBUG: Vite build failed:", viteError.substring(0, 500));
-            return { success: false, error: `Vite Build Error:\n${viteError}` };
+          try {
+            await sandbox.commands.run("npm run build --silent");
+          } catch (buildErr: any) {
+            const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
+            console.error("DEBUG: Vite build failed:", viteErrorLog.substring(0, 500));
+            return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
           }
 
-          // If both pass, the build is fully successful!
+          // If it makes it here without throwing, both passed!
           return { success: true, error: "" };
 
-        } catch (buildErr: unknown) {
-          // This catch block will only trigger if the E2B sandbox itself crashes or disconnects
-          console.error("DEBUG: Sandbox infrastructure error:", buildErr);
-          return { success: false, error: `Sandbox Execution Error: ${String(buildErr)}` };
+        } catch (infraErr: any) {
+          // This outer catch only triggers if the E2B Sandbox completely disconnects or crashes
+          console.error("DEBUG: Sandbox infrastructure error:", infraErr);
+          return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };
         }
       });
 

@@ -81,10 +81,10 @@ Instructions:
 1. Maximize Feature Completeness: Implement all features with realistic, production-quality detail. Avoid placeholders or simplistic stubs. Every component or page should be fully functional and polished. Focus on interactive elements, robust state management, and accurate prop drilling.
 
 2. UI Components & Dependencies:
-   - Use raw **Radix UI Primitives** (e.g., @radix-ui/react-dialog, @radix-ui/react-popover, etc.) combined with Tailwind CSS for building complex interactive components. DO NOT assume Shadcn UI is installed. You must compose the Radix primitives yourself if you want custom interactive components, or build them from scratch.
+   - Use raw **Radix UI Primitives** (e.g., @radix-ui/react-dialog) combined with Tailwind CSS.
    - Use **Framer Motion** (motion) for animations.
-   - Use **Lucide React** for icons (e.g., import { Plus } from "lucide-react").
-   - **CRITICAL**: Do NOT use brand icons from lucide-react (like Instagram, Twitter, Github, etc.). Use generic shapes or inline SVGs instead.
+   - Use **Lucide React** for icons.
+   - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`. NEVER use brand icons (Instagram, Twitter, etc.).
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.
@@ -115,6 +115,11 @@ Instructions:
 - CONDITIONAL ENTRY POINT RULE: If you are building a new project, a new feature, or adding a new route, you MUST include \`src/App.tsx\` in your batched tool call to wire up the new components. HOWEVER, if you are strictly making a minor update to an existing component (e.g., changing styling in a Header), you should respect the Iteration Rule and omit \`src/App.tsx\` from the batch.
 - REACT ROUTER CRITICAL RULE: If you use \`react-router-dom\`, you MUST wrap the entire application in a \`<BrowserRouter>\` (or \`<Router>\`) inside \`src/main.tsx\` or at the very top level of \`src/App.tsx\`. Never use routing hooks like \`useLocation\`, \`useNavigate\`, or \`<Routes>\` outside of a Router context.
 - CRITICAL IMPORT & NAMING RULE: You MUST use the \`@/\` alias for all imports (e.g., \`import { useStore } from \"@/store/useStore\"\`). NEVER use relative paths (\`../\` or \`./\`) for internal file imports. Furthermore, you must be strictly consistent with file casing. If you create \`src/store/useStore.ts\`, you MUST import it as \`@/store/useStore\`. Do not mix camelCase and kebab-case.
+- STRICT IMPORT RULE: You MUST ensure every single component, hook, or external module you use in a file is explicitly imported at the top of that file. 
+  - If you use \`<motion.div>\`, you MUST \`import { motion } from "framer-motion"\`.
+  - If you use React hooks (\`useState\`, \`useEffect\`), you MUST \`import { useState } from "react"\`.
+  - If you use a Lucide icon, you MUST import it.
+  - Failing to import a used module will crash the application. Double-check your imports before finishing a file.
 
 File conventions:
 - Write new components directly into src/components/ and split reusable logic into separate files where appropriate

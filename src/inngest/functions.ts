@@ -295,10 +295,8 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
-    let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
     let finalFiles = state.data.files;
-    let iterCount = 0;
 
     // --- 1. INITIAL GENERATION (The Creator) ---
     // Run the main massive agent exactly once to build the features
@@ -342,7 +340,7 @@ export const codeAgentFunction = inngest.createFunction(
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr: any) {
+          } catch (tsErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
             return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
           }
@@ -350,13 +348,13 @@ export const codeAgentFunction = inngest.createFunction(
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npm run build --silent");
-          } catch (buildErr: any) {
+          } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
           }
 
           return { success: true, error: "" };
-        } catch (infraErr: any) {
+        } catch (infraErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
           return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };
         }
       });
@@ -570,14 +568,14 @@ export const codeAgentFunction = inngest.createFunction(
       return await prisma.message.create({
         data: {
           projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput as any) || finalSummary,
+          content: parseAgentOutput(responseOutput) || finalSummary,
           role: "ASSISTANT",
           type: "RESULT",
           fragment: {
             create: {
               sandboxUrl: sandboxUrl,
               deploymentUrl: deploymentUrl,
-              title: parseAgentOutput(fragmentTitleOutput as any) || "Project Updated",
+              title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
               files: completeFiles || finalFiles || {},
             },
           },
@@ -589,7 +587,7 @@ export const codeAgentFunction = inngest.createFunction(
       url: deploymentUrl || sandboxUrl,
       deploymentUrl: deploymentUrl,
       sandboxUrl: sandboxUrl,
-      title: parseAgentOutput(fragmentTitleOutput as any) || "Project",
+      title: parseAgentOutput(fragmentTitleOutput) || "Project",
       files: finalFiles,
       summary: finalSummary,
     };

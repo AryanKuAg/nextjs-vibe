@@ -84,7 +84,7 @@ Instructions:
    - Use raw **Radix UI Primitives** (e.g., @radix-ui/react-dialog) combined with Tailwind CSS.
    - Use **Framer Motion** (motion) for animations.
    - Use **Lucide React** for icons.
-   - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`. NEVER use brand icons (Instagram, Twitter, etc.).
+   - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`. NEVER use brand icons (Instagram, Twitter, Linkedin, X, YouTube, Facebook etc.).
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.

@@ -374,7 +374,22 @@ export const codeAgentFunction = inngest.createFunction(
           }
 
           // Pass the raw error to the AI and let it reason through the fix
-          currentPrompt = `The React Vite build failed. Here is the exact error output:\n\n${buildCheck.error}\n\nAnalyze the error, fix the affected files using the createOrUpdateFiles or terminal tool, then reply with <task_summary> when done.`;
+          // Pass the raw error to the AI and let it reason through the fix
+          currentPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
+The React Vite build failed with the following exact errors:
+
+${buildCheck.error}
+
+INSTRUCTIONS TO FIX:
+1. Use the \`createOrUpdateFiles\` tool to fix these specific errors (e.g., if 'Plus' is missing, add \`import { Plus } from "lucide-react"\`, or fix the TypeScript type mismatches).
+2. ONLY update the specific files that are broken. Do not rewrite the whole app.
+3. Once you have called the tool and updated the files, you MUST immediately output the following tag to finish the task:
+
+<task_summary>
+Fixed build errors.
+</task_summary>
+
+You MUST output the <task_summary> tag. Do not explain your fixes, just call the tool and output the summary.`;
 
           // CRITICAL: Clear the summary so the router doesn't skip the fix step
           state.data.summary = "";

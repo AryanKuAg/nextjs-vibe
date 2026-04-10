@@ -41,6 +41,11 @@ RUN echo '@import "tailwindcss";\n\n@layer base {\n  :root {\n    --background: 
 RUN sed -i 's/"compilerOptions": {/"compilerOptions": {\n    "baseUrl": ".",\n    "paths": {\n      "@\/*": [".\/src\/*"]\n    },/' tsconfig.app.json || true
 RUN sed -i 's/"compilerOptions": {/"compilerOptions": {\n    "baseUrl": ".",\n    "paths": {\n      "@\/*": [".\/src\/*"]\n    },/' tsconfig.json || true
 
+# Disable strict unused variable checks so unused AI imports don't crash the build
+RUN sed -i 's/"noUnusedLocals": true/"noUnusedLocals": false/g' tsconfig.json tsconfig.app.json tsconfig.node.json || true
+RUN sed -i 's/"noUnusedParameters": true/"noUnusedParameters": false/g' tsconfig.json tsconfig.app.json tsconfig.node.json || true
+
+
 # Move the Vite app to the home directory and cleanup
 RUN cp -a /home/user/vite-app/. /home/user/ && rm -rf /home/user/vite-app
 

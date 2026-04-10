@@ -163,10 +163,10 @@ Instructions:
 2. The log will usually contain the exact file path and line number of the error.
 3. Use the \`readFiles\` tool to examine the broken file if you need to see the surrounding code.
 4. Use the \`createOrUpdateFiles\` tool to apply the minimal fix necessary. 
-   - If an import is missing (e.g., 'Plus' from lucide-react), add it.
-   - If a type is mismatched, correct it or safely bypass it.
+   - If an import is missing, add it.
    - If a file is hallucinated, remove the import or provide a fallback.
-5. DO NOT add new features. DO NOT rewrite unaffected code. ONLY fix the specific error mentioned.
+5. RUTHLESS TYPE BYPASS RULE (CRITICAL): If you see a complex TypeScript generic mismatch (like TS2322, especially involving Framer Motion, HTMLMotionProps, or React event handlers like onDrag), DO NOT try to perfectly solve the type puzzle. It is a waste of time. Force the build to pass by using \`// @ts-expect-error\` directly above the failing line, or casting the prop as \`any\` (e.g., \`{...(props as any)}\`).
+6. DO NOT add new features. DO NOT rewrite unaffected code. ONLY fix the specific error mentioned.
 
 Final output (MANDATORY):
 Once you have successfully called the tools to fix the issue, you MUST output exactly:

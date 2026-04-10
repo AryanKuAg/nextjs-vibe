@@ -500,6 +500,9 @@ Fixed build errors.
         // Create the CF pages project via curl (since Wrangler create can sometimes prompt interactively)
         await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
 
+        // Inject Cloudflare headers to allow iframe embedding in the dashboard
+        await sandbox.commands.run(`echo "/*\n  X-Frame-Options: ALLOWALL\n  Access-Control-Allow-Origin: *" > dist/_headers`);
+
         // Use official Wrangler CLI to deploy the dist folder seamlessly without zipping
         const envs = {
           CLOUDFLARE_API_TOKEN: cfToken,

@@ -480,6 +480,64 @@ export const codeAgentFunction = inngest.createFunction(
       return `https://${host}`;
     });
 
+    const completeFiles = await step.run("get-all-sandbox-files", async () => {
+      try {
+        const sandbox = await getSandbox(sandboxId);
+        // Scrape the sandbox using a strict Whitelist approach.
+        // We only want 'src/', 'public/', and specific configuration files. 
+        // This prevents capturing massive hidden folders like '~/.npm'.
+        const cmdResult = await sandbox.commands.run(`node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          function getFiles(dir, fileList = {}) {
+            if (!fs.existsSync(dir)) return fileList;
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+              const filePath = path.join(dir, file);
+              if (fs.statSync(filePath).isDirectory()) {
+                getFiles(filePath, fileList);
+              } else {
+                const ext = path.extname(filePath).toLowerCase();
+                if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {
+                   const normalizedPath = filePath.split(path.sep).join('/');
+                   fileList[normalizedPath] = fs.readFileSync(filePath, 'utf8');
+                }
+              }
+            }
+            return fileList;
+          }
+          
+          const result = {};
+          
+          // 1. Recursively get UI directories
+          Object.assign(result, getFiles('src'));
+          Object.assign(result, getFiles('public'));
+          
+          // 2. Explicitly grab root configuration files
+          const rootFiles = [
+            'index.html', 'vite.config.ts', 'tailwind.config.js', 'postcss.config.js', 
+            'package.json', 'components.json', 'eslint.config.js', 'tsconfig.app.json', 
+            'tsconfig.json', 'tsconfig.node.json'
+          ];
+          
+          for (const file of rootFiles) {
+            if (fs.existsSync(file)) {
+              result[file] = fs.readFileSync(file, 'utf8');
+            }
+          }
+          
+          console.log(JSON.stringify(result));
+        "`);
+
+        const parsedFiles = JSON.parse(cmdResult.stdout.trim());
+        return parsedFiles;
+      } catch (e) {
+        console.error('DEBUG: Failed to extract full file tree from sandbox:', e);
+        return null;
+      }
+    });
+
     await step.run("save-result", async () => {
       return await prisma.message.create({
         data: {
@@ -492,7 +550,7 @@ export const codeAgentFunction = inngest.createFunction(
               sandboxUrl: sandboxUrl,
               deploymentUrl: deploymentUrl,
               title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
-              files: finalFiles || {},
+              files: completeFiles || finalFiles || {},
             },
           },
         },

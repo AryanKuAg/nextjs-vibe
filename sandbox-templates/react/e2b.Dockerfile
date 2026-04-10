@@ -50,4 +50,11 @@ RUN sed -i 's/"noUnusedParameters": true/"noUnusedParameters": false/g' tsconfig
 RUN cp -a /home/user/vite-app/. /home/user/ && rm -rf /home/user/vite-app
 
 RUN chown -R user:user /home/user
+
+# Pre-create Vite's hidden cache directories so it doesn't crash trying to make them
+RUN mkdir -p /home/user/node_modules/.vite /home/user/node_modules/.vite-temp
+
+# Forcefully unlock the node_modules folder and the new cache folders
+RUN chmod -R 777 /home/user/node_modules
+
 USER user

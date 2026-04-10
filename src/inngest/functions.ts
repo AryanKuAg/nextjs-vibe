@@ -3,7 +3,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
@@ -174,9 +174,102 @@ export const codeAgentFunction = inngest.createFunction(
       },
     );
 
-    // Generate a truly unique runId for this specific execution to prevent Inngest
-    // AUTOMATIC_PARALLEL_INDEXING step ID collisions if the user clicks "Run" multiple times.
-    const runId = event.data.projectId.slice(0, 4);
+
+    const runId = event.id ? event.id.slice(0, 8) : Math.random().toString(36).substring(2, 10);
+
+    // Factory to generate tools with safe, deterministic, auto-incrementing step IDs
+    // Factory to generate tools with safe, deterministic, auto-incrementing step IDs
+    const getToolsForAgent = (prefix: string) => {
+      let terminalCount = 0;
+      let readFilesCount = 0;
+      let createFilesCount = 0; // <-- Add this counter
+
+      return [
+        createTool({
+          name: "terminal",
+          // ... keep existing terminal description/params ...
+          parameters: z.object({
+            command: z.string(),
+          }),
+          handler: async ({ command }, { step }) => {
+            terminalCount++;
+            return await step?.run(`terminal-${prefix}-call-${terminalCount}`, async () => {
+              const buffers = { stdout: "", stderr: "" };
+              try {
+                const sandbox = await getSandbox(sandboxId);
+                const result = await sandbox.commands.run(`yes 2>/dev/null | (${command})`, {
+                  timeoutMs: 0,
+                  onStdout: (data: string) => { buffers.stdout += data; },
+                  onStderr: (data: string) => { buffers.stderr += data; },
+                });
+                return result.stdout || "(done, no output)";
+              } catch (e) {
+                return `Command failed: ${e}\nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`;
+              }
+            });
+          },
+        }),
+        createTool({
+          name: "createOrUpdateFiles",
+          description: "Create or update files in the sandbox",
+          parameters: z.object({
+            files: z.array(z.object({ path: z.string(), content: z.string() })),
+          }),
+          handler: async ({ files }, { network, step }: Tool.Options<AgentState>) => {
+            createFilesCount++;
+
+            // 1. Do the heavy API work INSIDE the step
+            const updatedFiles = await step?.run(`createFiles-${prefix}-call-${createFilesCount}`, async () => {
+              try {
+                const updated: Record<string, string> = {};
+                const sandbox = await getSandbox(sandboxId);
+                for (const file of files) {
+                  await sandbox.files.write(file.path, file.content);
+                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
+                  updated[file.path] = file.content;
+                }
+                return updated;
+              } catch (e) {
+                throw new Error(`File write failed: ${e}`);
+              }
+            });
+
+            // 2. Safely mutate the state OUTSIDE the step
+            if (updatedFiles && network) {
+              network.state.data.files = {
+                ...(network.state.data.files || {}),
+                ...updatedFiles,
+              };
+            }
+            return `Successfully updated files`;
+          },
+        }),
+        createTool({
+          name: "readFiles",
+          // ... keep existing readFiles code ...
+          description: "Read files from the sandbox",
+          parameters: z.object({
+            files: z.array(z.string()),
+          }),
+          handler: async ({ files }, { step }) => {
+            readFilesCount++;
+            return await step?.run(`readFiles-${prefix}-call-${readFilesCount}`, async () => {
+              try {
+                const sandbox = await getSandbox(sandboxId);
+                const contents = [];
+                for (const file of files) {
+                  const content = await sandbox.files.read(file);
+                  contents.push({ path: file, content });
+                }
+                return JSON.stringify(contents);
+              } catch (e) {
+                return "Error: " + e;
+              }
+            });
+          },
+        }),
+      ];
+    };
 
     // Factory function: creates an agent with unique name and step IDs per attempt.
     const createCodeAgentForAttempt = (attemptIndex: number, iterIndex: number = 0) => {
@@ -187,81 +280,7 @@ export const codeAgentFunction = inngest.createFunction(
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
         model: geminiVertexKey("gemini-3-flash-preview"),
-        tools: [
-          createTool({
-            name: "terminal",
-            description: "Use the terminal to run commands",
-            parameters: z.object({
-              command: z.string(),
-            }),
-            handler: async ({ command }, { step }) => {
-              return await step?.run(`terminal-run-${runId}-attempt-${attemptIndex}`, async () => {
-                const buffers = { stdout: "", stderr: "" };
-                try {
-                  const sandbox = await getSandbox(sandboxId);
-                  const result = await sandbox.commands.run(
-                    `yes 2>/dev/null | (${command})`,
-                    {
-                      timeoutMs: 0,
-                      onStdout: (data: string) => { buffers.stdout += data; },
-                      onStderr: (data: string) => { buffers.stderr += data; },
-                    }
-                  );
-                  return result.stdout || "(done, no output)";
-                } catch (e) {
-                  return `Command failed: ${e}\nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`;
-                }
-              });
-            },
-          }),
-          createTool({
-            name: "createOrUpdateFiles",
-            description: "Create or update files in the sandbox",
-            parameters: z.object({
-              files: z.array(z.object({ path: z.string(), content: z.string() })),
-            }),
-            handler: async ({ files }, { network }: Tool.Options<AgentState>) => {
-              try {
-                const updatedFiles: Record<string, string> = {};
-                const sandbox = await getSandbox(sandboxId);
-                for (const file of files) {
-                  await sandbox.files.write(file.path, file.content);
-                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
-                  updatedFiles[file.path] = file.content;
-                }
-                network.state.data.files = {
-                  ...(network.state.data.files || {}),
-                  ...updatedFiles,
-                };
-                return `Successfully updated files`;
-              } catch (e) {
-                return "Error: " + e;
-              }
-            },
-          }),
-          createTool({
-            name: "readFiles",
-            description: "Read files from the sandbox",
-            parameters: z.object({
-              files: z.array(z.string()),
-            }),
-            handler: async ({ files }, { step }) => {
-              return await step?.run(`readFiles-run-${runId}-attempt-${attemptIndex}`, async () => {
-                try {
-                  const sandbox = await getSandbox(sandboxId);
-                  const contents = [];
-                  for (const file of files) {
-                    const content = await sandbox.files.read(file);
-                    contents.push({ path: file, content });
-                  }
-                  return JSON.stringify(contents);
-                } catch (e) {
-                  return "Error: " + e;
-                }
-              });
-            },
-          }),
-        ],
+        tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
             const lastAssistantMessageText = lastAssistantTextMessageContent(result);
@@ -276,150 +295,145 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
-    let isBuildSuccessful = false;
-    const maxRetries = 5; // Give the AI up to 5 chances to self-heal the build
-    let attempt = 0;
     let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
     let finalFiles = state.data.files;
     let iterCount = 0;
 
-    // --- THE SELF-HEALING LOOP ---
+    // --- 1. INITIAL GENERATION (The Creator) ---
+    // Run the main massive agent exactly once to build the features
+    const initialAgent = createCodeAgentForAttempt(0, 0);
+    const initialNetwork = createNetwork<AgentState>({
+      name: `coding-agent-network-run-${runId}-initial`,
+      agents: [initialAgent],
+      maxIter: 5,
+      defaultState: state,
+      router: async ({ network }) => {
+        // If we have a summary, we are done! Return nothing to stop the loop.
+        if (network.state.data.summary) return;
+        return initialAgent; // Otherwise, run the agent
+      },
+      defaultModel: geminiVertexKey("gemini-3-flash-preview"),
+    });
+
+    console.log('DEBUG: Running initial Creator agent...');
+    const result = await initialNetwork.run(event.data.value, { state });
+
+    finalSummary = result.state.data.summary || "";
+    finalFiles = result.state.data.files;
+
+    if (!finalSummary) {
+      console.error("DEBUG: AI returned no summary. Halting.");
+      finalSummary = "Task completed.";
+    }
+
+    // --- 2. THE SELF-HEALING LOOP (The Fixer) ---
+    let isBuildSuccessful = false;
+    const maxRetries = 5;
+    let attempt = 1;
+
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      iterCount = 0;
-      // Create a unique network for this attempt.
-      const attemptNetwork = createNetwork<AgentState>({
-        name: `coding-agent-network-run-${runId}-attempt-${attempt}`,
-        agents: [createCodeAgentForAttempt(attempt, iterCount)],
-        maxIter: 5,
-        defaultState: state,
-        router: async ({ network }) => {
-          const summary = network.state.data.summary;
-          console.log("DEBUG: Summary:", summary);
-          if (summary) return;
-          iterCount++;
-          return createCodeAgentForAttempt(attempt, iterCount);
-        },
-      });
-      console.log('Im here here here', attempt, event.data, currentPrompt)
-      // 1. Let the AI generate or fix the code.
-      // NOTE: network.run() must NOT be wrapped in step.run() — agent-kit tools
-      // internally call step?.run() themselves, and nesting steps deadlocks Inngest.
-      const result = await attemptNetwork.run(
-        attempt === 0 ? event.data.value : currentPrompt,
-        { state }
-      );
-
-      finalSummary = result.state.data.summary || "";
-      finalFiles = result.state.data.files;
-
-      // Guard: if AI returned nothing useful, don't retry — break out.
-      if (!finalSummary) {
-        console.error("DEBUG: AI returned no summary. Breaking loop to avoid infinite retry.");
-        finalSummary = "Task completed.";
-        break;
-      }
-
-      // 2. Verify the build in an isolated step
+      // Step A: Check the build
       const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
-          console.log(`DEBUG: Running build check (Run ${runId}, Attempt ${attempt})...`);
-
           await sandbox.commands.run("rm -rf dist");
 
-          // --- 1. THE TYPE CHECK ---
-          console.log("DEBUG: Running strict TypeScript check...");
+          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            // E2B throws CommandExitError on failure. The logs are inside tsErr.stdout / tsErr.stderr
+          } catch (tsErr: any) {
             const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
-            console.error("DEBUG: TypeScript check failed:", tsErrorLog.substring(0, 500));
-            return { success: false, error: `TypeScript Compilation Error:\n${tsErrorLog}` };
+            return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
           }
 
-          // --- 2. THE VITE BUILD ---
-          console.log("DEBUG: Running Vite build...");
+          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npm run build --silent");
-          } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+          } catch (buildErr: any) {
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
-            console.error("DEBUG: Vite build failed:", viteErrorLog.substring(0, 500));
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
           }
 
-          // If it makes it here without throwing, both passed!
           return { success: true, error: "" };
-
-        } catch (infraErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-          // This outer catch only triggers if the E2B Sandbox completely disconnects or crashes
-          console.error("DEBUG: Sandbox infrastructure error:", infraErr);
+        } catch (infraErr: any) {
           return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };
         }
       });
 
+      // Step B: Evaluate the check
       if (buildCheck.success) {
+        console.log("DEBUG: Build passed successfully!");
         isBuildSuccessful = true;
-      } else {
-        attempt++;
-        if (attempt <= maxRetries) {
-          console.log(`DEBUG: Feeding error back to AI for fix (Attempt ${attempt})...`);
-
-          if (!buildCheck.error || buildCheck.error.length < 10) {
-            console.error("DEBUG: Build error was empty after filtering. Treating as success.");
-            isBuildSuccessful = true;
-            break;
-          }
-
-          // Pass the raw error to the AI and let it reason through the fix
-          // Pass the raw error to the AI and let it reason through the fix
-          currentPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
-The React Vite build failed with the following exact errors:
-
-${buildCheck.error}
-
-INSTRUCTIONS TO FIX:
-1. Use the \`createOrUpdateFiles\` tool to fix these specific errors (e.g., if 'Plus' is missing, add \`import { Plus } from "lucide-react"\`, or fix the TypeScript type mismatches).
-2. ONLY update the specific files that are broken. Do not rewrite the whole app.
-3. Once you have called the tool and updated the files, you MUST immediately output the following tag to finish the task:
-
-<task_summary>
-Fixed build errors.
-</task_summary>
-
-You MUST output the <task_summary> tag. Do not explain your fixes, just call the tool and output the summary.`;
-
-          // CRITICAL: Clear the summary so the router doesn't skip the fix step
-          state.data.summary = "";
-        }
+        break; // Exit the loop!
       }
-    }
 
+      // Step C: The Fixer Agent takes over
+      console.log(`DEBUG: Build failed. Spinning up Fixer Agent (Attempt ${attempt})...`);
+
+      // We clear the summary so the Fixer starts fresh
+      state.data.summary = "";
+
+      // Create a dedicated mini-agent just for this fix attempt
+      const fixerAgent = createAgent<AgentState>({
+        name: `fixer-agent-run-${runId}-attempt-${attempt}`,
+        description: "An expert debugging agent",
+        system: FIXER_PROMPT, // Uses the strict, focused prompt
+        model: geminiVertexKey("gemini-3-flash-preview"),
+        tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
+        lifecycle: {
+          onResponse: async ({ result, network }) => {
+            const lastAssistantMessageText = lastAssistantTextMessageContent(result);
+            if (lastAssistantMessageText && network) {
+              if (lastAssistantMessageText.includes("<task_summary>")) {
+                network.state.data.summary = lastAssistantMessageText;
+              }
+            }
+            return result;
+          },
+        },
+      });
+
+      const fixerNetwork = createNetwork<AgentState>({
+        name: `fixer-network-run-${runId}-attempt-${attempt}`,
+        agents: [fixerAgent],
+        maxIter: 3,
+        defaultState: state,
+        router: async ({ network }) => {
+          if (network.state.data.summary) return;
+          return fixerAgent;
+        },
+        defaultModel: geminiVertexKey("gemini-3-flash-preview"),
+      });
+
+      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\nThe build failed with these exact errors:\n\n${buildCheck.error}\n\nUse your tools to fix ONLY the broken files, then output <task_summary>.`;
+
+      const fixResult = await fixerNetwork.run(fixPrompt, { state });
+
+      // Update our final state with whatever the fixer changed
+      finalFiles = fixResult.state.data.files;
+
+      attempt++;
+    }
     const fragmentTitleGenerator = createAgent({
-      name: "fragment-title-generator",
+      name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
       model: geminiVertexKey("gemini-3-flash-preview"),
-    })
+    });
 
     const responseGenerator = createAgent({
-      name: "response-generator",
+      name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
       model: geminiVertexKey("gemini-3-flash-preview"),
     });
 
-
-    const {
-      output: fragmentTitleOutput
-    } = await fragmentTitleGenerator.run(finalSummary);
-    const {
-      output: responseOutput
-    } = await responseGenerator.run(finalSummary);
-
+    const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
+    const { output: responseOutput } = await responseGenerator.run(finalSummary);
 
     console.log('hola', isBuildSuccessful);
+    // ... continues to deploymentUrl ...
 
     const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
       // If the AI failed to fix the code after max retries, abort the deployment
@@ -556,14 +570,14 @@ You MUST output the <task_summary> tag. Do not explain your fixes, just call the
       return await prisma.message.create({
         data: {
           projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput) || finalSummary,
+          content: parseAgentOutput(responseOutput as any) || finalSummary,
           role: "ASSISTANT",
           type: "RESULT",
           fragment: {
             create: {
               sandboxUrl: sandboxUrl,
               deploymentUrl: deploymentUrl,
-              title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
+              title: parseAgentOutput(fragmentTitleOutput as any) || "Project Updated",
               files: completeFiles || finalFiles || {},
             },
           },
@@ -575,7 +589,7 @@ You MUST output the <task_summary> tag. Do not explain your fixes, just call the
       url: deploymentUrl || sandboxUrl,
       deploymentUrl: deploymentUrl,
       sandboxUrl: sandboxUrl,
-      title: "Fragment",
+      title: parseAgentOutput(fragmentTitleOutput as any) || "Project",
       files: finalFiles,
       summary: finalSummary,
     };

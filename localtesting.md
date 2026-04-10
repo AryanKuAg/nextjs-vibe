@@ -24,5 +24,5 @@ ls node_modules         # Are all packages there?
 INNGEST_EVENT_KEY=local
 INNGEST_SIGNING_KEY=local
 
-npx inngest-cli@latest dev
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 localhost:8288

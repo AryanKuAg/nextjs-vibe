@@ -79,7 +79,7 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       if (!sandbox) {
-        sandbox = await Sandbox.create("vibe-nextjs-test-2");
+        sandbox = await Sandbox.create("vibe-reactjs-test");
         await sandbox.setTimeout(SANDBOX_TIMEOUT);
 
         await prisma.project.update({
@@ -174,142 +174,108 @@ export const codeAgentFunction = inngest.createFunction(
       },
     );
 
-    // Removed OAuth Service Account fetching entirely because the curl works with a standard API key!
+    // Generate a truly unique runId for this specific execution to prevent Inngest
+    // AUTOMATIC_PARALLEL_INDEXING step ID collisions if the user clicks "Run" multiple times.
+    const runId = event.data.projectId.slice(0, 4);
 
-    const codeAgent = createAgent<AgentState>({
-      name: "code-agent",
-      description: "An expert coding agent",
-      system: PROMPT,
-      model: geminiVertexKey("gemini-3.1-flash-lite-preview"),
-      tools: [
-        createTool({
-          name: "terminal",
-          description: "Use the terminal to run commands",
-          parameters: z.object({
-            command: z.string(),
-          }),
-          handler: async ({ command }, { step }) => {
-            return await step?.run("terminal", async () => {
-              const buffers = { stdout: "", stderr: "" };
-
-              try {
-                const sandbox = await getSandbox(sandboxId);
-                // timeoutMs: 0 disables the E2B deadline entirely so long-running
-                // commands (npm install, builds, etc.) never get killed mid-flight.
-                // We wrap the command with `yes |` to auto-answer any interactive
-                // prompts (e.g. "overwrite? y/N") so the AI never hangs.
-                const result = await sandbox.commands.run(
-                  `yes 2>/dev/null | (${command})`,
-                  {
-                    timeoutMs: 0,
-                    onStdout: (data: string) => {
-                      buffers.stdout += data;
-                    },
-                    onStderr: (data: string) => {
-                      buffers.stderr += data;
+    // Factory function: creates an agent with unique name and step IDs per attempt.
+    const createCodeAgentForAttempt = (attemptIndex: number) => {
+      return createAgent<AgentState>({
+        name: `code-agent-run-${runId}-attempt-${attemptIndex}`,
+        description: "An expert coding agent",
+        system: PROMPT,
+        // Using 1.5-pro-002 for the highest reliability in tool-calling.
+        // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
+        model: geminiVertexKey("gemini-3-flash-preview"),
+        tools: [
+          createTool({
+            name: "terminal",
+            description: "Use the terminal to run commands",
+            parameters: z.object({
+              command: z.string(),
+            }),
+            handler: async ({ command }, { step }) => {
+              return await step?.run(`terminal-run-${runId}-attempt-${attemptIndex}`, async () => {
+                const buffers = { stdout: "", stderr: "" };
+                try {
+                  const sandbox = await getSandbox(sandboxId);
+                  const result = await sandbox.commands.run(
+                    `yes 2>/dev/null | (${command})`,
+                    {
+                      timeoutMs: 0,
+                      onStdout: (data: string) => { buffers.stdout += data; },
+                      onStderr: (data: string) => { buffers.stderr += data; },
                     }
-                  }
-                );
-                return result.stdout || "(done, no output)";
-              } catch (e) {
-                console.error(
-                  `Command failed: ${e} \nstdout: ${buffers.stdout}\nstderror: ${buffers.stderr}`,
-                );
-                return `Command failed: ${e} \nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`;
-              }
-            });
-          },
-        }),
-        createTool({
-          name: "createOrUpdateFiles",
-          description: "Create or update files in the sandbox",
-          parameters: z.object({
-            files: z.array(
-              z.object({
-                path: z.string(),
-                content: z.string(),
-              }),
-            ),
-          }),
-          handler: async (
-            { files },
-            { network }: Tool.Options<AgentState>
-          ) => {
-            try {
-              const updatedFiles: Record<string, string> = {};
-              const sandbox = await getSandbox(sandboxId);
-              for (const file of files) {
-                await sandbox.files.write(file.path, file.content);
-                await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
-                updatedFiles[file.path] = file.content;
-              }
-
-              network.state.data.files = {
-                ...(network.state.data.files || {}),
-                ...updatedFiles
-              };
-              return `Successfully updated files`;
-            } catch (e) {
-              return "Error: " + e;
-            }
-          }
-        }),
-        createTool({
-          name: "readFiles",
-          description: "Read files from the sandbox",
-          parameters: z.object({
-            files: z.array(z.string()),
-          }),
-          handler: async ({ files }, { step }) => {
-            return await step?.run("readFiles", async () => {
-              try {
-                const sandbox = await getSandbox(sandboxId);
-                const contents = [];
-                for (const file of files) {
-                  const content = await sandbox.files.read(file);
-                  contents.push({ path: file, content });
+                  );
+                  return result.stdout || "(done, no output)";
+                } catch (e) {
+                  return `Command failed: ${e}\nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`;
                 }
-                return JSON.stringify(contents);
+              });
+            },
+          }),
+          createTool({
+            name: "createOrUpdateFiles",
+            description: "Create or update files in the sandbox",
+            parameters: z.object({
+              files: z.array(z.object({ path: z.string(), content: z.string() })),
+            }),
+            handler: async ({ files }, { network }: Tool.Options<AgentState>) => {
+              try {
+                const updatedFiles: Record<string, string> = {};
+                const sandbox = await getSandbox(sandboxId);
+                for (const file of files) {
+                  await sandbox.files.write(file.path, file.content);
+                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
+                  updatedFiles[file.path] = file.content;
+                }
+                network.state.data.files = {
+                  ...(network.state.data.files || {}),
+                  ...updatedFiles,
+                };
+                return `Successfully updated files`;
               } catch (e) {
                 return "Error: " + e;
               }
-            })
-          },
-        })
-      ],
-      lifecycle: {
-        onResponse: async ({ result, network }) => {
-          const lastAssistantMessageText =
-            lastAssistantTextMessageContent(result);
-
-          if (lastAssistantMessageText && network) {
-            if (lastAssistantMessageText.includes("<task_summary>")) {
-              network.state.data.summary = lastAssistantMessageText;
+            },
+          }),
+          createTool({
+            name: "readFiles",
+            description: "Read files from the sandbox",
+            parameters: z.object({
+              files: z.array(z.string()),
+            }),
+            handler: async ({ files }, { step }) => {
+              return await step?.run(`readFiles-run-${runId}-attempt-${attemptIndex}`, async () => {
+                try {
+                  const sandbox = await getSandbox(sandboxId);
+                  const contents = [];
+                  for (const file of files) {
+                    const content = await sandbox.files.read(file);
+                    contents.push({ path: file, content });
+                  }
+                  return JSON.stringify(contents);
+                } catch (e) {
+                  return "Error: " + e;
+                }
+              });
+            },
+          }),
+        ],
+        lifecycle: {
+          onResponse: async ({ result, network }) => {
+            console.log('aryan lifecycle,', result, network?.state.data)
+            const lastAssistantMessageText = lastAssistantTextMessageContent(result);
+            if (lastAssistantMessageText && network) {
+              if (lastAssistantMessageText.includes("<task_summary>")) {
+                network.state.data.summary = lastAssistantMessageText;
+              }
             }
-          }
-
-          return result;
+            return result;
+          },
         },
-      },
-    });
-
-    const network = createNetwork<AgentState>({
-      name: "coding-agent-network",
-      agents: [codeAgent],
-      maxIter: 15,
-      defaultState: state,
-      router: async ({ network }) => {
-        const summary = network.state.data.summary;
-
-        if (summary) {
-          return;
-        }
-
-        return codeAgent;
-      },
-    });
-
-    // const result = await network.run(event.data.value, { state });
+      });
+    };
 
     let isBuildSuccessful = false;
     const maxRetries = 5; // Give the AI up to 5 chances to self-heal the build
@@ -320,10 +286,25 @@ export const codeAgentFunction = inngest.createFunction(
 
     // --- THE SELF-HEALING LOOP ---
     while (!isBuildSuccessful && attempt <= maxRetries) {
+      // Create a uniquely named agent and network for this attempt.
+      const currentCodeAgent = createCodeAgentForAttempt(attempt);
+      const attemptNetwork = createNetwork<AgentState>({
+        name: `coding-agent-network-run-${runId}-attempt-${attempt}`,
+        agents: [currentCodeAgent],
+        maxIter: 5,
+        defaultState: state,
+        router: async ({ network }) => {
+          const summary = network.state.data.summary;
+          console.log("DEBUG: Summary:", summary);
+          if (summary) return;
+          return currentCodeAgent;
+        },
+      });
+      console.log('Im here here here', attempt, event.data, currentPrompt)
       // 1. Let the AI generate or fix the code.
       // NOTE: network.run() must NOT be wrapped in step.run() — agent-kit tools
       // internally call step?.run() themselves, and nesting steps deadlocks Inngest.
-      const result = await network.run(
+      const result = await attemptNetwork.run(
         attempt === 0 ? event.data.value : currentPrompt,
         { state }
       );
@@ -339,66 +320,57 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       // 2. Verify the build in an isolated step
-      const buildCheck = await step.run(`verify-build-attempt-${attempt}`, async () => {
+      const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
-          console.log(`DEBUG: Running build check (Attempt ${attempt})...`);
+          console.log(`DEBUG: Running build check (Run ${runId}, Attempt ${attempt})...`);
 
-          // Clean up to ensure a fresh build
           await sandbox.commands.run("rm -rf dist");
 
           // Suppress npm version notices. Vite/tsc errors always go to stdout.
-          const buildResult = await sandbox.commands.run(
-            "npm run build --silent 2>&1"
-          );
+          const buildResult = await sandbox.commands.run("npm run build --silent 2>&1");
 
-          // Even if exit code is 0, double-check stdout for known error markers
+          console.log('build result lol', buildResult);
+
+          // Double-check output for known error markers (some failures exit 0)
           const combinedOutput = (buildResult.stdout || "") + "\n" + (buildResult.stderr || "");
           const hasError = combinedOutput.includes("error TS") || combinedOutput.includes("Build failed");
 
-          if (hasError) {
-            return { success: false, error: combinedOutput.trim() };
-          }
-
+          if (hasError) return { success: false, error: combinedOutput.trim() };
           return { success: true, error: "" };
+
         } catch (buildErr: unknown) {
           const err = buildErr as { stderr?: string; stdout?: string; message?: string };
 
-          // Vite/tsc write errors to stdout — stderr only has npm notices, so check stdout first
+          // Vite/tsc errors go to stdout — stderr only has npm notices
           const rawOutput = (err.stdout || "") + "\n" + (err.stderr || "") || err.message || "Unknown build error";
 
-          // Strip npm notice lines — they are irrelevant and confuse the AI
           const errorLog = rawOutput
             .split("\n")
             .filter((line: string) => !line.trim().startsWith("npm notice") && !line.trim().startsWith("npm warn"))
             .join("\n")
             .trim();
 
-          console.error("DEBUG: Build failed with error:", errorLog.substring(0, 800));
+          console.error("DEBUG: Build failed:", errorLog.substring(0, 800));
           return { success: false, error: errorLog || "Build failed with unknown error." };
         }
       });
 
       if (buildCheck.success) {
-        isBuildSuccessful = true; // The code works! Break out of the loop.
+        isBuildSuccessful = true;
       } else {
         attempt++;
         if (attempt <= maxRetries) {
           console.log(`DEBUG: Feeding error back to AI for fix (Attempt ${attempt})...`);
 
-          // Safety guard: if the error is empty after filtering, don't send to AI
           if (!buildCheck.error || buildCheck.error.length < 10) {
-            console.error("DEBUG: Build error was empty after filtering. Breaking loop.");
-            isBuildSuccessful = true; // Treat as success to unblock the pipeline
+            console.error("DEBUG: Build error was empty after filtering. Treating as success.");
+            isBuildSuccessful = true;
             break;
           }
 
-          // Pass the raw error back to the AI and let it reason through the fix itself
-          currentPrompt = `The React Vite build failed. Here is the exact error output:
-
-${buildCheck.error}
-
-Analyze the error, fix the affected files using the createOrUpdateFiles or terminal tool, then reply with <task_summary> when done.`;
+          // Pass the raw error to the AI and let it reason through the fix
+          currentPrompt = `The React Vite build failed. Here is the exact error output:\n\n${buildCheck.error}\n\nAnalyze the error, fix the affected files using the createOrUpdateFiles or terminal tool, then reply with <task_summary> when done.`;
 
           // CRITICAL: Clear the summary so the router doesn't skip the fix step
           state.data.summary = "";
@@ -471,6 +443,25 @@ Analyze the error, fix the affected files using the createOrUpdateFiles or termi
 
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
       const sandbox = await getSandbox(sandboxId);
+
+      // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
+      await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
+
+      // 2. Start the Vite server in the background
+      await sandbox.commands.run("npm run dev -- --host 0.0.0.0 --port 3000", { background: true });
+
+      // 3. Robustly poll locally until the server is awake and accepting traffic
+      // This eliminates the race condition where the UI renders the URL before Vite has bound the port.
+      await sandbox.commands.run(`
+        for i in {1..20}; do
+          if curl -s http://localhost:3000 >/dev/null; then
+            exit 0
+          fi
+          sleep 0.5
+        done
+        exit 1
+      `);
+
       const host = sandbox.getHost(3000);
       return `https://${host}`;
     });

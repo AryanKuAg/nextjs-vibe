@@ -65,7 +65,7 @@ export function FragmentWeb({ data }: Props) {
         </Hint>
       </div>
       <iframe
-        key={fragmentKey}
+        key={`${data.id}-${fragmentKey}`}
         className="h-full w-full"
         sandbox="allow-forms allow-scripts allow-same-origin"
         loading="lazy"

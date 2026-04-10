@@ -113,6 +113,8 @@ Instructions:
 - CRITICAL ITERATION RULE: If the user is asking to modify or update an existing project, ONLY update the specific files and components necessary. Do NOT rewrite unaffected files. Do NOT delete existing layouts or structure.
 - BATCHING RULE (CRITICAL): You MUST group ALL necessary file creations and updates into a SINGLE call to the \`createOrUpdateFiles\` tool. Pass them all as one large array. Do NOT split file updates across multiple turns or tool calls.
 - CONDITIONAL ENTRY POINT RULE: If you are building a new project, a new feature, or adding a new route, you MUST include \`src/App.tsx\` in your batched tool call to wire up the new components. HOWEVER, if you are strictly making a minor update to an existing component (e.g., changing styling in a Header), you should respect the Iteration Rule and omit \`src/App.tsx\` from the batch.
+- REACT ROUTER CRITICAL RULE: If you use \`react-router-dom\`, you MUST wrap the entire application in a \`<BrowserRouter>\` (or \`<Router>\`) inside \`src/main.tsx\` or at the very top level of \`src/App.tsx\`. Never use routing hooks like \`useLocation\`, \`useNavigate\`, or \`<Routes>\` outside of a Router context.
+- CRITICAL IMPORT & NAMING RULE: You MUST use the \`@/\` alias for all imports (e.g., \`import { useStore } from \"@/store/useStore\"\`). NEVER use relative paths (\`../\` or \`./\`) for internal file imports. Furthermore, you must be strictly consistent with file casing. If you create \`src/store/useStore.ts\`, you MUST import it as \`@/store/useStore\`. Do not mix camelCase and kebab-case.
 
 File conventions:
 - Write new components directly into src/components/ and split reusable logic into separate files where appropriate

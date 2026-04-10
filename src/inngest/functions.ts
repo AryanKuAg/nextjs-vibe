@@ -329,32 +329,34 @@ export const codeAgentFunction = inngest.createFunction(
 
           await sandbox.commands.run("rm -rf dist");
 
-          // Suppress npm version notices. Vite/tsc errors always go to stdout.
-          const buildResult = await sandbox.commands.run("npm run build --silent 2>&1");
+          // --- 1. THE TYPE CHECK (Catches import/casing/variable errors) ---
+          console.log("DEBUG: Running strict TypeScript check...");
+          const typeCheck = await sandbox.commands.run("npx tsc --noEmit");
 
-          console.log('build result lol', buildResult);
+          // If tsc fails, it returns an exitCode > 0.
+          if (typeCheck.exitCode !== 0) {
+            const tsError = (typeCheck.stdout + "\n" + typeCheck.stderr).trim();
+            console.error("DEBUG: TypeScript check failed:", tsError.substring(0, 500));
+            return { success: false, error: `TypeScript Compilation Error:\n${tsError}` };
+          }
 
-          // Double-check output for known error markers (some failures exit 0)
-          const combinedOutput = (buildResult.stdout || "") + "\n" + (buildResult.stderr || "");
-          const hasError = combinedOutput.includes("error TS") || combinedOutput.includes("Build failed");
+          // --- 2. THE VITE BUILD (Catches bundler/Tailwind errors) ---
+          console.log("DEBUG: Running Vite build...");
+          const buildResult = await sandbox.commands.run("npm run build --silent");
 
-          if (hasError) return { success: false, error: combinedOutput.trim() };
+          if (buildResult.exitCode !== 0) {
+            const viteError = (buildResult.stdout + "\n" + buildResult.stderr).trim();
+            console.error("DEBUG: Vite build failed:", viteError.substring(0, 500));
+            return { success: false, error: `Vite Build Error:\n${viteError}` };
+          }
+
+          // If both pass, the build is fully successful!
           return { success: true, error: "" };
 
         } catch (buildErr: unknown) {
-          const err = buildErr as { stderr?: string; stdout?: string; message?: string };
-
-          // Vite/tsc errors go to stdout — stderr only has npm notices
-          const rawOutput = (err.stdout || "") + "\n" + (err.stderr || "") || err.message || "Unknown build error";
-
-          const errorLog = rawOutput
-            .split("\n")
-            .filter((line: string) => !line.trim().startsWith("npm notice") && !line.trim().startsWith("npm warn"))
-            .join("\n")
-            .trim();
-
-          console.error("DEBUG: Build failed:", errorLog.substring(0, 800));
-          return { success: false, error: errorLog || "Build failed with unknown error." };
+          // This catch block will only trigger if the E2B sandbox itself crashes or disconnects
+          console.error("DEBUG: Sandbox infrastructure error:", buildErr);
+          return { success: false, error: `Sandbox Execution Error: ${String(buildErr)}` };
         }
       });
 

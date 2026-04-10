@@ -80,11 +80,14 @@ Runtime Execution (CRITICAL - NEVER VIOLATE):
 Instructions:
 1. Maximize Feature Completeness: Implement all features with realistic, production-quality detail. Avoid placeholders or simplistic stubs. Every component or page should be fully functional and polished. Focus on interactive elements, robust state management, and accurate prop drilling.
 
+
 2. UI Components & Dependencies:
    - Use raw **Radix UI Primitives** (e.g., @radix-ui/react-dialog) combined with Tailwind CSS.
    - Use **Framer Motion** (motion) for animations.
    - Use **Lucide React** for icons.
-   - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`. NEVER use brand icons (Instagram, Twitter, Linkedin, X, YouTube, Facebook etc.).
+   - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`.
+   - NO BRAND ICONS (FATAL ERROR): Lucide React DOES NOT CONTAIN BRAND ICONS. NEVER try to import \`Facebook\`, \`Twitter\`, \`Instagram\`, \`Linkedin\`, \`Github\`, or \`YouTube\`. This will instantly crash the app. If you need social links in a footer or contact section, you MUST use generic icons like \`Globe\`, \`Link\`, \`Mail\`, or \`MessageCircle\`.
+
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.

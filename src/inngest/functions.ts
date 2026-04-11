@@ -387,16 +387,21 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       // Step C: The Fixer Agent takes over
+      // Step C: The Fixer Agent takes over
       console.log(`DEBUG: Build failed. Spinning up Fixer Agent (Attempt ${attempt})...`);
 
-      // We clear the summary so the Fixer starts fresh
-      state.data.summary = "";
+      // CREATE A CLEAN STATE FOR THE FIXER
+      // We pass the files so it can edit them, but we do NOT pass the messages history.
+      const fixerState = createState<AgentState>({
+        summary: "",
+        files: state.data.files,
+      });
 
       // Create a dedicated mini-agent just for this fix attempt
       const fixerAgent = createAgent<AgentState>({
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
-        system: FIXER_PROMPT, // Uses the strict, focused prompt
+        system: FIXER_PROMPT,
         model: geminiVertexKey("gemini-3-flash-preview"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
@@ -416,7 +421,7 @@ export const codeAgentFunction = inngest.createFunction(
         name: `fixer-network-run-${runId}-attempt-${attempt}`,
         agents: [fixerAgent],
         maxIter: 3,
-        defaultState: state,
+        defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
           if (network.state.data.summary) return;
           return fixerAgent;
@@ -424,16 +429,24 @@ export const codeAgentFunction = inngest.createFunction(
         defaultModel: geminiVertexKey("gemini-3-flash-preview"),
       });
 
-      // --- CONTEXT INJECTION FOR THE FIXER ---
+      // --- SMART CONTEXT INJECTION FOR THE FIXER ---
       let brokenFilesContext = "";
-      const hasStateFiles = Object.keys(state.data.files).length > 0;
+      const hasStateFiles = Object.keys(fixerState.data.files).length > 0;
       if (hasStateFiles) {
-        brokenFilesContext += `\n\n=== CURRENT PROJECT STATE ===\n`;
-        for (const [path, content] of Object.entries(state.data.files)) {
-          if (path.includes('package-lock.json') || path.includes('node_modules')) continue;
-          brokenFilesContext += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
+        brokenFilesContext += `\n\n=== BROKEN FILES CONTENT ===\n`;
+        let injectedCount = 0;
+
+        for (const [path, content] of Object.entries(fixerState.data.files)) {
+          if (buildCheck.error.includes(path)) {
+            brokenFilesContext += `--- ${path} ---\n\`\`\`tsx\n${content}\n\`\`\`\n\n`;
+            injectedCount++;
+          }
         }
-        brokenFilesContext += `=== END PROJECT STATE ===\n\n`;
+        brokenFilesContext += `=== END BROKEN FILES CONTENT ===\n\n`;
+
+        if (injectedCount === 0) {
+          brokenFilesContext = "\n*(Note: Could not auto-extract broken file contents. Use your `readFiles` tool to investigate the error above.)*\n";
+        }
       }
 
       const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
@@ -441,17 +454,15 @@ The build failed with these exact errors:
 
 ${buildCheck.error}
 ${brokenFilesContext}
-INSTRUCTIONS TO FIX:
-1. You MUST use the \`createOrUpdateFiles\` tool to fix the broken code. If a module/file is missing (e.g., TS2307), you must either CREATE the missing file with a basic React component, or REMOVE the import from the file that is calling it.
-2. Do NOT chat or explain your plan. Call the tool immediately.
-3. ONLY after the tool call succeeds, output EXACTLY this tag to end your turn:
-<task_summary>
-Fixed build errors.
-</task_summary>`;
 
-      const fixResult = await fixerNetwork.run(fixPrompt, { state });
-      // Update our final state with whatever the fixer changed
-      finalFiles = fixResult.state.data.files;
+Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
+
+      // <--- USE THE CLEAN STATE HERE AS WELL
+      const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });
+
+      // Update our master state with whatever the fixer changed
+      state.data.files = fixResult.state.data.files;
+      finalFiles = state.data.files;
 
       attempt++;
     }

@@ -153,23 +153,17 @@ Created a blog layout with a responsive sidebar, a dynamic list of articles, and
 This is the ONLY valid way to terminate your task. If you omit or alter this section, the task will be considered incomplete and will continue unnecessarily.
 `
 
-
 export const FIXER_PROMPT = `
-You are an expert React and TypeScript debugger. 
-Your ONLY job is to fix build errors, linting errors, or missing imports in an existing codebase.
+You are an expert React/TypeScript bug-fixing agent.
 
-Instructions:
-1. You will be provided with a raw compilation error log (e.g., from Vite or tsc).
-2. The log will usually contain the exact file path and line number of the error.
-3. Use the \`readFiles\` tool to examine the broken file if you need to see the surrounding code.
-4. Use the \`createOrUpdateFiles\` tool to apply the minimal fix necessary. 
-   - If an import is missing, add it.
-   - If a file is hallucinated, remove the import or provide a fallback.
-5. RUTHLESS TYPE BYPASS RULE (CRITICAL): If you see a complex TypeScript generic mismatch (like TS2322, especially involving Framer Motion, HTMLMotionProps, or React event handlers like onDrag), DO NOT try to perfectly solve the type puzzle. It is a waste of time. Force the build to pass by using \`// @ts-expect-error\` directly above the failing line, or casting the prop as \`any\` (e.g., \`{...(props as any)}\`).
-6. DO NOT add new features. DO NOT rewrite unaffected code. ONLY fix the specific error mentioned.
+You will be given a build error and the contents of the broken files.
 
-Final output (MANDATORY):
-Once you have successfully called the tools to fix the issue, you MUST output exactly:
+YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
+1. First, write a 1-sentence explanation of what the error is and how you will fix it. YOU MUST OUTPUT TEXT FIRST.
+2. Second, call the \`createOrUpdateFiles\` tool to apply the fix to the file.
+   - For TS2322 (Framer Motion prop errors), force it to pass by using \`// @ts-expect-error\` above the failing line.
+   - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
+3. Third, ONLY AFTER the tool successfully returns, output EXACTLY:
 <task_summary>
 Fixed build errors.
 </task_summary>

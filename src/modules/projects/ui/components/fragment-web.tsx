@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLinkIcon, RefreshCcwIcon } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 
 import { Hint } from "@/components/hint";
 import { Fragment } from "@/generated/prisma";
@@ -31,7 +31,7 @@ export function FragmentWeb({ data }: Props) {
       <div className="p-2 border-b bg-sidebar flex items-center gap-x-2">
         <Hint text="Refresh" side="bottom" align="start">
           <Button size="sm" variant="outline" onClick={onRefresh}>
-            <RefreshCcwIcon />
+            <i className="ri-refresh-line" />
           </Button>
         </Hint>
         <Hint text="Click to copy" side="bottom">
@@ -60,7 +60,7 @@ export function FragmentWeb({ data }: Props) {
               window.open(displayUrl, "_blank");
             }}
           >
-            <ExternalLinkIcon />
+            <i className="ri-external-link-line" />
           </Button>
         </Hint>
       </div>

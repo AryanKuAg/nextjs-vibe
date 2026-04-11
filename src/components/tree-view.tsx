@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDownIcon } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 import { cn } from "@/lib/utils";
 
 // Material Icon Theme by Philipp Kief (MIT License)
@@ -192,11 +192,11 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
         <CollapsibleTrigger asChild>
           <button className="w-full flex items-center gap-2 px-2 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-left truncate flex-shrink-0">
-            <ChevronDownIcon 
+            <i
               className={cn(
-                "w-3.5 h-3.5 shrink-0 transition-transform text-muted-foreground",
+                "ri-arrow-down-s-line w-3.5 h-3.5 shrink-0 transition-transform text-muted-foreground",
                 isOpen ? "rotate-0" : "-rotate-90"
-              )} 
+              )}
             />
             {/* Folder icon: VS Code style icons from CDN */}
             {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
-import { ArrowUpIcon, Loader2Icon } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cn } from "@/lib/utils";
@@ -123,9 +123,9 @@ export const MessageForm = ({ projectId }: Props) => {
             )}
           >
             {isPending ? (
-              <Loader2Icon className="size-4 animate-spin" />
+              <i className="ri-loader-4-line text-base leading-none animate-spin" />
             ) : (
-              <ArrowUpIcon />
+              <i className="ri-arrow-up-line text-base leading-none" />
             )}
           </Button>
         </div>

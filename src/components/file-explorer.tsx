@@ -1,4 +1,4 @@
-import { CopyCheckIcon, CopyIcon } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 import { useState, useMemo, useCallback, Fragment } from "react";
 
 import { Hint } from "@/components/hint";
@@ -168,7 +168,7 @@ export const FileExplorer = ({
                   onClick={handleCopy}
                   disabled={copied}
                 >
-                  {copied ? <CopyCheckIcon /> : <CopyIcon />}
+                  {copied ? <i className="ri-checkbox-multiple-line" /> : <i className="ri-file-copy-line" />}
                 </Button>
               </Hint>
             </div>

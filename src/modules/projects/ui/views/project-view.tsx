@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState, useTransition } from "react";
-import { EyeIcon, CodeIcon, CrownIcon, Download } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 
 import { Fragment } from "@/generated/prisma";
 import { Button } from "@/components/ui/button";
@@ -96,10 +96,10 @@ export const ProjectView = ({ projectId }: Props) => {
             <div className="w-full flex items-center p-2 border-b gap-x-2">
               <TabsList className="h-8 p-0 border rounded-md">
                 <TabsTrigger value="preview" className="rounded-md">
-                  <EyeIcon /> <span>Demo</span>
+                  <i className="ri-eye-line" /> <span>Demo</span>
                 </TabsTrigger>
                 <TabsTrigger value="code" className="rounded-md">
-                  <CodeIcon /> <span>Code</span>
+                  <i className="ri-code-line" /> <span>Code</span>
                 </TabsTrigger>
               </TabsList>
               <Button 
@@ -109,14 +109,14 @@ export const ProjectView = ({ projectId }: Props) => {
                 onClick={handleDownloadZip}
                 disabled={!activeFragment?.files || isDownloading}
               >
-                <Download className="w-4 h-4 mr-2" />
+                <i className="ri-download-line w-4 h-4 mr-2" />
                 {isDownloading ? "Zipping..." : "Download ZIP"}
               </Button>
               <div className="ml-auto flex items-center gap-x-2">
                 {!hasProAccess && (
                   <Button asChild size="sm" variant="tertiary">
                     <Link href="/pricing">
-                      <CrownIcon /> Upgrade
+                      <i className="ri-crown-line" /> Upgrade
                     </Link>
                   </Button>
                 )}

@@ -2,11 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  SunMoonIcon,
-} from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 
 import { useTRPC } from "@/trpc/client";
 import { Button } from "@/components/ui/button";
@@ -47,13 +43,13 @@ export const ProjectHeader = ({ projectId }: Props) => {
           >
             <Image src="/logo.svg" alt="Vibe" width={18} height={18} />
             <span className="text-sm font-medium">{project.name}</span>
-            <ChevronDownIcon />
+            <i className="ri-arrow-down-s-line" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">
           <DropdownMenuItem asChild>
             <Link href="/">
-              <ChevronLeftIcon />
+              <i className="ri-arrow-left-s-line" />
               <span>
                 Go to Dashboard
               </span>
@@ -62,7 +58,7 @@ export const ProjectHeader = ({ projectId }: Props) => {
           <DropdownMenuSeparator />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
-              <SunMoonIcon className="size-4 text-muted-foreground" />
+              <i className="ri-contrast-2-line size-4 text-muted-foreground" />
               <span>Appearance</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>

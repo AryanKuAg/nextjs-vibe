@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { CrownIcon } from "lucide-react";
+import "remixicon/fonts/remixicon.css";
 import { formatDuration, intervalToDuration } from "date-fns";
 
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export const Usage = ({ points, msBeforeNext }: Props) => {
             className="ml-auto"
           >
             <Link href="/pricing">
-              <CrownIcon /> Upgrade
+              <i className="ri-crown-line" /> Upgrade
             </Link>
           </Button>
         )}

@@ -1,4 +1,24 @@
-import { Inngest } from "inngest";
+import { Inngest, EventSchemas } from "inngest";
+
+type Events = {
+  "code-agent/run": {
+    data: {
+      projectId: string;
+      value: string;
+      videoUrl?: string; // Swapped from explicit Frame Generation
+    };
+  };
+  "veo/generate": {
+    data: {
+      projectId: string;
+      prompt: string;
+      outputGcsUri: string;
+    };
+  };
+};
 
 // Create a client to send and receive events
-export const inngest = new Inngest({ id: "vibe-development" });
+export const inngest = new Inngest({ 
+  id: "vibe-development",
+  schemas: new EventSchemas().fromRecord<Events>()
+});

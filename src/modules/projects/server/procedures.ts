@@ -18,6 +18,15 @@ export const projectsRouter = createTRPCRouter({
           id: input.id,
           userId: ctx.auth.userId,
         },
+        include: {
+          messages: {
+            where: {
+              role: "USER"
+            },
+            orderBy: { createdAt: "asc" },
+            take: 1
+          }
+        }
       });
 
       if (!existingProject) {
@@ -67,24 +76,111 @@ export const projectsRouter = createTRPCRouter({
           name: generateSlug(2, {
             format: "kebab",
           }),
+          currentStage: "SCENE",
           messages: {
             create: {
               content: input.value,
               role: "USER",
               type: "RESULT",
+              stage: "SCENE",
             }
           }
         }
+      });
+
+      return createdProject;
+    }),
+  startVideoGeneration: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().min(1),
+        prompt: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+      const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
+
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: { currentStage: "GENERATING_VIDEO" },
+      });
+
+      await inngest.send({
+        name: "veo/generate",
+        data: {
+          projectId: input.projectId,
+          prompt: input.prompt,
+          outputGcsUri,
+        },
+      });
+
+      return { success: true };
+    }),
+  buildSite: protectedProcedure
+    .input(z.object({
+      projectId: z.string().min(1),
+      value: z.string(),
+      videoUrl: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await consumeCredits();
+      
+      const existingProject = await prisma.project.findUnique({
+        where: { id: input.projectId, userId: ctx.auth.userId },
+      });
+
+      if (!existingProject) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+
+      const createdMessage = await prisma.message.create({
+        data: {
+          projectId: existingProject.id,
+          content: input.value,
+          role: "USER",
+          type: "RESULT",
+          stage: "SITE",
+        },
       });
 
       await inngest.send({
         name: "code-agent/run",
         data: {
           value: input.value,
-          projectId: createdProject.id,
+          projectId: input.projectId,
+          videoUrl: input.videoUrl ?? undefined,
         },
       });
 
-      return createdProject;
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: { 
+          currentStage: "SITE",
+          ...(input.videoUrl && { videoUrl: input.videoUrl })
+        },
+      });
+
+      return createdMessage;
+    }),
+  cancelVideoGeneration: protectedProcedure
+    .input(z.object({
+      projectId: z.string().uuid(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existingProject = await prisma.project.findUnique({
+        where: { id: input.projectId, userId: ctx.auth.userId },
+      });
+
+      if (!existingProject) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: { currentStage: "SCENE" }
+      });
+
+      return { success: true };
     }),
 });

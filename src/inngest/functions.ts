@@ -8,6 +8,9 @@ import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
+import { GoogleGenAI } from "@google/genai";
+import { Storage } from "@google-cloud/storage";
+import { GoogleAuth } from "google-auth-library";
 
 function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
@@ -316,6 +319,25 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
+    if (event.data.videoUrl) {
+      currentPrompt = `=== SCROLL ANIMATION REQUIREMENT (CRITICAL) ===
+You MUST build an Apple-style, butter-smooth scroll-scrub animation utilizing a high-performance Frame Sequence directly mapped to the Canvas! 
+To achieve this securely and perfectly:
+1. A background pipeline natively populates the \`public/\` folder with exactly 450 highly compressed JPG files named \`frame-0001.jpg\` through \`frame-0450.jpg\`. DO NOT modify package.json for this.
+2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the 450 image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / 450 — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out.
+3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar perfectly horizontally centered at the top of the screen (use \`fixed left-1/2 -translate-x-1/2 top-6 z-50\`). Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Deploy Now' button on the right.
+4. In your \`scroll-sequence.tsx\` or main application file, the architectural layout MUST be:
+   - A global container with a dynamically calculated height to enforce the scrollable area.
+   - A \`position: fixed, inset: 0, z-index: 0, w-full, h-full\` background \`<canvas>\` that fills the entire screen underneath EVERYTHING.
+   - ALL normal sections (Hero, Features, Pricing, Footer) go ON TOP of the canvas with \`z-index: 10\`, and MUST HAVE TRANSPARENT BACKGROUNDS! 
+5. Pre-load all 450 image paths from \`/frame-0001.jpg\` -> \`/frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load!
+6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which should be \`document.body.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. When the user hits the absolutely bottom of the page (the Footer), the frame MUST perfectly land on Frame 450. DO NOT allow the page to keep scrolling after the 450 sequence is over!
+7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
+=== END SCROLL ANIMATION REQUIREMENT ===
+
+` + currentPrompt;
+    }
+
     // --- 1. INITIAL GENERATION (The Creator) ---
 
     // --- 1. INITIAL GENERATION (The Creator) ---
@@ -356,6 +378,13 @@ export const codeAgentFunction = inngest.createFunction(
         try {
           const sandbox = await getSandbox(sandboxId);
           await sandbox.commands.run("rm -rf dist");
+
+          console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
+          const zipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+          if (zipResult.exitCode !== 0) {
+            console.error("ZIP FETCH ERR:", zipResult.stderr);
+            throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+          }
 
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
@@ -487,54 +516,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
     // ... continues to deploymentUrl ...
 
     const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
-      // If the AI failed to fix the code after max retries, abort the deployment
-      if (!isBuildSuccessful) {
-        console.error("DEBUG: AI failed to fix the build after max retries. Aborting Cloudflare deploy.");
-        return null;
-      }
-
-      try {
-        const sandbox = await getSandbox(sandboxId);
-
-        console.log("DEBUG: Starting Cloudflare Deployment via Wrangler...");
-
-        const cfToken = process.env.CLOUDFLARE_API_TOKEN;
-        const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-
-        if (!cfToken || !cfAccountId) {
-          console.error("DEBUG: Missing CF env variables");
-          return null;
-        }
-
-        const projectName = `vibe-${event.data.projectId.substring(0, 15)}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
-
-        // Create the CF pages project via curl (since Wrangler create can sometimes prompt interactively)
-        await sandbox.commands.run(`curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/pages/projects" -H "Authorization: Bearer ${cfToken}" -H "Content-Type: application/json" -d '{"name":"${projectName}","production_branch":"main"}'`);
-
-        // Inject Cloudflare headers to allow iframe embedding in the dashboard
-        await sandbox.commands.run(`echo "/*\n  X-Frame-Options: ALLOWALL\n  Access-Control-Allow-Origin: *" > dist/_headers`);
-
-        // Use official Wrangler CLI to deploy the dist folder seamlessly without zipping
-        const envs = {
-          CLOUDFLARE_API_TOKEN: cfToken,
-          CLOUDFLARE_ACCOUNT_ID: cfAccountId,
-          CI: "true" // Force non-interactive mode
-        };
-
-        console.log("DEBUG: Running Wrangler pages deploy...");
-        const uploadResult = await sandbox.commands.run(`npx wrangler@latest pages deploy dist --project-name ${projectName} --branch main`, { envs });
-
-        if (uploadResult.exitCode !== 0) {
-          console.error("DEBUG: Cloudflare Wrangler deploy failed:", uploadResult.stderr, uploadResult.stdout);
-          return null;
-        }
-
-        console.log("DEBUG: Cloudflare Deploy successful!");
-        return `https://${projectName}.pages.dev`;
-      } catch (e) {
-        console.error("DEBUG: Cloudflare Deploy infra err:", e);
-        return null;
-      }
+      // Cloudflare deployment has been fully disconnected per user request.
+      // We are securely bypassing Cloudflare and exclusively surfacing the E2B Sandbox URL to the frontend.
+      return null;
     });
 
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
@@ -542,6 +526,12 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
+
+      console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
+      const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+      if (devZipResult.exitCode !== 0) {
+        throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
+      }
 
       // 2. Start the Vite server in the background
       await sandbox.commands.run("npm run dev -- --host 0.0.0.0 --port 3000", { background: true });
@@ -581,8 +571,10 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
                 getFiles(filePath, fileList);
               } else {
                 const ext = path.extname(filePath).toLowerCase();
-                if (!['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {
-                   const normalizedPath = filePath.split(path.sep).join('/');
+                const normalizedPath = filePath.split(path.sep).join('/');
+                if (['.jpg', '.webp'].includes(ext)) {
+                   fileList[normalizedPath] = 'BINARY_ASSET_OMITTED_FROM_SYNC';
+                } else if (!['.png', '.jpeg', '.gif', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {
                    fileList[normalizedPath] = fs.readFileSync(filePath, 'utf8');
                 }
               }
@@ -648,4 +640,216 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       summary: finalSummary,
     };
   },
+);
+
+export const veoGenerateFunction = inngest.createFunction(
+  { id: "veo-generate", retries: 0 },
+  { event: "veo/generate" },
+  async ({ event, step }) => {
+    const { projectId, prompt, outputGcsUri } = event.data;
+
+    await step.run("update-project-stage-generating", async () => {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { currentStage: "GENERATING_VIDEO" }
+      });
+    });
+
+    const tokenHelper = async () => {
+      const auth = new GoogleAuth({
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/cloud-platform']
+      });
+      const client = await auth.getClient();
+      const { token } = await client.getAccessToken();
+      return token;
+    };
+
+    const operationName = await step.run("start-veo-generation", async () => {
+      try {
+        const token = await tokenHelper();
+        const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+        const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
+
+        let instances: any[] = [{ prompt: prompt }];
+
+        const projectRecord = await prisma.project.findUnique({ where: { id: event.data.projectId } });
+        if (projectRecord?.startFrameUrl?.includes('storage.googleapis.com')) {
+          const bucketMatch = projectRecord.startFrameUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
+          if (bucketMatch) {
+            instances = [{
+              prompt: prompt,
+              image: {
+                gcsUri: `gs://${bucketMatch[1]}/${bucketMatch[2]}`,
+                mimeType: "image/png"
+              }
+            }];
+          }
+        }
+
+        const payload = {
+          instances,
+          parameters: {
+            aspectRatio: "16:9",
+            resolution: "720p",
+            durationSeconds: 8
+          }
+        };
+
+        const result = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await result.json();
+
+        if (!result.ok) {
+          throw new Error(JSON.stringify(data));
+        }
+
+        return data.name; // operation name
+      } catch (err: any) {
+        throw new Error(err?.message || String(err));
+      }
+    });
+
+    // Poll Initial LRO and Extend recursively via REST
+    const videoUri = await step.run("poll-and-extend-veo", async () => {
+      let isDone = false;
+      let base64VideoData = null;
+
+      console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
+      // Phase 1 Polling
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 15000));
+
+        const token = await tokenHelper();
+        const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:fetchPredictOperation`;
+
+        const result = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ operationName })
+        });
+
+        const data = await result.json();
+        if (!result.ok) throw new Error(JSON.stringify(data));
+
+        if (data.done) {
+          isDone = true;
+          if (data.error) throw new Error(JSON.stringify(data.error));
+
+          base64VideoData = data.response?.videos?.[0]?.bytesBase64Encoded;
+
+          if (!base64VideoData) {
+            throw new Error(`Veo finished but returned no video format! Raw response: ${JSON.stringify(data.response)}`);
+          }
+        }
+      }
+
+      console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
+      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+      const storage = new Storage({
+        projectId: process.env.GOOGLE_CLOUD_PROJECT,
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        }
+      });
+
+      const bucket = storage.bucket(bucketName);
+      const part1OutputName = `videos/project-${event.data.projectId}-part1-${Date.now()}.mp4`;
+      const filePart1 = bucket.file(part1OutputName);
+      const buffer1 = Buffer.from(base64VideoData, 'base64');
+      await filePart1.save(buffer1, { metadata: { contentType: "video/mp4" } });
+
+      // Phase 2: Start Extension Sequence
+      console.log(`[Veo Extended Pipeline] Initiating Phase 2 Extention via GCS streaming...`);
+      const token = await tokenHelper();
+      const extUrl = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
+
+      const payload = {
+        instances: [{
+          prompt: prompt, // Keep prompt aligned to force motion continuation
+          video: {
+            gcsUri: `gs://${bucketName}/${part1OutputName}`, // Use GCS bypass
+            mimeType: "video/mp4"
+          }
+        }],
+        parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7 }
+      };
+
+      const extResult = await fetch(extUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const extData = await extResult.json();
+      if (!extResult.ok) throw new Error(JSON.stringify(extData));
+
+      const operationName2 = extData.name;
+
+      // Phase 2 Polling
+      isDone = false;
+      let finalBase64VideoData = null;
+      console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
+
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 15000));
+        const token2 = await tokenHelper();
+        const url2 = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:fetchPredictOperation`;
+
+        const result2 = await fetch(url2, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
+          body: JSON.stringify({ operationName: operationName2 })
+        });
+
+        const data2 = await result2.json();
+        if (!result2.ok) throw new Error(JSON.stringify(data2));
+
+        if (data2.done) {
+          isDone = true;
+          if (data2.error) throw new Error(JSON.stringify(data2.error));
+
+          finalBase64VideoData = data2.response?.videos?.[0]?.bytesBase64Encoded;
+
+          if (!finalBase64VideoData) {
+            throw new Error(`Veo extension finished but returned no video! Raw: ${JSON.stringify(data2.response)}`);
+          }
+        }
+      }
+
+      console.log(`[Veo Extended Pipeline] Flushing 16-Second Master Video to GCS!`);
+      const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
+      const fileFinal = bucket.file(finalOutputName);
+
+      const bufferFinal = Buffer.from(finalBase64VideoData, 'base64');
+      await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
+
+      return `https://storage.googleapis.com/${bucketName}/${finalOutputName}`;
+    });
+
+    await step.run("update-project-video-url", async () => {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          videoUrl: videoUri, // Directly inject the HTTPS URI explicitly uploaded from the polling loop
+          currentStage: "VIDEO"
+        }
+      });
+    });
+
+    return { videoUrl: videoUri };
+  }
 );

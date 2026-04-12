@@ -11,12 +11,14 @@ export const messagesRouter = createTRPCRouter({
   .input(
       z.object({
         projectId: z.string().min(1, { message: "Project ID is required" }),
+        stage: z.enum(["SCENE", "VIDEO", "SITE"]).optional().default("SITE"),
       }),
     )
     .query(async ({ input, ctx }) => {
       const messages = await prisma.message.findMany({
         where: {
           projectId: input.projectId,
+          stage: input.stage,
           project: {
             userId: ctx.auth.userId,
           },
@@ -38,6 +40,7 @@ export const messagesRouter = createTRPCRouter({
           .min(1, { message: "Value is required" })
           .max(10000, { message: "Value is too long" }),
         projectId: z.string().min(1, { message: "Project ID is required" }),
+        stage: z.enum(["SCENE", "VIDEO", "SITE"]).optional().default("SITE"),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -71,16 +74,23 @@ export const messagesRouter = createTRPCRouter({
           content: input.value,
           role: "USER",
           type: "RESULT",
+          stage: input.stage,
         },
       });
 
-      await inngest.send({
-        name: "code-agent/run",
-        data: {
-          value: input.value,
-          projectId: input.projectId,
-        },
-      });
+      // We ONLY fire the code-agent directly if we're in the old flow or triggered explicitly.
+      // With the new 3-stage flow, code-agent is fired via projects.buildSite instead,
+      // but if an existing project UI uses this for regular chat, we still fire it.
+      if (input.stage === "SITE") {
+        await inngest.send({
+          name: "code-agent/run",
+          data: {
+            value: input.value,
+            projectId: input.projectId,
+            videoUrl: existingProject.videoUrl ?? undefined,
+          },
+        });
+      }
 
       return createdMessage;
     }),

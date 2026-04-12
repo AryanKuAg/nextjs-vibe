@@ -15,12 +15,18 @@ datasource db {
 }
 
 model Project {
-  id  String @id @default(uuid())
-  name  String
-  userId String
-  sandboxId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  userId        String
+  sandboxId     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Visual pipeline state
+  currentStage  String   @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
+  startFrameUrl String?  // Vercel Blob URL for start keyframe
+  endFrameUrl   String?  // Vercel Blob URL for end keyframe
+  videoUrl      String?  // Vercel Blob URL for generated video
 
   messages Message[]
 }
@@ -36,15 +42,16 @@ enum MessageType {
 }
 
 model Message {
-  id  String @id @default(uuid())
-  content String
-  role MessageRole
-  type MessageType
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String      @id @default(uuid())
+  content   String
+  role      MessageRole
+  type      MessageType
+  stage     String      @default("SITE") // "SCENE" | "VIDEO" | "SITE" — isolated chat per tab
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   projectId String
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   fragment Fragment?
 }

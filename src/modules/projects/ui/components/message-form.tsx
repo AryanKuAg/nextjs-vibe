@@ -17,6 +17,7 @@ import { Usage } from "./usage";
 
 interface Props {
   projectId: string;
+  stage?: "SCENE" | "VIDEO" | "SITE";
 };
 
 const formSchema = z.object({
@@ -25,12 +26,14 @@ const formSchema = z.object({
     .max(10000, { message: "Value is too long" }),
 })
 
-export const MessageForm = ({ projectId }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+  const { data: project } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }));
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,11 +42,20 @@ export const MessageForm = ({ projectId }: Props) => {
     },
   });
   
+  const buildSite = useMutation(trpc.projects.buildSite.mutationOptions({
+    onSuccess: () => {
+      form.reset();
+      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
+      queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+    },
+    onError: (error) => toast.error(error.message),
+  }));
+
   const createMessage = useMutation(trpc.messages.create.mutationOptions({
     onSuccess: () => {
       form.reset();
       queryClient.invalidateQueries(
-        trpc.messages.getMany.queryOptions({ projectId }),
+        trpc.messages.getMany.queryOptions({ projectId, stage }),
       );
       queryClient.invalidateQueries(
         trpc.usage.status.queryOptions()
@@ -59,14 +71,39 @@ export const MessageForm = ({ projectId }: Props) => {
   }));
   
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await createMessage.mutateAsync({
-      value: values.value,
-      projectId,
-    });
+    if (stage === "SITE") {
+      try {
+        setIsExtracting(true);
+        const res = await fetch("/api/extract-frames", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+        if (!res.ok) throw new Error("Failed to extract frames into zip");
+        
+        const data = await res.json();
+        
+        await buildSite.mutateAsync({
+          value: values.value,
+          projectId,
+          videoUrl: data.zipUrl,
+        });
+      } catch (e) {
+        toast.error("Failed to build site: " + String(e));
+      } finally {
+        setIsExtracting(false);
+      }
+    } else {
+      await createMessage.mutateAsync({
+        value: values.value,
+        projectId,
+        stage,
+      });
+    }
   };
   
   const [isFocused, setIsFocused] = useState(false);
-  const isPending = createMessage.isPending;
+  const isPending = createMessage.isPending || buildSite.isPending || isExtracting;
   const isButtonDisabled = isPending || !form.formState.isValid;
   const showUsage = !!usage;
 

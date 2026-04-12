@@ -17,14 +17,16 @@ interface Props {
 export const MessagesContainer = ({ 
   projectId,
   activeFragment,
-  setActiveFragment
-}: Props) => {
+  setActiveFragment,
+  stage = "SITE",
+}: Props & { stage?: "SCENE" | "VIDEO" | "SITE" }) => {
   const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastAssistantMessageIdRef = useRef<string | null>(null);
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
+    stage: stage,
   }, {
     refetchInterval: 2000,
   }));
@@ -72,7 +74,7 @@ export const MessagesContainer = ({
       </div>
       <div className="relative p-3 pt-1">
         <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background pointer-events-none" />
-        <MessageForm projectId={projectId} />
+        <MessageForm projectId={projectId} stage={stage} />
       </div>
     </div>
   );

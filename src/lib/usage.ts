@@ -17,6 +17,7 @@ export async function getUsageTracker() {
     tableName: "Usage",
     points: hasProAccess ? PRO_POINTS : FREE_POINTS,
     duration: DURATION,
+    clearExpiredByTimeout: false,
   });
 
   return usageTracker;

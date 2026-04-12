@@ -29,7 +29,7 @@ Environment:
 - Command execution via terminal (use "npm install <package> --yes")
 - CRITICAL: ALL terminal commands MUST be non-interactive. Always append flags like --yes, -y, --force, or --defaults to any CLI tool that could prompt for input. NEVER run a command that waits for keyboard input — it will time out and crash the entire task.
 - Read files via readFiles
-- Do not modify package.json or lock files directly — install packages using the terminal only
+- Do not modify package.json for dependency management — install packages using the terminal only. However, you MAY modify package.json exclusively to add or update custom "scripts".
 - Main file: src/App.tsx
 - Tailwind CSS v4 is preconfigured. All styling MUST be done with Tailwind classes.
 - You MUST NOT create or modify any .css, .scss, or .sass files.

@@ -6,29 +6,22 @@ import { toast } from "sonner";
 
 interface Props {
   projectId: string;
-  startFrameUrl: string | null;
-  endFrameUrl: string | null;
   initialPrompt?: string;
   droppedFile?: File | null;
-  onFramesGenerated: (startUrl?: string, endUrl?: string) => void;
+  onFrameGenerated: (url: string) => void;
   onGeneratingChange?: (isGenerating: boolean) => void;
   onNext: () => void;
 }
 
-type Target = "both" | "start" | "end";
-
 export const SceneBuilder = ({
   projectId,
-  startFrameUrl,
-  endFrameUrl,
   initialPrompt = "",
   droppedFile,
-  onFramesGenerated,
+  onFrameGenerated,
   onGeneratingChange,
   onNext,
 }: Props) => {
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [target, setTarget] = useState<Target>("both");
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -80,7 +73,6 @@ export const SceneBuilder = ({
     try {
       const formData = new FormData();
       formData.append("prompt", prompt);
-      formData.append("target", target);
       formData.append("projectId", projectId);
       if (uploadedImage) formData.append("image", uploadedImage);
 
@@ -90,7 +82,7 @@ export const SceneBuilder = ({
           ? { body: formData }
           : {
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt, target, projectId }),
+              body: JSON.stringify({ prompt, projectId }),
             }),
       });
 
@@ -100,7 +92,7 @@ export const SceneBuilder = ({
       }
 
       const data = await res.json();
-      onFramesGenerated(data.startFrameUrl, data.endFrameUrl);
+      onFrameGenerated(data.frameUrl);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

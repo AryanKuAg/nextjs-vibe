@@ -25,8 +25,6 @@ import { ErrorBoundary } from "react-error-boundary";
 import { StageIndicator } from "../components/stage-indicator";
 import { SceneBuilder } from "../components/scene-builder";
 import { VideoBuilder } from "../components/video-builder";
-import { MessageForm } from "../components/message-form";
-import { toast } from "sonner";
 
 interface Props {
   projectId: string;
@@ -58,7 +56,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
   // Scene generation preview state
   const [sceneIsGenerating, setSceneIsGenerating] = useState(false);
-  const [sceneImageUrl, setSceneImageUrl] = useState<string | null>(null);
+  const [sceneImageUrls, setSceneImageUrls] = useState<string[]>([]);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeStageTab !== "SCENE") return;
@@ -160,8 +159,18 @@ export const ProjectView = ({ projectId }: Props) => {
     });
   };
 
-  const handleFramesGenerated = async (startUrl?: string) => {
-    if (startUrl) setSceneImageUrl(startUrl);
+  // Seed scene images from DB on project load
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const urls: string[] = Array.isArray((project as any)?.sceneImageUrls)
+      ? ((project as any).sceneImageUrls as string[])
+      : [];
+    
+    setSceneImageUrls(urls);
+  }, [project?.id, (project as any)?.sceneImageUrls]); // only on initial project load or when these specifically update
+
+  const handleFrameGenerated = async (url: string) => {
+    setSceneImageUrls((prev) => [...prev, url]);
     setSceneIsGenerating(false);
     await refetch();
   };
@@ -195,6 +204,26 @@ export const ProjectView = ({ projectId }: Props) => {
           <p className="text-white text-lg tracking-wide">Drop your image</p>
         </div>
       )}
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="absolute inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxUrl(null); }}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <i className="ri-close-line" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Scene preview"
+            className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel
           defaultSize={sidebarDefaultSize}
@@ -217,12 +246,10 @@ export const ProjectView = ({ projectId }: Props) => {
           {activeStageTab === "SCENE" && (
             <SceneBuilder
               projectId={projectId}
-              startFrameUrl={project.startFrameUrl}
-              endFrameUrl={project.endFrameUrl}
               initialPrompt={project.messages?.[0]?.content || ""}
               droppedFile={droppedFile}
               onGeneratingChange={setSceneIsGenerating}
-              onFramesGenerated={handleFramesGenerated}
+              onFrameGenerated={handleFrameGenerated}
               onNext={() => setActiveStageTab("VIDEO")}
             />
           )}
@@ -303,64 +330,68 @@ export const ProjectView = ({ projectId }: Props) => {
 
             <div className="flex-1 relative overflow-hidden">
               {(activeStageTab === "SCENE" || activeStageTab === "GENERATING_VIDEO") ? (
-                <div className="p-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* Currently generating card */}
-                    {sceneIsGenerating && (
-                      <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden">
-                        <div className="aspect-video flex flex-col items-center justify-center gap-2">
-                          <i className="ri-loader-4-line text-white/60 text-2xl animate-spin" />
-                          <p className="text-white/50 text-xs">Generating</p>
-                        </div>
-                      </div>
-                    )}
-                    {/* Generated image card */}
-                    {sceneImageUrl && (
-                      <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group">
-                        <div className="relative aspect-video">
-                          <img
-                            src={sceneImageUrl}
-                            alt="Generated scene"
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Hover action buttons */}
-                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <a
-                              href={sceneImageUrl}
-                              download
-                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
-                            >
-                              <i className="ri-download-line text-sm" />
-                            </a>
-                            <a
-                              href={sceneImageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
-                            >
-                              <i className="ri-fullscreen-line text-sm" />
-                            </a>
+                <>
+                  {/* Empty state – centered in the full area */}
+                  {!sceneIsGenerating && sceneImageUrls.length === 0 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <h2 className="text-lg font-medium text-white mb-2">Build scene</h2>
+                      <p className="text-sm text-white/30 leading-relaxed">
+                        Describe the world you want. We&apos;ll generate a visual you can animate.
+                      </p>
+                    </div>
+                  )}
+                  {/* Cards grid */}
+                  {(sceneIsGenerating || sceneImageUrls.length > 0) && (
+                    <div className="p-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        {/* Currently generating card */}
+                        {sceneIsGenerating && (
+                          <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden">
+                            <div className="aspect-video flex flex-col items-center justify-center gap-2">
+                              <i className="ri-loader-4-line text-white/60 text-2xl animate-spin" />
+                              <p className="text-white/50 text-xs">Generating</p>
+                            </div>
                           </div>
-                        </div>
-                        <button
-                          onClick={() => setActiveStageTab("VIDEO")}
-                          className="w-full py-2.5 text-xs text-white/60 hover:text-white/90 transition-colors border-t border-white/5"
-                        >
-                          Use this scene
-                        </button>
+                        )}
+                        {/* All generated image cards */}
+                        {[...sceneImageUrls].reverse().map((url, idx) => (
+                          <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group">
+                            <div className="relative aspect-video cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                              <img
+                                src={url}
+                                alt={`Generated scene ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Hover action buttons */}
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a
+                                  href={url}
+                                  download
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                >
+                                  <i className="ri-download-line text-sm" />
+                                </a>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                >
+                                  <i className="ri-fullscreen-line text-sm" />
+                                </button>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setActiveStageTab("VIDEO")}
+                              className="w-full py-2.5 text-xs text-white/60 hover:text-white/90 transition-colors border-t border-white/5"
+                            >
+                              Use this scene
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                    {/* Empty state – nothing generating or generated yet */}
-                    {!sceneIsGenerating && !sceneImageUrl && (
-                      <div className="w-full flex flex-col items-center justify-center py-24 text-center">
-                        <h2 className="text-lg font-medium text-white mb-2">Build scene</h2>
-                        <p className="text-sm text-white/30 leading-relaxed">
-                          Describe the world you want. We&apos;ll generate a visual you can animate.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </>
               ) : activeStageTab === "VIDEO" ? (
                 <div className="flex items-center justify-center h-full p-12 bg-black">
                   {project.videoUrl && (

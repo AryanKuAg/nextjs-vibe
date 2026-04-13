@@ -24,9 +24,8 @@ model Project {
 
   // Visual pipeline state
   currentStage  String   @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
-  startFrameUrl String?  // Vercel Blob URL for start keyframe
-  endFrameUrl   String?  // Vercel Blob URL for end keyframe
   videoUrl      String?  // Vercel Blob URL for generated video
+  sceneImageUrls Json    @default("[]") // Array of all generated scene image URLs
 
   messages Message[]
 }

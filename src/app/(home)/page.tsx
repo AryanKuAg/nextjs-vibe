@@ -10,7 +10,7 @@ const Page = () => {
         <div className="flex flex-col items-center">
           <Image
             src="/logo.svg"
-            alt="Vibe"
+            alt="Spatial"
             width={50}
             height={50}
             className="hidden md:block"
@@ -30,5 +30,5 @@ const Page = () => {
     </div>
   );
 };
- 
+
 export default Page;

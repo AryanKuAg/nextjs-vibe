@@ -15,12 +15,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { prompt, target, projectId } = body as {
-      prompt: string;
-      target: "start" | "end" | "both";
-      projectId: string;
-    };
+    // Support both JSON (text-only) and FormData (with optional image)
+    let prompt: string;
+    let target: "start" | "end" | "both";
+    let projectId: string;
+    let imageBytes: Buffer | null = null;
+    let imageMimeType = "image/png";
+
+    const contentType = req.headers.get("content-type") ?? "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const form = await req.formData();
+      prompt = (form.get("prompt") as string) ?? "";
+      target = ((form.get("target") as string) ?? "both") as "start" | "end" | "both";
+      projectId = (form.get("projectId") as string) ?? "";
+      const imageFile = form.get("image") as File | null;
+      if (imageFile) {
+        imageMimeType = imageFile.type || "image/png";
+        imageBytes = Buffer.from(await imageFile.arrayBuffer());
+      }
+    } else {
+      const body = await req.json();
+      prompt = body.prompt;
+      target = body.target;
+      projectId = body.projectId;
+    }
 
     if (!prompt || !target || !projectId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -45,9 +64,21 @@ export async function POST(req: NextRequest) {
           ? `Generate a vivid, cinematic image for the OPENING scene/first frame: ${prompt}. Make it visually stunning.`
           : `Generate a vivid, cinematic image for the CLOSING scene/last frame: ${prompt}. Make it visually stunning with a clear sense of transformation.`;
 
+      // Build content parts — include image if provided
+      const userParts: Parameters<typeof ai.models.generateContentStream>[0]["contents"][0]["parts"] = [];
+      if (imageBytes) {
+        userParts.push({
+          inlineData: {
+            data: imageBytes.toString("base64"),
+            mimeType: imageMimeType,
+          },
+        });
+      }
+      userParts.push({ text: framePrompt });
+
       const streamingResp = await ai.models.generateContentStream({
         model: "gemini-3.1-flash-image-preview",
-        contents: [{ role: "user", parts: [{ text: framePrompt }] }],
+        contents: [{ role: "user", parts: userParts }],
         config: {
           maxOutputTokens: 32768,
           temperature: 1,

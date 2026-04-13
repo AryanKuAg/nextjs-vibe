@@ -4,6 +4,7 @@ type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
 
 interface Props {
   currentStage: Stage;
+  activeTab: Stage;
   onStageClick: (stage: Stage) => void;
 }
 
@@ -13,35 +14,40 @@ const STAGES = [
   { id: "SITE", label: "03 Build site" },
 ];
 
-export const StageIndicator = ({ currentStage, onStageClick }: Props) => {
+export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props) => {
   const isVideoLoading = currentStage === "GENERATING_VIDEO";
-  const activeIndex = STAGES.findIndex((s) => s.id === (isVideoLoading ? "VIDEO" : currentStage));
+  const unlockedIndex = STAGES.findIndex((s) => s.id === (isVideoLoading ? "VIDEO" : currentStage));
+  const activeIndex = STAGES.findIndex((s) => s.id === activeTab);
 
   return (
-    <div className="flex items-center gap-x-2 px-4 py-3 bg-sidebar border-b">
+    <div className="flex items-center m-3 bg-sidebar"> {/* todo: add gap */}
       {STAGES.map((stage, idx) => {
         const isActive = activeIndex === idx;
-        const isPast = activeIndex > idx;
-        
+        const isUnlocked = unlockedIndex >= idx;
+        const isPast = activeIndex > idx; // Visually styling tabs before the active one
+        const [num, ...rest] = stage.label.split(" ");
+        const text = rest.join(" ");
+
         return (
-          <div key={stage.id} className="flex items-center gap-x-2">
+          <div key={stage.id} className="flex items-center">
             <button
               onClick={() => onStageClick(stage.id as Stage)}
               className={cn(
-                "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                "flex flex-col items-center justify-center w-[94px] h-[64px] rounded-[8px] border-[1px] transition-all font-mono",
                 isActive
-                  ? "border-white text-white font-medium shadow-[0_0_10px_rgba(255,255,255,0.1)]"
-                  : isPast
-                    ? "border-white/20 text-white/50 hover:text-white/80 cursor-pointer"
-                    : "border-white/10 text-white/30 cursor-not-allowed"
+                  ? "border-white bg-[#272725] text-white"
+                  : isUnlocked
+                    ? "border-transparent bg-[#272725] text-white/50 hover:text-white/80 hover:bg-[#272725] cursor-pointer"
+                    : "border-transparent bg-[#272725] text-white/30 cursor-not-allowed"
               )}
-              disabled={!isActive && !isPast}
+              disabled={!isUnlocked}
             >
-              {stage.label}
+              <span className="text-xs mb-[2px] text-[#666666] font-dm-mono">{num}</span>
+              <span className="text-xs text-white leading-tight text-center px-1 font-inconsolata">{text}</span>
             </button>
-            
+
             {idx < STAGES.length - 1 && (
-              <i className="ri-arrow-right-line text-white/20 text-xs" />
+              <img src="/arrow.svg" alt="arrow" className="w-3 h-auto opacity-70 mx-2" />
             )}
           </div>
         );

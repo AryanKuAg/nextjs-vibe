@@ -1,6 +1,4 @@
 import { auth } from "@clerk/nextjs/server";
-import { RateLimiterPrisma } from "rate-limiter-flexible";
-
 import { prisma } from "@/lib/db";
 
 const FREE_POINTS = 2;
@@ -8,41 +6,55 @@ const PRO_POINTS = 100;
 const DURATION = 30 * 24 * 60 * 60; // 30 days
 const GENERATION_COST = 1;
 
-export async function getUsageTracker() {
-  const { has } = await auth();
-  const hasProAccess = has({ plan: "pro" });
+export async function consumeCredits() {
+  const { userId, has } = await auth();
 
-  const usageTracker = new RateLimiterPrisma({
-    storeClient: prisma,
-    tableName: "Usage",
-    points: hasProAccess ? PRO_POINTS : FREE_POINTS,
-    duration: DURATION,
-    clearExpiredByTimeout: false,
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const hasProAccess = has({ plan: "pro" });
+  const maxPoints = hasProAccess ? PRO_POINTS : FREE_POINTS;
+
+  // Use a simple atomic upsert to avoid RateLimiterPrisma's nested transactions
+  // which frequently cause P2028 timeouts in Next.js development.
+  const usage = await prisma.usage.upsert({
+    where: { key: userId },
+    update: { points: { increment: GENERATION_COST } },
+    create: { key: userId, points: GENERATION_COST }
   });
 
-  return usageTracker;
-};
-
-export async function consumeCredits() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error("User not authenticated");
+  if (usage.points > maxPoints) {
+    // If they exceeded, revert the increment to prevent infinite debt and throw
+    await prisma.usage.update({
+      where: { key: userId },
+      data: { points: { decrement: GENERATION_COST } }
+    });
+    throw new Error("You have run out of credits");
   }
 
-  const usageTracker = await getUsageTracker();
-  const result = await usageTracker.consume(userId, GENERATION_COST);
-  return result;
-};
+  return { consumedPoints: usage.points };
+}
 
 export async function getUsageStatus() {
-  const { userId } = await auth();
+  const { userId, has } = await auth();
 
   if (!userId) {
     throw new Error("User not authenticated");
   }
 
-  const usageTracker = await getUsageTracker();
-  const result = await usageTracker.get(userId);
-  return result;
-};
+  const hasProAccess = has({ plan: "pro" });
+  const maxPoints = hasProAccess ? PRO_POINTS : FREE_POINTS;
+  
+  const usage = await prisma.usage.findUnique({
+    where: { key: userId }
+  });
+
+  const consumed = usage ? usage.points : 0;
+  
+  return {
+    consumedPoints: consumed,
+    remainingPoints: Math.max(0, maxPoints - consumed),
+    isAllowed: consumed < maxPoints,
+  };
+}

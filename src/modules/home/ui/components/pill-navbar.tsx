@@ -2,7 +2,46 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { SignedIn, SignedOut, SignUpButton, useUser, useClerk } from "@clerk/nextjs";
+import { useState } from "react";
+import { SignedIn, SignedOut, useUser, useClerk, useSignIn } from "@clerk/nextjs";
+
+const GoogleSignInButton = () => {
+  const { signIn, isLoaded } = useSignIn();
+  const [isPending, setIsPending] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded || isPending) return;
+    setIsPending(true);
+    await signIn.authenticateWithRedirect({
+      strategy: "oauth_google",
+      redirectUrl: "/sso-callback",
+      redirectUrlComplete: "/",
+    });
+  };
+
+  return (
+    <button
+      onClick={handleGoogleSignIn}
+      disabled={isPending}
+      className="bg-white text-black px-3 py-2 rounded-[6px] font-[500] text-sm flex items-center gap-2 disabled:opacity-70 transition-opacity"
+    >
+      {isPending ? (
+        <>
+          <svg className="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Connecting...
+        </>
+      ) : (
+        <>
+          <Image src="/google.svg" alt="Google" width={16} height={16} />
+          Get started
+        </>
+      )}
+    </button>
+  );
+};
 
 const UserAvatarButton = () => {
   const { user } = useUser();
@@ -57,12 +96,7 @@ export const PillNavbar = () => {
         {/* Right: Auth */}
         <div className="flex items-center h-full">
           <SignedOut>
-            <SignUpButton>
-              <button className="bg-white text-black px-3 py-2 rounded-[6px] font-[500] text-sm flex items-center gap-2">
-                <Image src="/google.svg" alt="Google" width={16} height={16} />
-                Get started
-              </button>
-            </SignUpButton>
+            <GoogleSignInButton />
           </SignedOut>
           <SignedIn>
             <UserAvatarButton />

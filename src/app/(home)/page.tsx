@@ -1,12 +1,33 @@
 "use client";
 
 import Image from "next/image";
-import { SignedIn, SignedOut, SignUpButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 
+const GoogleCTAButton = () => {
+  const { signIn, isLoaded } = useSignIn();
+
+  const handleClick = () => {
+    if (!isLoaded) return;
+    signIn.authenticateWithRedirect({
+      strategy: "oauth_google",
+      redirectUrl: "/sso-callback",
+      redirectUrlComplete: "/",
+    });
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors"
+    >
+      Sign up with Google
+    </button>
+  );
+};
 
 
 interface FeatureCardProps {
@@ -194,9 +215,7 @@ const Page = () => {
         <p className="text-sm text-[#666666] mb-[40px]">Take a single prompt into cinematic motion, frame sequences, and a scroll-driven 3D website. Built in minutes, ready to ship.</p>
         <div className="flex gap-2">
           <SignedOut>
-            <SignUpButton>
-              <button className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white">Sign up</button>
-            </SignUpButton>
+            <GoogleCTAButton />
             <button className="px-3 py-2 bg-transparent text-white/50 border border-[#41413F] text-sm font-[500] rounded-[8px]">View pricing</button>
           </SignedOut>
           <SignedIn>

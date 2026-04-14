@@ -463,7 +463,7 @@ export const ProjectView = ({ projectId }: Props) => {
                                   if (!res.ok) throw new Error("Failed to extract frames");
                                   const data = await res.json();
                                   setExtractedZipUrl(data.zipUrl);
-                                  setSelectedVideoUrl(url);
+
                                   setActiveStageTab("SITE");
                                 } catch (e) {
                                   toast.error("Extraction failed: " + String(e));

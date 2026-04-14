@@ -11,7 +11,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Project {
@@ -24,7 +23,7 @@ model Project {
 
   // Visual pipeline state
   currentStage  String   @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
-  videoUrl      String?  // Vercel Blob URL for generated video
+  videoUrls     Json     @default("[]") // Array of all generated cinematic videos
   sceneImageUrls Json    @default("[]") // Array of all generated scene image URLs
 
   messages Message[]

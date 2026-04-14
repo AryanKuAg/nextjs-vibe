@@ -27,33 +27,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { projectId, frameCount: requestedFrameCount } = body as {
-      projectId: string;
-      frameCount?: number;
-    };
+    const body = await req.json() as { projectId: string; videoUrl?: string; frameCount?: number };
+    const { projectId, videoUrl: bodyVideoUrl, frameCount: requestedFrameCount } = body;
 
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
     }
 
-    // Configurable frame count — change VIDEO_FRAME_COUNT in .env to adjust
-    const frameCount =
-      requestedFrameCount ??
-      parseInt(process.env.VIDEO_FRAME_COUNT ?? "60", 10);
-
     const project = await prisma.project.findUnique({
       where: { id: projectId, userId },
     });
-    if (!project?.videoUrl) {
+
+    // Use the explicitly passed videoUrl from the client, or fallback to first project video
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projectVideos = (project as any)?.videoUrls as string[] || [];
+    const videoUrl = bodyVideoUrl || projectVideos[0];
+
+    if (!videoUrl) {
       return NextResponse.json(
-        { error: "Project not found or video not yet generated" },
+        { error: "No video provided or found for this project" },
         { status: 404 }
       );
     }
 
     // Download video from Vercel Blob into /tmp
-    const videoResponse = await fetch(project.videoUrl);
+    const videoResponse = await fetch(videoUrl);
     if (!videoResponse.ok) {
       throw new Error(`Failed to download video: ${videoResponse.statusText}`);
     }

@@ -19,7 +19,9 @@ export const MessagesContainer = ({
   activeFragment,
   setActiveFragment,
   stage = "SITE",
-}: Props & { stage?: "SCENE" | "VIDEO" | "SITE" }) => {
+  extractedZipUrl,
+  onBack,
+}: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, onBack?: () => void }) => {
   const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastAssistantMessageIdRef = useRef<string | null>(null);
@@ -74,7 +76,16 @@ export const MessagesContainer = ({
       </div>
       <div className="relative p-3 pt-1">
         <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background pointer-events-none" />
-        <MessageForm projectId={projectId} stage={stage} />
+        <MessageForm projectId={projectId} stage={stage} extractedZipUrl={extractedZipUrl} />
+        {onBack && (
+          <button 
+            type="button" 
+            onClick={onBack}
+            className="w-full py-3 mt-2 text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/5 bg-[#171717] border border-white/5 transition-colors rounded-xl"
+          >
+            Back
+          </button>
+        )}
       </div>
     </div>
   );

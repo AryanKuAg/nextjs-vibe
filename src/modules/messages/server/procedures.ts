@@ -87,7 +87,8 @@ export const messagesRouter = createTRPCRouter({
           data: {
             value: input.value,
             projectId: input.projectId,
-            videoUrl: existingProject.videoUrl ?? undefined,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            videoUrl: ((existingProject as any).videoUrls as string[])?.[0] || undefined,
           },
         });
       }

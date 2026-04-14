@@ -15,8 +15,6 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
-import { PROJECT_TEMPLATES } from "../../constants";
-
 const formSchema = z.object({
   value: z
     .string()
@@ -80,9 +78,9 @@ export const ProjectForm = () => {
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className={cn(
-            "relative rounded-2xl overflow-hidden transition-all duration-200",
-            "bg-[#1c1c1c]",
-            isFocused && "ring-2 ring-white/10"
+            "relative rounded-2xl overflow-hidden transition-all duration-200 border border-white/10",
+            "bg-[#151515]/90 backdrop-blur-xl",
+            isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
         >
@@ -100,12 +98,12 @@ export const ProjectForm = () => {
                 maxRows={10}
                 className={cn(
                   "w-full resize-none border-none outline-none bg-transparent",
-                  "px-5 pt-5 pb-2",
+                  "px-5 pt-5 pb-8",
                   "text-[15px] leading-relaxed text-white/90",
                   "placeholder:text-white/30",
                   "transition-colors"
                 )}
-                placeholder="Create a landing page for…"
+                placeholder="Create a 3D landing page for a SaaS startup..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -117,60 +115,64 @@ export const ProjectForm = () => {
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center justify-between px-4 pb-4 pt-1">
-            {/* Image icon (left) */}
-            <button
-              type="button"
-              aria-label="Attach image"
-              className={cn(
-                "flex items-center justify-center size-9 rounded-xl",
-                "text-white/40 hover:text-white/70 hover:bg-white/8",
-                "transition-all duration-150"
-              )}
-            >
-              <i className="ri-image-line text-xl leading-none" />
-            </button>
+          <div className="flex items-center justify-between px-3 pb-3 pt-1">
+            <div className="flex gap-x-2 items-center flex-1">
+              <button
+                type="button"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-transparent hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors"
+              >
+                <i className="ri-add-line text-lg" />
+              </button>
+              <div className="h-7 px-3 flex items-center gap-1.5 rounded-full bg-white/5 border border-white/5 text-[11px] font-medium text-white/70 hover:bg-white/10 transition-colors cursor-pointer tracking-wide">
+                <span>Gemini 3.1 Pro</span>
+                <i className="ri-arrow-down-s-line ml-0.5 text-white/40" />
+              </div>
+            </div>
 
-            {/* Send button (right) */}
-            <button
-              type="submit"
-              disabled={isButtonDisabled}
-              aria-label="Submit"
-              className={cn(
-                "flex items-center justify-center size-9 rounded-full",
-                "transition-all duration-150 font-medium",
-                isButtonDisabled
-                  ? "bg-white/15 text-white/30 cursor-not-allowed"
-                  : "bg-white text-black hover:bg-white/90 active:scale-95 shadow-sm"
-              )}
-            >
-              {isPending ? (
-                <i className="ri-loader-4-line text-base leading-none animate-spin" />
-              ) : (
-                <i className="ri-arrow-up-line text-base leading-none" />
-              )}
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="text-[11px] text-white/40 font-mono hidden sm:flex items-center">
+                Use <kbd className="mx-1.5 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px]">shift</kbd> + <kbd className="mx-1.5 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px]">return</kbd> for a new line
+              </div>
+              <button
+                type="submit"
+                disabled={isButtonDisabled}
+                className={cn(
+                  "flex items-center justify-center size-7 rounded-full transition-all duration-150",
+                  isButtonDisabled
+                    ? "bg-white/10 text-white/20 cursor-not-allowed"
+                    : "bg-white text-black hover:bg-white/90 active:scale-95 shadow-sm"
+                )}
+              >
+                {isPending ? (
+                  <i className="ri-loader-4-line text-sm leading-none animate-spin" />
+                ) : (
+                  <i className="ri-arrow-up-line text-sm leading-none" />
+                )}
+              </button>
+            </div>
           </div>
         </form>
 
         {/* ── Template chips ── */}
         <div className="hidden md:flex flex-wrap justify-center gap-2">
-          {PROJECT_TEMPLATES.map((template) => (
+          {[
+            "SaaS landing page+",
+            "App website",
+            "AI startup homepage+",
+            "Personal portfolio"
+          ].map((title) => (
             <button
-              key={template.title}
+              key={title}
               type="button"
-              onClick={() => onSelect(template.prompt)}
+              onClick={() => onSelect(`Build me a ${title.replace('+','')}`)}
               className={cn(
-                "inline-flex items-center gap-1.5 px-4 py-2 rounded-full",
-                "text-sm font-medium text-white",
-                "bg-[#1c1c1c] hover:bg-[#2a2a2a] active:scale-[0.97]",
-                "transition-all duration-150",
-                "border border-transparent hover:border-white/10"
+                "inline-flex items-center px-4 py-1.5 rounded-full",
+                "text-[13px] font-medium text-white/80",
+                "bg-black/40 backdrop-blur-md hover:bg-black/60 hover:text-white active:scale-[0.98]",
+                "transition-all duration-200 border border-white/10"
               )}
-              style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}
             >
-              <span>{template.emoji}</span>
-              <span>{template.title}</span>
+              {title}
             </button>
           ))}
         </div>

@@ -18,6 +18,7 @@ import { Usage } from "./usage";
 interface Props {
   projectId: string;
   stage?: "SCENE" | "VIDEO" | "SITE";
+  extractedZipUrl?: string | null;
 };
 
 const formSchema = z.object({
@@ -26,11 +27,11 @@ const formSchema = z.object({
     .max(10000, { message: "Value is too long" }),
 })
 
-export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Props) => {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
   const { data: project } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }));
@@ -73,25 +74,13 @@ export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (stage === "SITE") {
       try {
-        setIsExtracting(true);
-        const res = await fetch("/api/extract-frames", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId }),
-        });
-        if (!res.ok) throw new Error("Failed to extract frames into zip");
-        
-        const data = await res.json();
-        
         await buildSite.mutateAsync({
           value: values.value,
           projectId,
-          videoUrl: data.zipUrl,
+          videoUrl: extractedZipUrl || undefined,
         });
       } catch (e) {
         toast.error("Failed to build site: " + String(e));
-      } finally {
-        setIsExtracting(false);
       }
     } else {
       await createMessage.mutateAsync({
@@ -102,8 +91,7 @@ export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
     }
   };
   
-  const [isFocused, setIsFocused] = useState(false);
-  const isPending = createMessage.isPending || buildSite.isPending || isExtracting;
+  const isPending = createMessage.isPending || buildSite.isPending;
   const isButtonDisabled = isPending || !form.formState.isValid;
   const showUsage = !!usage;
 
@@ -134,8 +122,8 @@ export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
               onBlur={() => setIsFocused(false)}
               minRows={2}
               maxRows={8}
-              className="pt-4 resize-none border-none w-full outline-none bg-transparent"
-              placeholder="What would you like to build?"
+              className="pt-4 resize-none border-none w-full outline-none bg-transparent text-sm placeholder:text-muted-foreground/50"
+              placeholder="Prompt here"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
@@ -145,18 +133,24 @@ export const MessageForm = ({ projectId, stage = "SITE" }: Props) => {
             />
           )}
         />
-        <div className="flex gap-x-2 items-end justify-between pt-2">
-          <div className="text-[10px] text-muted-foreground font-mono">
-            <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              <span>&#8984;</span>Enter
-            </kbd>
-            &nbsp;to submit
+        <div className="flex gap-x-2 items-center pt-2">
+          <div className="flex gap-x-2 items-center flex-1">
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/70 transition-colors border border-white/5"
+            >
+              <i className="ri-add-line" />
+            </button>
+            <div className="h-8 px-3 flex items-center gap-2 rounded-full bg-[#1e1e1e] border border-white/5 text-xs text-white/70 cursor-pointer hover:bg-[#252525] transition-colors">
+              <span>Gemini 3.1 Pro</span>
+              <i className="ri-arrow-down-s-line" />
+            </div>
           </div>
           <Button
             disabled={isButtonDisabled}
             className={cn(
-              "size-8 rounded-full",
-              isButtonDisabled && "bg-muted-foreground border"
+              "w-8 h-8 p-0 rounded-full bg-white text-black hover:bg-white/90",
+              isButtonDisabled && "opacity-50"
             )}
           >
             {isPending ? (

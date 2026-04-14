@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { useScroll } from "@/hooks/use-scroll";
@@ -11,6 +12,9 @@ import { UserControl } from "@/components/user-control";
 
 export const Navbar = () => {
   const isScrolled = useScroll();
+  const pathname = usePathname();
+
+  if (pathname === "/") return null;
 
   return (
     <nav

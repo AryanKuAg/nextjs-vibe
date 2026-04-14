@@ -95,6 +95,8 @@ export const projectsRouter = createTRPCRouter({
       z.object({
         projectId: z.string().min(1),
         prompt: z.string(),
+        imageUrl: z.string().optional(),
+        imageBase64: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -112,6 +114,8 @@ export const projectsRouter = createTRPCRouter({
           projectId: input.projectId,
           prompt: input.prompt,
           outputGcsUri,
+          imageUrl: input.imageUrl,
+          imageBase64: input.imageBase64,
         },
       });
 
@@ -157,7 +161,6 @@ export const projectsRouter = createTRPCRouter({
         where: { id: input.projectId },
         data: { 
           currentStage: "SITE",
-          ...(input.videoUrl && { videoUrl: input.videoUrl })
         },
       });
 

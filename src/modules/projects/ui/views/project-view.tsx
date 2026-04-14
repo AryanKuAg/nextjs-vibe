@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState, useTransition, useEffect, useRef } from "react";
@@ -48,6 +49,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("SCENE");
+  const [selectedSceneUrl, setSelectedSceneUrl] = useState<string | null>(null);
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
 
   // Drag-and-drop state – whole window
   const [isDragging, setIsDragging] = useState(false);
@@ -58,6 +61,8 @@ export const ProjectView = ({ projectId }: Props) => {
   const [sceneIsGenerating, setSceneIsGenerating] = useState(false);
   const [sceneImageUrls, setSceneImageUrls] = useState<string[]>([]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(null);
+  const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeStageTab !== "SCENE") return;
@@ -216,12 +221,23 @@ export const ProjectView = ({ projectId }: Props) => {
           >
             <i className="ri-close-line" />
           </button>
-          <img
-            src={lightboxUrl}
-            alt="Scene preview"
-            className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {lightboxUrl.match(/\.(mp4|webm)$/i) ? (
+            <video
+              src={lightboxUrl}
+              autoPlay
+              controls
+              loop
+              className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={lightboxUrl}
+              alt="Scene preview"
+              className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black/20"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       )}
       <ResizablePanelGroup direction="horizontal">
@@ -257,9 +273,11 @@ export const ProjectView = ({ projectId }: Props) => {
           {(activeStageTab === "VIDEO" || activeStageTab === "GENERATING_VIDEO") && (
             <VideoBuilder
               projectId={projectId}
+              selectedSceneUrl={selectedSceneUrl}
               isGenerating={isVideoLoading}
-              videoUrl={project.videoUrl}
               onNext={() => setActiveStageTab("SITE")}
+              onBack={() => setActiveStageTab("SCENE")}
+              onClearSelection={() => setSelectedSceneUrl(null)}
             />
           )}
 
@@ -271,6 +289,8 @@ export const ProjectView = ({ projectId }: Props) => {
                   activeFragment={activeFragment}
                   setActiveFragment={setActiveFragment}
                   stage="SITE"
+                  extractedZipUrl={extractedZipUrl}
+                  onBack={() => setActiveStageTab("VIDEO")}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -381,7 +401,10 @@ export const ProjectView = ({ projectId }: Props) => {
                               </div>
                             </div>
                             <button
-                              onClick={() => setActiveStageTab("VIDEO")}
+                              onClick={() => {
+                                setSelectedSceneUrl(url);
+                                setActiveStageTab("VIDEO");
+                              }}
                               className="w-full py-2.5 text-xs text-white/60 hover:text-white/90 transition-colors border-t border-white/5"
                             >
                               Use this scene
@@ -393,12 +416,78 @@ export const ProjectView = ({ projectId }: Props) => {
                   )}
                 </>
               ) : activeStageTab === "VIDEO" ? (
-                <div className="flex items-center justify-center h-full p-12 bg-black">
-                  {project.videoUrl && (
-                    <video src={project.videoUrl} autoPlay loop muted controls className="w-full max-h-full rounded-2xl shadow-2xl" />
+                <div className="flex-1 relative overflow-hidden flex flex-col h-full w-full">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {(!((project as any)?.videoUrls?.length > 0) && !isVideoLoading) ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <h2 className="text-lg font-medium text-white mb-2">Build video</h2>
+                      <p className="text-sm text-white/30 leading-relaxed max-w-[280px]">
+                        Describe the world you want. We&apos;ll generate a visual you can animate.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 w-full h-full overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-4">
+                        {isVideoLoading && (
+                          <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden aspect-video">
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                              <i className="ri-loader-4-line text-white/60 text-2xl animate-spin" />
+                              <p className="text-white/50 text-xs">Generating</p>
+                            </div>
+                          </div>
+                        )}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url, idx) => (
+                          <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group flex flex-col">
+                            <div className="relative aspect-video">
+                                <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <a href={url} download onClick={(e) => e.stopPropagation()} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                    <i className="ri-download-line text-sm" />
+                                  </a>
+                                  <button onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                    <i className="ri-fullscreen-line text-sm" />
+                                  </button>
+                                </div>
+                            </div>
+                            <button
+                              disabled={extractingVideoUrl === url}
+                              onClick={async () => {
+                                try {
+                                  setExtractingVideoUrl(url);
+                                  const res = await fetch("/api/extract-frames", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ projectId, videoUrl: url }),
+                                  });
+                                  if (!res.ok) throw new Error("Failed to extract frames");
+                                  const data = await res.json();
+                                  setExtractedZipUrl(data.zipUrl);
+                                  setSelectedVideoUrl(url);
+                                  setActiveStageTab("SITE");
+                                } catch (e) {
+                                  toast.error("Extraction failed: " + String(e));
+                                } finally {
+                                  setExtractingVideoUrl(null);
+                                }
+                              }}
+                              className="relative w-full py-3 text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/5 disabled:opacity-50 transition-colors border-t border-white/5 flex items-center justify-center gap-2"
+                            >
+                              {extractingVideoUrl === url ? (
+                                <>
+                                  <i className="ri-loader-4-line animate-spin text-sm" />
+                                  <span>Preparing...</span>
+                                </>
+                              ) : (
+                                "Use as background"
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </div>
-              ) : (
+                </div>              ) : (
                 <>
                   <TabsContent value="preview" className="h-full m-0">
                     {activeFragment ? (

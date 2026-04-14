@@ -676,18 +676,25 @@ export const veoGenerateFunction = inngest.createFunction(
 
         let instances: any[] = [{ prompt: prompt }];
 
-        const projectRecord = await prisma.project.findUnique({ where: { id: event.data.projectId } });
-        if (projectRecord?.startFrameUrl?.includes('storage.googleapis.com')) {
-          const bucketMatch = projectRecord.startFrameUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
+        if (event.data.imageUrl) {
+          const bucketMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
           if (bucketMatch) {
             instances = [{
               prompt: prompt,
               image: {
                 gcsUri: `gs://${bucketMatch[1]}/${bucketMatch[2]}`,
-                mimeType: "image/png"
+                mimeType: "image/png" // assuming standard generated image
               }
             }];
           }
+        } else if (event.data.imageBase64) {
+          instances = [{
+            prompt: prompt,
+            image: {
+              bytesBase64Encoded: event.data.imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+              mimeType: "image/png"
+            }
+          }];
         }
 
         const payload = {
@@ -841,10 +848,15 @@ export const veoGenerateFunction = inngest.createFunction(
     });
 
     await step.run("update-project-video-url", async () => {
-      await prisma.project.update({
+      const existingProject = await prisma.project.findUnique({ where: { id: projectId } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existingUrls = Array.isArray((existingProject as any)?.videoUrls) ? (existingProject as any).videoUrls as string[] : [];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma.project as any).update({
         where: { id: projectId },
         data: {
-          videoUrl: videoUri, // Directly inject the HTTPS URI explicitly uploaded from the polling loop
+          videoUrls: [...existingUrls, videoUri],
           currentStage: "VIDEO"
         }
       });

@@ -21,16 +21,16 @@ export async function GET(req: NextRequest) {
       where: { id: projectId, userId },
     });
 
-    if (!project?.videoUrl) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projectVideos = (project as any)?.videoUrls as string[] || [];
+    const zipUrl = projectVideos[projectVideos.length - 1];
+
+    if (!zipUrl) {
       return NextResponse.json(
         { error: "Project not found or frames not yet generated" },
         { status: 404 }
       );
     }
-
-    // The videoUrl points to the GCS frames ZIP
-    // Proxy it through Next.js to bypass browser CORS restrictions
-    const zipUrl = project.videoUrl;
 
     // If it's a GCS URL, stream directly via GCS SDK (avoids CORS)
     if (zipUrl.includes("storage.googleapis.com")) {

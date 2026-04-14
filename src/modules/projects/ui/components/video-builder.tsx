@@ -3,25 +3,29 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
-import { cn } from "@/lib/utils";
 
 interface Props {
   projectId: string;
+  selectedSceneUrl: string | null;
   isGenerating: boolean;
-  videoUrl: string | null;
   onNext: () => void;
+  onBack: () => void;
+  onClearSelection?: () => void;
 }
 
-export const VideoBuilder = ({ projectId, isGenerating, videoUrl, onNext }: Props) => {
+export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack, onClearSelection }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
+  const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
 
   const startVideoGeneration = useMutation(
     trpc.projects.startVideoGeneration.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
         toast.info("Started generating video. This will take a few minutes...");
+        setPrompt("");
+        // Don't auto-clear image so user can iterate on the same image
       },
       onError: (error) => {
         toast.error(error.message || "Failed to start video generation");
@@ -29,106 +33,105 @@ export const VideoBuilder = ({ projectId, isGenerating, videoUrl, onNext }: Prop
     })
   );
 
-  const cancelGeneration = useMutation(
-    trpc.projects.cancelVideoGeneration.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
-        toast.success("Generation forcibly cancelled.");
-      },
-      onError: (error) => {
-        toast.error("Failed to cancel: " + error.message);
-      }
-    })
-  );
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim() || isGenerating) return;
-    await startVideoGeneration.mutateAsync({ projectId, prompt });
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedBase64(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
-  return (
-    <div className="flex flex-col h-full bg-[#121212]">
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col justify-center max-w-2xl mx-auto w-full">
-        <div>
-          <h2 className="text-xl font-medium text-white/90">02. Build your video</h2>
-          <p className="text-sm text-white/50">Describe the transition between your keyframes.</p>
-        </div>
+  const handleSubmit = async () => {
+    const hasImage = selectedSceneUrl || uploadedBase64;
+    if (!prompt.trim() || isGenerating || !hasImage) return;
+    
+    await startVideoGeneration.mutateAsync({ 
+      projectId, 
+      prompt,
+      imageUrl: selectedSceneUrl || undefined,
+      imageBase64: uploadedBase64 || undefined
+    });
+  };
 
-        <div className="aspect-video bg-[#1c1c1c] rounded-xl border border-white/5 overflow-hidden relative flex flex-col items-center justify-center p-6 text-center">
-          {videoUrl ? (
-            <video 
-              src={videoUrl} 
-              autoPlay 
-              loop 
-              muted 
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-          ) : isGenerating ? (
-            <div className="space-y-4 relative z-10 w-full max-w-md mx-auto">
-              <i className="ri-loader-4-line text-4xl animate-spin text-white/50 inline-block mb-2" />
-              <h3 className="text-lg font-medium text-white/90">Creating your video</h3>
-              <p className="text-sm text-white/50 pb-4">
-                Veo 3.1 is synthesizing a 5-second cinematic transition. This typically takes 2–3 minutes.
-              </p>
-              <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden mb-6">
-                <div className="bg-white h-full rounded-full animate-[pulse_2s_ease-in-out_infinite] w-3/4" />
-              </div>
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={() => cancelGeneration.mutate({ projectId })}
-                disabled={cancelGeneration.isPending}
-                className="mt-6 rounded-full px-6 py-1 h-8 text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 shadow-none z-20 mx-auto"
+  const currentImage = uploadedBase64 || selectedSceneUrl;
+
+  return (
+    <div className="flex flex-col h-full bg-sidebar relative">
+      <div className="flex-1" />
+
+      <div className="p-4 space-y-3">
+        <div className="bg-[#1c1c1c] border border-white/5 rounded-2xl p-3 space-y-3">
+          {/* Image thumbnail preview or Upload Box */}
+          {currentImage ? (
+            <div className="relative w-fit">
+              <img
+                src={currentImage}
+                alt="Selected scene"
+                className="w-16 h-16 rounded-xl object-cover border border-white/10"
+              />
+              <button 
+                onClick={() => {
+                  setUploadedBase64(null);
+                  onClearSelection?.();
+                }}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white/50 hover:text-white border border-white/10 text-xs"
               >
-                {cancelGeneration.isPending ? "Cancelling..." : "Stop Generation"}
-              </Button>
+                <i className="ri-close-line" />
+              </button>
             </div>
           ) : (
-            <div className="space-y-2 text-white/30">
-              <i className="ri-movie-2-line text-5xl" />
-              <p className="text-sm">Ready to generate</p>
-            </div>
+            <label className="flex items-center justify-center w-16 h-16 rounded-xl border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <i className="ri-image-line text-white/30 text-xl" />
+            </label>
           )}
 
-          <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2 text-xs font-medium text-white/80 z-10">
-            <span className="text-[10px]">✦</span> Veo 3.1 Fast
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe the video you want to create"
+            className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px]"
+            disabled={isGenerating || startVideoGeneration.isPending}
+          />
+
+          <div className="flex items-center gap-x-2">
+            <div className="flex items-center gap-x-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-[11px] text-white/70">
+              <span>Veo 3.1</span>
+              <i className="ri-arrow-down-s-line" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isGenerating || startVideoGeneration.isPending || !prompt.trim() || !currentImage}
+              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-[#333333] hover:bg-white/20 text-white disabled:opacity-30 transition-all shadow-sm"
+            >
+              {isGenerating || startVideoGeneration.isPending ? (
+                <i className="ri-loader-4-line animate-spin" />
+              ) : (
+                <i className="ri-arrow-up-line" />
+              )}
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="p-4 border-t border-white/5 space-y-4">
-        {!videoUrl && (
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the cinematic motion..."
-              className="flex-1 bg-[#1c1c1c] border border-white/10 rounded-lg px-4 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-white/20"
-              disabled={isGenerating}
-            />
-            <Button 
-              type="submit" 
-              disabled={isGenerating || !prompt.trim() || startVideoGeneration.isPending} 
-              size="icon" 
-              className="shrink-0 rounded-lg"
-            >
-              {startVideoGeneration.isPending ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-send-plane-fill" />}
-            </Button>
-          </form>
-        )}
-
-        <Button 
-          className="w-full rounded-lg" 
-          variant={videoUrl ? "default" : "secondary"}
-          disabled={!videoUrl || isGenerating}
-          onClick={onNext}
+        <Button
+          variant="outline"
+          className="w-full rounded-xl bg-transparent border-white/5 text-white/70 hover:bg-white/5 text-xs font-medium h-10 transition-all"
+          onClick={onBack}
         >
-          Build site <i className="ri-arrow-right-line ml-2" />
+          Back
         </Button>
       </div>
     </div>
   );
 };
+

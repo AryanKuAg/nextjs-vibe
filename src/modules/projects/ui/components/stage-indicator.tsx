@@ -24,7 +24,6 @@ export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props)
       {STAGES.map((stage, idx) => {
         const isActive = activeIndex === idx;
         const isUnlocked = unlockedIndex >= idx;
-        const isPast = activeIndex > idx; // Visually styling tabs before the active one
         const [num, ...rest] = stage.label.split(" ");
         const text = rest.join(" ");
 
@@ -47,6 +46,7 @@ export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props)
             </button>
 
             {idx < STAGES.length - 1 && (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img src="/arrow.svg" alt="arrow" className="w-3 h-auto opacity-70 mx-2" />
             )}
           </div>

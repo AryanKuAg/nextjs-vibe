@@ -50,7 +50,6 @@ export const ProjectView = ({ projectId }: Props) => {
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("SCENE");
   const [selectedSceneUrl, setSelectedSceneUrl] = useState<string | null>(null);
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
 
   // Drag-and-drop state – whole window
   const [isDragging, setIsDragging] = useState(false);
@@ -165,14 +164,12 @@ export const ProjectView = ({ projectId }: Props) => {
   };
 
   // Seed scene images from DB on project load
+  const rawSceneUrls = (project as Record<string, unknown>)?.sceneImageUrls;
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const urls: string[] = Array.isArray((project as any)?.sceneImageUrls)
-      ? ((project as any).sceneImageUrls as string[])
-      : [];
-    
+    const urls: string[] = Array.isArray(rawSceneUrls) ? rawSceneUrls : [];
     setSceneImageUrls(urls);
-  }, [project?.id, (project as any)?.sceneImageUrls]); // only on initial project load or when these specifically update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, rawSceneUrls]);
 
   const handleFrameGenerated = async (url: string) => {
     setSceneImageUrls((prev) => [...prev, url]);
@@ -231,6 +228,7 @@ export const ProjectView = ({ projectId }: Props) => {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={lightboxUrl}
               alt="Scene preview"
@@ -377,6 +375,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         {[...sceneImageUrls].reverse().map((url, idx) => (
                           <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group">
                             <div className="relative aspect-video cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={url}
                                 alt={`Generated scene ${idx + 1}`}

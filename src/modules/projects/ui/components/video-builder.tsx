@@ -72,6 +72,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
           {/* Image thumbnail preview or Upload Box */}
           {currentImage ? (
             <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={currentImage}
                 alt="Selected scene"

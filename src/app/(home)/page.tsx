@@ -88,7 +88,7 @@ const Page = () => {
         </div>
 
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
-          <h1 className="text-3xl md:text-5xl lg:text-[56px] text-white/95 font-mono text-center leading-tight mb-8 drop-shadow-2xl font-light">
+          <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
             Build 3D websites<br />10x faster with AI
           </h1>
           <div className="w-full max-w-3xl mx-auto px-4 md:px-12">

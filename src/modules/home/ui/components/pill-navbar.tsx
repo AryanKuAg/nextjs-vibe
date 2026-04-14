@@ -36,34 +36,32 @@ const UserAvatarButton = () => {
 
 export const PillNavbar = () => {
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center h-12 px-2 bg-[#121212]/90 border border-white/10 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-md text-xs font-medium">
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
+      <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata">
         {/* Left side: Logo */}
-        <div className="flex items-center gap-2 pl-3 pr-5 border-r border-white/10 h-full">
-          <Image src="/logo.svg" alt="Spatial" width={18} height={18} />
-          <span className="text-white/90 font-semibold tracking-wide">Spatial</span>
+        <div className="flex items-center gap-3 pl-2">
+          <Image src="/logo.svg" alt="Spatial" width={22} height={22} />
+          <span className="text-white font-[500] tracking-wide text-base">Spatial</span>
         </div>
 
         {/* Center: Links */}
-        <div className="hidden md:flex items-center gap-8 px-6 text-white/50">
-          <Link href="#" className="hover:text-white transition-colors tracking-wide">Examples</Link>
-          <Link href="#" className="hover:text-white transition-colors tracking-wide">Pricing</Link>
-          <Link href="#" className="hover:text-white transition-colors tracking-wide">3D builder</Link>
-          <SignedOut>
-            <SignInButton>
-              <button className="hover:text-white transition-colors tracking-wide">Login</button>
-            </SignInButton>
-          </SignedOut>
+        <div className="hidden md:flex items-center gap-4 text-white text-sm">
+          <Link href="#" className="">How it works</Link>
+          <Link href="#" className="">Pricing</Link>
+          <Link href="#" className="">Contact</Link>
           <SignedIn>
-            <Link href="/projects" className="hover:text-white transition-colors tracking-wide">Dashboard</Link>
+            <Link href="/projects" className="hover:text-white transition-colors">Dashboard</Link>
           </SignedIn>
         </div>
 
         {/* Right: Auth */}
-        <div className="hidden md:flex items-center pl-4 pr-1 h-full">
+        <div className="flex items-center h-full">
           <SignedOut>
             <SignUpButton>
-              <button className="bg-white text-black px-4 py-1.5 rounded-full hover:bg-white/90 transition-colors font-semibold">Sign up</button>
+              <button className="bg-white text-black px-3 py-2 rounded-[6px] font-[500] text-sm flex items-center gap-2">
+                <Image src="/google.svg" alt="Google" width={16} height={16} />
+                Get started
+              </button>
             </SignUpButton>
           </SignedOut>
           <SignedIn>

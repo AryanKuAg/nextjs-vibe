@@ -8,7 +8,7 @@ import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
-import { GoogleGenAI } from "@google/genai";
+
 import { Storage } from "@google-cloud/storage";
 import { GoogleAuth } from "google-auth-library";
 

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json() as { projectId: string; videoUrl?: string; frameCount?: number };
-    const { projectId, videoUrl: bodyVideoUrl, frameCount: requestedFrameCount } = body;
+    const { projectId, videoUrl: bodyVideoUrl } = body;
 
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });

@@ -131,6 +131,7 @@ export async function POST(req: NextRequest) {
 
     // Persist to sceneImageUrls 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = await (prisma.project as any).findUnique({
         where: { id: projectId },
         select: { sceneImageUrls: true },
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
         ? (existing.sceneImageUrls as string[])
         : [];
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (prisma.project as any).update({
         where: { id: projectId },
         data: { sceneImageUrls: [...existingUrls, publicUrl] },
@@ -148,10 +150,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ frameUrl: publicUrl });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[generate-frames] Error:", err);
     return NextResponse.json(
-      { error: err?.message || err?.toString() || JSON.stringify(err) || "Unknown error" },
+      { error: (err as Error)?.message || String(err) || "Unknown error" },
       { status: 500 }
     );
   }

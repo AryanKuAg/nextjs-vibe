@@ -13,6 +13,8 @@ type Events = {
       projectId: string;
       prompt: string;
       outputGcsUri: string;
+      imageUrl?: string;
+      imageBase64?: string;
     };
   };
 };

@@ -47,28 +47,32 @@ const UserAvatarButton = () => {
   const { user } = useUser();
   const { signOut } = useClerk();
 
-  const initial = user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?";
+  const initial = (user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?").toUpperCase();
   const imageUrl = user?.imageUrl;
 
   return (
     <button
       onClick={() => signOut({ redirectUrl: "/" })}
-      className="flex items-center gap-2.5 pl-1 pr-4 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors group"
+      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group"
     >
+      {/* Vertical divider */}
+      <div className="w-px h-5 bg-[#3B3B38]" />
+      {/* Avatar — profile photo or initial fallback */}
       {imageUrl ? (
         <Image
           src={imageUrl}
           alt={initial}
           width={28}
           height={28}
-          className="rounded-full object-cover"
+          className="w-7 h-7 rounded-full object-cover flex-shrink-0 ml-[10px]"
         />
       ) : (
-        <div className="size-7 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs font-bold uppercase flex-shrink-0">
+        <div className="w-7 h-7 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
           {initial}
         </div>
       )}
-      <span className="text-xs text-white/60 group-hover:text-white/90 transition-colors font-mono">Sign out</span>
+      {/* Label */}
+      <span className="text-sm text-white/70 group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</span>
     </button>
   );
 };
@@ -76,7 +80,7 @@ const UserAvatarButton = () => {
 export const PillNavbar = () => {
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
-      <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata">
+      <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
         {/* Left side: Logo */}
         <div className="flex items-center gap-3 pl-2">
           <Image src="/logo.svg" alt="Spatial" width={22} height={22} />
@@ -88,9 +92,6 @@ export const PillNavbar = () => {
           <Link href="#" className="">How it works</Link>
           <Link href="#" className="">Pricing</Link>
           <Link href="#" className="">Contact</Link>
-          <SignedIn>
-            <Link href="/projects" className="hover:text-white transition-colors">Dashboard</Link>
-          </SignedIn>
         </div>
 
         {/* Right: Auth */}

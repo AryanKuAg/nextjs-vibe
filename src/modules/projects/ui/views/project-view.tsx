@@ -8,7 +8,7 @@ import "remixicon/fonts/remixicon.css";
 import { useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@/generated/prisma";
+import { Fragment } from "@/generated/prisma/client";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
 import { FileExplorer } from "@/components/file-explorer";

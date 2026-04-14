@@ -4,7 +4,7 @@ import "remixicon/fonts/remixicon.css";
 
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
-import { Fragment, MessageRole, MessageType } from "@/generated/prisma";
+import { Fragment, MessageRole, MessageType } from "@/generated/prisma/client";
 
 interface UserMessageProps {
   content: string;

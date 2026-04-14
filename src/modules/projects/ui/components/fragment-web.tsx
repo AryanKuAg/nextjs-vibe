@@ -2,7 +2,7 @@ import { useState } from "react";
 import "remixicon/fonts/remixicon.css";
 
 import { Hint } from "@/components/hint";
-import { Fragment } from "@/generated/prisma";
+import { Fragment } from "@/generated/prisma/client";
 import { Button } from "@/components/ui/button";
 
 interface Props {

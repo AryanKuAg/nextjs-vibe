@@ -1,10 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { toast } from "sonner";
 
 export const Footer = () => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigator.clipboard.writeText("contact@spatial.ai");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <footer className="py-20 px-6 max-w-7xl mx-auto w-full font-inconsolata">
       {/* Rounded card container */}
@@ -67,15 +76,17 @@ export const Footer = () => {
               contact@spatial.ai
             </Link>
             <button
-              onClick={(e) => {
-                e.preventDefault();
-                navigator.clipboard.writeText("contact@spatial.ai");
-                toast.success("Email copied to clipboard");
-              }}
+              onClick={handleCopy}
               className="text-white transition-colors"
               aria-label="Copy email"
             >
-              <i className="ri-file-copy-line text-xs" />
+              <i
+                key={copied ? "check" : "copy"}
+                className={`${copied ? "ri-check-line text-white" : "ri-file-copy-line text-white"
+                  } text-xs inline-block`}
+
+              />
+
             </button>
           </div>
         </div>

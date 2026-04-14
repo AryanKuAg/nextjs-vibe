@@ -1,37 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { SignedIn, SignedOut, SignUpButton, useUser, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignUpButton } from "@clerk/nextjs";
 
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 
-const CtaUserButton = () => {
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const initial = user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?";
-  const imageUrl = user?.imageUrl;
-  return (
-    <button
-      onClick={() => signOut({ redirectUrl: "/" })}
-      className="flex items-center gap-2.5 pl-1 pr-4 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors group"
-    >
-      {imageUrl ? (
-        <Image src={imageUrl} alt={initial} width={28} height={28} className="rounded-full object-cover" />
-      ) : (
-        <div className="size-7 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs font-bold uppercase flex-shrink-0">
-          {initial}
-        </div>
-      )}
-      <span className="text-xs text-white/60 group-hover:text-white/90 transition-colors font-mono">Sign out</span>
-    </button>
-  );
-};
 
 
-const FeatureCard = ({ step, title, description, children }: any) => (
+interface FeatureCardProps {
+  step: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+const FeatureCard = ({ step, title, description, children }: FeatureCardProps) => (
   <div className="flex flex-col gap-2 group p-2 bg-[#272725] rounded-[8px] font-inconsolata">
     <div className="relative aspect-[5/2] bg-[#272725]  overflow-hidden p-3">
       {children}
@@ -44,7 +29,14 @@ const FeatureCard = ({ step, title, description, children }: any) => (
   </div>
 )
 
-const PricingCard = ({ title, desc, price, features }: any) => (
+interface PricingCardProps {
+  title: string;
+  desc: string;
+  price: string;
+  features: string[];
+}
+
+const PricingCard = ({ title, desc, price, features }: PricingCardProps) => (
   <div className="flex flex-col bg-[#272725] rounded-[8px] p-4  font-inconsolata ">
     <h3 className="text-2xl text-white mb-2">{title}</h3>
     <p className="text-sm  text-[#666666] mb-8">{desc}</p>

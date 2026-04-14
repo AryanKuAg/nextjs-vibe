@@ -687,6 +687,7 @@ export const veoGenerateFunction = inngest.createFunction(
               }
             }];
           }
+          //
         } else if (event.data.imageBase64) {
           instances = [{
             prompt: prompt,

@@ -168,7 +168,6 @@ export const ProjectView = ({ projectId }: Props) => {
   useEffect(() => {
     const urls: string[] = Array.isArray(rawSceneUrls) ? rawSceneUrls : [];
     setSceneImageUrls(urls);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id, rawSceneUrls]);
 
   const handleFrameGenerated = async (url: string) => {

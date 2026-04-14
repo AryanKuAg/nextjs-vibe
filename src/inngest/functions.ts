@@ -646,7 +646,7 @@ export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0 },
   { event: "veo/generate" },
   async ({ event, step }) => {
-    const { projectId, prompt, outputGcsUri } = event.data;
+    const { projectId, prompt } = event.data;
 
     await step.run("update-project-stage-generating", async () => {
       await prisma.project.update({
@@ -674,7 +674,7 @@ export const veoGenerateFunction = inngest.createFunction(
         const projectId = process.env.GOOGLE_CLOUD_PROJECT;
         const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
 
-        let instances: any[] = [{ prompt: prompt }];
+        let instances: Record<string, unknown>[] = [{ prompt: prompt }];
 
         if (event.data.imageUrl) {
           const bucketMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
@@ -722,8 +722,8 @@ export const veoGenerateFunction = inngest.createFunction(
         }
 
         return data.name; // operation name
-      } catch (err: any) {
-        throw new Error(err?.message || String(err));
+      } catch (err: unknown) {
+        throw new Error((err as Error)?.message || String(err));
       }
     });
 

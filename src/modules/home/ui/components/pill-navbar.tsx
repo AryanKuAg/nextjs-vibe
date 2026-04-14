@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, useUser, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignUpButton, useUser, useClerk } from "@clerk/nextjs";
 
 const UserAvatarButton = () => {
   const { user } = useUser();

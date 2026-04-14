@@ -32,7 +32,6 @@ export const SceneBuilder = ({
     if (droppedFile) {
       handleImageFile(droppedFile);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [droppedFile]);
 
   // Clean up object URLs
@@ -110,6 +109,7 @@ export const SceneBuilder = ({
           {/* Image thumbnail preview */}
           {imagePreviewUrl && (
             <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreviewUrl}
                 alt="Uploaded"

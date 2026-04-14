@@ -34,7 +34,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const [isFocused, setIsFocused] = useState(false);
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
-  const { data: project } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }));
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

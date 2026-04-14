@@ -140,7 +140,7 @@ export const ProjectForm = () => {
                   "flex items-center justify-center size-8 rounded-full transition-all duration-150",
                   isButtonDisabled
                     ? "bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
-                    : "bg-[#555555] text-[#1C1C1C] hover:bg-[#666666] active:scale-95"
+                    : "bg-white text-[#1C1C1C]"
                 )}
               >
                 {isPending ? (

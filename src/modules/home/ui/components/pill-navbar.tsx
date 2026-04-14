@@ -82,10 +82,10 @@ export const PillNavbar = () => {
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
       <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
         {/* Left side: Logo */}
-        <div className="flex items-center gap-2 pl-2">
+        <Link href="/" className="flex items-center gap-2 pl-2">
           <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
           <span className="text-white font-[500] tracking-wide text-base">Spatial</span>
-        </div>
+        </Link>
 
         {/* Center: Links */}
         <div className="hidden md:flex items-center gap-4 text-white text-sm">

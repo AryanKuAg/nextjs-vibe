@@ -99,7 +99,7 @@ export const ProjectForm = () => {
                 className={cn(
                   "w-full resize-none border-none outline-none bg-transparent",
                   "px-4 pt-4 ",
-                  "text-[15px] font-inconsolata leading-relaxed text-[#CCCCCC]",
+                  "text-[15px] font-inconsolata leading-relaxed text-white",
                   "placeholder:text-[#666666] placeholder:text-[14px]",
                   "transition-colors"
                 )}
@@ -131,7 +131,7 @@ export const ProjectForm = () => {
 
             <div className="flex items-center gap-4">
               <div className="text-sm text-[#666666] hidden sm:flex items-center tracking-wide">
-                Use <kbd className="mx-1.5 px-1.5 py-0.5 rounded-[4px] bg-[#333333] text-[#CCCCCC] text-sm">shift</kbd> + <kbd className="mx-1.5 px-1.5 py-0.5 rounded-[4px] bg-[#333333] text-[#CCCCCC] text-sm">return</kbd> for a new line
+                Use <kbd className="h-[18px] mx-1.5 px-1.5 rounded-[4px] bg-[#333333] text-[#CCCCCC] text-xs leading-[18px]">shift</kbd> + <kbd className="leading-[18px] h-[18px] mx-1.5 px-1.5  rounded-[4px] bg-[#333333] text-[#CCCCCC] text-xs">return</kbd> for a new line
               </div>
               <button
                 type="submit"
@@ -154,11 +154,11 @@ export const ProjectForm = () => {
         </form>
 
         {/* ── Template chips ── */}
-        <div className="hidden md:flex flex-wrap justify-center gap-2">
+        <div className="hidden md:flex flex-wrap justify-center gap-2 font-inconsolata">
           {[
-            "SaaS landing page+",
+            "SaaS landing page",
             "App website",
-            "AI startup homepage+",
+            "AI startup homepage",
             "Personal portfolio"
           ].map((title) => (
             <button

@@ -59,13 +59,13 @@ interface PricingCardProps {
 
 const PricingCard = ({ title, desc, price, features }: PricingCardProps) => (
   <div className="flex flex-col bg-[#272725] rounded-[8px] p-4  font-inconsolata ">
-    <h3 className="text-2xl text-white mb-2">{title}</h3>
+    <h3 className="text-2xl text-white mb-0">{title}</h3>
     <p className="text-sm  text-[#666666] mb-8">{desc}</p>
     <div className="flex items-end gap-2 mb-6">
       <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
       <span className="text-sm text-[#666666] mb-1.5 leading-[1]">Billed monthly</span>
     </div>
-    <button className="w-full py-[13px] bg-white text-black rounded-lg text-sm font-[500]  mb-8 ">
+    <button className="w-full h-[36px]  bg-white text-black rounded-lg text-sm font-[500]  mb-8 ">
       Get {title.toLowerCase()}
     </button>
     <div className="flex flex-col gap-2">
@@ -86,9 +86,9 @@ const Page = () => {
 
       {/* Hero Section */}
       <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
-        <div className="absolute inset-0 z-0 bg-[#0e0e0e]">
+        {/* <div className="absolute inset-0 z-0 bg-[#0e0e0e]">
           <video
-            // autoPlay
+            autoPlay
             loop
             muted
             playsInline
@@ -97,8 +97,8 @@ const Page = () => {
           >
             <source src="/hero_video.mp4" type="video/mp4" />
           </video>
-          {/* <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-[#0e0e0e]/20 to-transparent pointer-events-none" /> */}
-        </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-[#0e0e0e]/20 to-transparent pointer-events-none" />
+        </div> */}
 
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
           <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">

@@ -53,7 +53,7 @@ const UserAvatarButton = () => {
   return (
     <button
       onClick={() => signOut({ redirectUrl: "/" })}
-      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group"
+      className="flex items-center gap-2.5  transition-opacity group"
     >
       {/* Vertical divider */}
       <div className="w-px h-5 bg-[#3B3B38]" />
@@ -72,7 +72,7 @@ const UserAvatarButton = () => {
         </div>
       )}
       {/* Label */}
-      <span className="text-sm text-white/70 group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</span>
+      <span className="text-sm text-[#cccccc] group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</span>
     </button>
   );
 };
@@ -82,8 +82,8 @@ export const PillNavbar = () => {
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
       <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
         {/* Left side: Logo */}
-        <div className="flex items-center gap-3 pl-2">
-          <Image src="/logo.svg" alt="Spatial" width={22} height={22} />
+        <div className="flex items-center gap-2 pl-2">
+          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
           <span className="text-white font-[500] tracking-wide text-base">Spatial</span>
         </div>
 

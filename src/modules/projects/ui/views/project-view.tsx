@@ -228,13 +228,15 @@ export const ProjectView = ({ projectId }: Props) => {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightboxUrl}
-              alt="Scene preview"
-              className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black/20"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxUrl}
+                alt="Scene preview"
+                className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black/20"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </>
           )}
         </div>
       )}

@@ -99,7 +99,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       {showUsage && (
         <Usage
           points={usage.remainingPoints}
-          msBeforeNext={usage.msBeforeNext}
         />
       )}
       <form

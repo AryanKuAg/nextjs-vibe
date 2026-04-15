@@ -244,7 +244,7 @@ export const ProjectView = ({ projectId }: Props) => {
           defaultSize={sidebarDefaultSize}
           minSize={sidebarMinSize}
           maxSize={sidebarMaxSize}
-          className="flex flex-col min-h-0 bg-[#1C1C1C] border-r"
+          className="flex flex-col min-h-0 bg-[#1C1C1C]"
         >
           <ErrorBoundary fallback={<p>Project header error</p>}>
             <Suspense fallback={<p>Loading project...</p>}>
@@ -337,9 +337,9 @@ export const ProjectView = ({ projectId }: Props) => {
                   1,325/1,500 credits left
                 </div>
                 {!hasProAccess && (
-                  <Button asChild size="sm" variant="tertiary">
+                  <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">
                     <Link href="/pricing">
-                      <i className="ri-crown-line mr-1.5" /> Upgrade
+                      Upgrade
                     </Link>
                   </Button>
                 )}
@@ -365,10 +365,10 @@ export const ProjectView = ({ projectId }: Props) => {
                       <div className="grid grid-cols-3 gap-3">
                         {/* Currently generating card */}
                         {sceneIsGenerating && (
-                          <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden">
-                            <div className="aspect-video flex flex-col items-center justify-center gap-2">
-                              <i className="ri-loader-4-line text-white/60 text-2xl animate-spin" />
-                              <p className="text-white/50 text-xs">Generating</p>
+                          <div className="bg-[#272725] rounded-[8px] overflow-hidden">
+                            <div className="aspect-video flex flex-col items-center justify-center gap-1">
+                              <i className="ri-loader-4-line text-white text-2xl animate-spin" />
+                              <p className="text-white text-sm">Generating</p>
                             </div>
                           </div>
                         )}
@@ -426,26 +426,35 @@ export const ProjectView = ({ projectId }: Props) => {
                       </p>
                     </div>
                   ) : (
-                    <div className="p-4 w-full h-full overflow-y-auto">
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3">
+                      <div className="grid grid-cols-3 gap-3">
                         {isVideoLoading && (
-                          <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden aspect-video">
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                              <i className="ri-loader-4-line text-white/60 text-2xl animate-spin" />
-                              <p className="text-white/50 text-xs">Generating</p>
+                          <div className="bg-[#272725] rounded-[8px] overflow-hidden">
+                            <div className="aspect-video flex flex-col items-center justify-center gap-1">
+                              <i className="ri-loader-4-line text-white text-2xl animate-spin" />
+                              <p className="text-white text-sm">Generating</p>
                             </div>
                           </div>
                         )}
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url, idx) => (
-                          <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group flex flex-col">
-                            <div className="relative aspect-video">
-                              <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                          <div key={idx} className="group">
+                            <div className="relative aspect-video cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                              <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover rounded-[8px]" />
+                              {/* Hover action buttons */}
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <a href={url} download onClick={(e) => e.stopPropagation()} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                <a
+                                  href={url}
+                                  download
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                >
                                   <i className="ri-download-line text-sm" />
                                 </a>
-                                <button onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                >
                                   <i className="ri-fullscreen-line text-sm" />
                                 </button>
                               </div>
@@ -471,7 +480,7 @@ export const ProjectView = ({ projectId }: Props) => {
                                   setExtractingVideoUrl(null);
                                 }
                               }}
-                              className="relative w-full py-3 text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/5 disabled:opacity-50 transition-colors border-t border-white/5 flex items-center justify-center gap-2"
+                              className=" mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10 flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               {extractingVideoUrl === url ? (
                                 <>

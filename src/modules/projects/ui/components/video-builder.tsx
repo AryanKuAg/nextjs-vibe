@@ -68,7 +68,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
       <div className="flex-1" />
 
       <div className="p-4 space-y-3">
-        <div className="bg-[#1c1c1c] border border-white/5 rounded-2xl p-3 space-y-3">
+        <div className="bg-[#272725] rounded-[8px] p-3 space-y-3">
           {/* Image thumbnail preview or Upload Box */}
           {currentImage ? (
             <div className="relative w-fit">
@@ -76,7 +76,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               <img
                 src={currentImage}
                 alt="Selected scene"
-                className="w-16 h-16 rounded-xl object-cover border border-white/10"
+                className="w-16 h-16 rounded-[8px] object-cover"
               />
               <button
                 onClick={() => {
@@ -99,7 +99,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe the video you want to create"
-            className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px]"
+            className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px] placeholder:text-sm"
             disabled={isGenerating || startVideoGeneration.isPending}
           />
 
@@ -113,12 +113,12 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               type="button"
               onClick={handleSubmit}
               disabled={isGenerating || startVideoGeneration.isPending || !prompt.trim() || !currentImage}
-              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-[#333333] hover:bg-white/20 text-white disabled:opacity-30 transition-all shadow-sm"
+              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full disabled:bg-[#333333] bg-[#fff]  text-white  transition-all shadow-sm"
             >
               {isGenerating || startVideoGeneration.isPending ? (
                 <i className="ri-loader-4-line animate-spin" />
               ) : (
-                <i className="ri-arrow-up-line" />
+                <i className="ri-arrow-up-line text-[#272725]" />
               )}
             </button>
           </div>

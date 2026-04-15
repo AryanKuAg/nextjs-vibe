@@ -59,6 +59,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <Toaster />
+              <div id="clerk-captcha"></div>
               {children}
             </ThemeProvider>
           </body>

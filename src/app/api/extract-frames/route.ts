@@ -18,6 +18,8 @@ async function getFFmpeg() {
   return ffmpeg;
 }
 
+export const maxDuration = 300; // Allow 5 minutes for video processing on Vercel
+
 export async function POST(req: NextRequest) {
   let tmpDir: string | null = null;
 

@@ -29,6 +29,10 @@ try {
 }
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static"],
+  outputFileTracingIncludes: {
+    "/api/extract-frames": ["./node_modules/ffmpeg-static/**/*"],
+  },
   images: {
     remotePatterns: [
       {

@@ -673,206 +673,206 @@ export const veoGenerateFunction = inngest.createFunction(
         try {
           const token = await tokenHelper();
           const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-        const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
+          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:predictLongRunning`;
 
-        let instances: Record<string, unknown>[] = [{ prompt: prompt }];
+          let instances: Record<string, unknown>[] = [{ prompt: prompt }];
 
-        if (event.data.imageUrl) {
-          const bucketMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
-          if (bucketMatch) {
+          if (event.data.imageUrl) {
+            const bucketMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
+            if (bucketMatch) {
+              instances = [{
+                prompt: prompt,
+                image: {
+                  gcsUri: `gs://${bucketMatch[1]}/${bucketMatch[2]}`,
+                  mimeType: "image/png" // assuming standard generated image
+                }
+              }];
+            }
+            //
+          } else if (event.data.imageBase64) {
             instances = [{
               prompt: prompt,
               image: {
-                gcsUri: `gs://${bucketMatch[1]}/${bucketMatch[2]}`,
-                mimeType: "image/png" // assuming standard generated image
+                bytesBase64Encoded: event.data.imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+                mimeType: "image/png"
               }
             }];
           }
-          //
-        } else if (event.data.imageBase64) {
-          instances = [{
-            prompt: prompt,
-            image: {
-              bytesBase64Encoded: event.data.imageBase64.replace(/^data:image\/\w+;base64,/, ''),
-              mimeType: "image/png"
+
+          const payload = {
+            instances,
+            parameters: {
+              aspectRatio: "16:9",
+              resolution: "720p",
+              durationSeconds: 8,
+              includeAudio: false,
+              generateAudio: false
             }
-          }];
+          };
+
+          const result = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await result.json();
+
+          if (!result.ok) {
+            throw new Error(JSON.stringify(data));
+          }
+
+          return data.name; // operation name
+        } catch (err: unknown) {
+          throw new Error((err as Error)?.message || String(err));
         }
+      });
+
+      // Poll Initial LRO and Extend recursively via REST
+      const videoUri = await step.run("poll-and-extend-veo", async () => {
+        let isDone = false;
+        let base64VideoData = null;
+
+        console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
+        // Phase 1 Polling
+        while (!isDone) {
+          await new Promise(r => setTimeout(r, 15000));
+
+          const token = await tokenHelper();
+          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:fetchPredictOperation`;
+
+          const result = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ operationName })
+          });
+
+          const data = await result.json();
+          if (!result.ok) throw new Error(JSON.stringify(data));
+
+          if (data.done) {
+            isDone = true;
+            if (data.error) throw new Error(JSON.stringify(data.error));
+
+            base64VideoData = data.response?.videos?.[0]?.bytesBase64Encoded;
+
+            if (!base64VideoData) {
+              throw new Error(`Veo finished but returned no video format! Raw response: ${JSON.stringify(data.response)}`);
+            }
+          }
+        }
+
+        console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
+        const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+        const storage = new Storage({
+          projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          credentials: {
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          }
+        });
+
+        const bucket = storage.bucket(bucketName);
+        const part1OutputName = `videos/project-${event.data.projectId}-part1-${Date.now()}.mp4`;
+        const filePart1 = bucket.file(part1OutputName);
+        const buffer1 = Buffer.from(base64VideoData, 'base64');
+        await filePart1.save(buffer1, { metadata: { contentType: "video/mp4" } });
+
+        // Phase 2: Start Extension Sequence
+        console.log(`[Veo Extended Pipeline] Initiating Phase 2 Extention via GCS streaming...`);
+        const token = await tokenHelper();
+        const extUrl = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:predictLongRunning`;
 
         const payload = {
-          instances,
-          parameters: {
-            aspectRatio: "16:9",
-            resolution: "720p",
-            durationSeconds: 8,
-            includeAudio: false,
-            generateAudio: false
-          }
+          instances: [{
+            prompt: prompt, // Keep prompt aligned to force motion continuation
+            video: {
+              gcsUri: `gs://${bucketName}/${part1OutputName}`, // Use GCS bypass
+              mimeType: "video/mp4"
+            }
+          }],
+          parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7, includeAudio: false, generateAudio: false }
         };
 
-        const result = await fetch(url, {
+        const extResult = await fetch(extUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
+        const extData = await extResult.json();
+        if (!extResult.ok) throw new Error(JSON.stringify(extData));
 
-        const data = await result.json();
+        const operationName2 = extData.name;
 
-        if (!result.ok) {
-          throw new Error(JSON.stringify(data));
+        // Phase 2 Polling
+        isDone = false;
+        let finalBase64VideoData = null;
+        console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
+
+        while (!isDone) {
+          await new Promise(r => setTimeout(r, 15000));
+          const token2 = await tokenHelper();
+          const url2 = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:fetchPredictOperation`;
+
+          const result2 = await fetch(url2, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
+            body: JSON.stringify({ operationName: operationName2 })
+          });
+
+          const data2 = await result2.json();
+          if (!result2.ok) throw new Error(JSON.stringify(data2));
+
+          if (data2.done) {
+            isDone = true;
+            if (data2.error) throw new Error(JSON.stringify(data2.error));
+
+            finalBase64VideoData = data2.response?.videos?.[0]?.bytesBase64Encoded;
+
+            if (!finalBase64VideoData) {
+              throw new Error(`Veo extension finished but returned no video! Raw: ${JSON.stringify(data2.response)}`);
+            }
+          }
         }
 
-        return data.name; // operation name
-      } catch (err: unknown) {
-        throw new Error((err as Error)?.message || String(err));
-      }
-    });
+        console.log(`[Veo Extended Pipeline] Flushing 16-Second Master Video to GCS!`);
+        const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
+        const fileFinal = bucket.file(finalOutputName);
 
-    // Poll Initial LRO and Extend recursively via REST
-    const videoUri = await step.run("poll-and-extend-veo", async () => {
-      let isDone = false;
-      let base64VideoData = null;
+        const bufferFinal = Buffer.from(finalBase64VideoData, 'base64');
+        await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
 
-      console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
-      // Phase 1 Polling
-      while (!isDone) {
-        await new Promise(r => setTimeout(r, 15000));
+        return `https://storage.googleapis.com/${bucketName}/${finalOutputName}`;
+      });
 
-        const token = await tokenHelper();
-        const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:fetchPredictOperation`;
+      await step.run("update-project-video-url", async () => {
+        const existingProject = await prisma.project.findUnique({ where: { id: projectId } });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingUrls = Array.isArray((existingProject as any)?.videoUrls) ? (existingProject as any).videoUrls as string[] : [];
 
-        const result = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ operationName })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma.project as any).update({
+          where: { id: projectId },
+          data: {
+            videoUrls: [...existingUrls, videoUri],
+            currentStage: "VIDEO"
+          }
         });
-
-        const data = await result.json();
-        if (!result.ok) throw new Error(JSON.stringify(data));
-
-        if (data.done) {
-          isDone = true;
-          if (data.error) throw new Error(JSON.stringify(data.error));
-
-          base64VideoData = data.response?.videos?.[0]?.bytesBase64Encoded;
-
-          if (!base64VideoData) {
-            throw new Error(`Veo finished but returned no video format! Raw response: ${JSON.stringify(data.response)}`);
-          }
-        }
-      }
-
-      console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
-      const storage = new Storage({
-        projectId: process.env.GOOGLE_CLOUD_PROJECT,
-        credentials: {
-          client_email: process.env.GOOGLE_CLIENT_EMAIL,
-          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }
       });
 
-      const bucket = storage.bucket(bucketName);
-      const part1OutputName = `videos/project-${event.data.projectId}-part1-${Date.now()}.mp4`;
-      const filePart1 = bucket.file(part1OutputName);
-      const buffer1 = Buffer.from(base64VideoData, 'base64');
-      await filePart1.save(buffer1, { metadata: { contentType: "video/mp4" } });
-
-      // Phase 2: Start Extension Sequence
-      console.log(`[Veo Extended Pipeline] Initiating Phase 2 Extention via GCS streaming...`);
-      const token = await tokenHelper();
-      const extUrl = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
-
-      const payload = {
-        instances: [{
-          prompt: prompt, // Keep prompt aligned to force motion continuation
-          video: {
-            gcsUri: `gs://${bucketName}/${part1OutputName}`, // Use GCS bypass
-            mimeType: "video/mp4"
-          }
-        }],
-        parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7, includeAudio: false, generateAudio: false }
-      };
-
-      const extResult = await fetch(extUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-      const extData = await extResult.json();
-      if (!extResult.ok) throw new Error(JSON.stringify(extData));
-
-      const operationName2 = extData.name;
-
-      // Phase 2 Polling
-      isDone = false;
-      let finalBase64VideoData = null;
-      console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
-
-      while (!isDone) {
-        await new Promise(r => setTimeout(r, 15000));
-        const token2 = await tokenHelper();
-        const url2 = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:fetchPredictOperation`;
-
-        const result2 = await fetch(url2, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
-          body: JSON.stringify({ operationName: operationName2 })
-        });
-
-        const data2 = await result2.json();
-        if (!result2.ok) throw new Error(JSON.stringify(data2));
-
-        if (data2.done) {
-          isDone = true;
-          if (data2.error) throw new Error(JSON.stringify(data2.error));
-
-          finalBase64VideoData = data2.response?.videos?.[0]?.bytesBase64Encoded;
-
-          if (!finalBase64VideoData) {
-            throw new Error(`Veo extension finished but returned no video! Raw: ${JSON.stringify(data2.response)}`);
-          }
-        }
-      }
-
-      console.log(`[Veo Extended Pipeline] Flushing 16-Second Master Video to GCS!`);
-      const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
-      const fileFinal = bucket.file(finalOutputName);
-
-      const bufferFinal = Buffer.from(finalBase64VideoData, 'base64');
-      await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
-
-      return `https://storage.googleapis.com/${bucketName}/${finalOutputName}`;
-    });
-
-    await step.run("update-project-video-url", async () => {
-      const existingProject = await prisma.project.findUnique({ where: { id: projectId } });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existingUrls = Array.isArray((existingProject as any)?.videoUrls) ? (existingProject as any).videoUrls as string[] : [];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (prisma.project as any).update({
-        where: { id: projectId },
-        data: {
-          videoUrls: [...existingUrls, videoUri],
-          currentStage: "VIDEO"
-        }
-      });
-    });
-
-    return { videoUrl: videoUri };
+      return { videoUrl: videoUri };
     } catch (error: unknown) {
       await step.run("handle-video-generation-error", async () => {
         await prisma.project.update({
           where: { id: projectId },
           data: { currentStage: "VIDEO" }
-        }).catch(() => {});
+        }).catch(() => { });
       });
       throw error;
     }

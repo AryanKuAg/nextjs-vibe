@@ -105,7 +105,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
 
           <div className="flex items-center gap-x-2">
             <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white">
-              <span>Veo 3.1</span>
+              <span>Veo 3.1 Lite</span>
               <i className="ri-arrow-down-s-line" />
             </div>
 

@@ -867,7 +867,7 @@ export const veoGenerateFunction = inngest.createFunction(
     });
 
     return { videoUrl: videoUri };
-    } catch (error: any) {
+    } catch (error: unknown) {
       await step.run("handle-video-generation-error", async () => {
         await prisma.project.update({
           where: { id: projectId },

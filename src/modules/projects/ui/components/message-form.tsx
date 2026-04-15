@@ -1,16 +1,13 @@
 import { z } from "zod";
 import { toast } from "sonner";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { Button } from "@/components/ui/button";
 import { Form, FormField } from "@/components/ui/form";
 
 
@@ -30,9 +27,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [isFocused, setIsFocused] = useState(false);
-
-
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -105,8 +99,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             <TextareaAutosize
               {...field}
               disabled={isPending}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
               minRows={2}
               maxRows={8}
               className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px]"

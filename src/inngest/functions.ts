@@ -668,10 +668,11 @@ export const veoGenerateFunction = inngest.createFunction(
       return token;
     };
 
-    const operationName = await step.run("start-veo-generation", async () => {
-      try {
-        const token = await tokenHelper();
-        const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+    try {
+      const operationName = await step.run("start-veo-generation", async () => {
+        try {
+          const token = await tokenHelper();
+          const projectId = process.env.GOOGLE_CLOUD_PROJECT;
         const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-generate-001:predictLongRunning`;
 
         let instances: Record<string, unknown>[] = [{ prompt: prompt }];
@@ -703,7 +704,9 @@ export const veoGenerateFunction = inngest.createFunction(
           parameters: {
             aspectRatio: "16:9",
             resolution: "720p",
-            durationSeconds: 8
+            durationSeconds: 8,
+            includeAudio: false,
+            generateAudio: false
           }
         };
 
@@ -794,7 +797,7 @@ export const veoGenerateFunction = inngest.createFunction(
             mimeType: "video/mp4"
           }
         }],
-        parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7 }
+        parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7, includeAudio: false, generateAudio: false }
       };
 
       const extResult = await fetch(extUrl, {
@@ -864,5 +867,14 @@ export const veoGenerateFunction = inngest.createFunction(
     });
 
     return { videoUrl: videoUri };
+    } catch (error: any) {
+      await step.run("handle-video-generation-error", async () => {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { currentStage: "VIDEO" }
+        }).catch(() => {});
+      });
+      throw error;
+    }
   }
 );

@@ -54,6 +54,7 @@ export async function getUsageStatus() {
   return {
     consumedPoints: consumed,
     remainingPoints: Math.max(0, maxPoints - consumed),
+    maxPoints: maxPoints,
     isAllowed: consumed < maxPoints,
   };
 }

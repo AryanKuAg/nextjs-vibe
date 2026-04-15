@@ -144,7 +144,7 @@ export const ProjectForm = () => {
                 )}
               >
                 {isPending ? (
-                  <i className="ri-loader-4-line text-[16px] animate-spin" />
+                  <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
                 ) : (
                   <i className="ri-arrow-up-line text-[16px]" />
                 )}

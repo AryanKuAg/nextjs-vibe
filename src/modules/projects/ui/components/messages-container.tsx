@@ -14,7 +14,7 @@ interface Props {
   setActiveFragment: (fragment: Fragment | null) => void;
 };
 
-export const MessagesContainer = ({ 
+export const MessagesContainer = ({
   projectId,
   activeFragment,
   setActiveFragment,
@@ -75,11 +75,11 @@ export const MessagesContainer = ({
         </div>
       </div>
       <div className="relative p-3 pt-1">
-        <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background pointer-events-none" />
+        <div className="absolute -top-6 left-0 right-0 h-6 pointer-events-none" />
         <MessageForm projectId={projectId} stage={stage} extractedZipUrl={extractedZipUrl} />
         {onBack && (
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={onBack}
             className="w-full py-3 mt-2 text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/5 bg-[#171717] border border-white/5 transition-colors rounded-xl"
           >

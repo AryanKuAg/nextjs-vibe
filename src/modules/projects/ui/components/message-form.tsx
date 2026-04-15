@@ -13,7 +13,6 @@ import { useTRPC } from "@/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Form, FormField } from "@/components/ui/form";
 
-import { Usage } from "./usage";
 
 interface Props {
   projectId: string;
@@ -33,7 +32,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const queryClient = useQueryClient();
   const [isFocused, setIsFocused] = useState(false);
 
-  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,7 +40,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       value: "",
     },
   });
-  
+
   const buildSite = useMutation(trpc.projects.buildSite.mutationOptions({
     onSuccess: () => {
       form.reset();
@@ -69,7 +68,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       }
     },
   }));
-  
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (stage === "SITE") {
       try {
@@ -89,25 +88,15 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       });
     }
   };
-  
+
   const isPending = createMessage.isPending || buildSite.isPending;
   const isButtonDisabled = isPending || !form.formState.isValid;
-  const showUsage = !!usage;
 
   return (
     <Form {...form}>
-      {showUsage && (
-        <Usage
-          points={usage.remainingPoints}
-        />
-      )}
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className={cn(
-          "relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all",
-          isFocused && "shadow-xs",
-          showUsage && "rounded-t-none",
-        )}
+        className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3 relative transition-all"
       >
         <FormField
           control={form.control}
@@ -120,7 +109,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
               onBlur={() => setIsFocused(false)}
               minRows={2}
               maxRows={8}
-              className="pt-4 resize-none border-none w-full outline-none bg-transparent text-sm placeholder:text-muted-foreground/50"
+              className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px]"
               placeholder="Prompt here"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -131,32 +120,30 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             />
           )}
         />
-        <div className="flex gap-x-2 items-center pt-2">
-          <div className="flex gap-x-2 items-center flex-1">
-            <button
-              type="button"
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/70 transition-colors border border-white/5"
-            >
-              <i className="ri-add-line" />
-            </button>
-            <div className="h-8 px-3 flex items-center gap-2 rounded-full bg-[#1e1e1e] border border-white/5 text-xs text-white/70 cursor-pointer hover:bg-[#252525] transition-colors">
-              <span>Gemini 3.1 Pro</span>
-              <i className="ri-arrow-down-s-line" />
-            </div>
+
+        <div className="flex items-center gap-x-2">
+          <button
+            type="button"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-transparent text-white transition-colors border-[0.5px] border-[#3B3B3B] px-2.5 py-2"
+          >
+            <i className="ri-add-line" />
+          </button>
+          <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white cursor-pointer">
+            <span>Gemini 3.1 Pro</span>
+            <i className="ri-arrow-down-s-line" />
           </div>
-          <Button
+
+          <button
+            type="submit"
             disabled={isButtonDisabled}
-            className={cn(
-              "w-8 h-8 p-0 rounded-full bg-white text-black hover:bg-white/90",
-              isButtonDisabled && "opacity-50"
-            )}
+            className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] transition-all shadow-sm"
           >
             {isPending ? (
-              <i className="ri-loader-4-line text-base leading-none animate-spin" />
+              <i className="ri-loader-4-line animate-spin inline-block" />
             ) : (
-              <i className="ri-arrow-up-line text-base leading-none" />
+              <i className="ri-arrow-up-line text-[#1C1C1C]" />
             )}
-          </Button>
+          </button>
         </div>
       </form>
     </Form>

@@ -89,7 +89,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               </button>
             </div>
           ) : (
-            <label className="flex items-center justify-center w-16 h-16 rounded-xl border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+            <label className="flex items-center justify-center w-16 h-16 rounded-[8px] border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               <i className="ri-image-line text-white/30 text-xl" />
             </label>
@@ -116,7 +116,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               className="ml-auto w-8 h-8 flex items-center justify-center rounded-full disabled:bg-[#333333] bg-[#fff]  text-white  transition-all shadow-sm"
             >
               {isGenerating || startVideoGeneration.isPending ? (
-                <i className="ri-loader-4-line animate-spin" />
+                <i className="ri-loader-4-line animate-spin inline-block" />
               ) : (
                 <i className="ri-arrow-up-line text-[#272725]" />
               )}

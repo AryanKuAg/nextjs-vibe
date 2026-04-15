@@ -43,6 +43,8 @@ export const ProjectView = ({ projectId }: Props) => {
     trpc.projects.getOne.queryOptions({ id: projectId })
   );
 
+  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
@@ -115,6 +117,28 @@ export const ProjectView = ({ projectId }: Props) => {
       return () => clearInterval(interval);
     }
   }, [project?.currentStage, refetch]);
+
+  // Track video generation status to show error toasts
+  const previousIsVideoLoading = useRef(project?.currentStage === "GENERATING_VIDEO");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const previousVideoUrlsLength = useRef(((project as any)?.videoUrls as string[] || []).length);
+
+  useEffect(() => {
+    const isVideoLoading = project?.currentStage === "GENERATING_VIDEO";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentVideoUrlsLength = ((project as any)?.videoUrls as string[] || []).length;
+
+    if (previousIsVideoLoading.current && !isVideoLoading) {
+      if (currentVideoUrlsLength === previousVideoUrlsLength.current) {
+        toast.error("Generation failed. Please try again or check usage limits.");
+      } else {
+        toast.success("Video generated successfully!");
+      }
+    }
+
+    previousIsVideoLoading.current = isVideoLoading;
+    previousVideoUrlsLength.current = currentVideoUrlsLength;
+  }, [project]);
 
   const handleDownloadZip = () => {
     if (!activeFragment?.files) return;
@@ -334,7 +358,7 @@ export const ProjectView = ({ projectId }: Props) => {
               )}
               <div className="ml-auto flex items-center gap-x-2">
                 <div className="bg-[#272725]  rounded-[8px] px-3 py-2 text-sm text-white">
-                  1,325/1,500 credits left
+                  {usage ? `${usage.remainingPoints.toLocaleString()}/${usage.maxPoints.toLocaleString()} credits left` : "Loading credits..."}
                 </div>
                 {!hasProAccess && (
                   <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">
@@ -367,7 +391,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         {sceneIsGenerating && (
                           <div className="bg-[#272725] rounded-[8px] overflow-hidden">
                             <div className="aspect-video flex flex-col items-center justify-center gap-1">
-                              <i className="ri-loader-4-line text-white text-2xl animate-spin" />
+                              <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
                               <p className="text-white text-sm">Generating</p>
                             </div>
                           </div>
@@ -431,7 +455,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         {isVideoLoading && (
                           <div className="bg-[#272725] rounded-[8px] overflow-hidden">
                             <div className="aspect-video flex flex-col items-center justify-center gap-1">
-                              <i className="ri-loader-4-line text-white text-2xl animate-spin" />
+                              <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
                               <p className="text-white text-sm">Generating</p>
                             </div>
                           </div>
@@ -484,7 +508,7 @@ export const ProjectView = ({ projectId }: Props) => {
                             >
                               {extractingVideoUrl === url ? (
                                 <>
-                                  <i className="ri-loader-4-line animate-spin text-sm" />
+                                  <i className="ri-loader-4-line animate-spin inline-block text-sm" />
                                   <span>Preparing...</span>
                                 </>
                               ) : (
@@ -502,9 +526,11 @@ export const ProjectView = ({ projectId }: Props) => {
                     {activeFragment ? (
                       <FragmentWeb data={activeFragment} />
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full opacity-30 select-none">
-                        <i className="ri-layout-masonry-line text-6xl mb-4" />
-                        <p>Type a prompt to build your site.</p>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                        <h2 className="text-lg font-medium text-white mb-2">Build site</h2>
+                        <p className="text-sm text-white/30 leading-relaxed">
+                          Your website preview will appear here
+                        </p>
                       </div>
                     )}
                   </TabsContent>

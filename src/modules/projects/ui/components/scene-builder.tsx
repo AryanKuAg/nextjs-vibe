@@ -163,7 +163,7 @@ export const SceneBuilder = ({
               className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] transition-all shadow-sm"
             >
               {isGenerating ? (
-                <i className="ri-loader-4-line animate-spin" />
+                <i className="ri-loader-4-line animate-spin inline-block" />
               ) : (
                 <i className="ri-arrow-up-line text-[#1C1C1C]" />
               )}

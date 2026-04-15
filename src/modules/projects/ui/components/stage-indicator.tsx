@@ -41,7 +41,7 @@ export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props)
               )}
               disabled={!isUnlocked}
             >
-              <span className="text-xs mb-[2px] text-[#666666] font-dm-mono">{num}</span>
+              <span className="text-xs mb-[4px] text-[#666666] font-dm-mono">{num}</span>
               <span className="text-xs text-white leading-tight text-center px-1 font-inconsolata">{text}</span>
             </button>
 

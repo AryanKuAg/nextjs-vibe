@@ -80,9 +80,9 @@ export const SceneBuilder = ({
         ...(uploadedImage
           ? { body: formData }
           : {
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt, projectId }),
-            }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, projectId }),
+          }),
       });
 
       if (!res.ok) {
@@ -101,11 +101,11 @@ export const SceneBuilder = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-sidebar">
+    <div className="flex flex-col h-full bg-[#1C1C1C] font-inconsolata">
       <div className="flex-1" />
 
       <div className="p-4 space-y-3">
-        <div className="bg-[#1c1c1c] border border-white/5 rounded-2xl p-3 space-y-3">
+        <div className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3">
           {/* Image thumbnail preview */}
           {imagePreviewUrl && (
             <div className="relative w-fit">
@@ -129,7 +129,7 @@ export const SceneBuilder = ({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Prompt here"
-            className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px]"
+            className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px] "
             disabled={isGenerating}
           />
 
@@ -145,12 +145,12 @@ export const SceneBuilder = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-transparent text-white transition-colors border-[0.5px] border-[#3B3B3B] px-2.5 py-2"
             >
               <i className="ri-add-line" />
             </button>
 
-            <div className="flex items-center gap-x-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-[11px] text-white/70">
+            <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white">
               <span className="text-sm">🍌</span>
               <span>Nano Banana 2</span>
               <i className="ri-arrow-down-s-line" />
@@ -160,20 +160,19 @@ export const SceneBuilder = ({
               type="button"
               onClick={handleSubmit}
               disabled={isGenerating || (!prompt.trim() && !uploadedImage)}
-              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-[#333333] hover:bg-white/20 text-white disabled:opacity-30 transition-all shadow-sm"
+              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] transition-all shadow-sm"
             >
               {isGenerating ? (
                 <i className="ri-loader-4-line animate-spin" />
               ) : (
-                <i className="ri-arrow-up-line" />
+                <i className="ri-arrow-up-line text-[#1C1C1C]" />
               )}
             </button>
           </div>
         </div>
 
         <Button
-          variant="outline"
-          className="w-full rounded-xl bg-transparent border-white/5 text-white/70 hover:bg-white/5 uppercase text-[10px] font-bold tracking-[0.1em] h-10 transition-all"
+          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
           onClick={onNext}
         >
           Skip

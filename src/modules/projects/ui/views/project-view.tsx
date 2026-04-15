@@ -232,7 +232,7 @@ export const ProjectView = ({ projectId }: Props) => {
               <img
                 src={lightboxUrl}
                 alt="Scene preview"
-                className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black/20"
+                className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-[#1C1C1C]"
                 onClick={(e) => e.stopPropagation()}
               />
             </>
@@ -244,7 +244,7 @@ export const ProjectView = ({ projectId }: Props) => {
           defaultSize={sidebarDefaultSize}
           minSize={sidebarMinSize}
           maxSize={sidebarMaxSize}
-          className="flex flex-col min-h-0 bg-sidebar border-r"
+          className="flex flex-col min-h-0 bg-[#1C1C1C] border-r"
         >
           <ErrorBoundary fallback={<p>Project header error</p>}>
             <Suspense fallback={<p>Loading project...</p>}>
@@ -296,12 +296,12 @@ export const ProjectView = ({ projectId }: Props) => {
           )}
         </ResizablePanel>
 
-        <ResizableHandle className="hover:bg-primary transition-colors" />
+        <ResizableHandle className="hover:bg-white transition-colors" />
 
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
           minSize={30}
-          className="bg-background relative"
+          className="bg-[#1C1C1C] relative"
         >
           <Tabs
             className="h-full flex flex-col gap-0"
@@ -309,7 +309,7 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2 border-b gap-x-2 bg-background h-[49px] shrink-0">
+            <div className="w-full flex items-center p-2.5 border-b gap-x-2 bg-[#1C1C1C] h-[56px] shrink-0">
               {activeStageTab === "SITE" && (
                 <>
                   <TabsList className="h-8 p-0 border rounded-md">
@@ -332,8 +332,8 @@ export const ProjectView = ({ projectId }: Props) => {
                   </Button>
                 </>
               )}
-              <div className="ml-auto flex items-center gap-x-3">
-                <div className="bg-[#1c1c1c] border border-white/5 rounded-lg px-3 py-1.5 text-[11px] text-white/50 font-medium">
+              <div className="ml-auto flex items-center gap-x-2">
+                <div className="bg-[#272725]  rounded-[8px] px-3 py-2 text-sm text-white">
                   1,325/1,500 credits left
                 </div>
                 {!hasProAccess && (
@@ -347,7 +347,7 @@ export const ProjectView = ({ projectId }: Props) => {
               </div>
             </div>
 
-            <div className="flex-1 relative overflow-hidden">
+            <div className="flex-1 relative overflow-hidden bg-[#1C1C1C]">
               {(activeStageTab === "SCENE" || activeStageTab === "GENERATING_VIDEO") ? (
                 <>
                   {/* Empty state – centered in the full area */}
@@ -374,13 +374,13 @@ export const ProjectView = ({ projectId }: Props) => {
                         )}
                         {/* All generated image cards */}
                         {[...sceneImageUrls].reverse().map((url, idx) => (
-                          <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group">
+                          <div key={idx} className="group">
                             <div className="relative aspect-video cursor-pointer" onClick={() => setLightboxUrl(url)}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={url}
                                 alt={`Generated scene ${idx + 1}`}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover  rounded-[8px]"
                               />
                               {/* Hover action buttons */}
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -405,7 +405,7 @@ export const ProjectView = ({ projectId }: Props) => {
                                 setSelectedSceneUrl(url);
                                 setActiveStageTab("VIDEO");
                               }}
-                              className="w-full py-2.5 text-xs text-white/60 hover:text-white/90 transition-colors border-t border-white/5"
+                              className=" mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
                             >
                               Use this scene
                             </button>
@@ -440,15 +440,15 @@ export const ProjectView = ({ projectId }: Props) => {
                         {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url, idx) => (
                           <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden group flex flex-col">
                             <div className="relative aspect-video">
-                                <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <a href={url} download onClick={(e) => e.stopPropagation()} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
-                                    <i className="ri-download-line text-sm" />
-                                  </a>
-                                  <button onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
-                                    <i className="ri-fullscreen-line text-sm" />
-                                  </button>
-                                </div>
+                              <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a href={url} download onClick={(e) => e.stopPropagation()} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                  <i className="ri-download-line text-sm" />
+                                </a>
+                                <button onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm text-white hover:bg-black/80 transition-transform hover:scale-105">
+                                  <i className="ri-fullscreen-line text-sm" />
+                                </button>
+                              </div>
                             </div>
                             <button
                               disabled={extractingVideoUrl === url}
@@ -487,7 +487,7 @@ export const ProjectView = ({ projectId }: Props) => {
                       </div>
                     </div>
                   )}
-                </div>              ) : (
+                </div>) : (
                 <>
                   <TabsContent value="preview" className="h-full m-0">
                     {activeFragment ? (

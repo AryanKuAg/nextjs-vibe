@@ -59,7 +59,7 @@ const Page = () => {
 
       {/* Hero Section */}
       <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
-        {/* <div className="absolute inset-0 z-0 bg-[#0e0e0e]">
+        <div className="absolute inset-0 z-0 bg-[#0e0e0e]">
           <video
             autoPlay
             loop
@@ -70,8 +70,8 @@ const Page = () => {
           >
             <source src="/hero_video.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-[#0e0e0e]/20 to-transparent pointer-events-none" />
-        </div> */}
+          {/* <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e0e] via-[#0e0e0e]/20 to-transparent pointer-events-none" /> */}
+        </div>
 
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
           <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">

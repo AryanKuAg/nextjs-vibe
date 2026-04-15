@@ -421,7 +421,7 @@ export const ProjectView = ({ projectId }: Props) => {
                   {(!((project as any)?.videoUrls?.length > 0) && !isVideoLoading) ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                       <h2 className="text-lg font-medium text-white mb-2">Build video</h2>
-                      <p className="text-sm text-white/30 leading-relaxed max-w-[280px]">
+                      <p className="text-sm text-white/30 leading-relaxed">
                         Describe the world you want. We&apos;ll generate a visual you can animate.
                       </p>
                     </div>

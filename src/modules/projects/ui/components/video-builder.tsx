@@ -52,9 +52,9 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const handleSubmit = async () => {
     const hasImage = selectedSceneUrl || uploadedBase64;
     if (!prompt.trim() || isGenerating || !hasImage) return;
-    
-    await startVideoGeneration.mutateAsync({ 
-      projectId, 
+
+    await startVideoGeneration.mutateAsync({
+      projectId,
       prompt,
       imageUrl: selectedSceneUrl || undefined,
       imageBase64: uploadedBase64 || undefined
@@ -64,7 +64,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const currentImage = uploadedBase64 || selectedSceneUrl;
 
   return (
-    <div className="flex flex-col h-full bg-sidebar relative">
+    <div className="flex flex-col h-full bg-[#1C1C1C] relative">
       <div className="flex-1" />
 
       <div className="p-4 space-y-3">
@@ -78,7 +78,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                 alt="Selected scene"
                 className="w-16 h-16 rounded-xl object-cover border border-white/10"
               />
-              <button 
+              <button
                 onClick={() => {
                   setUploadedBase64(null);
                   onClearSelection?.();
@@ -104,7 +104,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
           />
 
           <div className="flex items-center gap-x-2">
-            <div className="flex items-center gap-x-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-[11px] text-white/70">
+            <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white">
               <span>Veo 3.1</span>
               <i className="ri-arrow-down-s-line" />
             </div>
@@ -125,8 +125,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
         </div>
 
         <Button
-          variant="outline"
-          className="w-full rounded-xl bg-transparent border-white/5 text-white/70 hover:bg-white/5 text-xs font-medium h-10 transition-all"
+          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
           onClick={onBack}
         >
           Back

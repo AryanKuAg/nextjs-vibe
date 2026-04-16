@@ -1,12 +1,42 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useRef } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 import { PricingSection } from "@/modules/home/ui/components/pricing-section";
+
+// Isolated component — bypasses React hydration entirely via useEffect
+const HeroVideo = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("preload", "auto");
+    video.className = "w-full h-full object-cover opacity-80";
+
+    const source = document.createElement("source");
+    source.src = "/hero_video.mp4";
+    source.type = "video/mp4";
+    video.appendChild(source);
+    container.appendChild(video);
+    video.play().catch(() => {});
+
+    return () => { container.innerHTML = ""; };
+  }, []);
+
+  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e]" />;
+};
 
 const GoogleCTAButton = () => {
   const { signIn, isLoaded } = useSignIn();
@@ -59,23 +89,7 @@ const Page = () => {
 
       {/* Hero Section */}
       <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
-        <div 
-          className="absolute inset-0 z-0 bg-[#0e0e0e]"
-          dangerouslySetInnerHTML={{
-            __html: `
-              <video
-                autoplay
-                loop
-                muted
-                playsinline
-                preload="auto"
-                class="w-full h-full object-cover opacity-80"
-              >
-                <source src="/hero_video.mp4" type="video/mp4" />
-              </video>
-            `
-          }}
-        />
+        <HeroVideo />
 
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
           <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">

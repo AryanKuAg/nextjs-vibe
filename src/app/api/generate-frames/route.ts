@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     // Support both JSON (text-only) and FormData (with optional image)
     let prompt: string;
     let projectId: string;
+    let model: string = "gemini-3.1-flash-image-preview";
     let imageBytes: Buffer | null = null;
     let imageMimeType = "image/png";
 
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
       const form = await req.formData();
       prompt = (form.get("prompt") as string) ?? "";
       projectId = (form.get("projectId") as string) ?? "";
+      model = (form.get("model") as string) || model;
       const imageFile = form.get("image") as File | null;
       if (imageFile) {
         imageMimeType = imageFile.type || "image/png";
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
       const body = await req.json();
       prompt = body.prompt ?? "";
       projectId = body.projectId ?? "";
+      model = body.model || model;
     }
 
     if (!prompt || !projectId) {
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
     userParts.push({ text: framePrompt });
 
     const streamingResp = await ai.models.generateContentStream({
-      model: "gemini-3.1-flash-image-preview",
+      model,
       contents: [{ role: "user", parts: userParts }],
       config: {
         maxOutputTokens: 32768,

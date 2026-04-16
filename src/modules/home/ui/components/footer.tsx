@@ -56,10 +56,10 @@ export const Footer = () => {
             <div>
               <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Legal</h4>
               <div className="flex flex-col gap-2">
-                <Link href="#" className="text-sm text-white">Privacy policy</Link>
-                <Link href="#" className="text-sm text-white">Cookie policy</Link>
-                <Link href="#" className="text-sm text-white">Terms of service</Link>
-                <Link href="#" className="text-sm text-white">Compliance</Link>
+                <Link href="/privacy" className="text-sm text-white">Privacy policy</Link>
+                <Link href="/cookies" className="text-sm text-white">Cookie policy</Link>
+                <Link href="/terms" className="text-sm text-white">Terms of service</Link>
+                <Link href="/compliance" className="text-sm text-white">Compliance</Link>
               </div>
             </div>
           </div>

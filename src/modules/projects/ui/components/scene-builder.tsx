@@ -13,6 +13,13 @@ interface Props {
   onNext: () => void;
 }
 
+const MODELS = [
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌" },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌" },
+] as const;
+
+type ModelId = typeof MODELS[number]["id"];
+
 export const SceneBuilder = ({
   projectId,
   initialPrompt = "",
@@ -25,7 +32,21 @@ export const SceneBuilder = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // Accept a file dropped from the parent (right panel drag-drop)
   useEffect(() => {
@@ -78,10 +99,10 @@ export const SceneBuilder = ({
       const res = await fetch("/api/generate-frames", {
         method: "POST",
         ...(uploadedImage
-          ? { body: formData }
+          ? { body: (() => { formData.append("model", selectedModel); return formData; })() }
           : {
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, projectId }),
+            body: JSON.stringify({ prompt, projectId, model: selectedModel }),
           }),
       });
 
@@ -129,7 +150,7 @@ export const SceneBuilder = ({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Prompt here"
-            className="w-full bg-transparent text-sm text-white/90 outline-none resize-none min-h-[80px] "
+            className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px] "
             disabled={isGenerating}
           />
 
@@ -139,28 +160,50 @@ export const SceneBuilder = ({
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              className="hidden"
+              className="hidden "
               onChange={handleFileInputChange}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-transparent text-white transition-colors border-[0.5px] border-[#3B3B3B] px-2.5 py-2"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] hover:bg-white/5 text-[#CCCCCC] transition-colors"
             >
-              <i className="ri-add-line" />
+              <i className="ri-add-line text-base" />
             </button>
 
-            <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white">
-              <span className="text-sm">🍌</span>
-              <span>Nano Banana 2</span>
-              <i className="ri-arrow-down-s-line" />
+            <div className="relative" ref={dropdownRef}>
+              <div
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={() => setModelDropdownOpen((o) => !o)}
+              >
+                <span className="text-sm">🍌</span>
+                <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+              </div>
+
+              {modelDropdownOpen && (
+                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                  {MODELS.map((model) => (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        }`}
+                    >
+                      <span>{model.label}</span>
+                      {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button
               type="button"
               onClick={handleSubmit}
               disabled={isGenerating || (!prompt.trim() && !uploadedImage)}
-              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] transition-all shadow-sm"
+              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
             >
               {isGenerating ? (
                 <i className="ri-loader-4-line animate-spin inline-block" />
@@ -172,7 +215,7 @@ export const SceneBuilder = ({
         </div>
 
         <Button
-          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
+          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5!"
           onClick={onNext}
         >
           Skip

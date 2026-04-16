@@ -42,8 +42,8 @@ export const ProjectHeader = ({ projectId }: Props) => {
             className="focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity pl-2!"
           >
             <Image src="/logo.svg" alt="Vibe" width={24} height={24} />
-            <span className="ml-2 text-sm">{project.name}</span>
-            <i className="ri-arrow-down-s-line text-xl mt-0.5 text-white" />
+            <span className="ml-2 text-sm text-white">{project.name}</span>
+            <i className="ri-arrow-down-s-line text-base mt-0.5 text-white" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">

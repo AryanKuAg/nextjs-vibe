@@ -411,8 +411,8 @@ export const ProjectView = ({ projectId }: Props) => {
                   {/* Empty state – centered in the full area */}
                   {!sceneIsGenerating && sceneImageUrls.length === 0 && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <h2 className="text-lg font-medium text-white mb-2">Build scene</h2>
-                      <p className="text-sm text-white/30 leading-relaxed">
+                      <h2 className="text-sm text-white mb-1">Build scene</h2>
+                      <p className="text-xs text-white/30 leading-relaxed">
                         Describe the world you want. We&apos;ll generate a visual you can animate.
                       </p>
                     </div>

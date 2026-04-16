@@ -20,7 +20,7 @@ export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props)
   const activeIndex = STAGES.findIndex((s) => s.id === activeTab);
 
   return (
-    <div className="flex items-center m-3 bg-sidebar"> {/* todo: add gap */}
+    <div className="flex items-center m-3 "> {/* todo: add gap */}
       {STAGES.map((stage, idx) => {
         const isActive = activeIndex === idx;
         const isUnlocked = unlockedIndex >= idx;

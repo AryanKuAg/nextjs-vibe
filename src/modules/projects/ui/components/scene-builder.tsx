@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -146,11 +147,13 @@ export const SceneBuilder = ({
             </div>
           )}
 
-          <textarea
+          <TextareaAutosize
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Prompt here"
-            className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px] "
+            minRows={3}
+            maxRows={14}
+            className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px]"
             disabled={isGenerating}
           />
 

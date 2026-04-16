@@ -46,8 +46,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
         toast.info("Started generating video. This will take a few minutes...");
-        setPrompt("");
-        // Don't auto-clear image so user can iterate on the same image
+        // Don't auto-clear image or prompt so user can iterate
       },
       onError: (error) => {
         toast.error(error.message || "Failed to start video generation");

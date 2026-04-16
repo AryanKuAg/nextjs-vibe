@@ -46,6 +46,17 @@ export const ProjectView = ({ projectId }: Props) => {
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
+  const [fragmentKey, setFragmentKey] = useState(0);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const displayUrl = activeFragment?.deploymentUrl || activeFragment?.sandboxUrl;
+
+  const handleCopyUrl = () => {
+    if (!displayUrl) return;
+    navigator.clipboard.writeText(displayUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
 
@@ -306,7 +317,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
           {activeStageTab === "SITE" && (
             <ErrorBoundary fallback={<p>Messages container error</p>}>
-              <Suspense fallback={<p>Loading messages...</p>}>
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center"><i className="ri-loader-4-line animate-spin inline-block text-2xl text-white" /></div>}>
                 <MessagesContainer
                   projectId={projectId}
                   activeFragment={activeFragment}
@@ -333,27 +344,50 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2.5 border-b gap-x-2 bg-[#1C1C1C] h-[56px] shrink-0">
+            <div className="w-full flex items-center p-2.5  gap-x-2 bg-[#1C1C1C] h-[56px] shrink-0 border-b">
               {activeStageTab === "SITE" && (
                 <>
-                  <TabsList className="h-8 p-0 border rounded-md">
-                    <TabsTrigger value="preview" className="rounded-md">
-                      <i className="ri-eye-line mr-1.5" /> <span>Demo</span>
+                  <TabsList className="h-8 p-0.5 rounded-[8px] bg-[#272725]">
+                    <TabsTrigger value="preview" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-[#1C1C1C]">
+                      <i className="ri-eye-line" />
                     </TabsTrigger>
-                    <TabsTrigger value="code" className="rounded-md">
-                      <i className="ri-code-line mr-1.5" /> <span>Code</span>
+                    <TabsTrigger value="code" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-[#1C1C1C]">
+                      <i className="ri-code-line" />
                     </TabsTrigger>
                   </TabsList>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-md px-3 border-border/50 hover:bg-white/5"
+                    className="h-8 rounded-[8px] px-2 bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
                     onClick={handleDownloadZip}
                     disabled={!activeFragment?.files || isDownloading}
                   >
-                    <i className="ri-download-line w-4 h-4 mr-2" />
+                    <i className="ri-download-2-line w-4 h-4 mb-1" />
                     {isDownloading ? "Zipping..." : "Download ZIP"}
                   </Button>
+
+                  {displayUrl && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        onClick={() => setFragmentKey((prev) => prev + 1)}
+                      >
+                        <i className="ri-refresh-line" />
+                      </Button>
+                      <Button
+                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        asChild
+                      >
+                        <a href={displayUrl} target="_blank" rel="noopener noreferrer">
+                          <i className="ri-external-link-line" />
+                        </a>
+                      </Button>
+                      <Button
+                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        onClick={handleCopyUrl}
+                      >
+                        {copiedUrl ? <i className="ri-check-line text-white" /> : <i className="ri-file-copy-line" />}
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
               <div className="ml-auto flex items-center gap-x-2">
@@ -524,7 +558,7 @@ export const ProjectView = ({ projectId }: Props) => {
                 <>
                   <TabsContent value="preview" className="h-full m-0">
                     {activeFragment ? (
-                      <FragmentWeb data={activeFragment} />
+                      <FragmentWeb key={`${activeFragment.id}-${fragmentKey}`} data={activeFragment} />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                         <h2 className="text-lg font-medium text-white mb-2">Build site</h2>

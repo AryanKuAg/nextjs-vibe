@@ -13,7 +13,7 @@ interface UserMessageProps {
 const UserMessage = ({ content }: UserMessageProps) => {
   return (
     <div className="flex justify-end pb-4 pr-2 pl-10">
-      <Card className="rounded-lg bg-muted p-3 shadow-none border-none max-w-[80%] break-words">
+      <Card className="rounded-lg bg-[#272725] py-3 px-4 shadow-none border-none max-w-[80%] break-words">
         {content}
       </Card>
     </div>
@@ -34,9 +34,9 @@ const FragmentCard = ({
   return (
     <button
       className={cn(
-        "flex items-start text-start gap-2 border rounded-lg bg-muted w-fit p-3 hover:bg-secondary transition-colors",
-        isActiveFragment && 
-          "bg-primary text-primary-foreground border-primary hover:bg-primary",
+        "flex items-start text-start gap-2  rounded-lg bg-white w-fit p-3",
+        isActiveFragment &&
+        "bg-white text-[#272725]",
       )}
       onClick={() => onFragmentClick(fragment)}
     >
@@ -76,7 +76,7 @@ const AssistantMessage = ({
       "flex flex-col group px-2 pb-4",
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
-      <div className="flex items-center gap-2 pl-2 mb-2">
+      {/* <div className="flex items-center gap-2 pl-2 mb-2">
         <Image
           src="/logo.svg"
           alt="Vibe"
@@ -88,9 +88,9 @@ const AssistantMessage = ({
         <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
           {format(createdAt, "HH:mm 'on' MMM dd, yyyy")}
         </span>
-      </div>
-      <div className="pl-8.5 flex flex-col gap-y-4">
-        <span>{content}</span>
+      </div> */}
+      <div className="pl-1 flex flex-col gap-y-4">
+        <span className="text-white text-sm">{content}</span>
         {fragment && type === "RESULT" && (
           <FragmentCard
             fragment={fragment}

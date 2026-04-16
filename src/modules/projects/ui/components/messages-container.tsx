@@ -81,7 +81,7 @@ export const MessagesContainer = ({
           <button
             type="button"
             onClick={onBack}
-            className="w-full py-3 mt-2 text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/5 bg-[#171717] border border-white/5 transition-colors rounded-xl"
+            className="w-full py-3 mt-2 text-xs text-white  bg-[#1C1C1C] border border-[#282825] rounded-[8px]"
           >
             Back
           </button>

@@ -1,5 +1,3 @@
-import Image from "next/image";
-import { format } from "date-fns";
 import "remixicon/fonts/remixicon.css";
 
 import { cn } from "@/lib/utils";
@@ -66,7 +64,6 @@ interface AssistantMessageProps {
 const AssistantMessage = ({
   content,
   fragment,
-  createdAt,
   isActiveFragment,
   onFragmentClick,
   type,

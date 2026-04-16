@@ -41,6 +41,7 @@ export const messagesRouter = createTRPCRouter({
           .max(10000, { message: "Value is too long" }),
         projectId: z.string().min(1, { message: "Project ID is required" }),
         stage: z.enum(["SCENE", "VIDEO", "SITE"]).optional().default("SITE"),
+        model: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -89,6 +90,7 @@ export const messagesRouter = createTRPCRouter({
             projectId: input.projectId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             videoUrl: ((existingProject as any).videoUrls as string[])?.[0] || undefined,
+            model: input.model,
           },
         });
       }

@@ -6,6 +6,7 @@ type Events = {
       projectId: string;
       value: string;
       videoUrl?: string; // Swapped from explicit Frame Generation
+      model?: string;
     };
   };
   "veo/generate": {

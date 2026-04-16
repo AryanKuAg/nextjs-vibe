@@ -282,7 +282,7 @@ export const codeAgentFunction = inngest.createFunction(
         system: PROMPT,
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
-        model: geminiVertexKey("gemini-3-flash-preview"),
+        model: geminiVertexKey(event.data.model || "gemini-3.1-pro-preview"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {

@@ -131,6 +131,7 @@ export const projectsRouter = createTRPCRouter({
       projectId: z.string().min(1),
       value: z.string(),
       videoUrl: z.string().optional().nullable(),
+      model: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       await consumeCredits();
@@ -159,6 +160,7 @@ export const projectsRouter = createTRPCRouter({
           value: input.value,
           projectId: input.projectId,
           videoUrl: input.videoUrl ?? undefined,
+          model: input.model,
         },
       });
 

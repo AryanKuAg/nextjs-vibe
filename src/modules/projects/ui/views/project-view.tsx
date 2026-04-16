@@ -586,7 +586,7 @@ export const ProjectView = ({ projectId }: Props) => {
                             >
                               {extractingVideoUrl === url ? (
                                 <>
-                                  <i className="ri-loader-4-line animate-spin inline-block text-sm" />
+                                  <i className="ri-loader-4-line animate-spin inline-block text-sm mr-1" />
                                   <span>Preparing...</span>
                                 </>
                               ) : (
@@ -605,8 +605,8 @@ export const ProjectView = ({ projectId }: Props) => {
                       <FragmentWeb key={`${activeFragment.id}-${fragmentKey}`} data={activeFragment} />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                        <h2 className="text-lg font-medium text-white mb-2">Build site</h2>
-                        <p className="text-sm text-white/30 leading-relaxed">
+                        <h2 className="text-sm text-white mb-1">Build site</h2>
+                        <p className="text-xs text-white/30 leading-relaxed">
                           Your website preview will appear here
                         </p>
                       </div>

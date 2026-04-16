@@ -58,6 +58,11 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast.error("Unsupported image format. Please use JPEG or PNG.");
+      return;
+    }
+
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image must be less than 5MB");
       return;
@@ -112,7 +117,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
             </div>
           ) : (
             <label className="flex items-center justify-center w-16 h-16 rounded-[4px] border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <input type="file" accept="image/jpeg, image/png" className="hidden" onChange={handleImageUpload} />
               <i className="ri-image-line text-white/30 text-xl" />
             </label>
           )}

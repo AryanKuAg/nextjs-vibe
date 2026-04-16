@@ -142,7 +142,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
     if (previousIsVideoLoading.current && !isVideoLoading) {
       if (currentVideoUrlsLength === previousVideoUrlsLength.current) {
-        toast.error("Generation failed. Please try again or check usage limits.");
+        toast.error("Video generation failed. This usually happens if your prompt triggers the AI safety filters, or inputs were invalid. Please tweak your prompt and try again.", { duration: 8000 });
       } else {
         toast.success("Video generated successfully!");
       }

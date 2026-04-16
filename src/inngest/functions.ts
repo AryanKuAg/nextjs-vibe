@@ -734,10 +734,11 @@ export const veoGenerateFunction = inngest.createFunction(
 
       // Poll Initial LRO and Extend recursively via REST
       const videoUri = await step.run("poll-and-extend-veo", async () => {
-        let isDone = false;
-        let base64VideoData = null;
+        let base64VideoData: string | null | undefined = null;
+        try {
+          let isDone = false;
 
-        console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
+          console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
         // Phase 1 Polling
         while (!isDone) {
           await new Promise(r => setTimeout(r, 15000));
@@ -764,10 +765,20 @@ export const veoGenerateFunction = inngest.createFunction(
             base64VideoData = data.response?.videos?.[0]?.bytesBase64Encoded;
 
             if (!base64VideoData) {
-              throw new Error(`Veo finished but returned no video format! Raw response: ${JSON.stringify(data.response)}`);
+              const filterReasons = data.response?.raiMediaFilteredReasons;
+              const reasonStr = filterReasons ? filterReasons.join(", ") : JSON.stringify(data.response);
+              throw new Error(`Veo finished but returned no video format! Raw response: ${reasonStr}`);
             }
           }
         }
+      } catch (err) {
+        // Revert stage on failure so UI isn't stuck
+        await prisma.project.update({
+          where: { id: event.data.projectId },
+          data: { currentStage: "SCENE" }
+        });
+        throw err; // Still throw to mark job as failed
+      }
 
         console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
         const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
@@ -782,7 +793,7 @@ export const veoGenerateFunction = inngest.createFunction(
         const bucket = storage.bucket(bucketName);
         const part1OutputName = `videos/project-${event.data.projectId}-part1-${Date.now()}.mp4`;
         const filePart1 = bucket.file(part1OutputName);
-        const buffer1 = Buffer.from(base64VideoData, 'base64');
+        const buffer1 = Buffer.from(base64VideoData!, 'base64');
         await filePart1.save(buffer1, { metadata: { contentType: "video/mp4" } });
 
         // Phase 2: Start Extension Sequence
@@ -812,7 +823,7 @@ export const veoGenerateFunction = inngest.createFunction(
         const operationName2 = extData.name;
 
         // Phase 2 Polling
-        isDone = false;
+        let isDone = false;
         let finalBase64VideoData = null;
         console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
 

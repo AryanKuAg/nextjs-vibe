@@ -64,8 +64,8 @@ export const SceneBuilder = ({
   }, [imagePreviewUrl]);
 
   const handleImageFile = (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file.");
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast.error("Unsupported image format. Please use JPEG or PNG.");
       return;
     }
     const url = URL.createObjectURL(file);
@@ -162,8 +162,8 @@ export const SceneBuilder = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
-              className="hidden "
+              accept="image/jpeg, image/png"
+              className="hidden"
               onChange={handleFileInputChange}
             />
             <button

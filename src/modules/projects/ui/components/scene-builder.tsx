@@ -218,7 +218,7 @@ export const SceneBuilder = ({
         </div>
 
         <Button
-          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5!"
+          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
           onClick={onNext}
         >
           Skip

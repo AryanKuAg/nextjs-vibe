@@ -99,7 +99,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               <img
                 src={currentImage}
                 alt="Selected scene"
-                className="w-16 h-16 rounded-[8px] object-cover"
+                className="w-16 h-16 rounded-[4px] object-cover"
               />
               <button
                 onClick={() => {
@@ -112,7 +112,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               </button>
             </div>
           ) : (
-            <label className="flex items-center justify-center w-16 h-16 rounded-[8px] border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+            <label className="flex items-center justify-center w-16 h-16 rounded-[4px] border border-dashed border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               <i className="ri-image-line text-white/30 text-xl" />
             </label>
@@ -131,11 +131,11 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
           <div className="flex items-center gap-x-2">
             <div className="relative" ref={dropdownRef}>
               <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer tracking-[0em]"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
                 <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
               </div>
 
               {modelDropdownOpen && (
@@ -145,14 +145,13 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                       key={model.id}
                       type="button"
                       onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                      className={`w-full flex flex-col items-start px-3 py-2 text-[13px] font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                         }`}
                     >
                       <div className="flex w-full items-center font-inconsolata">
                         <span>{model.label}</span>
                         {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
                       </div>
-                      <span className="text-[11px] text-white/40 mt-0.5">{model.id}</span>
                     </button>
                   ))}
                 </div>
@@ -163,7 +162,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
               type="button"
               onClick={handleSubmit}
               disabled={isGenerating || startVideoGeneration.isPending || !prompt.trim() || !currentImage}
-              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full disabled:bg-[#333333] bg-[#fff]  text-white  transition-all shadow-sm"
+              className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
             >
               {isGenerating || startVideoGeneration.isPending ? (
                 <i className="ri-loader-4-line animate-spin inline-block" />
@@ -175,7 +174,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
         </div>
 
         <Button
-          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
+          className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
           onClick={onBack}
         >
           Back

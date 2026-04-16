@@ -435,8 +435,8 @@ export const ProjectView = ({ projectId }: Props) => {
                         )}
                         {/* All generated image cards */}
                         {[...sceneImageUrls].reverse().map((url, idx) => (
-                          <div key={idx} className="group">
-                            <div className="relative aspect-video cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                          <div key={idx} className="flex flex-col">
+                            <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={url}

@@ -67,7 +67,7 @@
   --accent-foreground: oklch(0.9663 0.0080 98.8792);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.3618 0.0101 106.8928);
+  --border: #282825;
   --input: oklch(0.4336 0.0113 100.2195);
   --ring: oklch(0.5937 0.1673 253.0630);
   --chart-1: oklch(0.5583 0.1276 42.9956);
@@ -157,7 +157,8 @@
     @apply border-border outline-ring/50;
   }
 
-  html, body {
+  html,
+  body {
     overscroll-behavior: none;
   }
 

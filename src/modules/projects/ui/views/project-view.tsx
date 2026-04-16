@@ -57,6 +57,7 @@ export const ProjectView = ({ projectId }: Props) => {
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
   };
+  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
 
@@ -423,11 +424,13 @@ export const ProjectView = ({ projectId }: Props) => {
                       <div className="grid grid-cols-3 gap-3">
                         {/* Currently generating card */}
                         {sceneIsGenerating && (
-                          <div className="bg-[#272725] rounded-[8px] overflow-hidden">
-                            <div className="aspect-video flex flex-col items-center justify-center gap-1">
+                          <div>
+                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1">
                               <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
                               <p className="text-white text-sm">Generating</p>
                             </div>
+                            {/* Spacer matching the "Use this scene" button height so the grid cell aligns */}
+                            <div className="mt-3 h-9" />
                           </div>
                         )}
                         {/* All generated image cards */}
@@ -442,19 +445,39 @@ export const ProjectView = ({ projectId }: Props) => {
                               />
                               {/* Hover action buttons */}
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <a
-                                  href={url}
-                                  download
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setDownloadingUrl(url);
+                                    try {
+                                      const res = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
+                                      const blob = await res.blob();
+                                      const blobUrl = URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = blobUrl;
+                                      a.download = `scene-${Date.now()}.png`;
+                                      a.click();
+                                      URL.revokeObjectURL(blobUrl);
+                                    } catch {
+                                      window.open(url, "_blank");
+                                    } finally {
+                                      setDownloadingUrl(null);
+                                    }
+                                  }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 disabled:opacity-50"
+                                  disabled={downloadingUrl === url}
                                 >
-                                  <i className="ri-download-line text-sm" />
-                                </a>
+                                  {downloadingUrl === url ? (
+                                    <i className="ri-loader-4-line text-xs animate-spin" />
+                                  ) : (
+                                    <i className="ri-download-line text-xs" />
+                                  )}
+                                </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
                                 >
-                                  <i className="ri-fullscreen-line text-sm" />
+                                  <i className="ri-fullscreen-line text-xs" />
                                 </button>
                               </div>
                             </div>
@@ -463,7 +486,7 @@ export const ProjectView = ({ projectId }: Props) => {
                                 setSelectedSceneUrl(url);
                                 setActiveStageTab("VIDEO");
                               }}
-                              className=" mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm tracking-[0.1em] h-10"
+                              className="mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5!"
                             >
                               Use this scene
                             </button>
@@ -501,14 +524,34 @@ export const ProjectView = ({ projectId }: Props) => {
                               <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover rounded-[8px]" />
                               {/* Hover action buttons */}
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <a
-                                  href={url}
-                                  download
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setDownloadingUrl(url);
+                                    try {
+                                      const res = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
+                                      const blob = await res.blob();
+                                      const blobUrl = URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = blobUrl;
+                                      a.download = `video-${Date.now()}.mp4`;
+                                      a.click();
+                                      URL.revokeObjectURL(blobUrl);
+                                    } catch {
+                                      window.open(url, "_blank");
+                                    } finally {
+                                      setDownloadingUrl(null);
+                                    }
+                                  }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 disabled:opacity-50"
+                                  disabled={downloadingUrl === url}
                                 >
-                                  <i className="ri-download-line text-sm" />
-                                </a>
+                                  {downloadingUrl === url ? (
+                                    <i className="ri-loader-4-line text-xs animate-spin" />
+                                  ) : (
+                                    <i className="ri-download-line text-xs" />
+                                  )}
+                                </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
                                   className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"

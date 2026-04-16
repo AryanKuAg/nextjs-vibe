@@ -646,7 +646,7 @@ export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0 },
   { event: "veo/generate" },
   async ({ event, step }) => {
-    const { projectId, prompt } = event.data;
+    const { projectId, prompt, model } = event.data;
 
     await step.run("update-project-stage-generating", async () => {
       await prisma.project.update({
@@ -673,7 +673,8 @@ export const veoGenerateFunction = inngest.createFunction(
         try {
           const token = await tokenHelper();
           const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:predictLongRunning`;
+          const targetModel = model || "veo-3.1-lite-generate-001";
+          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/${targetModel}:predictLongRunning`;
 
           let instances: Record<string, unknown>[] = [{ prompt: prompt }];
 

@@ -176,7 +176,7 @@ export const SceneBuilder = ({
 
             <div className="relative" ref={dropdownRef}>
               <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
                 <span className="text-sm">🍌</span>
@@ -191,7 +191,7 @@ export const SceneBuilder = ({
                       key={model.id}
                       type="button"
                       onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                         }`}
                     >
                       <span>{model.label}</span>

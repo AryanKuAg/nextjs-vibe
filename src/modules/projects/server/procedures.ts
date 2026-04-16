@@ -100,6 +100,7 @@ export const projectsRouter = createTRPCRouter({
         prompt: z.string(),
         imageUrl: z.string().optional(),
         imageBase64: z.string().optional(),
+        model: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -119,6 +120,7 @@ export const projectsRouter = createTRPCRouter({
           outputGcsUri,
           imageUrl: input.imageUrl,
           imageBase64: input.imageBase64,
+          model: input.model || "veo-3.1-lite-generate-001",
         },
       });
 

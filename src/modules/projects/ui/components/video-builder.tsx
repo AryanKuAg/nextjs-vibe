@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import TextareaAutosize from "react-textarea-autosize";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
+
+const MODELS = [
+  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite" },
+  { id: "veo-3.1-generate-001", label: "Veo 3.1" },
+  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast" },
+] as const;
+
+type ModelId = typeof MODELS[number]["id"];
 
 interface Props {
   projectId: string;
@@ -18,6 +27,19 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelId>("veo-3.1-lite-generate-001");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const startVideoGeneration = useMutation(
     trpc.projects.startVideoGeneration.mutationOptions({
@@ -57,7 +79,8 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
       projectId,
       prompt,
       imageUrl: selectedSceneUrl || undefined,
-      imageBase64: uploadedBase64 || undefined
+      imageBase64: uploadedBase64 || undefined,
+      model: selectedModel
     });
   };
 
@@ -95,18 +118,45 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
             </label>
           )}
 
-          <textarea
+          <TextareaAutosize
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe the video you want to create"
+            minRows={3}
+            maxRows={14}
             className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px] placeholder:text-sm"
             disabled={isGenerating || startVideoGeneration.isPending}
           />
 
           <div className="flex items-center gap-x-2">
-            <div className="flex items-center gap-x-1.5 px-2.5 py-2 rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] text-sm text-white">
-              <span>Veo 3.1 Lite</span>
-              <i className="ri-arrow-down-s-line" />
+            <div className="relative" ref={dropdownRef}>
+              <div
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={() => setModelDropdownOpen((o) => !o)}
+              >
+                <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+              </div>
+
+              {modelDropdownOpen && (
+                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
+                  {MODELS.map((model) => (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                      className={`w-full flex flex-col items-start px-3 py-2 text-[13px] font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        }`}
+                    >
+                      <div className="flex w-full items-center font-inconsolata">
+                        <span>{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                      </div>
+                      <span className="text-[11px] text-white/40 mt-0.5">{model.id}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button

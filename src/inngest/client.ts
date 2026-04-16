@@ -15,6 +15,7 @@ type Events = {
       outputGcsUri: string;
       imageUrl?: string;
       imageBase64?: string;
+      model?: string;
     };
   };
 };

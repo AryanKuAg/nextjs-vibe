@@ -20,13 +20,11 @@ const UserMessage = ({ content }: UserMessageProps) => {
 
 interface FragmentCardProps {
   fragment: Fragment;
-  isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
 };
 
 const FragmentCard = ({
   fragment,
-  isActiveFragment,
   onFragmentClick,
 }: FragmentCardProps) => {
   return (
@@ -89,7 +87,6 @@ const AssistantMessage = ({
         {fragment && type === "RESULT" && (
           <FragmentCard
             fragment={fragment}
-            isActiveFragment={isActiveFragment}
             onFragmentClick={onFragmentClick}
           />
         )}

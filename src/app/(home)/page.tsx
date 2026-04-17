@@ -2,8 +2,6 @@
 
 import Image from "next/image";
 import { useEffect, useRef } from "react";
-import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
-
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";

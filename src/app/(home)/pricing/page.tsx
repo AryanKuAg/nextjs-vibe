@@ -1,41 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import "remixicon/fonts/remixicon.css";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 import { PricingSection } from "@/modules/home/ui/components/pricing-section";
 import { FAQSection } from "@/modules/home/ui/components/faq-section";
-import { useSignIn, SignedIn, SignedOut } from "@clerk/nextjs";
 import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
 
-
-/* ─── CTA Button ───────────────────────────────────────────────────── */
-const GoogleCTAButton = () => {
-  const { signIn, isLoaded } = useSignIn();
-  const [isPending, setIsPending] = useState(false);
-
-  const handleClick = async () => {
-    if (!isLoaded || isPending) return;
-    setIsPending(true);
-    await signIn.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/",
-    });
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={isPending}
-      className="px-4 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors disabled:opacity-70 font-inconsolata"
-    >
-      {isPending ? "Connecting..." : "Start Building"}
-    </button>
-  );
-};
 
 /* ─── Page ─────────────────────────────────────────────────────────── */
 export default function PricingPage() {

@@ -32,9 +32,7 @@ const FragmentCard = ({
   return (
     <button
       className={cn(
-        "flex items-start text-start gap-2  rounded-lg bg-white w-fit p-3",
-        isActiveFragment &&
-        "bg-white text-[#272725]",
+        "flex items-start text-start gap-2  rounded-lg  w-fit p-3 bg-white text-[#272725]"
       )}
       onClick={() => onFragmentClick(fragment)}
     >

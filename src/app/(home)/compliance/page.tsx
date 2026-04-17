@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Compliance – Spatial",
-  description: "Spatial's compliance commitments and certifications.",
+  title: "Compliance – Framerate",
+  description: "Framerate's compliance commitments and certifications.",
 };
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
-    <span>2026 © Spatial</span>
+    <span>2026 © Framerate</span>
 
     <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
     <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
@@ -23,8 +23,8 @@ export default function CompliancePage() {
     <div className="min-h-screen bg-[#1C1C1C] font-inconsolata">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link href="/" className="flex items-center gap-2 mb-11">
-          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
-          <span className="text-white text-lg">Spatial</span>
+          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
+          <span className="text-white text-lg">Framerate</span>
         </Link>
 
         <h1 className="text-[40px] font-[500] text-white mb-11">Compliance</h1>
@@ -34,7 +34,7 @@ export default function CompliancePage() {
           <section>
             <h2 className="text-white text-xl mb-3">1. Our commitment</h2>
             <p>
-              Spatial is committed to operating in accordance with applicable laws and regulations. We take compliance seriously across data protection, security, and workplace standards.
+              Framerate is committed to operating in accordance with applicable laws and regulations. We take compliance seriously across data protection, security, and workplace standards.
             </p>
           </section>
 
@@ -72,7 +72,7 @@ export default function CompliancePage() {
           <section>
             <h2 className="text-white text-xl mb-3">5. AI and responsible use</h2>
             <p>
-              We are committed to responsible AI development and deployment. Our acceptable use policy prohibits using Spatial to generate harmful, illegal, or deceptive content. We actively work to detect and prevent misuse of the platform.
+              We are committed to responsible AI development and deployment. Our acceptable use policy prohibits using Framerate to generate harmful, illegal, or deceptive content. We actively work to detect and prevent misuse of the platform.
             </p>
           </section>
 

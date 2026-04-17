@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Cookie policy – Spatial",
-  description: "How Spatial uses cookies and similar technologies.",
+  title: "Cookie policy – Framerate",
+  description: "How Framerate uses cookies and similar technologies.",
 };
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
-    <span>2026 © Spatial</span>
+    <span>2026 © Framerate</span>
 
     <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
     <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
@@ -23,8 +23,8 @@ export default function CookiesPage() {
     <div className="min-h-screen bg-[#1C1C1C] font-inconsolata">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link href="/" className="flex items-center gap-2 mb-11">
-          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
-          <span className="text-white text-lg">Spatial</span>
+          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
+          <span className="text-white text-lg">Framerate</span>
         </Link>
 
         <h1 className="text-[40px] font-[500] text-white mb-11">Cookie policy</h1>
@@ -34,7 +34,7 @@ export default function CookiesPage() {
           <section>
             <h2 className="text-white text-xl mb-3">1. What this policy covers</h2>
             <p>
-              This Cookie Policy explains how Spatial&rsquo;s websites and web applications (&ldquo;Service&rdquo;) use cookies, pixels, local storage, and similar technologies (&ldquo;cookies&rdquo;). Please read it together with our Privacy Policy.
+              This Cookie Policy explains how Framerate&rsquo;s websites and web applications (&ldquo;Service&rdquo;) use cookies, pixels, local storage, and similar technologies (&ldquo;cookies&rdquo;). Please read it together with our Privacy Policy.
             </p>
           </section>
 

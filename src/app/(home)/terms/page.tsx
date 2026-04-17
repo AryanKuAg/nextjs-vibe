@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Terms of service – Spatial",
-  description: "Terms governing your use of Spatial.",
+  title: "Terms of service – Framerate",
+  description: "Terms governing your use of Framerate.",
 };
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
-    <span>2026 © Spatial</span>
+    <span>2026 © Framerate</span>
 
     <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
     <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
@@ -23,8 +23,8 @@ export default function TermsPage() {
     <div className="min-h-screen bg-[#1C1C1C] font-inconsolata">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link href="/" className="flex items-center gap-2 mb-11">
-          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
-          <span className="text-white text-lg">Spatial</span>
+          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
+          <span className="text-white text-lg">Framerate</span>
         </Link>
 
         <h1 className="text-[40px] font-[500] text-white mb-11">Terms of service</h1>
@@ -34,7 +34,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-white text-xl mb-3">1. Agreement</h2>
             <p>
-              These Terms of Service (&ldquo;Terms&rdquo;) govern your use of Spatial&rsquo;s websites, apps, and services (the &ldquo;Service&rdquo;). By using the Service, you agree to these Terms. If you use the Service on behalf of an organization, you confirm you have authority to accept these Terms for it. Our Privacy Policy explains how we handle personal data and is part of these Terms.
+              These Terms of Service (&ldquo;Terms&rdquo;) govern your use of Framerate&rsquo;s websites, apps, and services (the &ldquo;Service&rdquo;). By using the Service, you agree to these Terms. If you use the Service on behalf of an organization, you confirm you have authority to accept these Terms for it. Our Privacy Policy explains how we handle personal data and is part of these Terms.
             </p>
           </section>
 
@@ -75,21 +75,21 @@ export default function TermsPage() {
           <section>
             <h2 className="text-white text-xl mb-3">6. Your content</h2>
             <p>
-              You keep ownership of content you submit or create with the Service (&ldquo;Your Content&rdquo;). You give Spatial a limited license to host, process, and display that content as needed to provide and improve the Service. You promise you have the rights to Your Content and that using it in the Service does not break any laws or rights.
+              You keep ownership of content you submit or create with the Service (&ldquo;Your Content&rdquo;). You give Framerate a limited license to host, process, and display that content as needed to provide and improve the Service. You promise you have the rights to Your Content and that using it in the Service does not break any laws or rights.
             </p>
           </section>
 
           <section>
             <h2 className="text-white text-xl mb-3">7. AI outputs</h2>
             <p>
-              Spatial uses AI to generate and transform content. Outputs may be inaccurate or unsuitable, and you are responsible for reviewing and using them, especially in sensitive or high-impact contexts.
+              Framerate uses AI to generate and transform content. Outputs may be inaccurate or unsuitable, and you are responsible for reviewing and using them, especially in sensitive or high-impact contexts.
             </p>
           </section>
 
           <section>
             <h2 className="text-white text-xl mb-3">8. Our IP</h2>
             <p>
-              Spatial owns the Service and all related technology, designs, and branding, except Your Content and third-party materials. You receive only a limited right to use the Service under these Terms.
+              Framerate owns the Service and all related technology, designs, and branding, except Your Content and third-party materials. You receive only a limited right to use the Service under these Terms.
             </p>
           </section>
 
@@ -103,14 +103,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-white text-xl mb-3">10. Disclaimers</h2>
             <p>
-              The Service is provided &ldquo;as is&rdquo; and &ldquo;as available.&rdquo; To the fullest extent allowed by law, Spatial disclaims all warranties, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not guarantee uninterrupted or error-free operation.
+              The Service is provided &ldquo;as is&rdquo; and &ldquo;as available.&rdquo; To the fullest extent allowed by law, Framerate disclaims all warranties, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not guarantee uninterrupted or error-free operation.
             </p>
           </section>
 
           <section>
             <h2 className="text-white text-xl mb-3">11. Limitation of liability</h2>
             <p>
-              To the extent allowed by law, Spatial will not be liable for any indirect or consequential damages, or lost profits, data, or business, arising from or related to the Service or these Terms. Our total liability for all claims will not exceed the greater of: (a) the amount you paid Spatial for the Service in the 12 months before the claim, or (b) US $100 (or local equivalent), unless a higher limit is required by law.
+              To the extent allowed by law, Framerate will not be liable for any indirect or consequential damages, or lost profits, data, or business, arising from or related to the Service or these Terms. Our total liability for all claims will not exceed the greater of: (a) the amount you paid Framerate for the Service in the 12 months before the claim, or (b) US $100 (or local equivalent), unless a higher limit is required by law.
             </p>
           </section>
 

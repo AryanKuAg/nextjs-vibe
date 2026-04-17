@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Privacy policy – Spatial",
-  description: "How Spatial collects, uses, and protects your personal data.",
+  title: "Privacy policy – Framerate",
+  description: "How Framerate collects, uses, and protects your personal data.",
 };
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
-    <span>2026 © Spatial</span>
+    <span>2026 © Framerate</span>
 
     <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
     <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
@@ -24,8 +24,8 @@ export default function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <Link href="/" className="flex items-center gap-2 mb-11">
-          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
-          <span className="text-white text-lg">Spatial</span>
+          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
+          <span className="text-white text-lg">Framerate</span>
         </Link>
 
         <h1 className="text-[40px] font-[500] text-white mb-11">Privacy policy</h1>
@@ -33,14 +33,14 @@ export default function PrivacyPage() {
 
         <div className="space-y-10 text-sm text-[#CCCCCC] leading-relaxed">
           <p>
-            Spatial (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) provides websites, applications, and related services (the &ldquo;Service&rdquo;).
+            Framerate (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) provides websites, applications, and related services (the &ldquo;Service&rdquo;).
             This Privacy Policy explains what personal data we collect, how we use it, and the choices you have when you use the Service.
           </p>
           <p>If you do not agree with this Policy, please do not use the Service.</p>
 
           <section>
             <h2 className="text-white text-xl mb-3">1. Information we collect</h2>
-            <p className="mb-2">We collect the following types of information when you use Spatial:</p>
+            <p className="mb-2">We collect the following types of information when you use Framerate:</p>
             <ul className="space-y-1 list-none">
               <li>- Account information: name, email address, login identifiers, and basic profile details you choose to provide.</li>
               <li>- Payment and subscription information: plan details, transaction records, and billing-related data. Payment card details are processed by our payment provider, not stored by us.</li>

@@ -6,15 +6,15 @@ import { useState } from "react";
 /* ─── FAQ Data ──────────────────────────────────────────────────────── */
 const faqs_list = [
   {
-    q: "How does Spatial work?",
-    a: "Spatial lets you turn a background image into a cinematic video, then uses that video's frames to create a smooth scrolling background on your website. As visitors scroll, the frames play forward, making the page feel like an interactive 3D experience.",
+    q: "How does Framerate work?",
+    a: "Framerate lets you turn a background image into a cinematic video, then uses that video's frames to create a smooth scrolling background on your website. As visitors scroll, the frames play forward, making the page feel like an interactive 3D experience.",
   },
   {
     q: "Do I need any design or coding experience?",
-    a: "No, you don't need any design or coding experience to get started. Spatial is made so you can create and customize your site easily, even if you're a beginner.",
+    a: "No, you don't need any design or coding experience to get started. Framerate is made so you can create and customize your site easily, even if you're a beginner.",
   },
   {
-    q: "What can I create with Spatial?",
+    q: "What can I create with Framerate?",
     a: "You can create 3D websites, interactive pages, and immersive visuals for products, portfolios, events, or brand experiences.",
   },
   {

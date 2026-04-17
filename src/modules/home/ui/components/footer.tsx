@@ -23,8 +23,8 @@ export const Footer = () => {
           {/* Left: Logo + description */}
           <div className="max-w-[414px]">
             <div className="flex items-center gap-2.5 mb-[10px]">
-              <Image src="/logo.svg" alt="Spatial" width={20} height={20} />
-              <span className="text-white font-[500] tracking-wide text-lg">Spatial</span>
+              <Image src="/logo.svg" alt="Framerate" width={20} height={20} />
+              <span className="text-white font-[500] tracking-wide text-lg">Framerate</span>
             </div>
             <p className="text-sm text-[#CCCCCC]">
               The fastest way to go from a text prompt to a live,<br />production-ready 3D website.
@@ -60,7 +60,7 @@ export const Footer = () => {
 
         {/* Bottom bar */}
         <div className="pt-6 border-t border-[#41413F33] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <span className="text-sm text-white!">© 2026 Spatial. All rights reserved.</span>
+          <span className="text-sm text-white!">© 2026 Framerate. All rights reserved.</span>
           <div className="flex items-center gap-1.5 group">
             <Link
               href="mailto:contact@spatial.ai"

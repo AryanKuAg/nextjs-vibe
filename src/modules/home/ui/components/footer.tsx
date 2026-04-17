@@ -34,31 +34,24 @@ export const Footer = () => {
           {/* Right: Nav columns */}
           <div className="grid grid-cols-3 gap-16">
             <div>
-              <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide">Product</h4>
-              <div className="flex flex-col gap-2">
-                <Link href="#" className="text-sm text-white">Templates</Link>
-                <Link href="#" className="text-sm text-white">Process</Link>
-                <Link href="#" className="text-sm text-white">Pricing</Link>
-              </div>
+
             </div>
 
             <div>
-              <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Resources</h4>
+              <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Links</h4>
               <div className="flex flex-col gap-2">
-                <Link href="#" className="text-sm text-white">About</Link>
-                <Link href="#" className="text-sm text-white">How it works</Link>
-                <Link href="#" className="text-sm text-white">Features</Link>
-                <Link href="#" className="text-sm text-white">Changelog</Link>
-                <Link href="#" className="text-sm text-white">Contact</Link>
+
+                <Link href="#" className="text-sm text-white">3D Builder</Link>
+                <Link href="/pricing" className="text-sm text-white">Pricing</Link>
               </div>
             </div>
 
             <div>
               <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Legal</h4>
               <div className="flex flex-col gap-2">
+                <Link href="/terms" className="text-sm text-white">Terms of service</Link>
                 <Link href="/privacy" className="text-sm text-white">Privacy policy</Link>
                 <Link href="/cookies" className="text-sm text-white">Cookie policy</Link>
-                <Link href="/terms" className="text-sm text-white">Terms of service</Link>
                 <Link href="/compliance" className="text-sm text-white">Compliance</Link>
               </div>
             </div>

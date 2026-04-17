@@ -89,7 +89,7 @@ export const PillNavbar = () => {
 
         {/* Center: Links */}
         <div className="hidden md:flex items-center gap-4 text-white text-sm">
-          <Link href="#" className="">How it works</Link>
+          <Link href="#" className="">3D Builder</Link>
           <Link href="/pricing" className="">Pricing</Link>
           <Link href="#" className="">Contact</Link>
         </div>

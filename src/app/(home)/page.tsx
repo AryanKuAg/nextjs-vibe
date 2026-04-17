@@ -8,6 +8,8 @@ import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 import { PricingSection } from "@/modules/home/ui/components/pricing-section";
+import { FAQSection } from "@/modules/home/ui/components/faq-section";
+import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
 
 // Isolated component — bypasses React hydration entirely via useEffect
 const HeroVideo = () => {
@@ -30,7 +32,7 @@ const HeroVideo = () => {
     source.type = "video/mp4";
     video.appendChild(source);
     container.appendChild(video);
-    video.play().catch(() => {});
+    video.play().catch(() => { });
 
     return () => { container.innerHTML = ""; };
   }, []);
@@ -38,27 +40,6 @@ const HeroVideo = () => {
   return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e]" />;
 };
 
-const GoogleCTAButton = () => {
-  const { signIn, isLoaded } = useSignIn();
-
-  const handleClick = () => {
-    if (!isLoaded) return;
-    signIn.authenticateWithRedirect({
-      strategy: "oauth_google",
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/",
-    });
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors"
-    >
-      Sign up with Google
-    </button>
-  );
-};
 
 
 interface FeatureCardProps {
@@ -91,6 +72,7 @@ const Page = () => {
       <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
         <HeroVideo />
 
+
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
           <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
             Build 3D websites<br />10x faster with AI
@@ -103,7 +85,7 @@ const Page = () => {
 
       {/* Features Section */}
       <section className="py-20 px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-3xl md:text-5xl font-mono text-center text-white mb-10">From prompt to production</h2>
+        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">How it works?</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FeatureCard
@@ -148,22 +130,16 @@ const Page = () => {
       </section>
 
       {/* Pricing Section */}
-      <PricingSection />
+      <section className="py-20 px-6 max-w-7xl mx-auto w-full">
+        <PricingSection title="Pricing" />
+      </section>
+
+      <section className="py-20 px-6 max-w-2xl mx-auto w-full">
+        <FAQSection />
+      </section>
 
       {/* Final CTA Section */}
-      <section className="py-20 px-6 flex flex-col items-center text-center font-inconsolata">
-        <h2 className="text-3xl md:text-5xl text-white mb-4 font-[500]">Build 3D websites 10x faster with AI</h2>
-        <p className="text-sm text-[#666666] mb-[40px]">Take a single prompt into cinematic motion, frame sequences, and a scroll-driven 3D website. Built in minutes, ready to ship.</p>
-        <div className="flex gap-2">
-          <SignedOut>
-            <GoogleCTAButton />
-            <button className="px-3 py-2 bg-transparent text-white/50 border border-[#41413F] text-sm font-[500] rounded-[8px]">View pricing</button>
-          </SignedOut>
-          <SignedIn>
-            <button className="px-3 py-2 bg-transparent text-white/50 border border-[#41413F] text-sm font-[500] rounded-[8px] ">View pricing</button>
-          </SignedIn>
-        </div>
-      </section>
+      <FinalCTASection />
 
       <Footer />
     </div>

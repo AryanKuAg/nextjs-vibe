@@ -75,13 +75,21 @@ const PLANS: PricingCardProps[] = [
   },
 ];
 
-export const PricingSection = () => (
-  <section className="py-20 px-6 max-w-7xl mx-auto w-full">
-    <h2 className="text-3xl md:text-5xl font-mono text-center text-white mb-10">Pricing</h2>
+interface PricingSectionProps {
+  title?: string;
+}
+
+export const PricingSection = ({ title }: PricingSectionProps) => (
+  <div>
+    {title && (
+      <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">
+        {title}
+      </h2>
+    )}
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {PLANS.map((plan) => (
         <PricingCard key={plan.title} {...plan} />
       ))}
     </div>
-  </section>
+  </div>
 );

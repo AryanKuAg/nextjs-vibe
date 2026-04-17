@@ -7,28 +7,28 @@ export const metadata = {
 };
 
 const LegalFooter = () => (
-  <div className="mt-20 pt-6 border-t border-[#41413F33] flex items-center justify-between text-sm text-[#CCCCCC] font-inconsolata">
+  <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
     <span>2026 © Spatial</span>
-    <div className="flex items-center gap-4">
-      <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-      <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-      <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
-      <Link href="/compliance" className="hover:text-white transition-colors">Compliance</Link>
-    </div>
+
+    <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+    <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+    <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
+    <Link href="/compliance" className="hover:text-white transition-colors">Compliance</Link>
+
   </div>
 );
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#1C1C1C] font-inconsolata">
-      <div className="max-w-2xl mx-auto px-6 py-12">
+      <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
-        <Link href="/" className="flex items-center gap-2 mb-14">
-          <Image src="/logo.svg" alt="Spatial" width={18} height={18} />
-          <span className="text-white text-sm">Spatial</span>
+        <Link href="/" className="flex items-center gap-2 mb-11">
+          <Image src="/logo.svg" alt="Spatial" width={24} height={24} />
+          <span className="text-white text-lg">Spatial</span>
         </Link>
 
-        <h1 className="text-[40px] font-[500] text-white mb-4">Privacy policy</h1>
+        <h1 className="text-[40px] font-[500] text-white mb-11">Privacy policy</h1>
         <p className="text-sm text-[#CCCCCC] mb-12">Last updated: April 16, 2026</p>
 
         <div className="space-y-10 text-sm text-[#CCCCCC] leading-relaxed">
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
           <p>If you do not agree with this Policy, please do not use the Service.</p>
 
           <section>
-            <h2 className="text-white text-base mb-3">1. Information we collect</h2>
+            <h2 className="text-white text-xl mb-3">1. Information we collect</h2>
             <p className="mb-2">We collect the following types of information when you use Spatial:</p>
             <ul className="space-y-1 list-none">
               <li>- Account information: name, email address, login identifiers, and basic profile details you choose to provide.</li>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">2. How we use information</h2>
+            <h2 className="text-white text-xl mb-3">2. How we use information</h2>
             <p className="mb-2">We use your information to:</p>
             <ul className="space-y-1 list-none">
               <li>- Provide, maintain, and improve the Service.</li>
@@ -65,14 +65,14 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">3. Cookies and analytics</h2>
+            <h2 className="text-white text-xl mb-3">3. Cookies and analytics</h2>
             <p>
               We use cookies and similar technologies to keep you signed in, remember preferences, and understand how the Service is used. Some third-party providers (for example, analytics or payment services) may also set cookies when integrated with the Service. Where required, we will ask for your consent to non-essential cookies and provide ways to manage your choices.
             </p>
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">4. How we share information</h2>
+            <h2 className="text-white text-xl mb-3">4. How we share information</h2>
             <p className="mb-2">We do not sell your personal data for money. We share information only with:</p>
             <ul className="space-y-1 list-none">
               <li>- Service providers that help us run the Service (hosting, storage, analytics, payments, customer support, infrastructure, and AI models).</li>
@@ -83,21 +83,21 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">5. International transfers</h2>
+            <h2 className="text-white text-xl mb-3">5. International transfers</h2>
             <p>
               Your information may be processed and stored in countries other than where you live. When we transfer personal data from the EEA, UK, or Switzerland, we use appropriate safeguards such as Standard Contractual Clauses or similar mechanisms where required by law.
             </p>
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">6. Data retention and security</h2>
+            <h2 className="text-white text-xl mb-3">6. Data retention and security</h2>
             <p>
               We keep personal data only for as long as needed to provide the Service and meet legal or business requirements. We use reasonable technical and organizational measures to protect personal data, but no system is completely secure.
             </p>
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">7. Your rights</h2>
+            <h2 className="text-white text-xl mb-3">7. Your rights</h2>
             <p className="mb-2">Depending on your location, you may have rights such as:</p>
             <ul className="space-y-1 list-none">
               <li>- Accessing the personal data we hold about you.</li>
@@ -112,21 +112,21 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">8. Third-party services</h2>
+            <h2 className="text-white text-xl mb-3">8. Third-party services</h2>
             <p>
               The Service may link to or integrate with third-party sites and tools. Their use of your data is governed by their own terms and privacy policies, and we are not responsible for their practices.
             </p>
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">9. Changes to this Policy</h2>
+            <h2 className="text-white text-xl mb-3">9. Changes to this Policy</h2>
             <p>
               We may update this Privacy Policy from time to time. If we make material changes, we will update the &ldquo;Last updated&rdquo; date and, where required, notify you through the Service or by email.
             </p>
           </section>
 
           <section>
-            <h2 className="text-white text-base mb-3">10. Contact us</h2>
+            <h2 className="text-white text-xl mb-3">10. Contact us</h2>
             <p className="mb-2">If you have questions about this Privacy Policy or want to exercise your privacy rights, you can contact us at:</p>
             <p>Email: contact@spatial.app</p>
             <p className="mt-3">Please also provide your final legal entity name and address in this section.</p>

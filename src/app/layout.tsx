@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono, Inconsolata, DM_Mono } from "next/font/google";
+import Script from "next/script";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
@@ -52,6 +53,23 @@ export default function RootLayout({
           <body
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${dmMono.variable} antialiased`}
           >
+            <Script
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=G-EDJCD5QD81`}
+            />
+            <Script
+              id="google-analytics"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+
+                  gtag('config', 'G-EDJCD5QD81');
+                `,
+              }}
+            />
             <ThemeProvider
               attribute="class"
               defaultTheme="system"

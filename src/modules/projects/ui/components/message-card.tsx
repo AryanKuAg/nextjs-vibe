@@ -60,7 +60,6 @@ interface AssistantMessageProps {
 const AssistantMessage = ({
   content,
   fragment,
-  isActiveFragment,
   onFragmentClick,
   type,
 }: AssistantMessageProps) => {

@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
     }
     
     // Fallback if Dodo returns a different payload
-    return NextResponse.json({ url: (session as any).url || (session as any).payment_link });
+    const fallbackSession = session as unknown as Record<string, unknown>;
+    return NextResponse.json({ url: fallbackSession.url || fallbackSession.payment_link });
 
   } catch (error) {
     console.error("Error creating checkout session:", error);

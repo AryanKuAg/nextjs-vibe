@@ -39,8 +39,9 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
       if (data.url || data.checkoutUrl) {
         window.location.href = data.url || data.checkoutUrl;
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -69,7 +69,9 @@ model Fragment {
 }
 
 model Usage {
-  key    String    @id
-  points Int
-  expire DateTime?
+  key            String    @id
+  points         Int
+  expire         DateTime?
+  plan           String    @default("free") // "free", "basic", "plus", "pro"
+  subscriptionId String?
 }

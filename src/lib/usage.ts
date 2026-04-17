@@ -1,26 +1,31 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 
-const FREE_POINTS = 2;
-const PRO_POINTS = 100;
+const PLAN_LIMITS: Record<string, number> = {
+  free: 2,
+  basic: 1500,
+  plus: 2500,
+  pro: 3500,
+};
 const GENERATION_COST = 1;
 
 export async function consumeCredits() {
-  const { userId, has } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     throw new Error("User not authenticated");
   }
 
-  const hasProAccess = has({ plan: "pro" });
-  const maxPoints = hasProAccess ? PRO_POINTS : FREE_POINTS;
+  // Get current max points based on user's plan
+  const existingUsage = await prisma.usage.findUnique({ where: { key: userId } });
+  const plan = existingUsage?.plan || "free";
+  const maxPoints = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
 
-  // Use a simple atomic upsert to avoid RateLimiterPrisma's nested transactions
-  // which frequently cause P2028 timeouts in Next.js development.
+  // Use a simple atomic upsert
   const usage = await prisma.usage.upsert({
     where: { key: userId },
     update: { points: { increment: GENERATION_COST } },
-    create: { key: userId, points: GENERATION_COST }
+    create: { key: userId, points: GENERATION_COST, plan: "free" }
   });
 
   if (usage.points > maxPoints) {
@@ -36,19 +41,18 @@ export async function consumeCredits() {
 }
 
 export async function getUsageStatus() {
-  const { userId, has } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     throw new Error("User not authenticated");
   }
 
-  const hasProAccess = has({ plan: "pro" });
-  const maxPoints = hasProAccess ? PRO_POINTS : FREE_POINTS;
-  
   const usage = await prisma.usage.findUnique({
     where: { key: userId }
   });
 
+  const plan = usage?.plan || "free";
+  const maxPoints = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
   const consumed = usage ? usage.points : 0;
   
   return {
@@ -56,5 +60,6 @@ export async function getUsageStatus() {
     remainingPoints: Math.max(0, maxPoints - consumed),
     maxPoints: maxPoints,
     isAllowed: consumed < maxPoints,
+    plan: plan
   };
 }

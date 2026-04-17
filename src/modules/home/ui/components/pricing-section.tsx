@@ -1,3 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { useAuth, useClerk } from "@clerk/nextjs";
+import { toast } from "sonner";
+
 interface PricingCardProps {
   title: string;
   desc: string;
@@ -5,27 +11,67 @@ interface PricingCardProps {
   features: string[];
 }
 
-const PricingCard = ({ title, desc, price, features }: PricingCardProps) => (
-  <div className="flex flex-col bg-[#272725] rounded-[8px] p-4 font-inconsolata">
-    <h3 className="text-2xl text-white mb-0">{title}</h3>
-    <p className="text-sm text-[#666666] mb-8">{desc}</p>
-    <div className="flex items-end gap-2 mb-6">
-      <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
-      <span className="text-sm text-[#666666] mb-1.5 leading-[1]">Billed monthly</span>
+const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
+  const [loading, setLoading] = useState(false);
+  const { isSignedIn } = useAuth();
+  const clerk = useClerk();
+
+  const handleCheckout = async () => {
+    if (!isSignedIn) {
+      clerk.openSignIn();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: title.toLowerCase() }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Something went wrong");
+      }
+      
+      if (data.url || data.checkoutUrl) {
+        window.location.href = data.url || data.checkoutUrl;
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col bg-[#272725] rounded-[8px] p-4 font-inconsolata">
+      <h3 className="text-2xl text-white mb-0">{title}</h3>
+      <p className="text-sm text-[#666666] mb-8">{desc}</p>
+      <div className="flex items-end gap-2 mb-6">
+        <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
+        <span className="text-sm text-[#666666] mb-1.5 leading-[1]">Billed monthly</span>
+      </div>
+      <button 
+        onClick={handleCheckout}
+        disabled={loading}
+        className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-8 disabled:opacity-50 transition-opacity"
+      >
+        {loading ? "Redirecting..." : `Get ${title.toLowerCase()}`}
+      </button>
+      <div className="flex flex-col gap-2">
+        {features.map((f, i) => (
+          <div key={i} className="flex items-start gap-2 text-sm text-white">
+            <i className="ri-check-line text-white text-sm leading-none mt-1" />
+            <span className="leading-relaxed">{f}</span>
+          </div>
+        ))}
+      </div>
     </div>
-    <button className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-8">
-      Get {title.toLowerCase()}
-    </button>
-    <div className="flex flex-col gap-2">
-      {features.map((f, i) => (
-        <div key={i} className="flex items-start gap-2 text-sm text-white">
-          <i className="ri-check-line text-white text-sm leading-none mt-1" />
-          <span className="leading-relaxed">{f}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 const PLANS: PricingCardProps[] = [
   {

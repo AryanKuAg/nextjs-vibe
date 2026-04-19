@@ -80,13 +80,13 @@ export const ProjectForm = () => {
 
   return (
     <Form {...form}>
-      <section className="space-y-6 w-full">
+      <section className="space-y-6 w-full flex flex-col items-center">
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className={cn(
             "relative rounded-2xl overflow-hidden transition-all min-h-[148px]",
-            "bg-neutral-900",
+            "bg-neutral-900 w-full md:w-[720px]!",
             isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
@@ -105,9 +105,9 @@ export const ProjectForm = () => {
                 maxRows={10}
                 className={cn(
                   "w-full resize-none border-none outline-none bg-transparent",
-                  "px-4 pt-4 ",
+                  "px-2 md:px-4 pt-4 ",
                   "text-[15px] font-inconsolata leading-relaxed text-white",
-                  "placeholder:text-neutral-400 placeholder:text-[14px]",
+                  "placeholder:text-neutral-400 placeholder:whitespace-nowrap placeholder:text-[14px]",
                   "transition-colors"
                 )}
                 placeholder="Describe your background..."
@@ -130,14 +130,14 @@ export const ProjectForm = () => {
               >
                 <i className="ri-add-line text-base" />
               </button>
-              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
+              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
                 <span>Nano Banana 2</span>
                 <i className="ri-arrow-down-s-line mt-0.5 text-white" />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
+              <div className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
                 <span>Go to dashboard</span>
               </div>
               <button

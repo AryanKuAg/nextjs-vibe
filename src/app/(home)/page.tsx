@@ -48,8 +48,8 @@ interface FeatureCardProps {
 }
 
 const FeatureCard = ({ step, title, description, children }: FeatureCardProps) => (
-  <div className="flex flex-col gap-2 group p-2 bg-[#272725] rounded-[8px] font-inconsolata">
-    <div className="relative aspect-[5/2] bg-[#272725]  overflow-hidden p-3">
+  <div className="flex flex-col gap-2 group p-2 bg-neutral-800 rounded-[16px] font-inconsolata border border-neutral-700 shadow-sm backdrop-blur-sm">
+    <div className="relative aspect-[5/2] bg-neutral-800  overflow-hidden p-3">
       {children}
     </div>
     <div className="flex flex-col">
@@ -63,7 +63,7 @@ const FeatureCard = ({ step, title, description, children }: FeatureCardProps) =
 
 const Page = () => {
   return (
-    <div className="min-h-screen bg-[#1C1C1C] selection:bg-white/20 pb-0 flex flex-col">
+    <div className="min-h-screen bg-neutral-900 selection:bg-white/20 pb-0 flex flex-col">
       <PillNavbar />
 
       {/* Hero Section */}
@@ -75,7 +75,7 @@ const Page = () => {
           <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
             Build 3D websites<br />10x faster with AI
           </h1>
-          <div className="w-full max-w-3xl mx-auto px-4 md:px-12">
+          <div className="w-full mx-auto px-4 md:px-12">
             <ProjectForm />
           </div>
         </div>
@@ -83,7 +83,7 @@ const Page = () => {
 
       {/* Features Section */}
       <section className="py-20 px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">How it works?</h2>
+        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10 leading-[40px] font-[500]">How it works?</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FeatureCard
@@ -95,7 +95,7 @@ const Page = () => {
               src="/generate_background.png"
               alt="Generate background"
               fill
-              className="object-cover rounded-lg"
+              className="object-cover rounded-[8px]"
             />
           </FeatureCard>
 
@@ -108,7 +108,7 @@ const Page = () => {
               src="/animate_the_scene.png"
               alt="Animate the scene"
               fill
-              className="object-cover rounded-lg"
+              className="object-cover rounded-[8px]"
             />
           </FeatureCard>
 
@@ -121,16 +121,16 @@ const Page = () => {
               src="/build_your_website.png"
               alt="Build your website"
               fill
-              className="object-cover rounded-lg"
+              className="object-cover rounded-[8px]"
             />
           </FeatureCard>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 px-6 max-w-7xl mx-auto w-full">
+      {/* <section className="py-20 px-6 max-w-7xl mx-auto w-full">
         <PricingSection title="Pricing" />
-      </section>
+      </section> */}
 
       <section className="py-20 px-6 max-w-2xl mx-auto w-full">
         <FAQSection />

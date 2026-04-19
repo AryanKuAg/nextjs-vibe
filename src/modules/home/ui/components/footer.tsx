@@ -31,22 +31,22 @@ export const Footer = () => {
 
   return (
     <>
-      <CustomSignInModal 
-        isOpen={showSignInModal} 
+      <CustomSignInModal
+        isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
       <footer className="py-20 px-6 max-w-7xl mx-auto w-full font-inconsolata">
         {/* Rounded card container */}
-        <div className="bg-[#272725] rounded-[8px] px-10 pt-[40px] pb-8">
+        <div className="bg-neutral-800 rounded-[16px] border border-neutral-700 shadow-sm backdrop-blur-sm px-10 pt-[40px] pb-8">
           {/* Main grid row */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-12 mb-10">
             {/* Left: Logo + description */}
             <div className="max-w-[414px]">
               <div className="flex items-center gap-2.5 mb-[10px]">
                 <Image src="/logo.png" alt="framerate" width={20} height={20} />
-                <span className="text-white font-[500] tracking-wide text-lg">framerate</span>
+                <span className="text-white font-[500] text-[16px]" style={{ fontFamily: 'var(--font-space-grotesk)' }}>framerate</span>
               </div>
-              <p className="text-sm text-[#CCCCCC]">
+              <p className="text-sm text-neutral-400">
                 The fastest way to go from a text prompt to a live,<br />production-ready 3D website.
               </p>
             </div>
@@ -58,7 +58,7 @@ export const Footer = () => {
               </div>
 
               <div>
-                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Links</h4>
+                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Links</h4>
                 <div className="flex flex-col gap-2 items-start">
                   <button onClick={handleDashboardClick} className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Dashboard</button>
                   <Link href="/pricing" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Pricing</Link>
@@ -66,12 +66,12 @@ export const Footer = () => {
               </div>
 
               <div>
-                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide">Legal</h4>
+                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Legal</h4>
                 <div className="flex flex-col gap-2">
                   <Link href="/terms" className="text-sm text-white">Terms of service</Link>
                   <Link href="/privacy" className="text-sm text-white">Privacy policy</Link>
                   <Link href="/cookies" className="text-sm text-white">Cookie policy</Link>
-                  <Link href="/compliance" className="text-sm text-white">Compliance</Link>
+                  <Link href="/compliance" className="text-sm text-white">Compliance overview</Link>
                 </div>
               </div>
             </div>

@@ -46,8 +46,8 @@ const GoogleSignInButton = () => {
 export const FinalCTASection = () => {
     return (
         <section className="py-20 px-6 flex flex-col items-center text-center font-inconsolata">
-            <h2 className="text-3xl md:text-[40px] text-white mb-3 font-[500]">Build 3D websites 10x faster with AI</h2>
-            <p className="text-sm text-[#666666] mb-[40px]">The fastest way to go from a text prompt to a live, production-ready 3D website.</p>
+            <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
+            <p className="text-sm text-neutral-400 mb-[40px]">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
             <div className="flex gap-2">
                 <SignedOut>
                     <GoogleSignInButton />

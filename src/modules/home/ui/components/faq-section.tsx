@@ -34,27 +34,27 @@ export interface FAQItem {
 }
 
 /* ─── FAQItem ────────────────────────────────────────────────────────── */
-const FAQItem = ({ q, a }: FAQItem) => {
-  const [open, setOpen] = useState(false);
+const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onToggle: () => void }) => {
   return (
-    <div className="rounded-[8px] overflow-hidden font-inconsolata">
+    <div className="rounded-[16px] overflow-hidden font-inconsolata border border-neutral-700  shadow-sm backdrop-blur-sm">
       <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3.5 text-left text-sm text-white font-[500] bg-[#272725] transition-colors"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 text-left text-sm text-white font-[400] bg-neutral-800 transition-colors "
       >
-        <span>{q}</span>
-        <i className={`ri-arrow-down-s-line text-white transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <span className="text-sm leading-[20px]">{q}</span>
+        <i className={`ri-arrow-down-s-line text-white transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="bg-[#272725]">
-          {/* This div acts as the 16px padded border */}
-          <div className="mx-4 border-t border-white/5" />
-
-          <div className="px-4 py-3 text-sm text-[#999999] leading-relaxed">
+      <div
+        className="overflow-hidden"
+        style={{ maxHeight: isOpen ? "500px" : "0px", opacity: isOpen ? 1 : 0 }}
+      >
+        <div className="bg-neutral-800">
+          <div className="mx-4 border-t border-white/10" />
+          <div className="px-4 py-3 text-sm text-neutral-400 leading-[20px]">
             {a}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -66,14 +66,22 @@ interface FAQSectionProps {
 }
 
 export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questions" }: FAQSectionProps) => {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
   return (
     <>
-      <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-10">
+      <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-10 leading-[40px]">
         {title}
       </h2>
-      <div className="flex flex-col gap-2">
-        {faqs.map((faq) => (
-          <FAQItem key={faq.q} q={faq.q} a={faq.a} />
+      <div className="flex flex-col gap-3">
+        {faqs.map((faq, i) => (
+          <FAQItem
+            key={faq.q}
+            q={faq.q}
+            a={faq.a}
+            isOpen={openIndex === i}
+            onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+          />
         ))}
       </div>
     </>

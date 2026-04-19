@@ -128,7 +128,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-white text-xl mb-3">10. Contact us</h2>
             <p className="mb-2">If you have questions about this Privacy Policy or want to exercise your privacy rights, you can contact us at:</p>
-            <p>Email: contact@spatial.app</p>
+            <p>Email: teamframerate@gmail.com</p>
             <p className="mt-3">Please also provide your final legal entity name and address in this section.</p>
           </section>
         </div>

@@ -15,7 +15,7 @@ export const Footer = () => {
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault();
-    navigator.clipboard.writeText("contact@spatial.ai");
+    navigator.clipboard.writeText("teamframerate@gmail.com");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -82,10 +82,10 @@ export const Footer = () => {
             <span className="text-sm text-white!">© 2026 Framerate. All rights reserved.</span>
             <div className="flex items-center gap-1.5 group">
               <Link
-                href="mailto:contact@spatial.ai"
+                href="mailto:teamframerate@gmail.com"
                 className="text-sm text-white! hover:opacity-80 transition-opacity"
               >
-                contact@spatial.ai
+                teamframerate@gmail.com
               </Link>
               <button
                 onClick={handleCopy}

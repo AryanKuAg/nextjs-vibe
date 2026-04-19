@@ -47,7 +47,7 @@ export default function CompliancePage() {
               <li>- Other applicable privacy laws in jurisdictions where we operate.</li>
             </ul>
             <p className="mt-3">
-              Our Privacy Policy describes in detail how we collect, use, and protect personal data. Users may exercise their data rights by contacting us at contact@spatial.app.
+              Our Privacy Policy describes in detail how we collect, use, and protect personal data. Users may exercise their data rights by contacting us at teamframerate@gmail.com.
             </p>
           </section>
 
@@ -86,7 +86,7 @@ export default function CompliancePage() {
           <section>
             <h2 className="text-white text-xl mb-3">7. Reporting concerns</h2>
             <p className="mb-2">If you have concerns about our compliance practices, you can reach us at:</p>
-            <p>Email: contact@spatial.app</p>
+            <p>Email: teamframerate@gmail.com</p>
             <p className="mt-3">
               We take all compliance concerns seriously and aim to respond promptly. Where required by law, you may also have the right to lodge a complaint with a relevant supervisory authority.
             </p>

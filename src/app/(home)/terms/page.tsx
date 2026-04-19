@@ -138,7 +138,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-white text-xl mb-3">15. Contact</h2>
             <p className="mb-2">For questions about these Terms, contact us at:</p>
-            <p>Email: contact@spatial.app</p>
+            <p>Email: teamframerate@gmail.com</p>
           </section>
         </div>
 

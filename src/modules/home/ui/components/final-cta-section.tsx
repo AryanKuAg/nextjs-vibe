@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
@@ -18,8 +17,8 @@ const GoogleSignInButton = () => {
 
         // Cancel One Tap if it's showing to prevent AbortError conflict
         try {
-            window.google?.accounts.id.cancel();
-        } catch (e) {
+            (window as any).google?.accounts.id.cancel();
+        } catch {
             // Ignore cancel errors
         }
 

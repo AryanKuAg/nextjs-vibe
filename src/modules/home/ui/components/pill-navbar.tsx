@@ -19,8 +19,8 @@ const GoogleSignInButton = () => {
 
     // Cancel One Tap if it's showing to prevent AbortError conflict
     try {
-      window.google?.accounts.id.cancel();
-    } catch (e) {
+      (window as any).google?.accounts.id.cancel();
+    } catch {
       // Ignore cancel errors
     }
 

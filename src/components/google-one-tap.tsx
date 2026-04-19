@@ -1,12 +1,30 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
-    google: any;
+    google: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string | undefined;
+            itp_support?: boolean;
+            use_fedcm_for_prompt?: boolean;
+            callback: (response: { credential: string }) => Promise<void>;
+          }) => void;
+          prompt: (callback: (notification: {
+            isNotDisplayed: () => boolean;
+            getNotDisplayedReason: () => string;
+            isSkippedMoment: () => boolean;
+            getSkippedReason: () => string;
+          }) => void) => void;
+          cancel: () => void;
+        };
+      };
+    };
+    _googleOneTapPrompted?: boolean;
   }
 }
 
@@ -18,7 +36,7 @@ export const GoogleOneTap = () => {
   useEffect(() => {
     // Silence noisy Google GSI errors that aren't actual bugs
     const originalError = console.error;
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       const msg = args[0];
       if (typeof msg === "string" && msg.includes("[GSI_LOGGER]") && (msg.includes("AbortError") || msg.includes("NetworkError") || msg.includes("FedCM"))) {
         return;
@@ -33,19 +51,19 @@ export const GoogleOneTap = () => {
     }
 
     // Use a global variable to ensure we only prompt once per window lifetime
-    if ((window as any)._googleOneTapPrompted) return;
+    if (window._googleOneTapPrompted) return;
 
     const initializeOneTap = () => {
-      const { google } = window;
+      const google = window.google;
       if (!google || hasAutoSubmitted.current) return;
 
-      (window as any)._googleOneTapPrompted = true;
+      window._googleOneTapPrompted = true;
 
       google.accounts.id.initialize({
         client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
         itp_support: true,
         use_fedcm_for_prompt: false,
-        callback: async (response: any) => {
+        callback: async (response) => {
           if (hasAutoSubmitted.current) return;
           hasAutoSubmitted.current = true;
 
@@ -60,18 +78,18 @@ export const GoogleOneTap = () => {
           } catch (error) {
             console.error("One Tap authentication failed:", error);
             hasAutoSubmitted.current = false;
-            (window as any)._googleOneTapPrompted = false;
+            window._googleOneTapPrompted = false;
           }
         },
       });
 
-      google.accounts.id.prompt((notification: any) => {
+      google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed()) {
           console.log("One Tap not displayed:", notification.getNotDisplayedReason());
-          (window as any)._googleOneTapPrompted = false;
+          window._googleOneTapPrompted = false;
         } else if (notification.isSkippedMoment()) {
           console.log("One Tap skipped:", notification.getSkippedReason());
-          (window as any)._googleOneTapPrompted = false;
+          window._googleOneTapPrompted = false;
         }
       });
     };
@@ -82,7 +100,9 @@ export const GoogleOneTap = () => {
       console.error = originalError;
       try {
         window.google?.accounts.id.cancel();
-      } catch (e) {}
+      } catch {
+        // Ignore cancel errors
+      }
     };
   }, [isLoaded, isSignedIn, clerk]);
 

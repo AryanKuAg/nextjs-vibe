@@ -137,9 +137,19 @@ export const ProjectForm = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!userId) {
+                    setShowSignInModal(true);
+                  } else {
+                    router.push("/manage");
+                  }
+                }}
+                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+              >
                 <span>Go to dashboard</span>
-              </div>
+              </button>
               <button
                 type="submit"
                 disabled={isButtonDisabled}

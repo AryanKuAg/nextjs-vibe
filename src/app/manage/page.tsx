@@ -43,7 +43,7 @@ export default function ManageAccountPage() {
         await user?.delete();
         toast.success("Account deleted successfully");
         router.push("/");
-      } catch (e) {
+      } catch {
         toast.error("Failed to delete account");
       }
     }

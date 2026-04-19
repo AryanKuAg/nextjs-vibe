@@ -99,7 +99,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
           videoUrl: extractedZipUrl || undefined,
           model: selectedModel,
         });
-      } catch (e: any) {
+      } catch (error: unknown) {
+        const e = error as { data?: { code?: string }; message?: string };
         if (e?.data?.code === "TOO_MANY_REQUESTS" || e?.message?.toLowerCase().includes("credits")) {
           setShowCreditsModal(true);
         } else {

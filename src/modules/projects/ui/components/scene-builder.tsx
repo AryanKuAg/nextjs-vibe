@@ -116,11 +116,12 @@ export const SceneBuilder = ({
 
       const data = await res.json();
       onFrameGenerated(data.frameUrl);
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       if (err?.message?.toLowerCase().includes("credits") || err?.message?.toLowerCase().includes("too many requests")) {
         setShowCreditsModal(true);
       } else {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(error instanceof Error ? error.message : "Something went wrong");
       }
     } finally {
       setIsGenerating(false);

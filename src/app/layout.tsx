@@ -31,7 +31,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Framerate",
+  title: "framerate",
   description: "AI Video Editor",
 };
 

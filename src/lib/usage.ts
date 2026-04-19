@@ -63,3 +63,31 @@ export async function getUsageStatus() {
     plan: plan
   };
 }
+
+export async function getPortalSession() {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const usage = await prisma.usage.findUnique({
+    where: { key: userId }
+  });
+
+  if (!usage?.subscriptionId) {
+    throw new Error("No active subscription");
+  }
+
+  const DodoPayments = (await import("dodopayments")).default;
+  const dodo = new DodoPayments({
+    bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+  });
+
+  const subscription = await dodo.subscriptions.retrieve(usage.subscriptionId);
+  if (!subscription.customer?.customer_id) {
+    throw new Error("Could not find customer ID on subscription");
+  }
+
+  const portal = await dodo.customers.customerPortal.create(subscription.customer.customer_id);
+  return { url: portal.link };
+}

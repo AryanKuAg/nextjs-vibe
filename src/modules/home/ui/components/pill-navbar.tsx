@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { SignedIn, SignedOut, useUser, useClerk, useSignIn } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 
 const GoogleSignInButton = () => {
   const { signIn, isLoaded } = useSignIn();
@@ -78,18 +80,37 @@ const UserAvatarButton = () => {
 };
 
 export const PillNavbar = () => {
+  const { user } = useUser();
+  const router = useRouter();
+  const [showSignInModal, setShowSignInModal] = useState(false);
+
+  const handleDashboardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      setShowSignInModal(true);
+    } else {
+      router.push("/manage");
+    }
+  };
+
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
-      <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+    <>
+      <CustomSignInModal 
+        isOpen={showSignInModal} 
+        onClose={() => setShowSignInModal(false)}
+      />
+      
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
+        <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
         {/* Left side: Logo */}
         <Link href="/" className="flex items-center gap-2 pl-2">
-          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
-          <span className="text-white font-[500] tracking-wide text-base">Framerate</span>
+          <Image src="/logo.png" alt="framerate" width={24} height={24} />
+          <span className="text-white font-[500] tracking-wide text-base">framerate</span>
         </Link>
 
         {/* Center: Links */}
         <div className="hidden md:flex items-center gap-4 text-white text-sm">
-          <Link href="#" className="">3D Builder</Link>
+          <button onClick={handleDashboardClick} className="hover:text-[#CCCCCC] transition-colors">Dashboard</button>
           <Link href="/pricing" className="">Pricing</Link>
           <Link href="#" className="">Contact</Link>
         </div>
@@ -105,5 +126,6 @@ export const PillNavbar = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };

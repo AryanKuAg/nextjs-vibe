@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 interface Props {
   projectId: string;
@@ -35,6 +36,7 @@ export const SceneBuilder = ({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -114,8 +116,12 @@ export const SceneBuilder = ({
 
       const data = await res.json();
       onFrameGenerated(data.frameUrl);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    } catch (err: any) {
+      if (err?.message?.toLowerCase().includes("credits") || err?.message?.toLowerCase().includes("too many requests")) {
+        setShowCreditsModal(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Something went wrong");
+      }
     } finally {
       setIsGenerating(false);
       onGeneratingChange?.(false);
@@ -123,8 +129,10 @@ export const SceneBuilder = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1C1C1C] font-inconsolata">
-      <div className="flex-1" />
+    <>
+      <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
+      <div className="flex flex-col h-full bg-[#1C1C1C] font-inconsolata">
+        <div className="flex-1" />
 
       <div className="p-4 space-y-3">
         <div className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3">
@@ -225,5 +233,6 @@ export const SceneBuilder = ({
         </Button>
       </div>
     </div>
+    </>
   );
 };

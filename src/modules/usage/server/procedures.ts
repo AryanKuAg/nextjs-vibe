@@ -11,4 +11,9 @@ export const usageRouter = createTRPCRouter({
       return null;
     }
   }),
+  portalUrl: protectedProcedure.mutation(async () => {
+    const { getPortalSession } = await import("@/lib/usage");
+    const result = await getPortalSession();
+    return result;
+  }),
 });

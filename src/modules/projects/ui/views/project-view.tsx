@@ -34,8 +34,7 @@ interface Props {
 type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
 
 export const ProjectView = ({ projectId }: Props) => {
-  const { has, isLoaded } = useAuth();
-  const hasProAccess = has?.({ plan: "pro" });
+  const { isLoaded } = useAuth();
   const trpc = useTRPC();
 
   // Load project to get initial state
@@ -395,7 +394,7 @@ export const ProjectView = ({ projectId }: Props) => {
                 <div className="bg-[#272725]  rounded-[8px] px-3 py-2 text-sm text-white">
                   {usage ? `${usage.remainingPoints.toLocaleString()}/${usage.maxPoints.toLocaleString()} credits left` : "Loading credits..."}
                 </div>
-                {isLoaded && !hasProAccess && (
+                {usage?.plan === "free" && (
                   <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">
                     <Link href="/pricing">
                       Upgrade

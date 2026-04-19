@@ -3,7 +3,8 @@
 import { z } from "zod";
 import { toast } from "sonner";
 import { useState } from "react";
-import { useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
+import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +28,8 @@ export const ProjectForm = () => {
   const trpc = useTRPC();
   const clerk = useClerk();
   const queryClient = useQueryClient();
+  const { userId } = useAuth();
+  const [showSignInModal, setShowSignInModal] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -56,6 +59,10 @@ export const ProjectForm = () => {
   );
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!userId) {
+      setShowSignInModal(true);
+      return;
+    }
     await createProject.mutateAsync({ value: values.value });
   };
 
@@ -103,7 +110,7 @@ export const ProjectForm = () => {
                   "placeholder:text-[#666666] placeholder:text-[14px]",
                   "transition-colors"
                 )}
-                placeholder="Create a 3D landing page for a SaaS startup"
+                placeholder="Describe your background..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -124,7 +131,7 @@ export const ProjectForm = () => {
                 <i className="ri-add-line text-lg" />
               </button>
               <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
-                <span>Gemini 3.1 Pro</span>
+                <span>Nano Banana 2</span>
                 <i className="ri-arrow-down-s-line mt-0.5 text-white" />
               </div>
             </div>
@@ -176,6 +183,11 @@ export const ProjectForm = () => {
           ))}
         </div>
       </section>
+
+      <CustomSignInModal
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+      />
     </Form>
   );
 };

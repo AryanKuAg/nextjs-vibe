@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 const MODELS = [
   { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
@@ -37,6 +38,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,7 +64,13 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
       queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => {
+      if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+        setShowCreditsModal(true);
+      } else {
+        toast.error(error.message);
+      }
+    },
   }));
 
   const createMessage = useMutation(trpc.messages.create.mutationOptions({
@@ -76,10 +84,10 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       );
     },
     onError: (error) => {
-      toast.error(error.message);
-
-      if (error.data?.code === "TOO_MANY_REQUESTS") {
-        router.push("/pricing");
+      if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+        setShowCreditsModal(true);
+      } else {
+        toast.error(error.message);
       }
     },
   }));
@@ -93,8 +101,12 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
           videoUrl: extractedZipUrl || undefined,
           model: selectedModel,
         });
-      } catch (e) {
-        toast.error("Failed to build site: " + String(e));
+      } catch (e: any) {
+        if (e?.data?.code === "TOO_MANY_REQUESTS" || e?.message?.toLowerCase().includes("credits")) {
+          setShowCreditsModal(true);
+        } else {
+          toast.error("Failed to build site: " + String(e?.message || e));
+        }
       }
     } else {
       await createMessage.mutateAsync({
@@ -110,8 +122,10 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const isButtonDisabled = isPending || !form.formState.isValid;
 
   return (
-    <Form {...form}>
-      <form
+    <>
+      <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
+      <Form {...form}>
+        <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3 relative transition-all"
       >
@@ -178,7 +192,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             )}
           </button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+    </>
   );
 };

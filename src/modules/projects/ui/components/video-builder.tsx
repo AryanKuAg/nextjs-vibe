@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 const MODELS = [
   { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite" },
@@ -29,6 +30,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelId>("veo-3.1-lite-generate-001");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,7 +51,11 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
         // Don't auto-clear image or prompt so user can iterate
       },
       onError: (error) => {
-        toast.error(error.message || "Failed to start video generation");
+        if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+          setShowCreditsModal(true);
+        } else {
+          toast.error(error.message || "Failed to start video generation");
+        }
       }
     })
   );
@@ -91,8 +97,10 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const currentImage = uploadedBase64 || selectedSceneUrl;
 
   return (
-    <div className="flex flex-col h-full bg-[#1C1C1C] relative">
-      <div className="flex-1" />
+    <>
+      <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
+      <div className="flex flex-col h-full bg-[#1C1C1C] relative">
+        <div className="flex-1" />
 
       <div className="p-4 space-y-3">
         <div className="bg-[#272725] rounded-[8px] p-3 space-y-3">
@@ -185,6 +193,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
         </Button>
       </div>
     </div>
+    </>
   );
 };
 

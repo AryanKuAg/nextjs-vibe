@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <Link href="/" className="flex items-center gap-2 mb-11">
-          <Image src="/logo.svg" alt="Framerate" width={24} height={24} />
+          <Image src="/logo.png" alt="Framerate" width={24} height={24} />
           <span className="text-white text-lg">Framerate</span>
         </Link>
 

@@ -80,13 +80,13 @@ export const ProjectForm = () => {
 
   return (
     <Form {...form}>
-      <section className="space-y-4 w-full">
+      <section className="space-y-6 w-full">
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className={cn(
             "relative rounded-2xl overflow-hidden transition-all min-h-[148px]",
-            "bg-[#1C1C1C]",
+            "bg-neutral-900",
             isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
@@ -107,7 +107,7 @@ export const ProjectForm = () => {
                   "w-full resize-none border-none outline-none bg-transparent",
                   "px-4 pt-4 ",
                   "text-[15px] font-inconsolata leading-relaxed text-white",
-                  "placeholder:text-[#666666] placeholder:text-[14px]",
+                  "placeholder:text-neutral-400 placeholder:text-[14px]",
                   "transition-colors"
                 )}
                 placeholder="Describe your background..."
@@ -126,19 +126,19 @@ export const ProjectForm = () => {
             <div className="flex gap-x-1 items-center flex-1">
               <button
                 type="button"
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border-[0.5px] border-[#3B3B3B] hover:bg-white/5 text-[#CCCCCC] transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-neutral-800 hover:bg-white/5 text-[#CCCCCC] transition-colors"
               >
-                <i className="ri-add-line text-lg" />
+                <i className="ri-add-line text-base" />
               </button>
-              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-[13px] text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
+              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
                 <span>Nano Banana 2</span>
                 <i className="ri-arrow-down-s-line mt-0.5 text-white" />
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-[#666666] hidden sm:flex items-center tracking-wide">
-                Use <kbd className="h-[18px] mx-1.5 px-1.5 rounded-[4px] bg-[#333333] text-[#CCCCCC] text-xs leading-[18px]">shift</kbd> + <kbd className="leading-[18px] h-[18px] mx-1.5 px-1.5  rounded-[4px] bg-[#333333] text-[#CCCCCC] text-xs">return</kbd> for a new line
+            <div className="flex items-center gap-2">
+              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
+                <span>Go to dashboard</span>
               </div>
               <button
                 type="submit"

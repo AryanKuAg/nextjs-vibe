@@ -25,7 +25,7 @@ const GoogleSignInButton = () => {
     <button
       onClick={handleGoogleSignIn}
       disabled={isPending}
-      className="bg-white text-black px-3 py-2 rounded-[6px] font-[500] text-sm flex items-center gap-2 disabled:opacity-70 transition-opacity"
+      className="bg-white text-black px-3 py-2 pr-6 lg:pr-3 rounded-[8px] font-[500] text-sm flex items-center gap-2 disabled:opacity-70 transition-opacity"
     >
       {isPending ? (
         <>
@@ -95,37 +95,37 @@ export const PillNavbar = () => {
 
   return (
     <>
-      <CustomSignInModal 
-        isOpen={showSignInModal} 
+      <CustomSignInModal
+        isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
-      
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[590px] px-4">
-        <div className="flex items-center justify-between h-[56px] px-2 bg-[#1C1C1C] rounded-[8px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
-        {/* Left side: Logo */}
-        <Link href="/" className="flex items-center gap-2 pl-2">
-          <Image src="/logo.png" alt="framerate" width={24} height={24} />
-          <span className="text-white font-[500] tracking-wide text-base">framerate</span>
-        </Link>
 
-        {/* Center: Links */}
-        <div className="hidden md:flex items-center gap-4 text-white text-sm">
-          <button onClick={handleDashboardClick} className="hover:text-[#CCCCCC] transition-colors">Dashboard</button>
-          <Link href="/pricing" className="">Pricing</Link>
-          <Link href="#" className="">Contact</Link>
-        </div>
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full  px-4 max-w-fit">
+        <div className="flex items-center gap-20 h-[52px] px-2 bg-neutral-900 rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          {/* Left side: Logo */}
+          <Link href="/" className="flex items-center gap-2 pl-2">
+            <Image src="/logo.png" alt="framerate" width={24} height={24} />
+            <span className="text-white font-[500] text-[16px]" style={{ fontFamily: 'var(--font-space-grotesk)' }}>framerate</span>
+          </Link>
 
-        {/* Right: Auth */}
-        <div className="flex items-center h-full">
-          <SignedOut>
-            <GoogleSignInButton />
-          </SignedOut>
-          <SignedIn>
-            <UserAvatarButton />
-          </SignedIn>
+          {/* Center: Links */}
+          <div className="hidden md:flex items-center gap-4 text-white text-sm">
+            <button onClick={handleDashboardClick} className="hover:text-[#CCCCCC] transition-colors">Dashboard</button>
+            <Link href="/pricing" className="">Pricing</Link>
+            <Link href="#" className="">Contact</Link>
+          </div>
+
+          {/* Right: Auth */}
+          <div className="flex items-center h-[36px] text-nowrap">
+            <SignedOut>
+              <GoogleSignInButton />
+            </SignedOut>
+            <SignedIn>
+              <UserAvatarButton />
+            </SignedIn>
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 };

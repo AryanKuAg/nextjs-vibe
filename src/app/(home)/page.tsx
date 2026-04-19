@@ -5,7 +5,6 @@ import { useEffect, useRef } from "react";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
-import { PricingSection } from "@/modules/home/ui/components/pricing-section";
 import { FAQSection } from "@/modules/home/ui/components/faq-section";
 import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
 

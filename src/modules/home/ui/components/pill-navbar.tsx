@@ -53,8 +53,8 @@ const UserAvatarButton = () => {
   const imageUrl = user?.imageUrl;
 
   return (
-    <button
-      onClick={() => signOut({ redirectUrl: "/" })}
+    <div
+
       className="flex items-center gap-2.5  transition-opacity group"
     >
       {/* Vertical divider */}
@@ -74,8 +74,8 @@ const UserAvatarButton = () => {
         </div>
       )}
       {/* Label */}
-      <span className="text-sm text-[#cccccc] group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</span>
-    </button>
+      <button onClick={() => signOut({ redirectUrl: "/" })} className="text-sm text-[#cccccc] group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</button>
+    </div>
   );
 };
 

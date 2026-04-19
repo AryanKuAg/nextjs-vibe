@@ -37,8 +37,8 @@ export const UserControl = ({ showName }: Props) => {
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        align="end" 
+      <DropdownMenuContent
+        align="end"
         sideOffset={8}
         className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-inconsolata rounded-xl shadow-xl"
       >
@@ -58,25 +58,25 @@ export const UserControl = ({ showName }: Props) => {
             </span>
           </div>
         </div>
-        
-        <DropdownMenuItem 
-          onClick={() => router.push('/projects')} 
+
+        <DropdownMenuItem
+          onClick={() => router.push('/projects')}
           className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg focus:text-white"
         >
           <i className="ri-folder-2-line text-[#8A8A88] text-lg" />
           <span className="text-[15px] font-medium text-[#EBEBEB]">Projects</span>
         </DropdownMenuItem>
 
-        <DropdownMenuItem 
-          onClick={() => router.push('/manage')} 
+        <DropdownMenuItem
+          onClick={() => router.push('/manage')}
           className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg focus:text-white"
         >
           <i className="ri-user-line text-[#8A8A88] text-lg" />
           <span className="text-[15px] font-medium text-[#EBEBEB]">Manage account</span>
         </DropdownMenuItem>
-        
-        <DropdownMenuItem 
-          onClick={() => signOut({ redirectUrl: '/' })} 
+
+        <DropdownMenuItem
+          onClick={() => signOut({ redirectUrl: '/' })}
           className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg mt-1 focus:text-white"
         >
           <i className="ri-logout-box-r-line text-[#8A8A88] text-lg" />

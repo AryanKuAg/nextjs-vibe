@@ -2,8 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Terms of service – Framerate",
-  description: "Terms governing your use of Framerate.",
+  title: "Terms of Service – Framerate",
+  description: "Read Framerate's terms of service governing your use of our AI-powered 3D website builder.",
+  openGraph: {
+    title: "Terms of Service – Framerate",
+    description: "Read Framerate's terms of service governing your use of our AI-powered 3D website builder.",
+    url: "https://www.framerate.space/terms",
+    siteName: "Framerate",
+  },
+  twitter: {
+    card: "summary",
+    title: "Terms of Service – Framerate",
+    description: "Read Framerate's terms of service governing your use of our AI-powered 3D website builder.",
+  },
 };
 
 const LegalFooter = () => (

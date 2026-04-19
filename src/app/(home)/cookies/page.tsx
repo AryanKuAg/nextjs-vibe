@@ -2,8 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Cookie policy – Framerate",
-  description: "How Framerate uses cookies and similar technologies.",
+  title: "Cookie Policy – Framerate",
+  description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
+  openGraph: {
+    title: "Cookie Policy – Framerate",
+    description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
+    url: "https://www.framerate.space/cookies",
+    siteName: "Framerate",
+  },
+  twitter: {
+    card: "summary",
+    title: "Cookie Policy – Framerate",
+    description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
+  },
 };
 
 const LegalFooter = () => (

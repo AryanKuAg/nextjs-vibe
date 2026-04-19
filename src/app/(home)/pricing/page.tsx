@@ -11,7 +11,7 @@ import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section"
 /* ─── Page ─────────────────────────────────────────────────────────── */
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-[#1C1C1C] text-white">
+    <div className="min-h-screen bg-neutral-900 text-white">
       <PillNavbar />
 
       {/* Hero */}

@@ -57,7 +57,7 @@ export const FinalCTASection = () => {
                         href="/projects"
                         className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors"
                     >
-                        Go to Dashboard
+                        Start building
                     </Link>
                 </SignedIn>
             </div>

@@ -29,13 +29,13 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: title.toLowerCase() }),
       });
-      
+
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.error || "Something went wrong");
       }
-      
+
       if (data.url || data.checkoutUrl) {
         window.location.href = data.url || data.checkoutUrl;
       }
@@ -48,25 +48,25 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
   };
 
   return (
-    <div className="flex flex-col bg-[#272725] rounded-[8px] p-4 font-inconsolata">
+    <div className="flex flex-col bg-neutral-800 rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata">
       <h3 className="text-2xl text-white mb-0">{title}</h3>
-      <p className="text-sm text-[#666666] mb-8">{desc}</p>
+      <p className="text-sm text-neutral-400 mb-8">{desc}</p>
       <div className="flex items-end gap-2 mb-6">
         <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
-        <span className="text-sm text-[#666666] mb-1.5 leading-[1]">Billed monthly</span>
+        <span className="text-sm text-neutral-400 mb-1.5 leading-[1]">Billed monthly</span>
       </div>
-      <button 
+      <button
         onClick={handleCheckout}
         disabled={loading}
         className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-8 disabled:opacity-50 transition-opacity"
       >
         {loading ? "Redirecting..." : `Get ${title.toLowerCase()}`}
       </button>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         {features.map((f, i) => (
-          <div key={i} className="flex items-start gap-2 text-sm text-white">
-            <i className="ri-check-line text-white text-sm leading-none mt-1" />
-            <span className="leading-relaxed">{f}</span>
+          <div key={i} className="flex items-start gap-2 text-sm text-white leading-[20px]">
+            <i className="ri-check-line text-white text-sm" />
+            <span className="">{f}</span>
           </div>
         ))}
       </div>
@@ -85,9 +85,7 @@ const PLANS: PricingCardProps[] = [
       "15 videos",
       "2 websites",
       "20 design edits",
-      "Veo 3.1 & Nano Banana Pro",
-      "Credits refresh on billing date",
-      "Commercial use",
+      "Veo 3.1 & Nano Banana Pro"
     ],
   },
   {
@@ -100,9 +98,7 @@ const PLANS: PricingCardProps[] = [
       "25 videos",
       "4 websites",
       "35 design edits",
-      "Veo 3.1 & Nano Banana Pro",
-      "Credits refresh on billing date",
-      "Commercial use",
+      "Veo 3.1 & Nano Banana Pro"
     ],
   },
   {
@@ -115,9 +111,7 @@ const PLANS: PricingCardProps[] = [
       "60 videos",
       "6 websites",
       "40 design edits",
-      "Veo 3.1 & Nano Banana Pro",
-      "Credits refresh on billing date",
-      "Commercial use",
+      "Veo 3.1 & Nano Banana Pro"
     ],
   },
 ];

@@ -2,8 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Privacy policy – Framerate",
-  description: "How Framerate collects, uses, and protects your personal data.",
+  title: "Privacy Policy – Framerate",
+  description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
+  openGraph: {
+    title: "Privacy Policy – Framerate",
+    description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
+    url: "https://www.framerate.space/privacy",
+    siteName: "Framerate",
+  },
+  twitter: {
+    card: "summary",
+    title: "Privacy Policy – Framerate",
+    description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
+  },
 };
 
 const LegalFooter = () => (

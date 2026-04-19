@@ -2,8 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Compliance – Framerate",
-  description: "Framerate's compliance commitments and certifications.",
+  title: "Compliance Overview – Framerate",
+  description: "Framerate's commitments to data protection, security, and responsible AI usage.",
+  openGraph: {
+    title: "Compliance Overview – Framerate",
+    description: "Framerate's commitments to data protection, security, and responsible AI usage.",
+    url: "https://www.framerate.space/compliance",
+    siteName: "Framerate",
+  },
+  twitter: {
+    card: "summary",
+    title: "Compliance Overview – Framerate",
+    description: "Framerate's commitments to data protection, security, and responsible AI usage.",
+  },
 };
 
 const LegalFooter = () => (

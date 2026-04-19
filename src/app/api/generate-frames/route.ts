@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
 
-    // Persist to sceneImageUrls 
+    // Persist to sceneImageUrls and promote draft → active
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = await (prisma.project as any).findUnique({
@@ -142,11 +142,15 @@ export async function POST(req: NextRequest) {
       const existingUrls: string[] = Array.isArray(existing?.sceneImageUrls)
         ? (existing.sceneImageUrls as string[])
         : [];
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (prisma.project as any).update({
         where: { id: projectId },
-        data: { sceneImageUrls: [...existingUrls, publicUrl] },
+        data: {
+          sceneImageUrls: [...existingUrls, publicUrl],
+          // Promote to active on first successful scene generation
+          status: "active",
+        },
       });
     } catch {
       // sceneImageUrls column not yet in DB — skipping history persist until db push is run

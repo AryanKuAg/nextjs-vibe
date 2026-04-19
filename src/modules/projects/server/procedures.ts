@@ -51,9 +51,7 @@ export const projectsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        value: z.string()
-          .min(1, { message: "Value is required" })
-          .max(10000, { message: "Value is too long" })
+        value: z.string().max(10000, { message: "Value is too long" }),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -76,19 +74,23 @@ export const projectsRouter = createTRPCRouter({
       const createdProject = await prisma.project.create({
         data: {
           userId: ctx.auth.userId,
-          name: generateSlug(2, {
-            format: "kebab",
-          }),
+          name: generateSlug(2, { format: "kebab" }),
+          status: "draft",
           currentStage: "SCENE",
-          messages: {
-            create: {
-              content: input.value,
-              role: "USER",
-              type: "RESULT",
-              stage: "SCENE",
-            }
-          }
-        }
+          // Only create the initial message if the user provided a prompt
+          ...(input.value.trim()
+            ? {
+                messages: {
+                  create: {
+                    content: input.value,
+                    role: "USER",
+                    type: "RESULT",
+                    stage: "SCENE",
+                  },
+                },
+              }
+            : {}),
+        },
       });
 
       return createdProject;

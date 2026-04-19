@@ -4,6 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
 
 const GoogleSignInButton = () => {
     const { signIn, isLoaded } = useSignIn();
@@ -12,6 +15,14 @@ const GoogleSignInButton = () => {
     const handleGoogleSignIn = async () => {
         if (!isLoaded || isPending) return;
         setIsPending(true);
+
+        // Cancel One Tap if it's showing to prevent AbortError conflict
+        try {
+            window.google?.accounts.id.cancel();
+        } catch (e) {
+            // Ignore cancel errors
+        }
+
         await signIn.authenticateWithRedirect({
             strategy: "oauth_google",
             redirectUrl: "/sso-callback",
@@ -44,6 +55,26 @@ const GoogleSignInButton = () => {
 };
 
 export const FinalCTASection = () => {
+    const router = useRouter();
+    const trpc = useTRPC();
+    const queryClient = useQueryClient();
+
+    const createProject = useMutation(
+        trpc.projects.create.mutationOptions({
+            onSuccess: (data) => {
+                queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+                queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+                router.push(`/projects/${data.id}`);
+            },
+        })
+    );
+
+    const handleStartBuilding = async () => {
+        await createProject.mutateAsync({ value: "" });
+    };
+
+    const isPending = createProject.isPending;
+
     return (
         <section className="py-20 px-6 flex flex-col items-center text-center font-inconsolata">
             <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
@@ -53,12 +84,13 @@ export const FinalCTASection = () => {
                     <GoogleSignInButton />
                 </SignedOut>
                 <SignedIn>
-                    <Link
-                        href="/projects"
-                        className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors"
+                    <button
+                        onClick={handleStartBuilding}
+                        disabled={isPending}
+                        className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Start building
-                    </Link>
+                        {isPending ? "Starting..." : "Start building"}
+                    </button>
                 </SignedIn>
             </div>
         </section>

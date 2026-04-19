@@ -6,6 +6,8 @@ import { useState } from "react";
 import { SignedIn, SignedOut, useUser, useClerk, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
 
 const GoogleSignInButton = () => {
   const { signIn, isLoaded } = useSignIn();
@@ -14,6 +16,14 @@ const GoogleSignInButton = () => {
   const handleGoogleSignIn = async () => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
+
+    // Cancel One Tap if it's showing to prevent AbortError conflict
+    try {
+      window.google?.accounts.id.cancel();
+    } catch (e) {
+      // Ignore cancel errors
+    }
+
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -83,15 +93,29 @@ export const PillNavbar = () => {
   const { user } = useUser();
   const router = useRouter();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
-  const handleDashboardClick = (e: React.MouseEvent) => {
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
+
+  const handleDashboardClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
       setShowSignInModal(true);
     } else {
-      router.push("/manage");
+      await createProject.mutateAsync({ value: "" });
     }
   };
+
+  const isPending = createProject.isPending;
 
   return (
     <>
@@ -110,7 +134,13 @@ export const PillNavbar = () => {
 
           {/* Center: Links */}
           <div className="hidden md:flex items-center gap-4 text-white text-sm">
-            <button onClick={handleDashboardClick} className="hover:text-[#CCCCCC] transition-colors">Dashboard</button>
+            <button
+              onClick={handleDashboardClick}
+              disabled={isPending}
+              className="hover:text-[#CCCCCC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Dashboard
+            </button>
             <Link href="/pricing" className="">Pricing</Link>
             <Link href="#" className="">Contact</Link>
           </div>

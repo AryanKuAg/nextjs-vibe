@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider, SignedIn, SignedOut } from "@clerk/nextjs";
 import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 
+import { GoogleOneTap } from "@/components/google-one-tap";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
 
@@ -101,6 +102,7 @@ export default function RootLayout({
                 `,
               }}
             />
+            <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
@@ -108,6 +110,12 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <Toaster />
+              <SignedIn>
+                {/* Regular content */}
+              </SignedIn>
+              <SignedOut>
+                <GoogleOneTap />
+              </SignedOut>
               <div id="clerk-captcha"></div>
               {children}
             </ThemeProvider>

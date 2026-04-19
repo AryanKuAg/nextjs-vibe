@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
 
 export const Footer = () => {
   const { user } = useUser();
@@ -20,14 +22,29 @@ export const Footer = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDashboardClick = (e: React.MouseEvent) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
+
+  const handleDashboardClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
       setShowSignInModal(true);
     } else {
-      router.push("/manage");
+      await createProject.mutateAsync({ value: "" });
     }
   };
+
+  const isPending = createProject.isPending;
 
   return (
     <>
@@ -60,7 +77,13 @@ export const Footer = () => {
               <div>
                 <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Links</h4>
                 <div className="flex flex-col gap-2 items-start">
-                  <button onClick={handleDashboardClick} className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Dashboard</button>
+                  <button
+                    onClick={handleDashboardClick}
+                    disabled={isPending}
+                    className="text-sm text-white hover:text-[#CCCCCC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Dashboard
+                  </button>
                   <Link href="/pricing" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Pricing</Link>
                 </div>
               </div>

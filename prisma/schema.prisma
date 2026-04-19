@@ -21,6 +21,9 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Lifecycle — "draft" until first scene is generated, then "active"
+  status String @default("draft") // "draft" | "active"
+
   // Visual pipeline state
   currentStage   String @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
   videoUrls      Json   @default("[]") // Array of all generated cinematic videos

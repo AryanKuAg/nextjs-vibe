@@ -15,23 +15,23 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div 
+      <div
         className="bg-[#1C1C1C] rounded-[24px] w-full max-w-[360px] p-6 relative border border-[#3B3B3B] mx-4"
         style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
       >
-        <button 
+        <button
           type="button"
           onClick={onClose}
           className="absolute top-5 right-5 text-[#8A8A8A] hover:text-white transition-colors"
         >
           <i className="ri-close-line text-[22px]" />
         </button>
-        
+
         <Image src="/logo.png" alt="Logo" width={28} height={28} className="mb-6" />
-        
+
         <h2 className="text-[22px] text-white font-inconsolata mb-6 tracking-wide">Create account</h2>
-        
-        <button 
+
+        <button
           type="button"
           onClick={() => {
             if (isLoaded && signIn) {

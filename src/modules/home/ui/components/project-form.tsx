@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { useForm } from "react-hook-form";
@@ -15,6 +15,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
+
+const MODELS = [
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌" },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌" },
+] as const;
+
+type ModelId = typeof MODELS[number]["id"];
 
 const formSchema = z.object({
   value: z
@@ -30,6 +37,19 @@ export const ProjectForm = () => {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -39,10 +59,11 @@ export const ProjectForm = () => {
 
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}`);
+        const url = `/projects/${data.id}${variables.value ? "?autoSubmit=true" : ""}`;
+        router.push(url);
       },
       onError: (error) => {
         toast.error(error.message);
@@ -130,23 +151,47 @@ export const ProjectForm = () => {
               >
                 <i className="ri-add-line text-base" />
               </button>
-              <div className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer">
-                <span>Nano Banana 2</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+              <div className="relative" ref={dropdownRef}>
+                <div
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => setModelDropdownOpen((o) => !o)}
+                >
+                  <span>{MODELS.find((m) => m.id === selectedModel)?.emoji}</span>
+                  <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                  <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                </div>
+
+                {modelDropdownOpen && (
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#1C1C1C] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                    {MODELS.map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"}`}
+                      >
+                        <span>{model.emoji}</span>
+                        <span>{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
+                disabled={isPending}
+                onClick={async () => {
                   if (!userId) {
                     setShowSignInModal(true);
                   } else {
-                    router.push("/manage");
+                    await createProject.mutateAsync({ value: "" });
                   }
                 }}
-                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Go to dashboard</span>
               </button>

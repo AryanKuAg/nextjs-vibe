@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SignedIn, SignedOut, useUser, useClerk, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
@@ -35,7 +35,7 @@ const GoogleSignInButton = () => {
     <button
       onClick={handleGoogleSignIn}
       disabled={isPending}
-      className="bg-white text-black px-3 py-2 pr-6 lg:pr-3 rounded-[8px] font-[500] text-sm flex items-center gap-2 disabled:opacity-70 transition-opacity"
+      className="bg-white text-black px-3 py-2 pr-4 sm:pr-6 lg:pr-3 rounded-[8px] font-[500] text-sm flex  items-center gap-2 disabled:opacity-70 transition-opacity"
     >
       {isPending ? (
         <>
@@ -93,8 +93,13 @@ export const PillNavbar = () => {
   const { user } = useUser();
   const router = useRouter();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
@@ -116,6 +121,7 @@ export const PillNavbar = () => {
   };
 
   const isPending = createProject.isPending;
+  if (!isMounted) return null;
 
   return (
     <>
@@ -124,8 +130,8 @@ export const PillNavbar = () => {
         onClose={() => setShowSignInModal(false)}
       />
 
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full  px-4 max-w-fit">
-        <div className="flex items-center gap-20 h-[52px] px-2 bg-neutral-900 rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full px-4  md:max-w-fit">
+        <div className="flex items-center justify-between md:justify-normal md:gap-20 h-[52px] px-2 bg-neutral-900 rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
           {/* Left side: Logo */}
           <Link href="/" className="flex items-center gap-2 pl-2">
             <Image src="/logo.png" alt="framerate" width={24} height={24} />

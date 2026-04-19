@@ -110,9 +110,6 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <Toaster />
-              <SignedIn>
-                {/* Regular content */}
-              </SignedIn>
               <SignedOut>
                 <GoogleOneTap />
               </SignedOut>

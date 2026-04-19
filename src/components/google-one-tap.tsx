@@ -13,7 +13,7 @@ export const GoogleOneTap = () => {
     const originalError = console.error;
     console.error = (...args: unknown[]) => {
       const msg = args[0];
-      if (typeof msg === "string" && msg.includes("[GSI_LOGGER]") && (msg.includes("AbortError") || msg.includes("NetworkError") || msg.includes("FedCM"))) {
+      if (typeof msg === "string" && msg.includes("[GSI_LOGGER]") && (msg.includes("AbortError") || msg.includes("NetworkError") || msg.includes("FedCM") || msg.includes("origin is not allowed"))) {
         return;
       }
       originalError.apply(console, args);

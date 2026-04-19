@@ -1,6 +1,7 @@
 "use client";
 
 import { useUser, useClerk } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +20,13 @@ export const UserControl = ({ showName }: Props) => {
   const router = useRouter();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (!user) return null;
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || !user) return null;
 
   return (
     <DropdownMenu>

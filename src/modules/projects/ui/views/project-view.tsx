@@ -99,6 +99,24 @@ export const ProjectView = ({ projectId }: Props) => {
     window.addEventListener("dragleave", onDragLeave);
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("drop", onDrop);
+
+    // Pick up pending image from homepage if it exists
+    const pendingImage = sessionStorage.getItem("pending_image_base64");
+    if (pendingImage) {
+      const name = sessionStorage.getItem("pending_image_name") || "uploaded-image.png";
+      const type = sessionStorage.getItem("pending_image_type") || "image/png";
+
+      fetch(pendingImage)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], name, { type });
+          setDroppedFile(file);
+          sessionStorage.removeItem("pending_image_base64");
+          sessionStorage.removeItem("pending_image_name");
+          sessionStorage.removeItem("pending_image_type");
+        });
+    }
+
     return () => {
       window.removeEventListener("dragenter", onDragEnter);
       window.removeEventListener("dragleave", onDragLeave);

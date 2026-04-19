@@ -39,6 +39,9 @@ export const ProjectForm = () => {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,6 +53,36 @@ export const ProjectForm = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Clean up object URLs
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
+
+  const handleImageFile = (file: File) => {
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      toast.error("Unsupported image format. Please use JPEG or PNG.");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setUploadedImage(file);
+    setImagePreviewUrl(url);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageFile(file);
+    e.target.value = "";
+  };
+
+  const removeImage = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setUploadedImage(null);
+    setImagePreviewUrl(null);
+  };
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -84,6 +117,25 @@ export const ProjectForm = () => {
       setShowSignInModal(true);
       return;
     }
+
+    // Save image to sessionStorage to persist across redirect
+    if (uploadedImage) {
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64String = reader.result as string;
+          sessionStorage.setItem("pending_image_base64", base64String);
+          sessionStorage.setItem("pending_image_name", uploadedImage.name);
+          sessionStorage.setItem("pending_image_type", uploadedImage.type);
+          await createProject.mutateAsync({ value: values.value });
+        };
+        reader.readAsDataURL(uploadedImage);
+        return; // Success handled in reader
+      } catch (e) {
+        console.error("Failed to save image to session storage:", e);
+      }
+    }
+
     await createProject.mutateAsync({ value: values.value });
   };
 
@@ -97,7 +149,7 @@ export const ProjectForm = () => {
 
   const [isFocused, setIsFocused] = useState(false);
   const isPending = createProject.isPending;
-  const isButtonDisabled = isPending || !form.formState.isValid;
+  const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
 
   return (
     <Form {...form}>
@@ -112,6 +164,27 @@ export const ProjectForm = () => {
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
         >
+          {/* Image thumbnail preview */}
+          {imagePreviewUrl && (
+            <div className="px-4 pt-4">
+              <div className="relative w-fit">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreviewUrl}
+                  alt="Uploaded"
+                  className="w-16 h-16 rounded-xl object-cover border border-white/10"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-[#333] border border-white/10 text-white/70 hover:text-white text-[10px]"
+                >
+                  <i className="ri-close-line" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Textarea */}
           <FormField
             control={form.control}
@@ -126,9 +199,9 @@ export const ProjectForm = () => {
                 maxRows={10}
                 className={cn(
                   "w-full resize-none border-none outline-none bg-transparent",
-                  "px-2 md:px-4 pt-4 ",
+                  "px-4 pt-4 ",
                   "text-[15px] font-inconsolata leading-relaxed text-white",
-                  "placeholder:text-neutral-400 placeholder:whitespace-nowrap placeholder:text-[14px]",
+                  "placeholder:text-neutral-400 placeholder:whitespace-nowrap placeholder:text-[14px] ",
                   "transition-colors"
                 )}
                 placeholder="Describe your background..."
@@ -145,15 +218,23 @@ export const ProjectForm = () => {
           {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-4 pb-4 font-inconsolata pt-3">
             <div className="flex gap-x-1 items-center flex-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg, image/png"
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
               <button
                 type="button"
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-neutral-800 hover:bg-white/5 text-[#CCCCCC] transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-neutral-800 hover:bg-white/5 text-white transition-colors"
               >
                 <i className="ri-add-line text-base" />
               </button>
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   <span>{MODELS.find((m) => m.id === selectedModel)?.emoji}</span>
@@ -191,7 +272,7 @@ export const ProjectForm = () => {
                     await createProject.mutateAsync({ value: "" });
                   }
                 }}
-                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-[#CCCCCC] hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-white hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Go to dashboard</span>
               </button>

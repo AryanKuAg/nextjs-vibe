@@ -29,7 +29,7 @@ export default function PricingPage() {
         <PricingSection />
       </section>
       {/* FAQ */}
-      <section className="py-20 px-6 max-w-2xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-6 max-w-2xl mx-auto w-full">
         <FAQSection />
       </section>
 

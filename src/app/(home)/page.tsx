@@ -71,17 +71,17 @@ const Page = () => {
 
 
         <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
-          <h1 className="text-3xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
+          <h1 className="text-4xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
             Build 3D websites<br />10x faster with AI
           </h1>
-          <div className="w-full mx-auto px-4 md:px-12">
+          <div className="w-full mx-auto md:px-12">
             <ProjectForm />
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-6 max-w-7xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10 leading-[40px] font-[500]">How it works?</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -131,7 +131,7 @@ const Page = () => {
         <PricingSection title="Pricing" />
       </section> */}
 
-      <section className="py-20 px-6 max-w-2xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-6 max-w-2xl mx-auto w-full">
         <FAQSection />
       </section>
 

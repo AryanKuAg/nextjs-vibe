@@ -52,11 +52,11 @@ export const Footer = () => {
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
-      <footer className="py-20 px-6 max-w-7xl mx-auto w-full font-inconsolata">
+      <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-inconsolata">
         {/* Rounded card container */}
-        <div className="bg-neutral-800 rounded-[16px] border border-neutral-700 shadow-sm backdrop-blur-sm px-10 pt-[40px] pb-8">
+        <div className="bg-neutral-800 rounded-[16px] border border-neutral-700 shadow-sm backdrop-blur-sm px-5 py-6 md:px-10 md:pt-[40px] md:pb-8">
           {/* Main grid row */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-12 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 md:gap-12 mb-6 md:mb-10">
             {/* Left: Logo + description */}
             <div className="max-w-[414px]">
               <div className="flex items-center gap-2.5 mb-[10px]">
@@ -64,13 +64,13 @@ export const Footer = () => {
                 <span className="text-white font-[500] text-[16px]" style={{ fontFamily: 'var(--font-space-grotesk)' }}>framerate</span>
               </div>
               <p className="text-sm text-neutral-400">
-                The fastest way to go from a text prompt to a live,<br />production-ready 3D website.
+                The fastest way to go from a text prompt to a live,<br className="hidden md:block" /> production-ready 3D website.
               </p>
             </div>
 
             {/* Right: Nav columns */}
-            <div className="grid grid-cols-3 gap-16">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16">
+              <div className="hidden md:block">
 
               </div>
 
@@ -101,7 +101,7 @@ export const Footer = () => {
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-6 border-t border-[#41413F33] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="pt-6 border-t border-[#41413F33] flex flex-col sm:flex-row items-start md:items-center justify-between gap-4">
             <span className="text-sm text-white!">© 2026 Framerate. All rights reserved.</span>
             <div className="flex items-center gap-1.5 group">
               <Link

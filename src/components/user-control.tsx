@@ -18,7 +18,7 @@ interface Props {
 export const UserControl = ({ showName }: Props) => {
   const router = useRouter();
   const { user } = useUser();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
 
   if (!user) return null;
 

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useRef, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
@@ -34,7 +33,6 @@ const formSchema = z.object({
 
 export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Props) => {
   const trpc = useTRPC();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);

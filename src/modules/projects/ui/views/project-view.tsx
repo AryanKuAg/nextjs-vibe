@@ -2,7 +2,6 @@
 
 import { toast } from "sonner";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState, useTransition, useEffect, useRef } from "react";
 import "remixicon/fonts/remixicon.css";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +33,6 @@ interface Props {
 type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
 
 export const ProjectView = ({ projectId }: Props) => {
-  const { isLoaded } = useAuth();
   const trpc = useTRPC();
 
   // Load project to get initial state

@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import "remixicon/fonts/remixicon.css";
-import { useRouter } from "next/navigation";
 
 import { useTRPC } from "@/trpc/client";
 import { UserControl } from "@/components/user-control";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
-  const router = useRouter();
   const trpc = useTRPC();
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
@@ -48,7 +46,8 @@ export default function ProjectsPage() {
             </div>
           ) : projects && projects.length > 0 ? (
             <div className="grid grid-cols-2 gap-6">
-              {projects.map((project: any) => {
+              {projects.map((projectItem: unknown) => {
+                  const project = projectItem as { id: string; name: string; sceneImageUrls?: string[] | null };
                   const thumbnails = Array.isArray(project.sceneImageUrls) ? project.sceneImageUrls : [];
                   const thumbnail = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1] : null;
 
@@ -56,6 +55,7 @@ export default function ProjectsPage() {
                     <Link href={`/projects/${project.id}`} key={project.id} className="flex flex-col group cursor-pointer block">
                         <div className="relative aspect-video w-full rounded-xl bg-[#2A2A28] overflow-hidden border border-[#3B3B3B] transition-colors group-hover:border-[#5A5A5A]">
                             {thumbnail ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
                                 <img src={thumbnail} alt={project.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">

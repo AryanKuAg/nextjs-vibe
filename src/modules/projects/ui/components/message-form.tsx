@@ -14,6 +14,7 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 const MODELS = [
   { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 150 },
   { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", credits: 100 },
+  { id: 'claude-sonnet-4-6', label: "Claude Sonnet 4.6", credits: 100 }
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];

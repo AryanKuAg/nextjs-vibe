@@ -65,12 +65,33 @@ export async function POST(req: NextRequest) {
     fs.writeFileSync(videoPath, videoBuffer);
     fs.mkdirSync(framesDir);
 
-    // Extract N evenly-spaced frames using ffmpeg
+    // First, probe the video duration using ffprobe
     const ffmpeg = await getFFmpeg();
+    // ffprobe-static ships a separate binary alongside ffmpeg-static
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ffprobePath: string = require("ffprobe-static").path;
+    ffmpeg.setFfprobePath(ffprobePath);
+
+    const videoDuration = await new Promise<number>((resolve, reject) => {
+      ffmpeg.ffprobe(videoPath, (err, metadata) => {
+        if (err) {
+          console.warn("[extract-frames] ffprobe failed, defaulting to 16s:", err.message);
+          return resolve(16); // safe fallback
+        }
+        resolve(metadata.format.duration ?? 16);
+      });
+    });
+
+    // Compute the exact fps to always produce exactly 450 frames from any video length
+    const TARGET_FRAMES = 450;
+    const exactFps = TARGET_FRAMES / videoDuration;
+    console.log(`[extract-frames] Video duration: ${videoDuration}s. Target FPS: ${exactFps.toFixed(4)} to produce ${TARGET_FRAMES} frames.`);
+
+    // Extract exactly 450 evenly-spaced frames using ffmpeg
     await new Promise<void>((resolve, reject) => {
       ffmpeg(videoPath)
         .outputOptions([
-          `-vf fps=30`,
+          `-vf fps=${exactFps.toFixed(6)}`,
           "-q:v 50",
         ])
         .output(path.join(framesDir, "frame-%04d.jpg"))

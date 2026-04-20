@@ -65,7 +65,7 @@ interface AgentState {
 };
 
 export const codeAgentFunction = inngest.createFunction(
-  { 
+  {
     id: "code-agent",
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
@@ -79,11 +79,11 @@ export const codeAgentFunction = inngest.createFunction(
             type: "RESULT",
           }
         }).catch(err => console.error("Failed to write unjam message", err));
-        
+
         await prisma.project.update({
           where: { id: projectId },
           data: { currentStage: "SCENE" }
-        }).catch(() => {});
+        }).catch(() => { });
       });
     }
   },
@@ -362,7 +362,9 @@ To achieve this securely and perfectly:
    - A \`position: fixed, inset: 0, z-index: 0, w-full, h-full\` background \`<canvas>\` that fills the entire screen underneath EVERYTHING.
    - ALL normal sections (Hero, Features, Pricing, Footer) go ON TOP of the canvas with \`z-index: 10\`, and MUST HAVE TRANSPARENT BACKGROUNDS! 
 5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! NEVER use absolute root paths (like /frame-0001.jpg) because the deployed app is hosted in a nested subdirectory!
-6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which should be \`document.body.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. When the user hits the absolutely bottom of the page (the Footer), the frame MUST perfectly land on Frame 450. DO NOT allow the page to keep scrolling after the 450 sequence is over!
+6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. 
+   - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame 450.
+   - **NO OVER-SCROLL**: The canvas drawing logic MUST clamp the frame index: \`Math.min(450, Math.max(1, calculatedIndex))\`. If the user scrolls all the way down, the frame stops strictly at 450. The page itself must NOT have arbitrary extra whitespace at the bottom causing over-scroll. Make sure the height of the container perfectly fits the sections so the footer is the absolute end of the document.
 7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
 === END SCROLL ANIMATION REQUIREMENT ===
 
@@ -432,7 +434,7 @@ To achieve this securely and perfectly:
             // Safeguard: Forcibly convert any absolute frame paths the AI wrote (/frame-) into relative paths (./frame-) 
             // so they resolve correctly inside the nested GCS bucket deployment.
             await sandbox.commands.run("find src -type f -name '*.tsx' -exec sed -i 's|/frame-|./frame-|g' {} + || true");
-            
+
             await sandbox.commands.run("npm run build --silent -- --base=./");
           } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
@@ -558,28 +560,33 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         return null;
       }
 
-      console.log("DEBUG: Build succeeded. Extracting dist/ assets for GCS deployment...");
+      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for GCS deployment...");
       const sandbox = await getSandbox(sandboxId);
-      
+
+      // Step 1: Extract only text/code assets from dist/ (skip images — they are too large for base64)
       const cmdResult = await sandbox.commands.run(`node -e "
         const fs = require('fs');
         const path = require('path');
+        const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.ico', '.mp4', '.woff', '.woff2']);
         const getFiles = (dir, fileList = {}) => {
           if (!fs.existsSync(dir)) return fileList;
           for (const f of fs.readdirSync(dir)) {
             const p = path.join(dir, f);
             if (fs.statSync(p).isDirectory()) getFiles(p, fileList);
             else {
-              fileList[p.replace(/\\\\\\\\/g, '/').replace('dist/', '')] = fs.readFileSync(p).toString('base64');
+              const ext = path.extname(f).toLowerCase();
+              if (!IMAGE_EXTS.has(ext)) {
+                fileList[p.replace(/\\\\/g, '/').replace('dist/', '')] = fs.readFileSync(p).toString('base64');
+              }
             }
           }
           return fileList;
         };
         console.log(JSON.stringify(getFiles('dist')));
-      "`, { timeoutMs: 180000 });
+      "`, { timeoutMs: 60000 });
 
       if (cmdResult.exitCode !== 0) {
-        console.error("Failed to read dist folder fully:", cmdResult.stderr);
+        console.error("Failed to read dist folder:", cmdResult.stderr);
         throw new Error("Failed to read dist folder natively");
       }
 
@@ -592,34 +599,53 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
           private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
         }
       });
-      
+
       const bucket = storage.bucket(bucketName);
       const sitePrefix = `sites/${event.data.projectId}/`;
 
-      console.log(`DEBUG: Pushing ${Object.keys(files).length} assets to GCS...`);
-      
+      // Step 2: Upload text/code assets to GCS in batches
+      console.log(`DEBUG: Pushing ${Object.keys(files).length} text assets to GCS...`);
       const entries = Object.entries(files);
-      const chunkSize = 25; // Limits concurrent socket connections
-      
+      const chunkSize = 25;
+
       for (let i = 0; i < entries.length; i += chunkSize) {
         const chunk = entries.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
           let contentType = "application/octet-stream";
-          if (relativePath.endsWith(".html")) contentType = "text/html";
+          if (relativePath.endsWith(".html")) contentType = "text/html; charset=utf-8";
           else if (relativePath.endsWith(".js")) contentType = "application/javascript";
           else if (relativePath.endsWith(".css")) contentType = "text/css";
           else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (relativePath.endsWith(".png")) contentType = "image/png";
-          else if (relativePath.endsWith(".jpg") || relativePath.endsWith(".jpeg")) contentType = "image/jpeg";
           else if (relativePath.endsWith(".json")) contentType = "application/json";
-          
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType }});
+          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType } });
         }));
       }
 
+      // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
+      // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
+      if (event.data.videoUrl) {
+        console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
+        const JSZip = (await import("jszip")).default;
+        const zipResponse = await fetch(event.data.videoUrl);
+        if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
+        const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
+        const zip = await JSZip.loadAsync(zipBuffer);
+
+        const frameEntries = Object.entries(zip.files).filter(([name, f]) => !f.dir && name.endsWith(".jpg"));
+        const frameChunkSize = 25;
+        for (let i = 0; i < frameEntries.length; i += frameChunkSize) {
+          const chunk = frameEntries.slice(i, i + frameChunkSize);
+          await Promise.all(chunk.map(async ([name, zipEntry]) => {
+            const frameBuffer = Buffer.from(await zipEntry.async("arraybuffer"));
+            await bucket.file(`${sitePrefix}${name}`).save(frameBuffer, { metadata: { contentType: "image/jpeg" } });
+          }));
+        }
+        console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
+      }
+
       const finalUrl = `https://storage.googleapis.com/${bucketName}/${sitePrefix}index.html`;
-      console.log(`DEBUG: GCP Deployment perfect: ${finalUrl}`);
+      console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
       return finalUrl;
     });
 
@@ -842,7 +868,7 @@ export const veoGenerateFunction = inngest.createFunction(
         let base64VideoData: string | null | undefined = null;
         let isDone = false;
 
-          console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
+        console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
         // Phase 1 Polling
         while (!isDone) {
           await new Promise(r => setTimeout(r, 15000));

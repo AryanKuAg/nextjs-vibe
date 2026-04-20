@@ -57,7 +57,7 @@ export const messagesRouter = createTRPCRouter({
       }
 
       try {
-        await consumeCredits();
+        await consumeCredits(10);
       } catch (error) {
         if (error instanceof Error) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
@@ -91,6 +91,7 @@ export const messagesRouter = createTRPCRouter({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             videoUrl: ((existingProject as any).videoUrls as string[])?.[0] || undefined,
             model: input.model,
+            userId: ctx.auth.userId,
           },
         });
       }

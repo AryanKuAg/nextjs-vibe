@@ -11,7 +11,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 
 import { Storage } from "@google-cloud/storage";
 import { GoogleAuth } from "google-auth-library";
-import { consumeCredits, refundCredits, VEO_MODEL_COSTS } from "@/lib/usage";
+import { refundCredits, VEO_MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 

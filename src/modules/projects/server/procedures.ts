@@ -154,7 +154,7 @@ export const projectsRouter = createTRPCRouter({
         try {
           // Extremely fast check to see if the sandbox is still alive
           // If it throws an error, the sandbox expired/died.
-          const sandbox = await Sandbox.connect(existingProject.sandboxId);
+          await Sandbox.connect(existingProject.sandboxId);
           isHot = true;
         } catch {
           isHot = false;

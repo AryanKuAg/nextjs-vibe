@@ -63,7 +63,7 @@ export default function ManageAccountPage() {
         
         <div className="flex items-center gap-4">
           <div className="bg-[#2A2A28] rounded-[8px] px-3 py-1.5 text-sm text-white">
-            {usage ? `${usage.remainingPoints.toLocaleString()}/${usage.maxPoints.toLocaleString()} credits left` : "Loading credits..."}
+            {usage ? `${usage.remainingCredits.toLocaleString()}/${usage.totalCredits.toLocaleString()} credits left` : "Loading credits..."}
           </div>
           <UserControl showName={false} />
         </div>

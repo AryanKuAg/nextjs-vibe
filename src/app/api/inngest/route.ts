@@ -3,6 +3,10 @@ import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import { codeAgentFunction, veoGenerateFunction } from "@/inngest/functions";
 
+// Allow Vercel serverless functions to run up to 5 minutes
+// Required for long E2B sandbox operations and GCS deployments
+export const maxDuration = 300;
+
 // Create an API that serves zero functions
 export const { GET, POST, PUT } = serve({
   client: inngest,

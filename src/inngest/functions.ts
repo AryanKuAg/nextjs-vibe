@@ -11,6 +11,9 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 
 import { Storage } from "@google-cloud/storage";
 import { GoogleAuth } from "google-auth-library";
+import { consumeCredits, refundCredits, VEO_MODEL_COSTS } from "@/lib/usage";
+
+// Constants moved to usage.ts
 
 function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
@@ -62,7 +65,28 @@ interface AgentState {
 };
 
 export const codeAgentFunction = inngest.createFunction(
-  { id: "code-agent" },
+  { 
+    id: "code-agent",
+    onFailure: async ({ error, event, step }) => {
+      const projectId = event.data.event.data.projectId;
+      // Guarantee the UI un-jams by writing a fallback Assistant message
+      await step.run("unjam-ui", async () => {
+        await prisma.message.create({
+          data: {
+            projectId: projectId,
+            content: `The code agent encountered a critical infrastructure error and exhausted all retries. The error was: ${error.message}. Please send another prompt to try again. (Your credits will be automatically refunded by the system shortly)`,
+            role: "ASSISTANT",
+            type: "RESULT",
+          }
+        }).catch(err => console.error("Failed to write unjam message", err));
+        
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { currentStage: "SCENE" }
+        }).catch(() => {});
+      });
+    }
+  },
   { event: "code-agent/run" },
   async ({ event, step }) => {
     const project = await step.run("get-project", async () => {
@@ -120,6 +144,13 @@ export const codeAgentFunction = inngest.createFunction(
 
       if (!hasFiles) {
         console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
+        return null;
+      }
+
+      // If the returned sandboxId exactly matches the one previously saved in the DB, 
+      // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
+      if (sandboxId === project?.sandboxId) {
+        console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
         return null;
       }
 
@@ -330,7 +361,7 @@ To achieve this securely and perfectly:
    - A global container with a dynamically calculated height to enforce the scrollable area.
    - A \`position: fixed, inset: 0, z-index: 0, w-full, h-full\` background \`<canvas>\` that fills the entire screen underneath EVERYTHING.
    - ALL normal sections (Hero, Features, Pricing, Footer) go ON TOP of the canvas with \`z-index: 10\`, and MUST HAVE TRANSPARENT BACKGROUNDS! 
-5. Pre-load all 450 image paths from \`/frame-0001.jpg\` -> \`/frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load!
+5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! NEVER use absolute root paths (like /frame-0001.jpg) because the deployed app is hosted in a nested subdirectory!
 6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which should be \`document.body.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. When the user hits the absolutely bottom of the page (the Footer), the frame MUST perfectly land on Frame 450. DO NOT allow the page to keep scrolling after the 450 sequence is over!
 7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
 === END SCROLL ANIMATION REQUIREMENT ===
@@ -379,11 +410,13 @@ To achieve this securely and perfectly:
           const sandbox = await getSandbox(sandboxId);
           await sandbox.commands.run("rm -rf dist");
 
-          console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-          const zipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-          if (zipResult.exitCode !== 0) {
-            console.error("ZIP FETCH ERR:", zipResult.stderr);
-            throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+          if (event.data.videoUrl) {
+            console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
+            const zipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+            if (zipResult.exitCode !== 0) {
+              console.error("ZIP FETCH ERR:", zipResult.stderr);
+              throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+            }
           }
 
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
@@ -396,7 +429,11 @@ To achieve this securely and perfectly:
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
-            await sandbox.commands.run("npm run build --silent");
+            // Safeguard: Forcibly convert any absolute frame paths the AI wrote (/frame-) into relative paths (./frame-) 
+            // so they resolve correctly inside the nested GCS bucket deployment.
+            await sandbox.commands.run("find src -type f -name '*.tsx' -exec sed -i 's|/frame-|./frame-|g' {} + || true");
+            
+            await sandbox.commands.run("npm run build --silent -- --base=./");
           } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
@@ -515,10 +552,75 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
     console.log('hola', isBuildSuccessful);
     // ... continues to deploymentUrl ...
 
-    const deploymentUrl = await step.run("deploy-to-cloudflare", async () => {
-      // Cloudflare deployment has been fully disconnected per user request.
-      // We are securely bypassing Cloudflare and exclusively surfacing the E2B Sandbox URL to the frontend.
-      return null;
+    const deploymentUrl = await step.run("deploy-to-gcp", async () => {
+      if (!isBuildSuccessful) {
+        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting GCP deployment.");
+        return null;
+      }
+
+      console.log("DEBUG: Build succeeded. Extracting dist/ assets for GCS deployment...");
+      const sandbox = await getSandbox(sandboxId);
+      
+      const cmdResult = await sandbox.commands.run(`node -e "
+        const fs = require('fs');
+        const path = require('path');
+        const getFiles = (dir, fileList = {}) => {
+          if (!fs.existsSync(dir)) return fileList;
+          for (const f of fs.readdirSync(dir)) {
+            const p = path.join(dir, f);
+            if (fs.statSync(p).isDirectory()) getFiles(p, fileList);
+            else {
+              fileList[p.replace(/\\\\\\\\/g, '/').replace('dist/', '')] = fs.readFileSync(p).toString('base64');
+            }
+          }
+          return fileList;
+        };
+        console.log(JSON.stringify(getFiles('dist')));
+      "`, { timeoutMs: 180000 });
+
+      if (cmdResult.exitCode !== 0) {
+        console.error("Failed to read dist folder fully:", cmdResult.stderr);
+        throw new Error("Failed to read dist folder natively");
+      }
+
+      const files = JSON.parse(cmdResult.stdout);
+      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+      const storage = new Storage({
+        projectId: process.env.GOOGLE_CLOUD_PROJECT,
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        }
+      });
+      
+      const bucket = storage.bucket(bucketName);
+      const sitePrefix = `sites/${event.data.projectId}/`;
+
+      console.log(`DEBUG: Pushing ${Object.keys(files).length} assets to GCS...`);
+      
+      const entries = Object.entries(files);
+      const chunkSize = 25; // Limits concurrent socket connections
+      
+      for (let i = 0; i < entries.length; i += chunkSize) {
+        const chunk = entries.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
+          const buffer = Buffer.from(base64Content as string, 'base64');
+          let contentType = "application/octet-stream";
+          if (relativePath.endsWith(".html")) contentType = "text/html";
+          else if (relativePath.endsWith(".js")) contentType = "application/javascript";
+          else if (relativePath.endsWith(".css")) contentType = "text/css";
+          else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
+          else if (relativePath.endsWith(".png")) contentType = "image/png";
+          else if (relativePath.endsWith(".jpg") || relativePath.endsWith(".jpeg")) contentType = "image/jpeg";
+          else if (relativePath.endsWith(".json")) contentType = "application/json";
+          
+          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType }});
+        }));
+      }
+
+      const finalUrl = `https://storage.googleapis.com/${bucketName}/${sitePrefix}index.html`;
+      console.log(`DEBUG: GCP Deployment perfect: ${finalUrl}`);
+      return finalUrl;
     });
 
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
@@ -527,10 +629,12 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
 
-      console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-      const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-      if (devZipResult.exitCode !== 0) {
-        throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
+      if (event.data.videoUrl) {
+        console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
+        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+        if (devZipResult.exitCode !== 0) {
+          throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
+        }
       }
 
       // 2. Start the Vite server in the background
@@ -646,14 +750,8 @@ export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0 },
   { event: "veo/generate" },
   async ({ event, step }) => {
-    const { projectId, prompt, model } = event.data;
-
-    await step.run("update-project-stage-generating", async () => {
-      await prisma.project.update({
-        where: { id: projectId },
-        data: { currentStage: "GENERATING_VIDEO" }
-      });
-    });
+    const { projectId, prompt, model, userId } = event.data;
+    const cost = VEO_MODEL_COSTS[model as string] || 75;
 
     const tokenHelper = async () => {
       const auth = new GoogleAuth({
@@ -669,6 +767,13 @@ export const veoGenerateFunction = inngest.createFunction(
     };
 
     try {
+      await step.run("update-project-stage-generating", async () => {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { currentStage: "GENERATING_VIDEO" }
+        });
+      });
+
       const operationName = await step.run("start-veo-generation", async () => {
         try {
           const token = await tokenHelper();
@@ -735,8 +840,7 @@ export const veoGenerateFunction = inngest.createFunction(
       // Poll Initial LRO and Extend recursively via REST
       const videoUri = await step.run("poll-and-extend-veo", async () => {
         let base64VideoData: string | null | undefined = null;
-        try {
-          let isDone = false;
+        let isDone = false;
 
           console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
         // Phase 1 Polling
@@ -771,14 +875,7 @@ export const veoGenerateFunction = inngest.createFunction(
             }
           }
         }
-      } catch (err) {
-        // Revert stage on failure so UI isn't stuck
-        await prisma.project.update({
-          where: { id: event.data.projectId },
-          data: { currentStage: "SCENE" }
-        });
-        throw err; // Still throw to mark job as failed
-      }
+
 
         console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
         const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
@@ -823,7 +920,7 @@ export const veoGenerateFunction = inngest.createFunction(
         const operationName2 = extData.name;
 
         // Phase 2 Polling
-        let isDone = false;
+        isDone = false;
         let finalBase64VideoData = null;
         console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
 
@@ -880,12 +977,18 @@ export const veoGenerateFunction = inngest.createFunction(
 
       return { videoUrl: videoUri };
     } catch (error: unknown) {
-      await step.run("handle-video-generation-error", async () => {
+      // Global Failure Handler: Ensure UI is NEVER stuck and credits are refunded
+      await step.run("handle-video-generation-failure", async () => {
+        // 1. Reset project stage so user can try again
         await prisma.project.update({
           where: { id: projectId },
-          data: { currentStage: "VIDEO" }
+          data: { currentStage: "SCENE" }
         }).catch(() => { });
+
+        // 2. Refund credits since generation failed
+        await refundCredits(cost, userId).catch(() => { });
       });
+
       throw error;
     }
   }

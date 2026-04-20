@@ -7,21 +7,19 @@ import "remixicon/fonts/remixicon.css";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  points: number;
+  credits: number;
 };
 
-export const Usage = ({ points }: Props) => {
+export const Usage = ({ credits }: Props) => {
   const { has } = useAuth();
   const hasProAccess = has?.({ plan: "pro" });
-
-
 
   return (
     <div className="rounded-t-xl bg-background border border-b-0 p-2.5">
       <div className="flex items-center gap-x-2">
         <div>
           <p className="text-sm">
-            {points} {hasProAccess ? "": "free"} credits remaining
+            {credits} {hasProAccess ? "": "free"} credits remaining
           </p>
         </div>
         {!hasProAccess && (

@@ -7,6 +7,7 @@ type Events = {
       value: string;
       videoUrl?: string; // Swapped from explicit Frame Generation
       model?: string;
+      userId: string;
     };
   };
   "veo/generate": {
@@ -17,6 +18,7 @@ type Events = {
       imageUrl?: string;
       imageBase64?: string;
       model?: string;
+      userId: string;
     };
   };
 };

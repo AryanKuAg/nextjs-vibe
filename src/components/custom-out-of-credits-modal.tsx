@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { PLANS, PricingCard } from "@/modules/home/ui/components/pricing-section";
+import { usePathname } from "next/navigation";
 
 interface CustomOutOfCreditsModalProps {
   isOpen: boolean;
@@ -9,51 +10,54 @@ interface CustomOutOfCreditsModalProps {
 }
 
 export const CustomOutOfCreditsModal = ({ isOpen, onClose }: CustomOutOfCreditsModalProps) => {
-  const router = useRouter();
+  const pathname = usePathname();
+  const isProjectPage = pathname?.startsWith("/projects/");
+
+  const projectDescs: Record<string, string> = {
+    "Basic": "For first-time AI content creators",
+    "Plus": "For consistent and easy AI content creation",
+    "Pro": "For creators building AI projects",
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div 
-        className="bg-[#1C1C1C] rounded-[24px] w-full max-w-[360px] p-6 relative border border-[#3B3B3B]"
+      <div
+        className="bg-neutral-900 rounded-[16px] w-full max-w-[1200px] p-6 md:p-16 md:pt-10  relative overflow-y-auto max-h-[90vh]"
         style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
       >
-        <button 
+        <button
           type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 text-[#8A8A8A] hover:text-white transition-colors"
+          className="absolute top-6 right-6 text-[#8A8A8A] hover:text-white transition-colors"
         >
-          <i className="ri-close-line text-[22px]" />
+          <i className="ri-close-line text-[24px]" />
         </button>
-        
-        <Image src="/logo.png" alt="Logo" width={28} height={28} className="mb-6" />
-        
-        <h2 className="text-[22px] text-white font-inconsolata mb-3 tracking-wide">You&apos;re out of credits</h2>
-        
-        <p className="text-[#8A8A8A] text-[15px] font-inconsolata mb-8 leading-relaxed">
-          Your free plan credits have been used up.<br/>Upgrade to keep building.
-        </p>
-        
-        <div className="space-y-3 font-inconsolata">
-          <button 
-            type="button"
-            onClick={() => {
-              onClose();
-              router.push("/pricing");
-            }}
-            className="w-full h-[46px] flex items-center justify-center bg-white text-[#1C1C1C] rounded-[10px] hover:bg-[#F3F3F3] transition-colors font-medium text-[15px]"
-          >
-            Upgrade
-          </button>
-          
-          <button 
-            type="button"
-            onClick={onClose}
-            className="w-full h-[46px] flex items-center justify-center bg-transparent border border-[#3B3B3B] text-[#CCCCCC] rounded-[10px] hover:bg-white/5 transition-colors font-medium text-[15px]"
-          >
-            Maybe later
-          </button>
+
+        {/* Header Branding */}
+        <div className="flex flex-col items-center text-center mb-10">
+          <div className="flex items-center gap-2 mb-8">
+            <Image src="/logo.png" alt="Logo" width={24} height={24} />
+            <span className="text-white font-[500] text-[20px] font-space-grotesk tracking-tight">framerate</span>
+          </div>
+
+          <h2 className="text-3xl md:text-[40px] text-white font-inconsolata mb-4 tracking-tight font-[500]">Upgrade to keep creating</h2>
+          <p className="text-neutral-400 text-sm leading-sm font-inconsolata mx-auto">
+            You&apos;ve used all your free credits. Choose a plan to continue building 3D websites.
+          </p>
+        </div>
+
+        {/* Pricing Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-inconsolata">
+          {PLANS.map((plan) => (
+            <PricingCard
+              key={plan.title}
+              {...plan}
+              desc={isProjectPage ? projectDescs[plan.title] : plan.desc}
+              className="bg-[#272725]/50 border-[#3B3B3B] p-6 hover:border-white/20 transition-all"
+            />
+          ))}
         </div>
       </div>
     </div>

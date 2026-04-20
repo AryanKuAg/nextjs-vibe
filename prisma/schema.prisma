@@ -5,8 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -73,7 +72,7 @@ model Fragment {
 
 model Usage {
   key            String    @id
-  points         Int
+  credits        Int       @default(0)
   expire         DateTime?
   plan           String    @default("free") // "free", "basic", "plus", "pro"
   subscriptionId String?

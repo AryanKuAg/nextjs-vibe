@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
-interface PricingCardProps {
+export interface PricingCardProps {
   title: string;
   desc: string;
   price: string;
   features: string[];
+  className?: string;
 }
 
-const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
+export const PricingCard = ({ title, desc, price, features, className }: PricingCardProps) => {
   const [loading, setLoading] = useState(false);
   const { isSignedIn } = useAuth();
   const clerk = useClerk();
@@ -27,7 +30,7 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: title.toLowerCase() }),
+        body: JSON.stringify({ plan: title.toLowerCase(), returnUrl: window.location.href }),
       });
 
       const data = await res.json();
@@ -48,7 +51,7 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
   };
 
   return (
-    <div className="flex flex-col bg-neutral-800 rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata">
+    <div className={cn("flex flex-col bg-neutral-800 rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata", className)}>
       <h3 className="text-2xl text-white mb-0">{title}</h3>
       <p className="text-sm text-neutral-400 mb-8">{desc}</p>
       <div className="flex items-end gap-2 mb-6">
@@ -74,43 +77,40 @@ const PricingCard = ({ title, desc, price, features }: PricingCardProps) => {
   );
 };
 
-const PLANS: PricingCardProps[] = [
+export const PLANS: PricingCardProps[] = [
   {
     title: "Basic",
-    desc: "For first-time AI content creators",
+    desc: "For hobbyists and explorers",
     price: "19",
     features: [
-      "1,500 credits / mo",
-      "30 images",
-      "15 videos",
-      "2 websites",
-      "20 design edits",
+      "1,200 credits / mo",
+      "~120 Images or ~15 Videos",
+      "~12 Pro Website Builds",
+      "Neon DB & GCP Hosting",
       "Veo 3.1 & Nano Banana Pro"
     ],
   },
   {
     title: "Plus",
-    desc: "For consistent and easy AI content creation",
+    desc: "For power creators and freelancers",
     price: "39",
     features: [
-      "2,500 credits / mo",
-      "50 images",
-      "25 videos",
-      "4 websites",
-      "35 design edits",
+      "3,000 credits / mo",
+      "~300 Images or ~40 Videos",
+      "~30 Pro Website Builds",
+      "Priority Sandboxes (E2B)",
       "Veo 3.1 & Nano Banana Pro"
     ],
   },
   {
     title: "Pro",
-    desc: "For creators building AI projects",
+    desc: "For agencies and AI startups",
     price: "59",
     features: [
-      "3,500 credits / mo",
-      "120 images",
-      "60 videos",
-      "6 websites",
-      "40 design edits",
+      "5,500 credits / mo",
+      "~550 Images or ~75 Videos",
+      "~55 Pro Website Builds",
+      "Long-running Sessions (1hr+)",
       "Veo 3.1 & Nano Banana Pro"
     ],
   },
@@ -120,17 +120,32 @@ interface PricingSectionProps {
   title?: string;
 }
 
-export const PricingSection = ({ title }: PricingSectionProps) => (
-  <div>
-    {title && (
-      <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">
-        {title}
-      </h2>
-    )}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {PLANS.map((plan) => (
-        <PricingCard key={plan.title} {...plan} />
-      ))}
+export const PricingSection = ({ title }: PricingSectionProps) => {
+  const pathname = usePathname();
+  const isProjectPage = pathname?.startsWith("/projects/");
+
+  const projectDescs: Record<string, string> = {
+    "Basic": "For first-time AI content creators",
+    "Plus": "For consistent and easy AI content creation",
+    "Pro": "For creators building AI projects",
+  };
+
+  return (
+    <div>
+      {title && (
+        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">
+          {title}
+        </h2>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {PLANS.map((plan) => (
+          <PricingCard
+            key={plan.title}
+            {...plan}
+            desc={isProjectPage ? projectDescs[plan.title] : plan.desc}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};

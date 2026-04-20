@@ -1,12 +1,12 @@
 import "remixicon/fonts/remixicon.css";
-import { Fragment } from "@/generated/prisma/client";
+import { Fragment } from "@prisma/client";
 
 interface Props {
   data: Fragment;
 };
 
 export function FragmentWeb({ data }: Props) {
-  const displayUrl = data.deploymentUrl || data.sandboxUrl;
+  const displayUrl = data.sandboxUrl;
 
   return (
     <div className="flex flex-col w-full h-full">

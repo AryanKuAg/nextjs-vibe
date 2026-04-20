@@ -28,7 +28,7 @@ const inconsolata = Inconsolata({
 const dmMono = DM_Mono({
   variable: "--font-dm-mono",
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  weight: "400", // Using a single weight string instead of array
 });
 
 const spaceGrotesk = Space_Grotesk({

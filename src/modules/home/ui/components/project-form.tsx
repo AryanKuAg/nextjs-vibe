@@ -17,8 +17,8 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌" },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌" },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 10 },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 25 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -127,7 +127,11 @@ export const ProjectForm = () => {
           sessionStorage.setItem("pending_image_base64", base64String);
           sessionStorage.setItem("pending_image_name", uploadedImage.name);
           sessionStorage.setItem("pending_image_type", uploadedImage.type);
-          await createProject.mutateAsync({ value: values.value });
+          try {
+            await createProject.mutateAsync({ value: values.value });
+          } catch {
+            // Error is handled in the mutation's onError callback
+          }
         };
         reader.readAsDataURL(uploadedImage);
         return; // Success handled in reader
@@ -136,7 +140,11 @@ export const ProjectForm = () => {
       }
     }
 
-    await createProject.mutateAsync({ value: values.value });
+    try {
+      await createProject.mutateAsync({ value: values.value });
+    } catch {
+      // Error is handled in the mutation's onError callback
+    }
   };
 
   const onSelect = (value: string) => {
@@ -276,22 +284,28 @@ export const ProjectForm = () => {
               >
                 <span>Go to dashboard</span>
               </button>
-              <button
-                type="submit"
-                disabled={isButtonDisabled}
-                className={cn(
-                  "flex items-center justify-center size-8 rounded-full transition-all duration-150",
-                  isButtonDisabled
-                    ? "bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
-                    : "bg-white text-[#1C1C1C]"
-                )}
-              >
-                {isPending ? (
-                  <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                ) : (
-                  <i className="ri-arrow-up-line text-[16px]" />
-                )}
-              </button>
+              <div className="flex gap-2 ml-auto">
+                <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
+                  <i className="ri-sparkling-fill text-white text-sm" />
+                  <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isButtonDisabled}
+                  className={cn(
+                    "flex items-center justify-center size-8 rounded-full transition-all duration-150",
+                    isButtonDisabled
+                      ? "bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
+                      : "bg-white text-[#1C1C1C]"
+                  )}
+                >
+                  {isPending ? (
+                    <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
+                  ) : (
+                    <i className="ri-arrow-up-line text-[16px]" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </form>

@@ -7,7 +7,7 @@ import "remixicon/fonts/remixicon.css";
 import { useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@/generated/prisma/client";
+import { Fragment } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
 import { FileExplorer } from "@/components/file-explorer";
@@ -46,7 +46,7 @@ export const ProjectView = ({ projectId }: Props) => {
   const [fragmentKey, setFragmentKey] = useState(0);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  const displayUrl = activeFragment?.deploymentUrl || activeFragment?.sandboxUrl;
+  const displayUrl = activeFragment?.deploymentUrl;
 
   const handleCopyUrl = () => {
     if (!displayUrl) return;
@@ -408,7 +408,7 @@ export const ProjectView = ({ projectId }: Props) => {
               )}
               <div className="ml-auto flex items-center gap-x-2">
                 <div className="bg-[#272725]  rounded-[8px] px-3 py-2 text-sm text-white">
-                  {usage ? `${usage.remainingPoints.toLocaleString()}/${usage.maxPoints.toLocaleString()} credits left` : "Loading credits..."}
+                  {usage ? `${usage?.remainingCredits ?? 0}/${usage?.totalCredits ?? 0} credits left` : "Loading credits..."}
                 </div>
                 {usage?.plan === "free" && (
                   <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">

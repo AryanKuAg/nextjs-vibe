@@ -33,20 +33,14 @@ export async function POST(req: NextRequest) {
         console.log(`Updating usage for user ${userId} to plan ${plan}`);
         
         const subscriptionId = data.subscription_id || data.id;
-
-        await prisma.usage.upsert({
+        const { syncCredits } = await import("@/lib/usage");
+        
+        await syncCredits(userId, plan.toLowerCase());
+        
+        // Ensure subscriptionId is saved
+        await prisma.usage.update({
           where: { key: userId },
-          update: { 
-            plan: plan.toLowerCase(),
-            points: 0, // Reset points on new billing cycle / new upgrade
-            subscriptionId: subscriptionId
-          },
-          create: {
-            key: userId,
-            plan: plan.toLowerCase(),
-            points: 0,
-            subscriptionId: subscriptionId
-          }
+          data: { subscriptionId }
         });
       } else {
         console.error("Missing userId or plan in webhook metadata", metadata);

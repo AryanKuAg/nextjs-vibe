@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const email = user.emailAddresses[0]?.emailAddress;
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
-    const { plan } = await req.json();
+    const { plan, returnUrl } = await req.json();
 
     const planToProduct: Record<string, string | undefined> = {
       basic: process.env.DODO_PRODUCT_BASIC,
@@ -40,6 +40,13 @@ export async function POST(req: NextRequest) {
       environment: "test_mode",
     });
 
+    // Handle local development webhook limitations
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[Local Dev] Auto-syncing credits for ${plan} plan since webhooks cannot reach localhost without Ngrok.`);
+      const { syncCredits } = await import("@/lib/usage");
+      await syncCredits(userId, plan.toLowerCase());
+    }
+
     // Create a payment session/link
     const session = await dodo.checkoutSessions.create({
       ...(email && {
@@ -54,7 +61,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         }
       ],
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`, 
+      return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`, 
       metadata: {
         userId,
         plan

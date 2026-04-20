@@ -17,8 +17,8 @@ interface Props {
 }
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌" },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌" },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 10 },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 25 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -242,19 +242,24 @@ export const SceneBuilder = ({
                   </div>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isGenerating || (!prompt.trim() && !uploadedImage)}
-                className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
-              >
-                {isGenerating ? (
-                  <i className="ri-loader-4-line animate-spin inline-block" />
-                ) : (
-                  <i className="ri-arrow-up-line text-[#1C1C1C]" />
-                )}
-              </button>
+              <div className="flex gap-2 ml-auto">
+                <div className="flex items-center gap-1 text-[#CCCCCC]">
+                  <i className="ri-sparkling-fill text-white text-sm" />
+                  <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isGenerating || (!prompt.trim() && !uploadedImage)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                >
+                  {isGenerating ? (
+                    <i className="ri-loader-4-line animate-spin inline-block" />
+                  ) : (
+                    <i className="ri-arrow-up-line text-[#1C1C1C]" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 

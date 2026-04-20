@@ -1,74 +1,116 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 
-const PLAN_LIMITS: Record<string, number> = {
-  free: 2,
-  basic: 1500,
-  plus: 2500,
-  pro: 3500,
+export const PLAN_CREDITS: Record<string, number> = {
+  free: 15,
+  basic: 1200,
+  plus: 3000,
+  pro: 5500,
 };
-const GENERATION_COST = 1;
+ 
+export const VEO_MODEL_COSTS: Record<string, number> = {
+  "veo-3.1-lite-generate-001": 75,
+  "veo-3.1-fast-generate-001": 200,
+};
 
-export async function consumeCredits() {
-  const { userId } = await auth();
-
+/**
+ * Atomic credit deduction.
+ * Ensures the user has enough credits before subtracting.
+ */
+export async function consumeCredits(amount: number, overrideUserId?: string) {
+  let userId = overrideUserId;
+  
   if (!userId) {
-    throw new Error("User not authenticated");
+    const authResult = await auth();
+    userId = authResult.userId ?? undefined;
   }
+  
+  if (!userId) throw new Error("User not authenticated");
 
-  // Get current max points based on user's plan
-  const existingUsage = await prisma.usage.findUnique({ where: { key: userId } });
-  const plan = existingUsage?.plan || "free";
-  const maxPoints = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-
-  // Use a simple atomic upsert
-  const usage = await prisma.usage.upsert({
-    where: { key: userId },
-    update: { points: { increment: GENERATION_COST } },
-    create: { key: userId, points: GENERATION_COST, plan: "free" }
+  // We use updateMany with a condition on credits to ensure atomicity
+  const result = await prisma.usage.updateMany({
+    where: {
+      key: userId,
+      credits: { gte: amount }
+    },
+    data: {
+      credits: { decrement: amount }
+    }
   });
 
-  if (usage.points > maxPoints) {
-    // If they exceeded, revert the increment to prevent infinite debt and throw
-    await prisma.usage.update({
-      where: { key: userId },
-      data: { points: { decrement: GENERATION_COST } }
-    });
+  if (result.count === 0) {
+    // Check if user exists, if not create with free credits first then try again
+    const exists = await prisma.usage.findUnique({ where: { key: userId } });
+    if (!exists) {
+      await prisma.usage.create({
+        data: { key: userId, credits: PLAN_CREDITS.free, plan: "free" }
+      });
+      return consumeCredits(amount, userId); // Retry once
+    }
     throw new Error("You have run out of credits");
   }
 
-  return { consumedPoints: usage.points };
+  const updated = await prisma.usage.findUnique({ where: { key: userId } });
+  return { remainingCredits: updated?.credits ?? 0 };
+}
+
+/**
+ * Refund credits in case of failures.
+ */
+export async function refundCredits(amount: number, overrideUserId?: string) {
+  let userId = overrideUserId;
+  
+  if (!userId) {
+    const authResult = await auth();
+    userId = authResult.userId ?? undefined;
+  }
+  
+  if (!userId) return;
+
+  await prisma.usage.update({
+    where: { key: userId },
+    data: { credits: { increment: amount } }
+  });
+}
+
+/**
+ * Re-initialize or sync credits based on a plan.
+ * Used after successful subscription or admin action.
+ */
+export async function syncCredits(userId: string, plan: string) {
+  const credits = PLAN_CREDITS[plan] || PLAN_CREDITS.free;
+  await prisma.usage.upsert({
+    where: { key: userId },
+    update: { credits, plan },
+    create: { key: userId, credits, plan }
+  });
 }
 
 export async function getUsageStatus() {
   const { userId } = await auth();
+  if (!userId) throw new Error("User not authenticated");
 
-  if (!userId) {
-    throw new Error("User not authenticated");
-  }
-
-  const usage = await prisma.usage.findUnique({
+  let usage = await prisma.usage.findUnique({
     where: { key: userId }
   });
 
-  const plan = usage?.plan || "free";
-  const maxPoints = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-  const consumed = usage ? usage.points : 0;
-  
+  if (!usage) {
+    usage = await prisma.usage.create({
+      data: { key: userId, credits: PLAN_CREDITS.free, plan: "free" }
+    });
+  }
+
   return {
-    consumedPoints: consumed,
-    remainingPoints: Math.max(0, maxPoints - consumed),
-    maxPoints: maxPoints,
-    isAllowed: consumed < maxPoints,
-    plan: plan
+    remainingCredits: usage.credits,
+    totalCredits: PLAN_CREDITS[usage.plan] || PLAN_CREDITS.free,
+    plan: usage.plan,
+    isAllowed: usage.credits > 0
   };
 }
 
 export async function getPortalSession() {
   const { userId } = await auth();
-  if (!userId) {
-    throw new Error("User not authenticated");
-  }
+  if (!userId) throw new Error("User not authenticated");
 
   const usage = await prisma.usage.findUnique({
     where: { key: userId }

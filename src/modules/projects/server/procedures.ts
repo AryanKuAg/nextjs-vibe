@@ -4,7 +4,8 @@ import { generateSlug } from "random-word-slugs";
 import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
-import { consumeCredits } from "@/lib/usage";
+import { Sandbox } from "@e2b/code-interpreter";
+import { consumeCredits, VEO_MODEL_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -56,7 +57,7 @@ export const projectsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        await consumeCredits();
+        await consumeCredits(0); // Project metadata creation is free; generation is charged separately
       } catch (error) {
         if (error instanceof Error) {
           throw new TRPCError({ 
@@ -105,7 +106,10 @@ export const projectsRouter = createTRPCRouter({
         model: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const cost = VEO_MODEL_COSTS[input.model || ""] || 75;
+      await consumeCredits(cost);
+
       const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
       const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
 
@@ -123,6 +127,7 @@ export const projectsRouter = createTRPCRouter({
           imageUrl: input.imageUrl,
           imageBase64: input.imageBase64,
           model: input.model || "veo-3.1-lite-generate-001",
+          userId: ctx.auth.userId,
         },
       });
 
@@ -136,8 +141,6 @@ export const projectsRouter = createTRPCRouter({
       model: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      await consumeCredits();
-      
       const existingProject = await prisma.project.findUnique({
         where: { id: input.projectId, userId: ctx.auth.userId },
       });
@@ -145,6 +148,27 @@ export const projectsRouter = createTRPCRouter({
       if (!existingProject) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
+
+      let isHot = false;
+      if (existingProject.sandboxId) {
+        try {
+          // Extremely fast check to see if the sandbox is still alive
+          // If it throws an error, the sandbox expired/died.
+          const sandbox = await Sandbox.connect(existingProject.sandboxId);
+          isHot = true;
+        } catch {
+          isHot = false;
+        }
+      }
+
+      // Hot (alive) = 30 credits. Cold (dead) = full cost.
+      const modelCostMap: Record<string, number> = {
+        "gemini-3.1-pro-preview": isHot ? 30 : 150,
+        "gemini-3.1-flash-lite-preview": isHot ? 20 : 100,
+      };
+      const cost = modelCostMap[input.model || ""] || (isHot ? 30 : 150);
+      
+      await consumeCredits(cost);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -163,6 +187,7 @@ export const projectsRouter = createTRPCRouter({
           projectId: input.projectId,
           videoUrl: input.videoUrl ?? undefined,
           model: input.model,
+          userId: ctx.auth.userId,
         },
       });
 

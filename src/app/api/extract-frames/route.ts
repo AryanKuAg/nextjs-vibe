@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const ffprobePath: string = require("ffprobe-static").path;
     ffmpeg.setFfprobePath(ffprobePath);
 
-    const videoDuration = await new Promise<number>((resolve, _reject) => {
+    const videoDuration = await new Promise<number>((resolve) => {
       ffmpeg.ffprobe(videoPath, (err, metadata) => {
         if (err) {
           console.warn("[extract-frames] ffprobe failed, defaulting to 16s:", err.message);

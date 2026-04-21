@@ -4,8 +4,9 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-# Install all deps (including devDeps needed for build)
-RUN npm ci
+# --ignore-scripts skips the postinstall `prisma generate` which needs schema.prisma
+# prisma generate is run explicitly in the builder stage where all files exist
+RUN npm ci --ignore-scripts
 
 # ─── Stage 2: builder ─────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder

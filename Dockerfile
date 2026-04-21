@@ -19,6 +19,16 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# ── NEXT_PUBLIC_* vars baked into the client bundle at build time ────────────
+# These are all PUBLIC keys (safe to be in the image — they're exposed to browsers anyway)
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuZnJhbWVyYXRlLnNwYWNlJA
+ENV NEXT_PUBLIC_APP_URL=https://framerate.space
+ENV NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+ENV NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+ENV NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
+ENV NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=178411879617-d0fhq6cokkk01ogupjuf40o6ld83hhfr.apps.googleusercontent.com
+
 # Build Next.js standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

@@ -21,8 +21,8 @@ RUN npx prisma generate
 
 # ── NEXT_PUBLIC_* vars baked into the client bundle at build time ────────────
 # These are all PUBLIC keys (safe to be in the image — they're exposed to browsers anyway)
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuZnJhbWVyYXRlLnNwYWNlJA
-ENV NEXT_PUBLIC_APP_URL=https://framerate.space
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZnJlc2gtcm9iaW4tMjQuY2xlcmsuYWNjb3VudHMuZGV2JA
+ENV NEXT_PUBLIC_APP_URL=https://www.framerate.space
 ENV NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 ENV NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 ENV NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/

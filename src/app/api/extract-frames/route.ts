@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { execSync } from "child_process";
 
 // Dynamically import ffmpeg to avoid issues with server startup
 async function getFFmpeg() {
@@ -69,7 +70,6 @@ export async function POST(req: NextRequest) {
     const ffmpeg = await getFFmpeg();
     // In Cloud Run (Alpine), ffprobe is installed system-wide via `apk add ffmpeg`.
     // Locally on macOS, we fall back to the ffprobe-static npm binary.
-    const { execSync } = require("child_process") as typeof import("child_process");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     let ffprobePath: string = require("ffprobe-static").path;
     try {

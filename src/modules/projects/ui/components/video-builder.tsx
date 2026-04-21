@@ -42,7 +42,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
+  //
   const startVideoGeneration = useMutation(
     trpc.projects.startVideoGeneration.mutationOptions({
       onSuccess: () => {

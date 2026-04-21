@@ -563,31 +563,40 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       console.log("DEBUG: Build succeeded. Extracting dist/ text assets for GCS deployment...");
       const sandbox = await getSandbox(sandboxId);
 
-      // Step 1: Extract only text/code assets from dist/ (skip images — they are too large for base64)
-      const cmdResult = await sandbox.commands.run(`node -e "
-        const fs = require('fs');
-        const path = require('path');
-        const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.ico', '.mp4', '.woff', '.woff2']);
-        const getFiles = (dir, fileList = {}) => {
-          if (!fs.existsSync(dir)) return fileList;
-          for (const f of fs.readdirSync(dir)) {
-            const p = path.join(dir, f);
-            if (fs.statSync(p).isDirectory()) getFiles(p, fileList);
-            else {
-              const ext = path.extname(f).toLowerCase();
-              if (!IMAGE_EXTS.has(ext)) {
-                fileList[p.replace(/\\\\/g, '/').replace('dist/', '')] = fs.readFileSync(p).toString('base64');
-              }
-            }
-          }
-          return fileList;
-        };
-        console.log(JSON.stringify(getFiles('dist')));
-      "`, { timeoutMs: 60000 });
+      // Step 1: Write the extraction script as a file to the sandbox (avoids all quote/escape mangling)
+      const extractionScript = [
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "const IMAGE_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.ico','.mp4','.woff','.woff2']);",
+        "function getFiles(dir, fileList) {",
+        "  fileList = fileList || {};",
+        "  if (!fs.existsSync(dir)) return fileList;",
+        "  var items = fs.readdirSync(dir);",
+        "  for (var i = 0; i < items.length; i++) {",
+        "    var p = path.join(dir, items[i]);",
+        "    if (fs.statSync(p).isDirectory()) {",
+        "      getFiles(p, fileList);",
+        "    } else {",
+        "      var ext = path.extname(items[i]).toLowerCase();",
+        "      if (!IMAGE_EXTS.has(ext)) {",
+        "        var key = p.split(path.sep).join('/').replace('dist/', '');",
+        "        fileList[key] = fs.readFileSync(p).toString('base64');",
+        "      }",
+        "    }",
+        "  }",
+        "  return fileList;",
+        "}",
+        "process.stdout.write(JSON.stringify(getFiles('dist')));",
+      ].join("\n");
+
+      // Write it to the sandbox filesystem then execute — no shell quoting issues
+      await sandbox.files.write("/app/extract-dist.js", extractionScript);
+      const cmdResult = await sandbox.commands.run("node /app/extract-dist.js", { timeoutMs: 60000 });
 
       if (cmdResult.exitCode !== 0) {
-        console.error("Failed to read dist folder:", cmdResult.stderr);
-        throw new Error("Failed to read dist folder natively");
+        console.error("Failed to extract dist folder. stderr:", cmdResult.stderr);
+        console.error("stdout:", cmdResult.stdout);
+        throw new Error(`Failed to read dist folder: ${cmdResult.stderr || "unknown error"}`);
       }
 
       const files = JSON.parse(cmdResult.stdout);

@@ -11,11 +11,19 @@ import { execSync } from "child_process";
 // Dynamically import ffmpeg to avoid issues with server startup
 async function getFFmpeg() {
   const ffmpeg = (await import("fluent-ffmpeg")).default;
-  const ext = process.platform === "win32" ? ".exe" : "";
-  // Bypass Turbopack import mangling on file structures
-  const ffmpegPath = path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg" + ext);
-  ffmpeg.setFfmpegPath(ffmpegPath);
-  
+  // In Cloud Run (Alpine), ffmpeg is installed system-wide via `apk add ffmpeg`.
+  // Locally on macOS, fall back to the ffmpeg-static npm binary.
+  let ffmpegBinaryPath: string;
+  try {
+    const systemPath = execSync("which ffmpeg").toString().trim();
+    ffmpegBinaryPath = systemPath || path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg");
+  } catch {
+    // which failed — use the npm binary
+    const ext = process.platform === "win32" ? ".exe" : "";
+    ffmpegBinaryPath = path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg" + ext);
+  }
+  console.log(`[extract-frames] Using ffmpeg at: ${ffmpegBinaryPath}`);
+  ffmpeg.setFfmpegPath(ffmpegBinaryPath);
   return ffmpeg;
 }
 

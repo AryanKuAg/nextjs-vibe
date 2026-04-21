@@ -355,13 +355,13 @@ export const codeAgentFunction = inngest.createFunction(
 You MUST build an Apple-style, butter-smooth scroll-scrub animation utilizing a high-performance Frame Sequence directly mapped to the Canvas! 
 To achieve this securely and perfectly:
 1. A background pipeline natively populates the \`public/\` folder with exactly 450 highly compressed JPG files named \`frame-0001.jpg\` through \`frame-0450.jpg\`. DO NOT modify package.json for this.
-2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the 450 image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / 450 — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out.
-3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar perfectly horizontally centered at the top of the screen (use \`fixed left-1/2 -translate-x-1/2 top-6 z-50\`). Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Deploy Now' button on the right.
+2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the 450 image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / 450 — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out. **CRITICAL**: BOTH \`img.onload\` AND \`img.onerror\` MUST increment the loaded counter identically — a failed/404 frame still counts as "loaded" for preloader purposes. Additionally, add a 30-second hard timeout that force-completes the preloader regardless. This ensures the site is ALWAYS visible even if some frames fail to load.
+3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar PERFECTLY HORIZONTALLY CENTERED at the top of the screen. Use ONLY this exact inline style on the nav element: \`style={{ position: \'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}\`. DO NOT use \`left: 0\`, \`right: 0\`, \`width: 100%\` or \`margin: auto\` — those break centering. Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Deploy Now' button on the right. The pill must have \`width: fit-content\` and \`min-width: 600px\`.
 4. In your \`scroll-sequence.tsx\` or main application file, the architectural layout MUST be:
    - A global container with a dynamically calculated height to enforce the scrollable area.
    - A \`position: fixed, inset: 0, z-index: 0, w-full, h-full\` background \`<canvas>\` that fills the entire screen underneath EVERYTHING.
    - ALL normal sections (Hero, Features, Pricing, Footer) go ON TOP of the canvas with \`z-index: 10\`, and MUST HAVE TRANSPARENT BACKGROUNDS! 
-5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! NEVER use absolute root paths (like /frame-0001.jpg) because the deployed app is hosted in a nested subdirectory!
+5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! **CRITICAL PATH RULES**: NEVER use \`import.meta.url\` to construct frame paths — \`import.meta.url\` resolves relative to the JS bundle file inside \`assets/\`, NOT the page, resulting in broken \`assets/frame-0001.jpg\` paths. NEVER use absolute root paths like \`/frame-0001.jpg\`. ALWAYS use plain string literals: \`img.src = './frame-0001.jpg'\` or template literals \`\`./frame-\${idx}.jpg\`\`. These resolve correctly relative to the page URL regardless of where the JS bundle lives.
 6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. 
    - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame 450.
    - **NO OVER-SCROLL**: The canvas drawing logic MUST clamp the frame index: \`Math.min(450, Math.max(1, calculatedIndex))\`. If the user scrolls all the way down, the frame stops strictly at 450. The page itself must NOT have arbitrary extra whitespace at the bottom causing over-scroll. Make sure the height of the container perfectly fits the sections so the footer is the absolute end of the document.
@@ -431,11 +431,44 @@ To achieve this securely and perfectly:
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
-            // Safeguard: Forcibly convert any absolute frame paths the AI wrote (/frame-) into relative paths (./frame-) 
-            // so they resolve correctly inside the nested GCS bucket deployment.
-            await sandbox.commands.run("find src -type f -name '*.tsx' -exec sed -i 's|/frame-|./frame-|g' {} + || true");
+            // Safeguard: Convert absolute frame paths (/frame-) into relative paths (./frame-) 
+            // We use a robust Node script to avoid turning existing './frame-' into '.../frame-'
+            const fixPathsScript = `
+const fs = require('fs');
+const path = require('path');
+function fixPaths(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
+    if (fs.statSync(p).isDirectory()) fixPaths(p);
+    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html')) {
+      let content = fs.readFileSync(p, 'utf8');
+      let changed = false;
+      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\/frame-/g, '$1./frame-');
+        changed = true;
+      }
+      // Strip assets/ prefix if import.meta.url was used
+      if (content.includes('assets/frame-')) {
+        content = content.replace(/assets\\/frame-/g, 'frame-');
+        changed = true;
+      }
+      if (changed) fs.writeFileSync(p, content);
+    }
+  }
+}
+fixPaths(process.argv[2]);
+`;
+            await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
+            
+            // Run pre-build to fix source files
+            await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
 
             await sandbox.commands.run("npm run build --silent -- --base=./");
+
+            // Run post-build to fix bundled output files
+            await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
           } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
@@ -647,7 +680,14 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
           const chunk = frameEntries.slice(i, i + frameChunkSize);
           await Promise.all(chunk.map(async ([name, zipEntry]) => {
             const frameBuffer = Buffer.from(await zipEntry.async("arraybuffer"));
-            await bucket.file(`${sitePrefix}${name}`).save(frameBuffer, { metadata: { contentType: "image/jpeg" } });
+            const meta = { metadata: { contentType: "image/jpeg" } };
+            // Upload to root site dir (for AI code using ./frame-N.jpg relative to the page)
+            // AND to assets/ subdir (for AI code using import.meta.url inside the JS bundle)
+            // This guarantees frames load correctly regardless of how the AI resolves paths.
+            await Promise.all([
+              bucket.file(`${sitePrefix}${name}`).save(frameBuffer, meta),
+              bucket.file(`${sitePrefix}assets/${name}`).save(frameBuffer, meta),
+            ]);
           }));
         }
         console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);

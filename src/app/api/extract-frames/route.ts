@@ -67,9 +67,19 @@ export async function POST(req: NextRequest) {
 
     // First, probe the video duration using ffprobe
     const ffmpeg = await getFFmpeg();
-    // ffprobe-static ships a separate binary alongside ffmpeg-static
+    // In Cloud Run (Alpine), ffprobe is installed system-wide via `apk add ffmpeg`.
+    // Locally on macOS, we fall back to the ffprobe-static npm binary.
+    const { execSync } = require("child_process") as typeof import("child_process");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ffprobePath: string = require("ffprobe-static").path;
+    let ffprobePath: string = require("ffprobe-static").path;
+    try {
+      // Prefer system ffprobe if available (Cloud Run Alpine)
+      const systemPath = execSync("which ffprobe").toString().trim();
+      if (systemPath) ffprobePath = systemPath;
+    } catch {
+      // Not found in PATH — stick with ffprobe-static (local dev)
+    }
+    console.log(`[extract-frames] Using ffprobe at: ${ffprobePath}`);
     ffmpeg.setFfprobePath(ffprobePath);
 
     const videoDuration = await new Promise<number>((resolve) => {

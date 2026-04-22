@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import Image from "next/image";
+
 
 const ShimmerMessages = () => {
   const messages = [
@@ -24,8 +26,17 @@ const ShimmerMessages = () => {
   }, [messages.length]);
 
   return (
-    <div className="flex items-center gap-2 ">
-      <span className="text-sm text-muted-foreground animate-pulse">
+    <div className="flex items-start gap-2.5">
+      <div className="flex-shrink-0 mt-0.5">
+        <Image
+          src="/logo.png"
+          alt="Vibe"
+          width={24}
+          height={24}
+          className="shrink-0"
+        />
+      </div>
+      <span className="text-sm text-muted-foreground animate-pulse pt-0.5">
         {messages[currentMessageIndex]}
       </span>
     </div>
@@ -34,10 +45,8 @@ const ShimmerMessages = () => {
 
 export const MessageLoading = () => {
   return (
-    <div className="flex flex-col group px-2 pb-4">
-      <div className="pl-1 flex flex-col gap-y-4">
-        <ShimmerMessages />
-      </div>
+    <div className="px-2 pb-4">
+      <ShimmerMessages />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import "remixicon/fonts/remixicon.css";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
+import Image from "next/image";
 
 interface UserMessageProps {
   content: string;
@@ -65,24 +66,22 @@ const AssistantMessage = ({
 }: AssistantMessageProps) => {
   return (
     <div className={cn(
-      "flex flex-col group px-2 pb-4",
+      "flex group px-2 pb-4 gap-2.5 items-start",
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
-      {/* <div className="flex items-center gap-2 pl-2 mb-2">
+      <div className="flex-shrink-0 mt-0.5">
         <Image
           src="/logo.png"
           alt="Vibe"
-          width={18}
-          height={18}
+          width={24}
+          height={24}
           className="shrink-0"
         />
-        <span className="text-sm font-medium">Vibe</span>
-        <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-          {format(createdAt, "HH:mm 'on' MMM dd, yyyy")}
-        </span>
-      </div> */}
-      <div className="pl-1 flex flex-col gap-y-4">
-        <span className="text-white text-sm">{content}</span>
+      </div>
+      <div className="flex flex-col gap-y-4 pt-0.5">
+        <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+          {content || (type === "RESULT" ? "Building..." : "")}
+        </div>
         {fragment && type === "RESULT" && (
           <FragmentCard
             fragment={fragment}

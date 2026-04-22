@@ -60,8 +60,11 @@ export const ProjectForm = () => {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -79,6 +82,43 @@ export const ProjectForm = () => {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
+
+  // Global drag-and-drop listeners for the fullscreen overlay
+  useEffect(() => {
+    const handleDragEnter = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) {
+        dragCounterRef.current++;
+        setIsDragging(true);
+      }
+    };
+    const handleDragLeave = () => {
+      dragCounterRef.current--;
+      if (dragCounterRef.current <= 0) {
+        dragCounterRef.current = 0;
+        setIsDragging(false);
+      }
+    };
+    const handleDragOver = (e: DragEvent) => e.preventDefault();
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleImageFile(file);
+    };
+
+    window.addEventListener("dragenter", handleDragEnter);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragenter", handleDragEnter);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("drop", handleDrop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleImageFile = (file: File) => {
     if (!["image/jpeg", "image/png"].includes(file.type)) {
@@ -174,12 +214,23 @@ export const ProjectForm = () => {
     });
   };
 
-  const [isFocused, setIsFocused] = useState(false);
   const isPending = createProject.isPending;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
 
   return (
     <Form {...form}>
+      {/* Fullscreen drag-over overlay */}
+      {isDragging && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
+          aria-hidden
+        >
+          <div className="flex flex-col items-center gap-2 text-white">
+            <i className="ri-download-line text-white text-3xl mb-3" />
+            <p className="text-lg font-inconsolata font-medium">Drop your image</p>
+          </div>
+        </div>
+      )}
       <section className="space-y-6 w-full flex flex-col items-center">
         {/* ── Main input card ── */}
         <form

@@ -912,12 +912,12 @@ export const veoGenerateFunction = inngest.createFunction(
         }
       });
 
-      // Poll Initial LRO and Extend recursively via REST
-      const videoUri = await step.run("poll-and-extend-veo", async () => {
+      // Poll Initial LRO
+      const videoUri = await step.run("poll-veo", async () => {
         let base64VideoData: string | null | undefined = null;
         let isDone = false;
 
-        console.log(`[Veo Extended Pipeline] Polling Phase 1...`);
+        console.log(`[Veo Pipeline] Polling Phase 1...`);
         // Phase 1 Polling
         while (!isDone) {
           await new Promise(r => setTimeout(r, 15000));
@@ -951,8 +951,7 @@ export const veoGenerateFunction = inngest.createFunction(
           }
         }
 
-
-        console.log(`[Veo Extended Pipeline] Pushing Phase 1 Chunk to GCS natively to bypass node limits...`);
+        console.log(`[Veo Pipeline] Pushing 8s Master Video to GCS natively to bypass node limits...`);
         const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
         const storage = new Storage({
           projectId: process.env.GOOGLE_CLOUD_PROJECT,
@@ -963,73 +962,10 @@ export const veoGenerateFunction = inngest.createFunction(
         });
 
         const bucket = storage.bucket(bucketName);
-        const part1OutputName = `videos/project-${event.data.projectId}-part1-${Date.now()}.mp4`;
-        const filePart1 = bucket.file(part1OutputName);
-        const buffer1 = Buffer.from(base64VideoData!, 'base64');
-        await filePart1.save(buffer1, { metadata: { contentType: "video/mp4" } });
-
-        // Phase 2: Start Extension Sequence
-        console.log(`[Veo Extended Pipeline] Initiating Phase 2 Extention via GCS streaming...`);
-        const token = await tokenHelper();
-        const extUrl = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:predictLongRunning`;
-
-        const payload = {
-          instances: [{
-            prompt: prompt, // Keep prompt aligned to force motion continuation
-            video: {
-              gcsUri: `gs://${bucketName}/${part1OutputName}`, // Use GCS bypass
-              mimeType: "video/mp4"
-            }
-          }],
-          parameters: { aspectRatio: "16:9", resolution: "720p", durationSeconds: 7, includeAudio: false, generateAudio: false }
-        };
-
-        const extResult = await fetch(extUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(payload)
-        });
-        const extData = await extResult.json();
-        if (!extResult.ok) throw new Error(JSON.stringify(extData));
-
-        const operationName2 = extData.name;
-
-        // Phase 2 Polling
-        isDone = false;
-        let finalBase64VideoData = null;
-        console.log(`[Veo Extended Pipeline] Polling Phase 2...`);
-
-        while (!isDone) {
-          await new Promise(r => setTimeout(r, 15000));
-          const token2 = await tokenHelper();
-          const url2 = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:fetchPredictOperation`;
-
-          const result2 = await fetch(url2, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
-            body: JSON.stringify({ operationName: operationName2 })
-          });
-
-          const data2 = await result2.json();
-          if (!result2.ok) throw new Error(JSON.stringify(data2));
-
-          if (data2.done) {
-            isDone = true;
-            if (data2.error) throw new Error(JSON.stringify(data2.error));
-
-            finalBase64VideoData = data2.response?.videos?.[0]?.bytesBase64Encoded;
-
-            if (!finalBase64VideoData) {
-              throw new Error(`Veo extension finished but returned no video! Raw: ${JSON.stringify(data2.response)}`);
-            }
-          }
-        }
-
-        console.log(`[Veo Extended Pipeline] Flushing 16-Second Master Video to GCS!`);
         const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
         const fileFinal = bucket.file(finalOutputName);
 
-        const bufferFinal = Buffer.from(finalBase64VideoData, 'base64');
+        const bufferFinal = Buffer.from(base64VideoData!, 'base64');
         await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
 
         return `https://storage.googleapis.com/${bucketName}/${finalOutputName}`;

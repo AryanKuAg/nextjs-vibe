@@ -8,7 +8,6 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 
 const MODELS = [
   { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 75 },
-  // { id: "veo-3.1-generate-001", label: "Veo 3.1", credits: 150 },
   { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 200 },
 ] as const;
 
@@ -21,9 +20,10 @@ interface Props {
   onNext: () => void;
   onBack: () => void;
   onClearSelection?: () => void;
+  droppedFile?: File | null;
 }
 
-export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack, onClearSelection }: Props) => {
+export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack, onClearSelection, droppedFile }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -32,6 +32,22 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Convert a dropped File into base64 and set it as the uploaded image
+  useEffect(() => {
+    if (!droppedFile) return;
+    if (!['image/jpeg', 'image/png'].includes(droppedFile.type)) {
+      toast.error("Unsupported image format. Please use JPEG or PNG.");
+      return;
+    }
+    if (droppedFile.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setUploadedBase64(ev.target?.result as string);
+    reader.readAsDataURL(droppedFile);
+  }, [droppedFile]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -42,7 +58,6 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-  //
   const startVideoGeneration = useMutation(
     trpc.projects.startVideoGeneration.mutationOptions({
       onSuccess: () => {

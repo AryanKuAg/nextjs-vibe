@@ -65,6 +65,7 @@ export const ProjectView = ({ projectId }: Props) => {
   // Drag-and-drop state – whole window
   const [isDragging, setIsDragging] = useState(false);
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const [droppedVideoFile, setDroppedVideoFile] = useState<File | null>(null);
   const dragCounterRef = useRef(0);
 
   // Scene generation preview state
@@ -75,7 +76,8 @@ export const ProjectView = ({ projectId }: Props) => {
   const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeStageTab !== "SCENE") return;
+    const isImageTab = activeStageTab === "SCENE" || activeStageTab === "VIDEO";
+    if (!isImageTab) return;
 
     const onDragEnter = (e: DragEvent) => {
       e.preventDefault();
@@ -92,7 +94,13 @@ export const ProjectView = ({ projectId }: Props) => {
       dragCounterRef.current = 0;
       setIsDragging(false);
       const file = e.dataTransfer?.files?.[0];
-      if (file && file.type.startsWith("image/")) setDroppedFile(file);
+      if (file && file.type.startsWith("image/")) {
+        if (activeStageTab === "VIDEO") {
+          setDroppedVideoFile(file);
+        } else {
+          setDroppedFile(file);
+        }
+      }
     };
 
     window.addEventListener("dragenter", onDragEnter);
@@ -100,21 +108,23 @@ export const ProjectView = ({ projectId }: Props) => {
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("drop", onDrop);
 
-    // Pick up pending image from homepage if it exists
-    const pendingImage = sessionStorage.getItem("pending_image_base64");
-    if (pendingImage) {
-      const name = sessionStorage.getItem("pending_image_name") || "uploaded-image.png";
-      const type = sessionStorage.getItem("pending_image_type") || "image/png";
+    // Pick up pending image from homepage if it exists (SCENE only)
+    if (activeStageTab === "SCENE") {
+      const pendingImage = sessionStorage.getItem("pending_image_base64");
+      if (pendingImage) {
+        const name = sessionStorage.getItem("pending_image_name") || "uploaded-image.png";
+        const type = sessionStorage.getItem("pending_image_type") || "image/png";
 
-      fetch(pendingImage)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], name, { type });
-          setDroppedFile(file);
-          sessionStorage.removeItem("pending_image_base64");
-          sessionStorage.removeItem("pending_image_name");
-          sessionStorage.removeItem("pending_image_type");
-        });
+        fetch(pendingImage)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], name, { type });
+            setDroppedFile(file);
+            sessionStorage.removeItem("pending_image_base64");
+            sessionStorage.removeItem("pending_image_name");
+            sessionStorage.removeItem("pending_image_type");
+          });
+      }
     }
 
     return () => {
@@ -321,13 +331,14 @@ export const ProjectView = ({ projectId }: Props) => {
           )}
 
           {(activeStageTab === "VIDEO" || activeStageTab === "GENERATING_VIDEO") && (
-            <VideoBuilder
+          <VideoBuilder
               projectId={projectId}
               selectedSceneUrl={selectedSceneUrl}
               isGenerating={isVideoLoading}
               onNext={() => setActiveStageTab("SITE")}
               onBack={() => setActiveStageTab("SCENE")}
               onClearSelection={() => setSelectedSceneUrl(null)}
+              droppedFile={droppedVideoFile}
             />
           )}
 

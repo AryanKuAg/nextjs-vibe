@@ -148,7 +148,7 @@ export const PillNavbar = () => {
               Dashboard
             </button>
             <Link href="/pricing" className="">Pricing</Link>
-            <Link href="#" className="">Contact</Link>
+            <Link href="mailto:teamframerate@gmail.com" className="">Contact</Link>
           </div>
 
           {/* Right: Auth */}

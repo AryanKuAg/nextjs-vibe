@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import "remixicon/fonts/remixicon.css";
 
 import { useTRPC } from "@/trpc/client";
@@ -10,18 +11,45 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
   const trpc = useTRPC();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
   const { data: projects, isLoading: isProjectsLoading } = useQuery(trpc.projects.getMany.queryOptions());
+
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
+
+  const handleDashboardClick = async () => {
+    if (projects && projects.length > 0) {
+      // Already has projects — go to the most recent one
+      const latest = projects[0] as { id: string };
+      router.push(`/projects/${latest.id}`);
+    } else {
+      // No projects yet — create a fresh one
+      await createProject.mutateAsync({ value: "" });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#1C1C1C] text-white font-inconsolata flex flex-col font-mono selection:bg-[#F1336E]/30">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
         <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">
-          <Link href="/" className="hover:text-white transition-colors duration-200">
-            Dashboard
-          </Link>
+          <button
+            onClick={handleDashboardClick}
+            disabled={createProject.isPending}
+            className="hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {createProject.isPending ? "Creating..." : "Dashboard"}
+          </button>
           <i className="ri-arrow-right-s-line" />
           <span className="text-[#EBEBEB]">Projects</span>
         </div>

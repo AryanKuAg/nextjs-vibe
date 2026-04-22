@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { toast } from "sonner";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import "remixicon/fonts/remixicon.css";
 import { useRouter } from "next/navigation";
 
@@ -18,7 +18,30 @@ export default function ManageAccountPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
 
+  const queryClient = useQueryClient();
   const { data: usage, isLoading: isUsageLoading } = useQuery(trpc.usage.status.queryOptions());
+  const { data: projects } = useQuery(trpc.projects.getMany.queryOptions());
+
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
+
+  const handleDashboardClick = async () => {
+    if (projects && projects.length > 0) {
+      // Already has projects — go to the most recent one
+      const latest = projects[0] as { id: string };
+      router.push(`/projects/${latest.id}`);
+    } else {
+      // No projects yet — create a fresh one
+      await createProject.mutateAsync({ value: "" });
+    }
+  };
 
   const portalMutation = useMutation(trpc.usage.portalUrl.mutationOptions({
     onSuccess: (data) => {
@@ -32,7 +55,7 @@ export default function ManageAccountPage() {
       toast.error(error.message || "Failed to access billing portal. No active subscription found.");
     }
   }));
-  
+
   const deleteAccountMutation = useMutation(trpc.usage.deleteAccount.mutationOptions());
 
   const handleSignOut = () => {
@@ -57,13 +80,17 @@ export default function ManageAccountPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
         <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">
-          <Link href="/" className="hover:text-white transition-colors duration-200">
-            Dashboard
-          </Link>
+          <button
+            onClick={handleDashboardClick}
+            disabled={createProject.isPending}
+            className="hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {createProject.isPending ? "Creating..." : "Dashboard"}
+          </button>
           <i className="ri-arrow-right-s-line" />
           <span className="text-[#EBEBEB]">Manage account</span>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="bg-[#2A2A28] rounded-[8px] px-3 py-1.5 text-sm text-white">
             {usage ? `${usage.remainingCredits.toLocaleString()}/${usage.totalCredits.toLocaleString()} credits left` : "Loading credits..."}
@@ -76,7 +103,7 @@ export default function ManageAccountPage() {
       <main className="flex-1 w-full max-w-3xl mx-auto py-12 px-6 overflow-y-auto">
         <section className="mb-14">
           <h2 className="text-xl font-bold mb-6 text-white tracking-wide">General</h2>
-          
+
           <div className="space-y-8">
             <div className="flex flex-col gap-1 pb-4 border-b border-[#2A2A28]/50">
               <span className="text-sm text-[#EBEBEB] font-medium">Email</span>
@@ -84,14 +111,14 @@ export default function ManageAccountPage() {
                 {user?.primaryEmailAddress?.emailAddress || <Skeleton className="h-4 w-48 bg-[#2A2A28]" />}
               </span>
             </div>
-            
+
             <div className="flex flex-col gap-1 pb-4 border-b border-[#2A2A28]/50">
               <span className="text-sm text-[#EBEBEB] font-medium">Name</span>
               <span className="text-sm text-[#8A8A8A]">
                 {user?.fullName || <Skeleton className="h-4 w-32 bg-[#2A2A28]" />}
               </span>
             </div>
-            
+
             <div className="flex items-center justify-between pb-4 border-b border-[#2A2A28]/50">
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-[#EBEBEB] font-medium">Current Plan</span>
@@ -99,7 +126,7 @@ export default function ManageAccountPage() {
                   {isUsageLoading ? <Skeleton className="h-4 w-16 bg-[#2A2A28]" /> : (usage?.plan || "Free")}
                 </span>
               </div>
-              <Button 
+              <Button
                 onClick={() => portalMutation.mutate()}
                 disabled={portalMutation.isPending || usage?.plan === "free" || !usage?.plan}
                 className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-inconsolata"
@@ -107,7 +134,7 @@ export default function ManageAccountPage() {
                 {portalMutation.isPending ? "Redirecting..." : "Manage subscription"}
               </Button>
             </div>
-            
+
             <div className="flex items-center justify-between pb-4 border-b border-[#2A2A28]/50">
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-[#EBEBEB] font-medium">Sign out</span>
@@ -115,14 +142,14 @@ export default function ManageAccountPage() {
                   Sign out from this device
                 </span>
               </div>
-              <Button 
+              <Button
                 onClick={handleSignOut}
                 className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-inconsolata"
               >
                 Sign out
               </Button>
             </div>
-            
+
             <div className="flex items-center justify-between pb-4">
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-[#EBEBEB] font-medium">Delete account</span>
@@ -130,7 +157,7 @@ export default function ManageAccountPage() {
                   Permanently delete your account and all data
                 </span>
               </div>
-              <Button 
+              <Button
                 onClick={handleDeleteAccount}
                 disabled={deleteAccountMutation.isPending}
                 className="bg-transparent text-[#F1336E] border border-[#3B3B3B] hover:bg-[#F1336E]/10 h-9 px-4 rounded-[8px] text-sm font-inconsolata transition-colors disabled:opacity-50"

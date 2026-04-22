@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { toast } from "sonner";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -69,8 +68,8 @@ export default function ManageAccountPage() {
         await user?.delete();
         toast.success("Account and data deleted successfully");
         router.push("/");
-      } catch (error: any) {
-        toast.error(error?.message || "Failed to delete account");
+      } catch (error: unknown) {
+        toast.error((error as Error)?.message || "Failed to delete account");
       }
     }
   };

@@ -117,7 +117,6 @@ export const ProjectForm = () => {
       window.removeEventListener("dragover", handleDragOver);
       window.removeEventListener("drop", handleDrop);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleImageFile = (file: File) => {

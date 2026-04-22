@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { generateSlug } from "random-word-slugs";
 
 import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
@@ -72,10 +71,15 @@ export const projectsRouter = createTRPCRouter({
         }
       }
 
+      const count = await prisma.project.count({
+        where: { userId: ctx.auth.userId },
+      });
+      const name = `Project ${count + 1}`;
+
       const createdProject = await prisma.project.create({
         data: {
           userId: ctx.auth.userId,
-          name: generateSlug(2, { format: "kebab" }),
+          name,
           status: "draft",
           currentStage: "SCENE",
           // Only create the initial message if the user provided a prompt
@@ -95,6 +99,23 @@ export const projectsRouter = createTRPCRouter({
       });
 
       return createdProject;
+    }),
+  rename: protectedProcedure
+    .input(z.object({
+      id: z.string().min(1),
+      name: z.string().min(1).max(100),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await prisma.project.findUnique({
+        where: { id: input.id, userId: ctx.auth.userId },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+      return prisma.project.update({
+        where: { id: input.id },
+        data: { name: input.name.trim() },
+      });
     }),
   startVideoGeneration: protectedProcedure
     .input(

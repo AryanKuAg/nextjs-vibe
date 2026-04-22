@@ -30,7 +30,7 @@ export const PricingCard = ({ title, desc, price, features, className }: Pricing
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: title.toLowerCase(), returnUrl: window.location.href }),
+        body: JSON.stringify({ plan: title.toLowerCase(), returnUrl: `${window.location.origin}/dashboard` }),
       });
 
       const data = await res.json();

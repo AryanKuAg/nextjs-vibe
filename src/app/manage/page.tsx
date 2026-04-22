@@ -32,6 +32,8 @@ export default function ManageAccountPage() {
       toast.error(error.message || "Failed to access billing portal. No active subscription found.");
     }
   }));
+  
+  const deleteAccountMutation = useMutation(trpc.usage.deleteAccount.mutationOptions());
 
   const handleSignOut = () => {
     signOut({ redirectUrl: "/" });
@@ -40,11 +42,12 @@ export default function ManageAccountPage() {
   const handleDeleteAccount = async () => {
     if (confirm("Are you sure you want to permanently delete your account & all data? This cannot be undone.")) {
       try {
+        await deleteAccountMutation.mutateAsync();
         await user?.delete();
-        toast.success("Account deleted successfully");
+        toast.success("Account and data deleted successfully");
         router.push("/");
-      } catch {
-        toast.error("Failed to delete account");
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to delete account");
       }
     }
   };
@@ -129,9 +132,10 @@ export default function ManageAccountPage() {
               </div>
               <Button 
                 onClick={handleDeleteAccount}
-                className="bg-transparent text-[#F1336E] border border-[#3B3B3B] hover:bg-[#F1336E]/10 h-9 px-4 rounded-[8px] text-sm font-inconsolata transition-colors"
+                disabled={deleteAccountMutation.isPending}
+                className="bg-transparent text-[#F1336E] border border-[#3B3B3B] hover:bg-[#F1336E]/10 h-9 px-4 rounded-[8px] text-sm font-inconsolata transition-colors disabled:opacity-50"
               >
-                Delete account
+                {deleteAccountMutation.isPending ? "Deleting..." : "Delete account"}
               </Button>
             </div>
           </div>

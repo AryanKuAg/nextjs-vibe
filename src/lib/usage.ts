@@ -123,6 +123,7 @@ export async function getPortalSession() {
   const DodoPayments = (await import("dodopayments")).default;
   const dodo = new DodoPayments({
     bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+    environment: process.env.NODE_ENV === "development" ? "test_mode" : "live_mode",
   });
 
   const subscription = await dodo.subscriptions.retrieve(usage.subscriptionId);

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // Initialize DodoPayments client
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: "test_mode",
+      environment: process.env.NODE_ENV === "development" ? "test_mode" : "live_mode",
     });
 
     // Handle local development webhook limitations

@@ -3,6 +3,21 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { Storage } from "@google-cloud/storage";
 
+/** Parse a GCS or CDN URL into { bucketName, filePath } */
+function parseGcsUrl(url: string): { bucketName: string; filePath: string } | null {
+  const gcsMatch = url.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+  if (gcsMatch) return { bucketName: gcsMatch[1], filePath: gcsMatch[2] };
+
+  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
+  if (cdnBase && url.startsWith(cdnBase + "/")) {
+    const bucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
+    const filePath = url.slice(cdnBase.length + 1);
+    return { bucketName, filePath };
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -32,8 +47,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // If it's a GCS URL or new CDN, stream directly via GCS SDK (avoids CORS)
-    if (zipUrl.includes("storage.googleapis.com") || zipUrl.includes("sites.framerate.space")) {
+    const parsed = parseGcsUrl(zipUrl);
+
+    if (parsed) {
       const storage = new Storage({
         projectId: process.env.GOOGLE_CLOUD_PROJECT,
         credentials: {
@@ -42,20 +58,7 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      let bucketName = "";
-      let filePath = "";
-      
-      if (zipUrl.startsWith("https://sites.framerate.space/")) {
-        bucketName = "sites.framerate.space";
-        filePath = zipUrl.replace("https://sites.framerate.space/", "");
-      } else {
-        const urlPath = zipUrl.replace("https://storage.googleapis.com/", "");
-        const slashIdx = urlPath.indexOf("/");
-        bucketName = urlPath.slice(0, slashIdx);
-        filePath = urlPath.slice(slashIdx + 1);
-      }
-
-      const file = storage.bucket(bucketName).file(filePath);
+      const file = storage.bucket(parsed.bucketName).file(parsed.filePath);
       const [buffer] = await file.download();
 
       return new NextResponse(buffer as unknown as BodyInit, {

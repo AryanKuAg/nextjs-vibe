@@ -208,7 +208,8 @@ export const ProjectView = ({ projectId }: Props) => {
       });
 
       // Merge extracted frames (public/ folder) if available
-      const resolvedZipUrl = extractedZipUrl || (project?.id ? `https://sites.framerate.space/frames/${project.id}/frames.zip` : null);
+      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || 'sites.framerate.space'}`;
+      const resolvedZipUrl = extractedZipUrl || (project?.id ? `${cdnBase}/frames/${project.id}/frames.zip` : null);
       if (resolvedZipUrl) {
         try {
           // Proxy via our server route to avoid CORS issues fetching GCS directly

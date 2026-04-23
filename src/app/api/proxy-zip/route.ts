@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { Storage } from "@google-cloud/storage";
 
+/** Parse a GCS or CDN URL into { bucketName, filePath } */
+function parseGcsUrl(url: string): { bucketName: string; filePath: string } | null {
+  // Direct GCS: https://storage.googleapis.com/{bucket}/{path}
+  const gcsMatch = url.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+  if (gcsMatch) return { bucketName: gcsMatch[1], filePath: gcsMatch[2] };
+
+  // CDN / storage.googleapis.com CNAME: https://{bucket}/{path}
+  // bucket name is embedded in the hostname
+  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
+  if (cdnBase && url.startsWith(cdnBase + "/")) {
+    const bucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
+    const filePath = url.slice(cdnBase.length + 1);
+    return { bucketName, filePath };
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -16,12 +34,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
     }
 
-    // Only allow our own GCS bucket or new CDN
-    if (!url.startsWith("https://storage.googleapis.com/") && !url.startsWith("https://sites.framerate.space/")) {
+    const parsed = parseGcsUrl(url);
+    if (!parsed) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
-    // Use GCS SDK to stream — avoids public-access CORS issues
     const storage = new Storage({
       projectId: process.env.GOOGLE_CLOUD_PROJECT,
       credentials: {
@@ -30,20 +47,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    let bucketName = "";
-    let filePath = "";
-    
-    if (url.startsWith("https://sites.framerate.space/")) {
-      bucketName = "sites.framerate.space";
-      filePath = url.replace("https://sites.framerate.space/", "");
-    } else {
-      const urlPath = url.replace("https://storage.googleapis.com/", "");
-      const slashIdx = urlPath.indexOf("/");
-      bucketName = urlPath.slice(0, slashIdx);
-      filePath = urlPath.slice(slashIdx + 1);
-    }
-
-    const file = storage.bucket(bucketName).file(filePath);
+    const file = storage.bucket(parsed.bucketName).file(parsed.filePath);
     const [buffer] = await file.download();
 
     return new NextResponse(buffer as unknown as BodyInit, {

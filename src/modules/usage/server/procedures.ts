@@ -51,10 +51,11 @@ export const usageRouter = createTRPCRouter({
         for (const url of sceneUrls) {
           try {
             // Extract GCS path from public URL
+            const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://sites.framerate.space`;
             const gcsPath = url
               .replace(`https://storage.googleapis.com/${bucketName}/`, "")
               .replace("https://storage.googleapis.com/spatial_io/", "")
-              .replace("https://sites.framerate.space/", "");
+              .replace(`${cdnBase}/`, "");
             if (gcsPath && gcsPath !== url) {
               await bucket.file(gcsPath).delete({ ignoreNotFound: true });
             }
@@ -69,10 +70,11 @@ export const usageRouter = createTRPCRouter({
           : [];
         for (const url of videoUrls) {
           try {
+            const cdnBase2 = process.env.NEXT_PUBLIC_CDN_URL || `https://sites.framerate.space`;
             const gcsPath = url
               .replace(`https://storage.googleapis.com/${bucketName}/`, "")
               .replace("https://storage.googleapis.com/spatial_io/", "")
-              .replace("https://sites.framerate.space/", "");
+              .replace(`${cdnBase2}/`, "");
             if (gcsPath && gcsPath !== url) {
               await bucket.file(gcsPath).delete({ ignoreNotFound: true });
             }

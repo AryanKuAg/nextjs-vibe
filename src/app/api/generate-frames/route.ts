@@ -137,7 +137,8 @@ export async function POST(req: NextRequest) {
       metadata: { contentType: mimeType },
     });
 
-    const publicUrl = `https://sites.framerate.space/${fileName}`;
+    const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+    const publicUrl = `${cdnBase}/${fileName}`;
 
     // Persist to sceneImageUrls and promote draft → active
     try {

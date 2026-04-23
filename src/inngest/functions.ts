@@ -696,7 +696,8 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
       }
 
-      const finalUrl = `https://sites.framerate.space/${sitePrefix}index.html`;
+      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+      const finalUrl = `${cdnBase}/${sitePrefix}index.html`;
       console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
       return finalUrl;
     });
@@ -882,7 +883,7 @@ export const veoGenerateFunction = inngest.createFunction(
               gcsBucketName = standardMatch[1];
               gcsObjectPath = standardMatch[2];
             } else if (cdnMatch) {
-              gcsBucketName = "sites.framerate.space";
+              gcsBucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
               gcsObjectPath = cdnMatch[1];
             }
 
@@ -1001,7 +1002,8 @@ export const veoGenerateFunction = inngest.createFunction(
         const bufferFinal = Buffer.from(base64VideoData!, 'base64');
         await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
 
-        return `https://sites.framerate.space/${finalOutputName}`;
+        const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+        return `${cdnBase}/${finalOutputName}`;
       });
 
       await step.run("update-project-video-url", async () => {

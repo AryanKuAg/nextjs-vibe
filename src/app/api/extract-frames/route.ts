@@ -150,7 +150,8 @@ export async function POST(req: NextRequest) {
     const gcsFile = bucket.file(fileToUpload);
     await gcsFile.save(zipBuffer, { metadata: { contentType: "application/zip" } });
 
-    const zipUrl = `https://sites.framerate.space/${fileToUpload}`;
+    const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+    const zipUrl = `${cdnBase}/${fileToUpload}`;
 
     // Clean up tmp files
     fs.rmSync(tmpDir, { recursive: true, force: true });

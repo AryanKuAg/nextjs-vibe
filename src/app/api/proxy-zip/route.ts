@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
     }
 
-    // Only allow our own GCS bucket
-    if (!url.startsWith("https://storage.googleapis.com/")) {
+    // Only allow our own GCS bucket or new CDN
+    if (!url.startsWith("https://storage.googleapis.com/") && !url.startsWith("https://sites.framerate.space/")) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
@@ -30,12 +30,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Parse bucket + file path from URL
-    // e.g. https://storage.googleapis.com/spatial_io/frames/xxx/frames.zip
-    const urlPath = url.replace("https://storage.googleapis.com/", "");
-    const slashIdx = urlPath.indexOf("/");
-    const bucketName = urlPath.slice(0, slashIdx);
-    const filePath = urlPath.slice(slashIdx + 1);
+    let bucketName = "";
+    let filePath = "";
+    
+    if (url.startsWith("https://sites.framerate.space/")) {
+      bucketName = "sites.framerate.space";
+      filePath = url.replace("https://sites.framerate.space/", "");
+    } else {
+      const urlPath = url.replace("https://storage.googleapis.com/", "");
+      const slashIdx = urlPath.indexOf("/");
+      bucketName = urlPath.slice(0, slashIdx);
+      filePath = urlPath.slice(slashIdx + 1);
+    }
 
     const file = storage.bucket(bucketName).file(filePath);
     const [buffer] = await file.download();

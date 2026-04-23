@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "STORE" });
 
     // Upload a singular ZIP to GCS
-    const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+    const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
     const storage = new Storage({ 
       projectId: process.env.GOOGLE_CLOUD_PROJECT,
       credentials: {
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     const gcsFile = bucket.file(fileToUpload);
     await gcsFile.save(zipBuffer, { metadata: { contentType: "application/zip" } });
 
-    const zipUrl = `https://storage.googleapis.com/${bucketName}/${fileToUpload}`;
+    const zipUrl = `https://sites.framerate.space/${fileToUpload}`;
 
     // Clean up tmp files
     fs.rmSync(tmpDir, { recursive: true, force: true });

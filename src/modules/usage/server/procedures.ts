@@ -33,7 +33,7 @@ export const usageRouter = createTRPCRouter({
 
     // 2. Delete GCS assets (scene images, videos, deployed sites)
     try {
-      const bucketName = process.env.GCS_BUCKET_NAME || "spatial_io";
+      const bucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
       const storage = new Storage({
         projectId: process.env.GOOGLE_CLOUD_PROJECT,
         credentials: {
@@ -51,10 +51,10 @@ export const usageRouter = createTRPCRouter({
         for (const url of sceneUrls) {
           try {
             // Extract GCS path from public URL
-            const gcsPath = url.replace(
-              `https://storage.googleapis.com/${bucketName}/`,
-              ""
-            );
+            const gcsPath = url
+              .replace(`https://storage.googleapis.com/${bucketName}/`, "")
+              .replace("https://storage.googleapis.com/spatial_io/", "")
+              .replace("https://sites.framerate.space/", "");
             if (gcsPath && gcsPath !== url) {
               await bucket.file(gcsPath).delete({ ignoreNotFound: true });
             }
@@ -69,10 +69,10 @@ export const usageRouter = createTRPCRouter({
           : [];
         for (const url of videoUrls) {
           try {
-            const gcsPath = url.replace(
-              `https://storage.googleapis.com/${bucketName}/`,
-              ""
-            );
+            const gcsPath = url
+              .replace(`https://storage.googleapis.com/${bucketName}/`, "")
+              .replace("https://storage.googleapis.com/spatial_io/", "")
+              .replace("https://sites.framerate.space/", "");
             if (gcsPath && gcsPath !== url) {
               await bucket.file(gcsPath).delete({ ignoreNotFound: true });
             }

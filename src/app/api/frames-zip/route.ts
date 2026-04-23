@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // If it's a GCS URL, stream directly via GCS SDK (avoids CORS)
-    if (zipUrl.includes("storage.googleapis.com")) {
+    // If it's a GCS URL or new CDN, stream directly via GCS SDK (avoids CORS)
+    if (zipUrl.includes("storage.googleapis.com") || zipUrl.includes("sites.framerate.space")) {
       const storage = new Storage({
         projectId: process.env.GOOGLE_CLOUD_PROJECT,
         credentials: {
@@ -42,17 +42,23 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      // Parse bucket and file path from URL
-      // e.g. https://storage.googleapis.com/spatial_io/frames/xxx/frames.zip
-      const urlPath = zipUrl.replace("https://storage.googleapis.com/", "");
-      const slashIdx = urlPath.indexOf("/");
-      const bucketName = urlPath.slice(0, slashIdx);
-      const filePath = urlPath.slice(slashIdx + 1);
+      let bucketName = "";
+      let filePath = "";
+      
+      if (zipUrl.startsWith("https://sites.framerate.space/")) {
+        bucketName = "sites.framerate.space";
+        filePath = zipUrl.replace("https://sites.framerate.space/", "");
+      } else {
+        const urlPath = zipUrl.replace("https://storage.googleapis.com/", "");
+        const slashIdx = urlPath.indexOf("/");
+        bucketName = urlPath.slice(0, slashIdx);
+        filePath = urlPath.slice(slashIdx + 1);
+      }
 
       const file = storage.bucket(bucketName).file(filePath);
       const [buffer] = await file.download();
 
-      return new NextResponse(buffer, {
+      return new NextResponse(buffer as unknown as BodyInit, {
         status: 200,
         headers: {
           "Content-Type": "application/zip",
@@ -70,7 +76,7 @@ export async function GET(req: NextRequest) {
     }
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",

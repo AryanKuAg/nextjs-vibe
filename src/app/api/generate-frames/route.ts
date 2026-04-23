@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     // Convert base64 to Buffer and upload to Google Cloud Storage
     const imageBuffer = Buffer.from(imageBase64, "base64");
-    const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+    const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
     const storage = new Storage({
       projectId: process.env.GOOGLE_CLOUD_PROJECT,
       credentials: {
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       metadata: { contentType: mimeType },
     });
 
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+    const publicUrl = `https://sites.framerate.space/${fileName}`;
 
     // Persist to sceneImageUrls and promote draft → active
     try {

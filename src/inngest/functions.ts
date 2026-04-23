@@ -635,7 +635,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       }
 
       const files = JSON.parse(cmdResult.stdout);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
       const storage = new Storage({
         projectId: process.env.GOOGLE_CLOUD_PROJECT,
         credentials: {
@@ -695,7 +695,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
       }
 
-      const finalUrl = `https://storage.googleapis.com/${bucketName}/${sitePrefix}index.html`;
+      const finalUrl = `https://sites.framerate.space/${sitePrefix}index.html`;
       console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
       return finalUrl;
     });
@@ -970,7 +970,7 @@ export const veoGenerateFunction = inngest.createFunction(
         }
 
         console.log(`[Veo Pipeline] Pushing 8s Master Video to GCS natively to bypass node limits...`);
-        const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+        const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
         const storage = new Storage({
           projectId: process.env.GOOGLE_CLOUD_PROJECT,
           credentials: {
@@ -986,7 +986,7 @@ export const veoGenerateFunction = inngest.createFunction(
         const bufferFinal = Buffer.from(base64VideoData!, 'base64');
         await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
 
-        return `https://storage.googleapis.com/${bucketName}/${finalOutputName}`;
+        return `https://sites.framerate.space/${finalOutputName}`;
       });
 
       await step.run("update-project-video-url", async () => {

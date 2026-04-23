@@ -208,7 +208,7 @@ export const ProjectView = ({ projectId }: Props) => {
       });
 
       // Merge extracted frames (public/ folder) if available
-      const resolvedZipUrl = extractedZipUrl || (project?.id ? `https://storage.googleapis.com/spatial_io/frames/${project.id}/frames.zip` : null);
+      const resolvedZipUrl = extractedZipUrl || (project?.id ? `https://sites.framerate.space/frames/${project.id}/frames.zip` : null);
       if (resolvedZipUrl) {
         try {
           // Proxy via our server route to avoid CORS issues fetching GCS directly

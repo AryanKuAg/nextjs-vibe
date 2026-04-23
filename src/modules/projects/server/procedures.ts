@@ -131,7 +131,7 @@ export const projectsRouter = createTRPCRouter({
       const cost = MODEL_COSTS[input.model || ""] || 25;
       await checkCredits(cost);
 
-      const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
+      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
       const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
 
       await prisma.project.update({

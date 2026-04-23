@@ -193,10 +193,11 @@ export const ProjectView = ({ projectId }: Props) => {
       });
 
       // Merge extracted frames (public/ folder) if available
-      if (extractedZipUrl) {
+      const resolvedZipUrl = extractedZipUrl || (project?.id ? `https://storage.googleapis.com/spatial_io/frames/${project.id}/frames.zip` : null);
+      if (resolvedZipUrl) {
         try {
           // Proxy via our server route to avoid CORS issues fetching GCS directly
-          const proxyUrl = `/api/proxy-zip?url=${encodeURIComponent(extractedZipUrl)}`;
+          const proxyUrl = `/api/proxy-zip?url=${encodeURIComponent(resolvedZipUrl)}`;
           const res = await fetch(proxyUrl);
           if (res.ok) {
             const zipBuffer = await res.arrayBuffer();

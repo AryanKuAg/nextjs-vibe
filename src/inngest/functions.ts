@@ -752,6 +752,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
               } else {
                 const ext = path.extname(filePath).toLowerCase();
                 const normalizedPath = filePath.split(path.sep).join('/');
+                if (normalizedPath.startsWith('public/assets/frame-') && ext === '.jpg') {
+                  continue; // Hide these routing duplicates from the UI
+                }
                 if (['.jpg', '.webp'].includes(ext)) {
                    fileList[normalizedPath] = 'BINARY_ASSET_OMITTED_FROM_SYNC';
                 } else if (!['.png', '.jpeg', '.gif', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {

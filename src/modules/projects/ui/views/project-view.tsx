@@ -184,6 +184,7 @@ export const ProjectView = ({ projectId }: Props) => {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
+      // Add all code files from the fragment (skip binary placeholders)
       const files = activeFragment.files as { [path: string]: string };
       Object.entries(files).forEach(([path, content]) => {
         if (content !== "BINARY_ASSET_OMITTED_FROM_SYNC") {
@@ -191,9 +192,12 @@ export const ProjectView = ({ projectId }: Props) => {
         }
       });
 
-      if (project?.id) {
+      // Merge extracted frames (public/ folder) if available
+      if (extractedZipUrl) {
         try {
-          const res = await fetch(`/api/frames-zip?projectId=${project.id}`);
+          // Proxy via our server route to avoid CORS issues fetching GCS directly
+          const proxyUrl = `/api/proxy-zip?url=${encodeURIComponent(extractedZipUrl)}`;
+          const res = await fetch(proxyUrl);
           if (res.ok) {
             const zipBuffer = await res.arrayBuffer();
             const framesZip = await JSZip.loadAsync(zipBuffer);
@@ -203,10 +207,10 @@ export const ProjectView = ({ projectId }: Props) => {
               zip.file(`public/${relativePath}`, fileData);
             }
           } else {
-            console.warn("frames-zip proxy returned non-ok:", res.status);
+            console.warn("[Download ZIP] proxy-zip returned non-ok:", res.status);
           }
         } catch (e) {
-          console.error("Failed to merge frames zip into codebase download", e);
+          console.error("[Download ZIP] Failed to merge frames zip:", e);
         }
       }
 
@@ -223,6 +227,7 @@ export const ProjectView = ({ projectId }: Props) => {
       URL.revokeObjectURL(url);
     });
   };
+
 
   // Seed scene images from DB on project load
   const rawSceneUrls = (project as Record<string, unknown>)?.sceneImageUrls;
@@ -331,7 +336,7 @@ export const ProjectView = ({ projectId }: Props) => {
           )}
 
           {(activeStageTab === "VIDEO" || activeStageTab === "GENERATING_VIDEO") && (
-          <VideoBuilder
+            <VideoBuilder
               projectId={projectId}
               selectedSceneUrl={selectedSceneUrl}
               isGenerating={isVideoLoading}

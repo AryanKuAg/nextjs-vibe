@@ -33,19 +33,38 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Convert a dropped File into base64 and set it as the uploaded image
+  // Convert a dropped File into a clean JPEG via Canvas
   useEffect(() => {
     if (!droppedFile) return;
-    if (!['image/jpeg', 'image/png'].includes(droppedFile.type)) {
-      toast.error("Unsupported image format. Please use JPEG or PNG.");
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(droppedFile.type)) {
+      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.");
       return;
     }
     if (droppedFile.size > 5 * 1024 * 1024) {
       toast.error("Image must be less than 5MB");
       return;
     }
+    
     const reader = new FileReader();
-    reader.onload = (ev) => setUploadedBase64(ev.target?.result as string);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          // Fill white background to safely remove transparent alpha channels
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          // Export as clean standard JPEG
+          const jpegBase64 = canvas.toDataURL("image/jpeg", 0.9);
+          setUploadedBase64(jpegBase64);
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
     reader.readAsDataURL(droppedFile);
   }, [droppedFile]);
 
@@ -79,8 +98,8 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      toast.error("Unsupported image format. Please use JPEG or PNG.");
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.");
       return;
     }
 
@@ -91,7 +110,21 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      setUploadedBase64(event.target?.result as string);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          const jpegBase64 = canvas.toDataURL("image/jpeg", 0.9);
+          setUploadedBase64(jpegBase64);
+        }
+      };
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };

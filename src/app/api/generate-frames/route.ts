@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
         imageConfig: {
           aspectRatio: "16:9",
           numberOfImages: 1,
+          imageSize: "1K",
         },
         safetySettings: [
           { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },

@@ -105,12 +105,9 @@ export const ProjectHeader = ({ projectId }: Props) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="start">
-            <DropdownMenuItem onClick={startEditing}>
-              <i className="ri-pencil-line" />
-              <span>Rename</span>
-            </DropdownMenuItem>
+
             <DropdownMenuItem asChild>
-              <Link href="/projects">
+              <Link href="/">
                 <i className="ri-arrow-left-s-line" />
                 <span>Go to Dashboard</span>
               </Link>

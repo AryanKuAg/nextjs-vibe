@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       ffmpeg(videoPath)
         .outputOptions([
           `-vf fps=${exactFps.toFixed(6)}`,
-          "-q:v 50",
+          "-q:v 5", // 2-31 scale (lower is better). 5 provides very high quality without massive file sizes.
         ])
         .output(path.join(framesDir, "frame-%04d.jpg"))
         .on("end", () => resolve())

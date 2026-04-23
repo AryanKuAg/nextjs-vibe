@@ -357,10 +357,11 @@ To achieve this securely and perfectly:
 1. A background pipeline natively populates the \`public/\` folder with exactly 450 highly compressed JPG files named \`frame-0001.jpg\` through \`frame-0450.jpg\`. DO NOT modify package.json for this.
 2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the 450 image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / 450 — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out. **CRITICAL**: BOTH \`img.onload\` AND \`img.onerror\` MUST increment the loaded counter identically — a failed/404 frame still counts as "loaded" for preloader purposes. Additionally, add a 30-second hard timeout that force-completes the preloader regardless. This ensures the site is ALWAYS visible even if some frames fail to load.
 3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar PERFECTLY HORIZONTALLY CENTERED at the top of the screen. Use ONLY this exact inline style on the nav element: \`style={{ position: \'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}\`. DO NOT use \`left: 0\`, \`right: 0\`, \`width: 100%\` or \`margin: auto\` — those break centering. Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Deploy Now' button on the right. The pill must have \`width: fit-content\` and \`min-width: 600px\`.
-4. In your \`scroll-sequence.tsx\` or main application file, the architectural layout MUST be:
+4. In your \`scroll - sequence.tsx\` or main application file, the architectural layout MUST be:
    - A global container with a dynamically calculated height to enforce the scrollable area.
-   - A \`position: fixed, inset: 0, z-index: 0, w-full, h-full\` background \`<canvas>\` that fills the entire screen underneath EVERYTHING.
-   - ALL normal sections (Hero, Features, Pricing, Footer) go ON TOP of the canvas with \`z-index: 10\`, and MUST HAVE TRANSPARENT BACKGROUNDS! 
+   - A perfectly fixed background \`<canvas>\` that fills the entire screen underneath EVERYTHING. You MUST use exactly this class: \`<canvas className="fixed top-0 left-0 w-screen h-screen object-cover -z-10 pointer-events-none" />\`
+   - ALL normal sections (Hero, Features, Pricing, Footer), AS WELL AS the root containers, MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! 
+   - CRITICAL FOREGROUND RULE: Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page sections, \`main\`, or \`div\` wrappers. If you put a solid background color on your sections, you will completely hide the \`<canvas>\` behind them! Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) if you need readable contrast for text.
 5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! **CRITICAL PATH RULES**: NEVER use \`import.meta.url\` to construct frame paths — \`import.meta.url\` resolves relative to the JS bundle file inside \`assets/\`, NOT the page, resulting in broken \`assets/frame-0001.jpg\` paths. NEVER use absolute root paths like \`/frame-0001.jpg\`. ALWAYS use plain string literals: \`img.src = './frame-0001.jpg'\` or template literals \`\`./frame-\${idx}.jpg\`\`. These resolve correctly relative to the page URL regardless of where the JS bundle lives.
 6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. 
    - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame 450.
@@ -461,7 +462,7 @@ function fixPaths(dir) {
 fixPaths(process.argv[2]);
 `;
             await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
-            
+
             // Run pre-build to fix source files
             await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
 
@@ -660,7 +661,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
           else if (relativePath.endsWith(".css")) contentType = "text/css";
           else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
           else if (relativePath.endsWith(".json")) contentType = "application/json";
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType } });
+          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType }, resumable: false });
         }));
       }
 
@@ -675,12 +676,12 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         const zip = await JSZip.loadAsync(zipBuffer);
 
         const frameEntries = Object.entries(zip.files).filter(([name, f]) => !f.dir && name.endsWith(".jpg"));
-        const frameChunkSize = 25;
+        const frameChunkSize = 12; // Reduced to 5 to prevent socket hang up with high-quality larger frames
         for (let i = 0; i < frameEntries.length; i += frameChunkSize) {
           const chunk = frameEntries.slice(i, i + frameChunkSize);
           await Promise.all(chunk.map(async ([name, zipEntry]) => {
-            const frameBuffer = Buffer.from(await zipEntry.async("arraybuffer"));
-            const meta = { metadata: { contentType: "image/jpeg" } };
+            const frameBuffer = await zipEntry.async("nodebuffer");
+            const meta = { metadata: { contentType: "image/jpeg" }, resumable: false };
             // Upload to root site dir (for AI code using ./frame-N.jpg relative to the page)
             // AND to assets/ subdir (for AI code using import.meta.url inside the JS bundle)
             // This guarantees frames load correctly regardless of how the AI resolves paths.
@@ -706,7 +707,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 
       if (event.data.videoUrl) {
         console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
         if (devZipResult.exitCode !== 0) {
           throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
         }
@@ -871,11 +872,18 @@ export const veoGenerateFunction = inngest.createFunction(
             }
             //
           } else if (event.data.imageBase64) {
+            const base64Str = event.data.imageBase64;
+            const match = base64Str.match(/^data:(image\/[^;]+);/);
+            const mimeType = match ? match[1] : "image/png";
+            const rawBase64 = base64Str.includes("base64,")
+              ? base64Str.split("base64,")[1]
+              : base64Str;
+
             instances = [{
               prompt: prompt,
               image: {
-                bytesBase64Encoded: event.data.imageBase64.replace(/^data:image\/\w+;base64,/, ''),
-                mimeType: "image/png"
+                bytesBase64Encoded: rawBase64,
+                mimeType: mimeType
               }
             }];
           }

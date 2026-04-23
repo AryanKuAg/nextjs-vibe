@@ -6,7 +6,7 @@ interface Props {
 };
 
 export function FragmentWeb({ data }: Props) {
-  const displayUrl = data.sandboxUrl;
+  const displayUrl = data.deploymentUrl || data.sandboxUrl;
 
   return (
     <div className="flex flex-col w-full h-full">

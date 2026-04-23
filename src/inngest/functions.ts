@@ -367,6 +367,7 @@ To achieve this securely and perfectly:
    - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame 450.
    - **NO OVER-SCROLL**: The canvas drawing logic MUST clamp the frame index: \`Math.min(450, Math.max(1, calculatedIndex))\`. If the user scrolls all the way down, the frame stops strictly at 450. The page itself must NOT have arbitrary extra whitespace at the bottom causing over-scroll. Make sure the height of the container perfectly fits the sections so the footer is the absolute end of the document.
 7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
+8. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
 === END SCROLL ANIMATION REQUIREMENT ===
 
 ` + currentPrompt;

@@ -551,7 +551,7 @@ export const ProjectView = ({ projectId }: Props) => {
                           </div>
                         )}
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url, idx) => (
+                        {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url) => (
                           <div key={url} className="flex flex-col">
                             <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
                               <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover rounded-[8px]" />

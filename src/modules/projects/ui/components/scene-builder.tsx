@@ -5,6 +5,8 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 interface Props {
@@ -17,8 +19,8 @@ interface Props {
 }
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 10 },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 25 },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -43,6 +45,8 @@ export const SceneBuilder = ({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
 
   // Keep prompt in sync with initialPrompt if it arrives late
   useEffect(() => {
@@ -99,7 +103,7 @@ export const SceneBuilder = ({
 
   const handleImageFile = (file: File) => {
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      toast.error("Unsupported image format. Please use JPEG or PNG.");
+      toast.error("Unsupported image format. Please use JPEG or PNG.", { duration: Infinity });
       return;
     }
     const url = URL.createObjectURL(file);
@@ -147,13 +151,14 @@ export const SceneBuilder = ({
       }
 
       const data = await res.json();
+      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
       onFrameGenerated(data.frameUrl);
     } catch (error: unknown) {
       const err = error as { message?: string };
       if (err?.message?.toLowerCase().includes("credits") || err?.message?.toLowerCase().includes("too many requests")) {
         setShowCreditsModal(true);
       } else {
-        toast.error(error instanceof Error ? error.message : "Something went wrong");
+        toast.error(error instanceof Error ? error.message : "Something went wrong", { duration: Infinity });
       }
     } finally {
       setIsGenerating(false);

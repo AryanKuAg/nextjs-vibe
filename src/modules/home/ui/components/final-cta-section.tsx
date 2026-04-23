@@ -79,7 +79,7 @@ export const FinalCTASection = () => {
         <section className="py-[60px] md:py-20 px-6 flex flex-col items-center text-center font-inconsolata">
             <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
             <p className="text-sm text-neutral-400 mb-[40px]">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
-            <div className="flex gap-2 min-h-[36px]">
+            <div className="flex gap-2 min-h-[36px]" suppressHydrationWarning>
                 {isLoaded && (
                     <>
                         <SignedOut>

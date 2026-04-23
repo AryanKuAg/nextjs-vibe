@@ -44,7 +44,7 @@ export const PricingCard = ({ title, desc, price, features, className }: Pricing
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Something went wrong";
-      toast.error(errorMessage);
+      toast.error(errorMessage, { duration: Infinity });
     } finally {
       setLoading(false);
     }

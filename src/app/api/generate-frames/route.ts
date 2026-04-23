@@ -3,12 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { Storage } from "@google-cloud/storage";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
-import { consumeCredits, refundCredits } from "@/lib/usage";
-
-const MODEL_COSTS: Record<string, number> = {
-  "gemini-3.1-flash-image-preview": 10,
-  "gemini-3-pro-image-preview": 25,
-};
+import { checkCredits, consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
@@ -58,10 +53,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  // Pre-charge credits
+  // Pre-check credits
   const cost = MODEL_COSTS[model] ?? 10;
   try {
-    await consumeCredits(cost);
+    await checkCredits(cost);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 402 });
   }
@@ -168,11 +163,12 @@ export async function POST(req: NextRequest) {
       // sceneImageUrls column not yet in DB — skipping history persist until db push is run
     }
 
+    // Consume credits only on success
+    await consumeCredits(cost);
+
     return NextResponse.json({ frameUrl: publicUrl });
   } catch (err: unknown) {
     console.error("[generate-frames] Error:", err);
-    // Auto-refund on failure
-    await refundCredits(cost);
 
     return NextResponse.json(
       { error: (err as Error)?.message || String(err) || "Unknown error" },

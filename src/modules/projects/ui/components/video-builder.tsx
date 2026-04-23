@@ -7,8 +7,8 @@ import { useTRPC } from "@/trpc/client";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 const MODELS = [
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 75 },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 200 },
+  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 25 },
+  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 65 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -37,11 +37,11 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   useEffect(() => {
     if (!droppedFile) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(droppedFile.type)) {
-      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.");
+      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.", { duration: Infinity });
       return;
     }
     if (droppedFile.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+      toast.error("Image must be less than 5MB", { duration: Infinity });
       return;
     }
     
@@ -81,6 +81,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     trpc.projects.startVideoGeneration.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
         toast.info("Started generating video. This will take a few minutes...");
         // Don't auto-clear image or prompt so user can iterate
       },
@@ -88,7 +89,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
         if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
           setShowCreditsModal(true);
         } else {
-          toast.error(error.message || "Failed to start video generation");
+          toast.error(error.message || "Failed to start video generation", { duration: Infinity });
         }
       }
     })
@@ -99,12 +100,12 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
     if (!file) return;
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.");
+      toast.error("Unsupported image format. Please use JPEG, PNG, or WebP.", { duration: Infinity });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+      toast.error("Image must be less than 5MB", { duration: Infinity });
       return;
     }
 

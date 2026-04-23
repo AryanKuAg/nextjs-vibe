@@ -47,11 +47,11 @@ export default function ManageAccountPage() {
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        toast.error("Failed to generate billing portal link");
+        toast.error("Failed to generate billing portal link", { duration: Infinity });
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to access billing portal. No active subscription found.");
+      toast.error(error.message || "Failed to access billing portal. No active subscription found.", { duration: Infinity });
     }
   }));
 
@@ -69,7 +69,7 @@ export default function ManageAccountPage() {
         toast.success("Account and data deleted successfully");
         router.push("/");
       } catch (error: unknown) {
-        toast.error((error as Error)?.message || "Failed to delete account");
+        toast.error((error as Error)?.message || "Failed to delete account", { duration: Infinity });
       }
     }
   };

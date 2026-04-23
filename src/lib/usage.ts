@@ -7,11 +7,46 @@ export const PLAN_CREDITS: Record<string, number> = {
   plus: 3000,
   pro: 5500,
 };
- 
-export const VEO_MODEL_COSTS: Record<string, number> = {
-  "veo-3.1-lite-generate-001": 75,
-  "veo-3.1-fast-generate-001": 200,
+
+export const MODEL_COSTS: Record<string, number> = {
+  "veo-3.1-lite-generate-001": 25,
+  "veo-3.1-fast-generate-001": 65,
+  "gemini-3.1-flash-image-preview": 7,  // Nano Banana 2
+  "gemini-3-pro-image-preview": 14,     // Nano Banana Pro
+  "gemini-3.1-pro-preview": 100,
+  "gemini-3.1-flash-lite-preview": 80,
 };
+
+/**
+ * Ensures the user has enough credits without deducting them.
+ */
+export async function checkCredits(amount: number, overrideUserId?: string) {
+  let userId = overrideUserId;
+  
+  if (!userId) {
+    const authResult = await auth();
+    userId = authResult.userId ?? undefined;
+  }
+  
+  if (!userId) throw new Error("User not authenticated");
+
+  const usage = await prisma.usage.findUnique({ where: { key: userId } });
+  
+  if (!usage) {
+    // Check if user exists, if not create with free credits
+    await prisma.usage.create({
+      data: { key: userId, credits: PLAN_CREDITS.free, plan: "free" }
+    });
+    if (PLAN_CREDITS.free < amount) {
+      throw new Error("You do not have enough credits for this generation");
+    }
+    return;
+  }
+
+  if (usage.credits < amount) {
+    throw new Error("You do not have enough credits for this generation");
+  }
+}
 
 /**
  * Atomic credit deduction.

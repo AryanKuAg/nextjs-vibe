@@ -12,8 +12,8 @@ import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 const MODELS = [
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 150 },
-  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", credits: 100 }
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 100 },
+  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", credits: 80 }
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -61,12 +61,13 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       form.reset();
       queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
       queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
     },
     onError: (error) => {
       if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
         setShowCreditsModal(true);
       } else {
-        toast.error(error.message);
+        toast.error(error.message, { duration: Infinity });
       }
     },
   }));
@@ -85,7 +86,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
         setShowCreditsModal(true);
       } else {
-        toast.error(error.message);
+        toast.error(error.message, { duration: Infinity });
       }
     },
   }));

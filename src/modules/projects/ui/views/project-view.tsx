@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Suspense, useState, useTransition, useEffect, useRef } from "react";
 import "remixicon/fonts/remixicon.css";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Fragment } from "@prisma/client";
@@ -34,13 +34,14 @@ type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
 
 export const ProjectView = ({ projectId }: Props) => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
   // Load project to get initial state
   const { data: project, refetch } = useQuery(
     trpc.projects.getOne.queryOptions({ id: projectId })
   );
 
-  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+  const { data: usage, refetch: refetchUsage } = useQuery(trpc.usage.status.queryOptions());
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [fragmentKey, setFragmentKey] = useState(0);
@@ -145,6 +146,18 @@ export const ProjectView = ({ projectId }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.currentStage]);
 
+  const cancelVideoGeneration = useMutation(
+    trpc.projects.cancelVideoGeneration.mutationOptions({
+      onSuccess: () => {
+        toast.success("Generation cancelled");
+        queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+      },
+      onError: (error) => {
+        toast.error("Failed to cancel: " + error.message, { duration: Infinity });
+      }
+    })
+  );
+
   // Polling for video generation
   useEffect(() => {
     if (project?.currentStage === "GENERATING_VIDEO") {
@@ -167,15 +180,17 @@ export const ProjectView = ({ projectId }: Props) => {
 
     if (previousIsVideoLoading.current && !isVideoLoading) {
       if (currentVideoUrlsLength === previousVideoUrlsLength.current) {
-        toast.error("Video generation failed. This usually happens if your prompt triggers the AI safety filters, or inputs were invalid. Please tweak your prompt and try again.", { duration: 8000 });
+        toast.error("Video generation failed. This usually happens if your prompt triggers the AI safety filters, or inputs were invalid. Please tweak your prompt and try again.", { duration: Infinity });
+
       } else {
         toast.success("Video generated successfully!");
+        refetchUsage();
       }
     }
 
     previousIsVideoLoading.current = isVideoLoading;
     previousVideoUrlsLength.current = currentVideoUrlsLength;
-  }, [project]);
+  }, [project, refetchUsage]);
 
   const handleDownloadZip = () => {
     if (!activeFragment?.files) return;
@@ -542,11 +557,21 @@ export const ProjectView = ({ projectId }: Props) => {
                     <div className="p-3">
                       <div className="grid grid-cols-3 gap-3">
                         {isVideoLoading && (
-                          <div>
-                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1">
+                          <div className="relative group">
+                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1 transition-opacity group-hover:opacity-60">
                               <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
                               <p className="text-white text-sm">Generating</p>
                             </div>
+                            <button
+                              onClick={() => cancelVideoGeneration.mutate({ projectId })}
+                              disabled={cancelVideoGeneration.isPending}
+                              className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-1 hover:bg-red-500/40 transition-colors">
+                                <i className="ri-close-line text-xl" />
+                              </div>
+                              <span className="text-xs text-red-400 font-medium">Cancel</span>
+                            </button>
                             <div className="mt-3 h-9" />
                           </div>
                         )}
@@ -609,7 +634,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
                                   setActiveStageTab("SITE");
                                 } catch (e) {
-                                  toast.error("Extraction failed: " + String(e));
+                                  toast.error("Extraction failed: " + String(e), { duration: Infinity });
                                 } finally {
                                   setExtractingVideoUrl(null);
                                 }

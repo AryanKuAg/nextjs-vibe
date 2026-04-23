@@ -11,7 +11,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 
 import { Storage } from "@google-cloud/storage";
 import { GoogleAuth } from "google-auth-library";
-import { refundCredits, VEO_MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 
@@ -74,7 +74,7 @@ export const codeAgentFunction = inngest.createFunction(
         await prisma.message.create({
           data: {
             projectId: projectId,
-            content: `The code agent encountered a critical infrastructure error and exhausted all retries. The error was: ${error.message}. Please send another prompt to try again. (Your credits will be automatically refunded by the system shortly)`,
+            content: `The code agent encountered a critical infrastructure error and exhausted all retries. The error was: ${error.message}. Please send another prompt to try again.`,
             role: "ASSISTANT",
             type: "RESULT",
           }
@@ -815,6 +815,12 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       });
     });
 
+    await step.run("charge-credits", async () => {
+      const model = event.data.model || "gemini-3.1-pro-preview";
+      const cost = MODEL_COSTS[model] || 100;
+      await consumeCredits(cost, event.data.userId);
+    });
+
     return {
       url: deploymentUrl || sandboxUrl,
       deploymentUrl: deploymentUrl,
@@ -831,7 +837,7 @@ export const veoGenerateFunction = inngest.createFunction(
   { event: "veo/generate" },
   async ({ event, step }) => {
     const { projectId, prompt, model, userId } = event.data;
-    const cost = VEO_MODEL_COSTS[model as string] || 75;
+    const cost = MODEL_COSTS[model as string] || 25;
 
     const tokenHelper = async () => {
       const auth = new GoogleAuth({
@@ -998,6 +1004,10 @@ export const veoGenerateFunction = inngest.createFunction(
         });
       });
 
+      await step.run("charge-credits", async () => {
+        await consumeCredits(cost, userId);
+      });
+
       return { videoUrl: videoUri };
     } catch (error: unknown) {
       // Global Failure Handler: Ensure UI is NEVER stuck and credits are refunded
@@ -1007,9 +1017,6 @@ export const veoGenerateFunction = inngest.createFunction(
           where: { id: projectId },
           data: { currentStage: "SCENE" }
         }).catch(() => { });
-
-        // 2. Refund credits since generation failed
-        await refundCredits(cost, userId).catch(() => { });
       });
 
       throw error;

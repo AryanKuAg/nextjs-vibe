@@ -17,8 +17,8 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 10 },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 25 },
+  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
+  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14 },
 ] as const;
 
 const SUGGESTED_PROMPTS = [
@@ -121,7 +121,7 @@ export const ProjectForm = () => {
 
   const handleImageFile = (file: File) => {
     if (!["image/jpeg", "image/png"].includes(file.type)) {
-      toast.error("Unsupported image format. Please use JPEG or PNG.");
+      toast.error("Unsupported image format. Please use JPEG or PNG.", { duration: Infinity });
       return;
     }
     const url = URL.createObjectURL(file);
@@ -157,7 +157,7 @@ export const ProjectForm = () => {
         router.push(url);
       },
       onError: (error) => {
-        toast.error(error.message);
+        toast.error(error.message, { duration: Infinity });
 
         if (error.data?.code === "UNAUTHORIZED") {
           clerk.openSignIn();

@@ -3,8 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
-import { Sandbox } from "@e2b/code-interpreter";
-import { consumeCredits, VEO_MODEL_COSTS } from "@/lib/usage";
+
+import { checkCredits, consumeCredits, MODEL_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -128,8 +128,8 @@ export const projectsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const cost = VEO_MODEL_COSTS[input.model || ""] || 75;
-      await consumeCredits(cost);
+      const cost = MODEL_COSTS[input.model || ""] || 25;
+      await checkCredits(cost);
 
       const bucketName = process.env.GCS_BUCKET_NAME || 'spatial_io';
       const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
@@ -170,26 +170,9 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      let isHot = false;
-      if (existingProject.sandboxId) {
-        try {
-          // Extremely fast check to see if the sandbox is still alive
-          // If it throws an error, the sandbox expired/died.
-          await Sandbox.connect(existingProject.sandboxId);
-          isHot = true;
-        } catch {
-          isHot = false;
-        }
-      }
-
-      // Hot (alive) = 30 credits. Cold (dead) = full cost.
-      const modelCostMap: Record<string, number> = {
-        "gemini-3.1-pro-preview": isHot ? 30 : 150,
-        "gemini-3.1-flash-lite-preview": isHot ? 20 : 100,
-      };
-      const cost = modelCostMap[input.model || ""] || (isHot ? 30 : 150);
-      
-      await consumeCredits(cost);
+      // Flat pricing as requested: 100 for Pro, 80 for Flash.
+      const cost = MODEL_COSTS[input.model || ""] || 100;
+      await checkCredits(cost);
 
       const createdMessage = await prisma.message.create({
         data: {

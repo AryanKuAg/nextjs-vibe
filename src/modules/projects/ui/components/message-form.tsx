@@ -5,11 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { FOLLOW_UP_COST } from "@/lib/pricing";
 
 const MODELS = [
   { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 100 },
@@ -38,6 +39,13 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Detect follow-up: any existing SITE-stage message means this is a follow-up prompt
+  const { data: existingMessages } = useQuery({
+    ...trpc.messages.getMany.queryOptions({ projectId, stage }),
+    staleTime: 30_000,
+  });
+  const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -99,6 +107,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
           projectId,
           videoUrl: extractedZipUrl || undefined,
           model: selectedModel,
+          isFollowUp,
         });
       } catch {
         // Error is handled in the mutation's onError callback
@@ -181,7 +190,9 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             <div className="flex gap-2 ml-auto">
               <div className="flex items-center gap-1 text-[#CCCCCC]">
                 <i className="ri-sparkling-fill text-white text-sm" />
-                <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
+                <span className="text-sm font-medium">
+                  {isFollowUp ? FOLLOW_UP_COST : MODELS.find(m => m.id === selectedModel)?.credits}
+                </span>
               </div>
               <button
                 type="submit"

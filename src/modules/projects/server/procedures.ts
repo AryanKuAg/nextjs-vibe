@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COST } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -195,6 +195,7 @@ export const projectsRouter = createTRPCRouter({
       value: z.string(),
       videoUrl: z.string().optional().nullable(),
       model: z.string().optional(),
+      isFollowUp: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -205,8 +206,9 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Flat pricing as requested: 100 for Pro, 80 for Flash.
-      const cost = MODEL_COSTS[input.model || ""] || 100;
+      // Follow-up prompts (conversation already has messages) cost only 10 credits.
+      // First-time generation costs 100 (Pro) or 80 (Flash).
+      const cost = input.isFollowUp ? FOLLOW_UP_COST : (MODEL_COSTS[input.model || ""] || 100);
       await checkCredits(cost);
 
       const createdMessage = await prisma.message.create({

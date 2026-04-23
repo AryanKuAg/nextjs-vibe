@@ -8,14 +8,8 @@ export const PLAN_CREDITS: Record<string, number> = {
   pro: 5500,
 };
 
-export const MODEL_COSTS: Record<string, number> = {
-  "veo-3.1-lite-generate-001": 25,
-  "veo-3.1-fast-generate-001": 65,
-  "gemini-3.1-flash-image-preview": 7,  // Nano Banana 2
-  "gemini-3-pro-image-preview": 14,     // Nano Banana Pro
-  "gemini-3.1-pro-preview": 100,
-  "gemini-3.1-flash-lite-preview": 80,
-};
+export { MODEL_COSTS, FOLLOW_UP_COST } from "@/lib/pricing";
+
 
 /**
  * Ensures the user has enough credits without deducting them.

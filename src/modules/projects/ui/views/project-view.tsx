@@ -467,7 +467,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         )}
                         {/* All generated image cards */}
                         {[...sceneImageUrls].reverse().map((url, idx) => (
-                          <div key={idx} className="flex flex-col">
+                          <div key={url} className="flex flex-col">
                             <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
@@ -552,7 +552,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         )}
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url, idx) => (
-                          <div key={idx} className="flex flex-col">
+                          <div key={url} className="flex flex-col">
                             <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
                               <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover rounded-[8px]" />
                               {/* Hover action buttons */}

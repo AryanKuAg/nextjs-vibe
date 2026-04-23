@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { SignedIn, SignedOut, useSignIn, useAuth } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
@@ -57,7 +57,7 @@ export const FinalCTASection = () => {
     const router = useRouter();
     const trpc = useTRPC();
     const queryClient = useQueryClient();
-    const { isLoaded } = useAuth();
+
 
     const createProject = useMutation(
         trpc.projects.create.mutationOptions({
@@ -80,22 +80,18 @@ export const FinalCTASection = () => {
             <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
             <p className="text-sm text-neutral-400 mb-[40px]">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
             <div className="flex gap-2 min-h-[36px]" suppressHydrationWarning>
-                {isLoaded && (
-                    <>
-                        <SignedOut>
-                            <GoogleSignInButton />
-                        </SignedOut>
-                        <SignedIn>
-                            <button
-                                onClick={handleStartBuilding}
-                                disabled={isPending}
-                                className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isPending ? "Starting..." : "Start building"}
-                            </button>
-                        </SignedIn>
-                    </>
-                )}
+                <SignedOut>
+                    <GoogleSignInButton />
+                </SignedOut>
+                <SignedIn>
+                    <button
+                        onClick={handleStartBuilding}
+                        disabled={isPending}
+                        className="px-3 py-2 bg-white text-black text-sm font-[500] rounded-[8px] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isPending ? "Starting..." : "Start building"}
+                    </button>
+                </SignedIn>
             </div>
         </section>
     );

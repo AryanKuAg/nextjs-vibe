@@ -362,6 +362,7 @@ To achieve this securely and perfectly:
    - A perfectly fixed background \`<canvas>\` that fills the entire screen underneath EVERYTHING. You MUST use exactly this class: \`<canvas className="fixed top-0 left-0 w-screen h-screen object-cover -z-10 pointer-events-none" />\`
    - ALL normal sections (Hero, Features, Pricing, Footer), AS WELL AS the root containers, MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! 
    - CRITICAL FOREGROUND RULE: Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page sections, \`main\`, or \`div\` wrappers. If you put a solid background color on your sections, you will completely hide the \`<canvas>\` behind them! Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) if you need readable contrast for text.
+   - **OVERLAY PROHIBITION (CRITICAL)**: NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. This includes hero overlays, gradient overlays, dark tint layers, and any fixed/absolute element covering the canvas area. The canvas images MUST ALWAYS be fully visible and NEVER obscured by any overlay div. Violating this rule makes the canvas animation completely invisible.
 5. Pre-load all 450 image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-0450.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! **CRITICAL PATH RULES**: NEVER use \`import.meta.url\` to construct frame paths — \`import.meta.url\` resolves relative to the JS bundle file inside \`assets/\`, NOT the page, resulting in broken \`assets/frame-0001.jpg\` paths. NEVER use absolute root paths like \`/frame-0001.jpg\`. ALWAYS use plain string literals: \`img.src = './frame-0001.jpg'\` or template literals \`\`./frame-\${idx}.jpg\`\`. These resolve correctly relative to the page URL regardless of where the JS bundle lives.
 6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to 450. 
    - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame 450.
@@ -870,13 +871,27 @@ export const veoGenerateFunction = inngest.createFunction(
           let instances: Record<string, unknown>[] = [{ prompt: prompt }];
 
           if (event.data.imageUrl) {
-            const bucketMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
-            if (bucketMatch) {
+            // Check for both standard GCS URL and custom CDN domain URL
+            let gcsBucketName = "";
+            let gcsObjectPath = "";
+            
+            const standardMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
+            const cdnMatch = event.data.imageUrl.match(/sites\.framerate\.space\/(.+)$/);
+            
+            if (standardMatch) {
+              gcsBucketName = standardMatch[1];
+              gcsObjectPath = standardMatch[2];
+            } else if (cdnMatch) {
+              gcsBucketName = "sites.framerate.space";
+              gcsObjectPath = cdnMatch[1];
+            }
+
+            if (gcsBucketName && gcsObjectPath) {
               instances = [{
                 prompt: prompt,
                 image: {
-                  gcsUri: `gs://${bucketMatch[1]}/${bucketMatch[2]}`,
-                  mimeType: "image/png" // assuming standard generated image
+                  gcsUri: `gs://${gcsBucketName}/${gcsObjectPath}`,
+                  mimeType: "image/jpeg" // usually JPEG from UI
                 }
               }];
             }

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Suspense, useState, useTransition, useEffect, useRef } from "react";
 import "remixicon/fonts/remixicon.css";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Fragment } from "@prisma/client";
@@ -34,7 +34,7 @@ type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
 
 export const ProjectView = ({ projectId }: Props) => {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
 
   // Load project to get initial state
   const { data: project, refetch } = useQuery(
@@ -146,17 +146,17 @@ export const ProjectView = ({ projectId }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.currentStage]);
 
-  const cancelVideoGeneration = useMutation(
-    trpc.projects.cancelVideoGeneration.mutationOptions({
-      onSuccess: () => {
-        toast.success("Generation cancelled");
-        queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
-      },
-      onError: (error) => {
-        toast.error("Failed to cancel: " + error.message, { duration: Infinity });
-      }
-    })
-  );
+  // const cancelVideoGeneration = useMutation(
+  //   trpc.projects.cancelVideoGeneration.mutationOptions({
+  //     onSuccess: () => {
+  //       toast.success("Generation cancelled");
+  //       queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+  //     },
+  //     onError: (error) => {
+  //       toast.error("Failed to cancel: " + error.message, { duration: Infinity });
+  //     }
+  //   })
+  // );
 
   // Polling for video generation
   useEffect(() => {
@@ -558,20 +558,10 @@ export const ProjectView = ({ projectId }: Props) => {
                       <div className="grid grid-cols-3 gap-3">
                         {isVideoLoading && (
                           <div className="relative group">
-                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1 transition-opacity group-hover:opacity-60">
+                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1 ">
                               <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
                               <p className="text-white text-sm">Generating</p>
                             </div>
-                            <button
-                              onClick={() => cancelVideoGeneration.mutate({ projectId })}
-                              disabled={cancelVideoGeneration.isPending}
-                              className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <div className="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mb-1 hover:bg-red-500/40 transition-colors">
-                                <i className="ri-close-line text-xl" />
-                              </div>
-                              <span className="text-xs text-red-400 font-medium">Cancel</span>
-                            </button>
                             <div className="mt-3 h-9" />
                           </div>
                         )}

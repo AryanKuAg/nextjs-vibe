@@ -9,7 +9,7 @@ import { MessageForm } from "./message-form";
 import { MessageLoading } from "./message-loading";
 
 // If the last message has been from a USER for longer than this, show a recovery UI
-const STUCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const STUCK_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes – site generation can take a long time
 
 interface Props {
   projectId: string;

@@ -20,8 +20,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Redirect www to non-www
   if (host === "www.framerate.space") {
-    url.host = "framerate.space";
-    return NextResponse.redirect(url, 301);
+    return NextResponse.redirect(`https://framerate.space${url.pathname}${url.search}`, 301);
   }
 
   if (!isPublicRoute(req)) {

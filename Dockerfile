@@ -66,6 +66,9 @@ COPY --from=builder /app/node_modules/ffmpeg-static ./node_modules/ffmpeg-static
 # ffprobe-static binary
 COPY --from=builder /app/node_modules/ffprobe-static ./node_modules/ffprobe-static
 
+# Fix EACCES permissions for Next.js cache
+RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next
+
 USER nextjs
 
 EXPOSE 8080

@@ -7,7 +7,7 @@ export const metadata = {
   openGraph: {
     title: "Privacy Policy – Framerate",
     description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
-    url: "https://www.framerate.space/privacy",
+    url: "https://framerate.space/privacy",
     siteName: "Framerate",
   },
   twitter: {

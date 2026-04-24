@@ -40,10 +40,10 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Framerate – Build 3D Websites with AI",
   description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
-  metadataBase: new URL("https://www.framerate.space"),
+  metadataBase: new URL("https://framerate.space"),
   openGraph: {
     type: "website",
-    url: "https://www.framerate.space/",
+    url: "https://framerate.space/",
     title: "Framerate – Build 3D Websites with AI",
     description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
     siteName: "Framerate",
@@ -62,8 +62,8 @@ export const metadata: Metadata = {
     description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
     images: ["/og-image.png"],
   },
-  other: {
-    "google-site-verification": "",
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
   },
 };
 

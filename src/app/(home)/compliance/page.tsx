@@ -7,7 +7,7 @@ export const metadata = {
   openGraph: {
     title: "Compliance Overview – Framerate",
     description: "Framerate's commitments to data protection, security, and responsible AI usage.",
-    url: "https://www.framerate.space/compliance",
+    url: "https://framerate.space/compliance",
     siteName: "Framerate",
   },
   twitter: {

@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
 
-const BASE_URL = "https://www.framerate.space";
+const BASE_URL = "https://framerate.space";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();

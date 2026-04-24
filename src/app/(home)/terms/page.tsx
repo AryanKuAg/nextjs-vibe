@@ -7,7 +7,7 @@ export const metadata = {
   openGraph: {
     title: "Terms of Service – Framerate",
     description: "Read Framerate's terms of service governing your use of our AI-powered 3D website builder.",
-    url: "https://www.framerate.space/terms",
+    url: "https://framerate.space/terms",
     siteName: "Framerate",
   },
   twitter: {

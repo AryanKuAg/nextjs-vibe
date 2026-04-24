@@ -7,7 +7,7 @@ export const metadata = {
   openGraph: {
     title: "Cookie Policy – Framerate",
     description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
-    url: "https://www.framerate.space/cookies",
+    url: "https://framerate.space/cookies",
     siteName: "Framerate",
   },
   twitter: {

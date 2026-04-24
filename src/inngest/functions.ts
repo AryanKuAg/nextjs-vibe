@@ -663,7 +663,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
           else if (relativePath.endsWith(".css")) contentType = "text/css";
           else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
           else if (relativePath.endsWith(".json")) contentType = "application/json";
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType }, resumable: false });
+          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
         }));
       }
 

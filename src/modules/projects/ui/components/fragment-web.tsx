@@ -8,6 +8,10 @@ interface Props {
 export function FragmentWeb({ data }: Props) {
   const displayUrl = data.deploymentUrl || data.sandboxUrl;
 
+  // Append a cache-buster so the browser doesn't load a stale index.html from disk cache
+  const cacheBuster = data.updatedAt ? new Date(data.updatedAt).getTime() : Date.now();
+  const finalUrl = displayUrl ? `${displayUrl}?v=${cacheBuster}` : undefined;
+
   return (
     <div className="flex flex-col w-full h-full">
       <iframe
@@ -15,7 +19,7 @@ export function FragmentWeb({ data }: Props) {
         className="h-full w-full border-none"
         sandbox="allow-forms allow-scripts allow-same-origin"
         loading="lazy"
-        src={displayUrl}
+        src={finalUrl}
       />
     </div>
   )

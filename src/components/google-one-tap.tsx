@@ -34,8 +34,14 @@ export const GoogleOneTap = () => {
 
       window._googleOneTapPrompted = true;
 
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        console.error("Google One Tap: NEXT_PUBLIC_GOOGLE_CLIENT_ID is missing.");
+        return;
+      }
+
       google.accounts.id.initialize({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        client_id: clientId,
         itp_support: true,
         use_fedcm_for_prompt: false,
         callback: async (response) => {

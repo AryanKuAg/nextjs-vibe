@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 const isPublicRoute = createRouteMatcher([
@@ -17,16 +16,8 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const url = req.nextUrl;
-  const host = req.headers.get("host");
-
-  // Redirect www to non-www
-  if (host === "www.framerate.space") {
-    return NextResponse.redirect(`https://framerate.space${url.pathname}${url.search}`, 301);
-  }
-
   if (!isPublicRoute(req)) {
-    await auth.protect()
+    await auth.protect();
   }
 });
 

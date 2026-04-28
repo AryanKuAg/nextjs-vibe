@@ -66,7 +66,7 @@ const AssistantMessage = ({
 }: AssistantMessageProps) => {
   return (
     <div className={cn(
-      "flex group px-2 pb-4 gap-2.5 items-start",
+      "flex group pl-3 pb-4 gap-2.5 items-start",
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
       <div className="flex-shrink-0 mt-0.5">

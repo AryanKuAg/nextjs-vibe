@@ -26,7 +26,7 @@ const ShimmerMessages = () => {
   }, [messages.length]);
 
   return (
-    <div className="flex items-start gap-2.5">
+    <div className="flex items-start pl-1 gap-2.5">
       <div className="flex-shrink-0 mt-0.5">
         <Image
           src="/logo.png"

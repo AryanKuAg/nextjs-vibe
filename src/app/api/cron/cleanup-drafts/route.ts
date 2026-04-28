@@ -4,11 +4,16 @@ import { prisma } from "@/lib/db";
 /**
  * GET /api/cron/cleanup-drafts
  *
- * Deletes draft projects that are older than 30 minutes and have
- * no messages beyond the initial creation prompt.
+ * Deletes draft projects that:
+ *   1. Have status = "draft" (no scene ever generated)
+ *   2. Have ≤ 1 message (only the initial prompt, no AI response yet)
+ *   3. Have had NO activity for at least 30 minutes (based on updatedAt)
+ *   4. Are at least 1 hour old (createdAt) — safety buffer against active sessions
  *
- * Secure this with a CRON_SECRET environment variable.
- * Hit this endpoint from any external cron service (e.g. cron-job.org, EasyCron, Vercel Cron).
+ * Using updatedAt (not createdAt) prevents the race condition where a user
+ * who has been typing for 30+ minutes gets their in-progress draft deleted.
+ * Any user interaction (sending a message, navigating to the project) bumps
+ * updatedAt, keeping the project safe.
  */
 export async function GET(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -18,21 +23,19 @@ export async function GET(req: NextRequest) {
   }
 
   // ── TTL ───────────────────────────────────────────────────────────────────
-  const cutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+  // A project is "stale" only if it has had no activity for 30 minutes.
+  const inactiveSince = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  // We target projects that are:
-  //   1. status = "draft"  (never had a scene generated)
-  //   2. createdAt < 30 min ago
-  //   3. have ≤ 1 message (only the initial USER prompt; no ASSISTANT response)
-  //      — counted via a subquery using _count
-  //
-  // Prisma doesn't support deleteMany with _count directly, so we fetch IDs first.
+  // Extra safety: never delete a project that is less than 1 hour old,
+  // even if it looks idle — the user might just be slow to type.
+  const minimumAge = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+
   try {
     const staleProjects = await prisma.project.findMany({
       where: {
         status: "draft",
-        createdAt: { lt: cutoff },
+        updatedAt: { lt: inactiveSince }, // ← activity-based, not birth-based
+        createdAt: { lt: minimumAge },    // ← safety buffer: project must be ≥1h old
       },
       select: {
         id: true,
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Keep projects that somehow got more than one message despite being "draft"
+    // Keep projects that have more than 1 message (user has been active)
     const idsToDelete = staleProjects
       .filter((p) => p._count.messages <= 1)
       .map((p) => p.id);
@@ -59,7 +62,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       deleted: result.count,
       ids: idsToDelete,
-      message: `Cleaned up ${result.count} stale draft project(s) older than 30 minutes.`,
+      message: `Cleaned up ${result.count} stale draft project(s) older than 1 hour with no recent activity.`,
     });
   } catch (err) {
     console.error("[cleanup-drafts] Error:", err);

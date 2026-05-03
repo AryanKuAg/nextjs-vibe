@@ -43,7 +43,7 @@ const GoogleSignInButton = () => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Connecting...
+          Get started
         </>
       ) : (
         <>
@@ -130,7 +130,7 @@ export const PillNavbar = () => {
         onClose={() => setShowSignInModal(false)}
       />
 
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full px-4  md:max-w-fit">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-10 w-full px-4  md:max-w-fit">
         <div className="flex items-center justify-between md:justify-normal md:gap-20 h-[52px] px-2 bg-neutral-900 rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
           {/* Left side: Logo */}
           <Link href="/" className="flex items-center gap-2 pl-2">

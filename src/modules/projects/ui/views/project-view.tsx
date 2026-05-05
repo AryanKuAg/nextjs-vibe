@@ -23,14 +23,14 @@ import { ProjectHeader } from "../components/project-header";
 import { MessagesContainer } from "../components/messages-container";
 import { ErrorBoundary } from "react-error-boundary";
 import { StageIndicator } from "../components/stage-indicator";
-import { SceneBuilder } from "../components/scene-builder";
-import { VideoBuilder } from "../components/video-builder";
+import { BackgroundBuilderLeft } from "../components/background-builder-left";
+import { BackgroundBuilderRight, VideoBlock, BlockTab } from "../components/background-builder-right";
 
 interface Props {
   projectId: string;
 };
 
-type Stage = "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE";
+type Stage = "BACKGROUND" | "SITE";
 
 export const ProjectView = ({ projectId }: Props) => {
   const trpc = useTRPC();
@@ -55,96 +55,284 @@ export const ProjectView = ({ projectId }: Props) => {
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
   };
-  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
 
   // Local state for UI navigation
-  const [activeStageTab, setActiveStageTab] = useState<Stage>("SCENE");
-  const [selectedSceneUrl, setSelectedSceneUrl] = useState<string | null>(null);
+  const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
 
-  // Drag-and-drop state – whole window
-  const [isDragging, setIsDragging] = useState(false);
-  const [droppedFile, setDroppedFile] = useState<File | null>(null);
-  const [droppedVideoFile, setDroppedVideoFile] = useState<File | null>(null);
-  const dragCounterRef = useRef(0);
+  const emptyBlock: VideoBlock = {
+    startFrameUrl: null, startFrameHistory: [],
+    endFrameUrl: null, endFrameHistory: [],
+    videoUrl: null, videoHistory: [],
+    isGeneratingStart: false, isGeneratingEnd: false, isGeneratingVideo: false,
+  };
 
-  // Scene generation preview state
-  const [sceneIsGenerating, setSceneIsGenerating] = useState(false);
-  const [sceneImageUrls, setSceneImageUrls] = useState<string[]>([]);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(null);
-  const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
+  // Read block count from localStorage SYNCHRONOUSLY in the initializer.
+  // This runs before any effect, so there is no race condition.
+  const [blocks, setBlocks] = useState<VideoBlock[]>([emptyBlock]);
 
+  const [activeBlockIndex, setActiveBlockIndex] = useState(0);
+  const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("START");
+  // Prevent the DB restore effect from running more than once
+  const hasRestoredFromDBRef = useRef(false);
+  // True once the client-side localStorage restore has completed.
+  // The save effect is gated on this so it can't overwrite localStorage
+  // before the restore runs.
+  const [hasRestored, setHasRestored] = useState(false);
+
+  // Restore block count + prompts from localStorage after hydration.
+  // Must use useEffect (not useState initializer) so SSR and CSR both start
+  // with [emptyBlock] and avoid a hydration mismatch.
   useEffect(() => {
-    const isImageTab = activeStageTab === "SCENE" || activeStageTab === "VIDEO";
-    if (!isImageTab) return;
-
-    const onDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounterRef.current++;
-      if (e.dataTransfer?.types.includes("Files")) setIsDragging(true);
-    };
-    const onDragLeave = () => {
-      dragCounterRef.current--;
-      if (dragCounterRef.current === 0) setIsDragging(false);
-    };
-    const onDragOver = (e: DragEvent) => e.preventDefault();
-    const onDrop = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounterRef.current = 0;
-      setIsDragging(false);
-      const file = e.dataTransfer?.files?.[0];
-      if (file && file.type.startsWith("image/")) {
-        if (activeStageTab === "VIDEO") {
-          setDroppedVideoFile(file);
-        } else {
-          setDroppedFile(file);
+    try {
+      const saved = localStorage.getItem(`vibe-blocks-${projectId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 1) {
+          setBlocks(parsed.map((item: Record<string, string | undefined>) => ({
+            ...emptyBlock,
+            startPrompt: item?.startPrompt,
+            endPrompt: item?.endPrompt,
+            videoPrompt: item?.videoPrompt,
+          })));
         }
       }
-    };
+    } catch (e) {
+      console.error("[blocks] Failed to restore from localStorage:", e);
+    }
+    // Signal that restore is done — batched with setBlocks above so
+    // the save effect always sees the correct block array on its first run.
+    setHasRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount (client-only)
 
-    window.addEventListener("dragenter", onDragEnter);
-    window.addEventListener("dragleave", onDragLeave);
-    window.addEventListener("dragover", onDragOver);
-    window.addEventListener("drop", onDrop);
+  const handleAddBlock = () => {
+    if (blocks.length < 4) {
+      setBlocks(prev => {
+        const lastBlock = prev[prev.length - 1];
+        const newBlock = { 
+          ...emptyBlock,
+          startFrameUrl: lastBlock.endFrameUrl || lastBlock.startFrameUrl, // Inherit end frame of previous video
+          startFrameHistory: lastBlock.endFrameUrl ? [lastBlock.endFrameUrl] : (lastBlock.startFrameUrl ? [lastBlock.startFrameUrl] : []),
+        };
+        return [...prev, newBlock];
+      });
+      setActiveBlockIndex(blocks.length);
+      setActiveBlockTab("END"); // Skip "START" tab since they shouldn't edit the inherited start frame
+    }
+  };
 
-    // Pick up pending image from homepage if it exists (SCENE only)
-    if (activeStageTab === "SCENE") {
-      const pendingImage = sessionStorage.getItem("pending_image_base64");
-      if (pendingImage) {
-        const name = sessionStorage.getItem("pending_image_name") || "uploaded-image.png";
-        const type = sessionStorage.getItem("pending_image_type") || "image/png";
+  const handleRemoveBlock = (index: number) => {
+    setBlocks(prev => {
+      const newBlocks = [...prev];
+      newBlocks.splice(index, 1);
+      return newBlocks;
+    });
+    if (activeBlockIndex >= index) {
+      setActiveBlockIndex(Math.max(0, index - 1));
+      if (index === 1) setActiveBlockTab("START"); // if we go back to block 0, we can see START tab again
+    }
+  };
 
-        fetch(pendingImage)
-          .then(res => res.blob())
-          .then(blob => {
-            const file = new File([blob], name, { type });
-            setDroppedFile(file);
-            sessionStorage.removeItem("pending_image_base64");
-            sessionStorage.removeItem("pending_image_name");
-            sessionStorage.removeItem("pending_image_type");
-          });
-      }
+  const updateBlock = (index: number, updates: Partial<VideoBlock>) => {
+    setBlocks(prev => {
+      const newBlocks = [...prev];
+      newBlocks[index] = { ...newBlocks[index], ...updates };
+      return newBlocks;
+    });
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleProceed = async () => {
+    // Check if any videos have been generated yet
+    const hasVideos = blocks.some(b => b.videoUrl);
+
+    if (!hasVideos) {
+      // No videos generated yet — skip extraction and go straight to the site builder
+      toast.info("No videos generated yet. You can generate videos and extract frames later.");
+      setActiveStageTab("SITE");
+      return;
     }
 
-    return () => {
-      window.removeEventListener("dragenter", onDragEnter);
-      window.removeEventListener("dragleave", onDragLeave);
-      window.removeEventListener("dragover", onDragOver);
-      window.removeEventListener("drop", onDrop);
-      dragCounterRef.current = 0;
-      setIsDragging(false);
-    };
-  }, [activeStageTab]);
+    try {
+      setIsExtracting(true);
+      const res = await fetch("/api/extract-frames", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExtractedZipUrl(data.zipUrl);
+        toast.success("Frames extracted successfully!");
+      } else {
+        let errorMsg = res.statusText;
+        try {
+          const errData = await res.json();
+          errorMsg = errData?.error ?? errorMsg;
+        } catch { /* body wasn't JSON */ }
+        console.error("Failed to extract frames:", errorMsg);
+        toast.error(`Extraction failed: ${errorMsg}`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("An error occurred during frame extraction");
+    } finally {
+      setIsExtracting(false);
+      setActiveStageTab("SITE");
+    }
+  };
 
   // Sync initial render from project
   useEffect(() => {
-    if (project && activeStageTab === "SCENE") {
-      setActiveStageTab(project.currentStage as Stage);
+    if (project) {
+      if (project.currentStage === "SITE") {
+        setActiveStageTab("SITE");
+      } else {
+        setActiveStageTab("BACKGROUND");
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.currentStage]);
+
+  // Merge URL history and prompt data from DB into the existing blocks.
+  // Block COUNT is already set correctly from the localStorage restore above.
+  // This effect only runs once per project load (gated by hasRestoredFromDBRef).
+  useEffect(() => {
+    // Wait until localStorage restore is done so we don't clobber the block count
+    if (!project || !hasRestored || hasRestoredFromDBRef.current) return;
+    hasRestoredFromDBRef.current = true;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sceneUrls = ((project as any)?.sceneImageUrls as any[]) || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const videoUrls = ((project as any)?.videoUrls as any[]) || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPrompts = ((project as any)?.prompts as any[]) || [];
+
+    setBlocks(prev => {
+      // Start from the current blocks (already size-correct from localStorage initializer)
+      const newBlocks = prev.map(b => ({ ...b }));
+
+      const ensureBlock = (idx: number) => {
+        while (newBlocks.length <= idx) {
+          newBlocks.push({
+            startFrameUrl: null, startFrameHistory: [],
+            endFrameUrl: null, endFrameHistory: [],
+            videoUrl: null, videoHistory: [],
+            isGeneratingStart: false, isGeneratingEnd: false, isGeneratingVideo: false,
+          });
+        }
+      };
+
+      // If DB has MORE blocks than localStorage (e.g. after a different device saves),
+      // extend newBlocks to match
+      if (dbPrompts.length > newBlocks.length) {
+        ensureBlock(dbPrompts.length - 1);
+      }
+
+      // Merge prompts from DB (DB wins for text prompts since it's the source of truth)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dbPrompts.forEach((dp: any, i: number) => {
+        if (newBlocks[i]) {
+          if (dp.startPrompt) newBlocks[i].startPrompt = dp.startPrompt;
+          if (dp.endPrompt) newBlocks[i].endPrompt = dp.endPrompt;
+          if (dp.videoPrompt) newBlocks[i].videoPrompt = dp.videoPrompt;
+        }
+      });
+
+      // Apply scene image URLs from DB
+      sceneUrls.forEach((item: unknown) => {
+        if (typeof item === "string") {
+          ensureBlock(0);
+          newBlocks[0].startFrameHistory = [...(newBlocks[0].startFrameHistory || []), item];
+          newBlocks[0].startFrameUrl = item;
+        } else if (item && typeof item === "object") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parsed = item as any;
+          const bIdx = parsed.blockIndex || 0;
+          ensureBlock(bIdx);
+          if (parsed.type === "END") {
+            newBlocks[bIdx].endFrameHistory = [...(newBlocks[bIdx].endFrameHistory || []), parsed.url];
+            newBlocks[bIdx].endFrameUrl = parsed.url;
+          } else {
+            newBlocks[bIdx].startFrameHistory = [...(newBlocks[bIdx].startFrameHistory || []), parsed.url];
+            newBlocks[bIdx].startFrameUrl = parsed.url;
+          }
+        }
+      });
+
+      // Apply video URLs from DB
+      videoUrls.forEach((item: unknown) => {
+        if (typeof item === "string") {
+          ensureBlock(0);
+          newBlocks[0].videoHistory = [...(newBlocks[0].videoHistory || []), item];
+          newBlocks[0].videoUrl = item;
+        } else if (item && typeof item === "object") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parsed = item as any;
+          const bIdx = parsed.blockIndex || 0;
+          ensureBlock(bIdx);
+          newBlocks[bIdx].videoHistory = [...(newBlocks[bIdx].videoHistory || []), parsed.url];
+          newBlocks[bIdx].videoUrl = parsed.url;
+        }
+      });
+
+      // Inherit start frame from the previous block's end frame if missing
+      for (let i = 1; i < newBlocks.length; i++) {
+        if (!newBlocks[i].startFrameUrl) {
+          const inheritedUrl = newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl;
+          newBlocks[i].startFrameUrl = inheritedUrl;
+          if (inheritedUrl && (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0)) {
+            newBlocks[i].startFrameHistory = [inheritedUrl];
+          }
+        }
+      }
+
+      return newBlocks;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, hasRestored]);
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Persist block prompts to localStorage and DB on every change.
+  // Gated on hasRestored so we don't write stale state before the
+  // localStorage restore useEffect has run.
+  useEffect(() => {
+    if (!hasRestored || !project?.id || blocks.length === 0) return;
+
+    const dataToSave = blocks.map(b => ({
+      startPrompt: b.startPrompt,
+      endPrompt: b.endPrompt,
+      videoPrompt: b.videoPrompt
+    }));
+
+    // Save locally immediately
+    localStorage.setItem(`vibe-blocks-${project.id}`, JSON.stringify(dataToSave));
+
+    // Debounce saving to DB
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    const { mutationFn } = trpc.projects.updatePrompts.mutationOptions();
+    saveTimeoutRef.current = setTimeout(() => {
+      if (mutationFn) {
+        mutationFn({ projectId: project.id, prompts: dataToSave })
+          .catch(err => console.error("Failed to save prompts to DB:", err));
+      }
+    }, 1500);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRestored, project?.id, blocks]);
 
   // const cancelVideoGeneration = useMutation(
   //   trpc.projects.cancelVideoGeneration.mutationOptions({
@@ -181,10 +369,46 @@ export const ProjectView = ({ projectId }: Props) => {
     if (previousIsVideoLoading.current && !isVideoLoading) {
       if (currentVideoUrlsLength === previousVideoUrlsLength.current) {
         toast.error("Video generation failed. This usually happens if your prompt triggers the AI safety filters, or inputs were invalid. Please tweak your prompt and try again.", { duration: Infinity });
-
+        
+        setBlocks(prev => {
+          const newBlocks = [...prev];
+          const generatingIndex = newBlocks.findIndex(b => b.isGeneratingVideo);
+          if (generatingIndex !== -1) {
+            newBlocks[generatingIndex] = { ...newBlocks[generatingIndex], isGeneratingVideo: false };
+          }
+          return newBlocks;
+        });
       } else {
         toast.success("Video generated successfully!");
         refetchUsage();
+        
+        // Find the block that was generating and update it
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const newVideoUrls = ((project as any)?.videoUrls as any[] || []);
+        if (newVideoUrls.length > 0) {
+          setBlocks(prev => {
+            const newBlocks = [...prev];
+            // Find the last block or the block that is currently generating video
+            const generatingIndex = newBlocks.findIndex(b => b.isGeneratingVideo);
+            const targetIndex = generatingIndex !== -1 ? generatingIndex : newBlocks.length - 1;
+            
+            const targetBlock = newBlocks[targetIndex];
+            const lastItem = newVideoUrls[newVideoUrls.length - 1];
+            const finalUrl = typeof lastItem === "string" ? lastItem : lastItem?.url;
+            
+            if (finalUrl) {
+              const newHistory = [...(targetBlock.videoHistory || []), finalUrl];
+              
+              newBlocks[targetIndex] = { 
+                ...targetBlock, 
+                videoUrl: finalUrl, 
+                videoHistory: newHistory,
+                isGeneratingVideo: false 
+              };
+            }
+            return newBlocks;
+          });
+        }
       }
     }
 
@@ -247,18 +471,6 @@ export const ProjectView = ({ projectId }: Props) => {
 
 
   // Seed scene images from DB on project load
-  const rawSceneUrls = (project as Record<string, unknown>)?.sceneImageUrls;
-  useEffect(() => {
-    const urls: string[] = Array.isArray(rawSceneUrls) ? rawSceneUrls : [];
-    setSceneImageUrls(urls);
-  }, [project?.id, rawSceneUrls]);
-
-  const handleFrameGenerated = async (url: string) => {
-    setSceneImageUrls((prev) => [...prev, url]);
-    setSceneIsGenerating(false);
-    await refetch();
-  };
-
   const [windowWidth, setWindowWidth] = useState(1440);
 
   useEffect(() => {
@@ -277,51 +489,9 @@ export const ProjectView = ({ projectId }: Props) => {
   if (!project) return null;
 
   const currentStage = project.currentStage as Stage;
-  const isVideoLoading = currentStage === "GENERATING_VIDEO";
 
   return (
     <div className="h-screen bg-background relative">
-      {/* Full-screen drag overlay */}
-      {isDragging && (
-        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none">
-          <i className="ri-download-line text-white text-3xl mb-3" />
-          <p className="text-white text-lg tracking-wide">Drop your image</p>
-        </div>
-      )}
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          className="absolute inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <button
-            onClick={(e) => { e.stopPropagation(); setLightboxUrl(null); }}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-          >
-            <i className="ri-close-line" />
-          </button>
-          {lightboxUrl.match(/\.(mp4|webm)$/i) ? (
-            <video
-              src={lightboxUrl}
-              autoPlay
-              controls
-              loop
-              className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-black"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={lightboxUrl}
-                alt="Scene preview"
-                className="max-w-[80%] max-h-[80vh] rounded-2xl shadow-2xl object-contain bg-[#1C1C1C]"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </>
-          )}
-        </div>
-      )}
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel
           defaultSize={sidebarDefaultSize}
@@ -341,26 +511,16 @@ export const ProjectView = ({ projectId }: Props) => {
             onStageClick={(stage) => setActiveStageTab(stage)}
           />
 
-          {activeStageTab === "SCENE" && (
-            <SceneBuilder
+          {activeStageTab === "BACKGROUND" && (
+            <BackgroundBuilderLeft
               projectId={projectId}
-              initialPrompt={project.messages?.[0]?.content || ""}
-              droppedFile={droppedFile}
-              onGeneratingChange={setSceneIsGenerating}
-              onFrameGenerated={handleFrameGenerated}
-              onNext={() => setActiveStageTab("VIDEO")}
-            />
-          )}
-
-          {(activeStageTab === "VIDEO" || activeStageTab === "GENERATING_VIDEO") && (
-            <VideoBuilder
-              projectId={projectId}
-              selectedSceneUrl={selectedSceneUrl}
-              isGenerating={isVideoLoading}
-              onNext={() => setActiveStageTab("SITE")}
-              onBack={() => setActiveStageTab("SCENE")}
-              onClearSelection={() => setSelectedSceneUrl(null)}
-              droppedFile={droppedVideoFile}
+              blocks={blocks}
+              activeBlockIndex={activeBlockIndex}
+              activeBlockTab={activeBlockTab}
+              onTabChange={setActiveBlockTab}
+              onProceed={handleProceed}
+              isExtracting={isExtracting}
+              updateBlock={updateBlock}
             />
           )}
 
@@ -373,7 +533,7 @@ export const ProjectView = ({ projectId }: Props) => {
                   setActiveFragment={setActiveFragment}
                   stage="SITE"
                   extractedZipUrl={extractedZipUrl}
-                  onBack={() => setActiveStageTab("VIDEO")}
+                  onBack={() => setActiveStageTab("BACKGROUND")}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -455,198 +615,16 @@ export const ProjectView = ({ projectId }: Props) => {
             </div>
 
             <div className="flex-1 relative overflow-hidden bg-[#1C1C1C]">
-              {(activeStageTab === "SCENE" || activeStageTab === "GENERATING_VIDEO") ? (
-                <>
-                  {/* Empty state – centered in the full area */}
-                  {!sceneIsGenerating && sceneImageUrls.length === 0 && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <h2 className="text-sm text-white mb-1">Build scene</h2>
-                      <p className="text-xs text-white/30 leading-relaxed">
-                        Describe the world you want. We&apos;ll generate a visual you can animate.
-                      </p>
-                    </div>
-                  )}
-                  {/* Cards grid */}
-                  {(sceneIsGenerating || sceneImageUrls.length > 0) && (
-                    <div className="p-3">
-                      <div className="grid grid-cols-3 gap-3">
-                        {/* Currently generating card */}
-                        {sceneIsGenerating && (
-                          <div>
-                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1">
-                              <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
-                              <p className="text-white text-sm">Generating</p>
-                            </div>
-                            {/* Spacer matching the "Use this scene" button height so the grid cell aligns */}
-                            <div className="mt-3 h-9" />
-                          </div>
-                        )}
-                        {/* All generated image cards */}
-                        {[...sceneImageUrls].reverse().map((url, idx) => (
-                          <div key={url} className="flex flex-col">
-                            <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt={`Generated scene ${idx + 1}`}
-                                className="w-full h-full object-cover  rounded-[8px]"
-                              />
-                              {/* Hover action buttons */}
-                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    setDownloadingUrl(url);
-                                    try {
-                                      const res = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
-                                      const blob = await res.blob();
-                                      const blobUrl = URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = blobUrl;
-                                      a.download = `scene-${Date.now()}.png`;
-                                      a.click();
-                                      URL.revokeObjectURL(blobUrl);
-                                    } catch {
-                                      window.open(url, "_blank");
-                                    } finally {
-                                      setDownloadingUrl(null);
-                                    }
-                                  }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 disabled:opacity-50"
-                                  disabled={downloadingUrl === url}
-                                >
-                                  {downloadingUrl === url ? (
-                                    <i className="ri-loader-4-line text-xs animate-spin" />
-                                  ) : (
-                                    <i className="ri-download-line text-xs" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
-                                >
-                                  <i className="ri-fullscreen-line text-xs" />
-                                </button>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setSelectedSceneUrl(url);
-                                setActiveStageTab("VIDEO");
-                              }}
-                              className="mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5!"
-                            >
-                              Use this scene
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : activeStageTab === "VIDEO" ? (
-                <div className="flex-1 relative overflow-hidden flex flex-col h-full w-full">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {(!((project as any)?.videoUrls?.length > 0) && !isVideoLoading) ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <h2 className="text-sm text-white mb-1">Build video</h2>
-                      <p className="text-xs text-white/30 leading-relaxed">
-                        Describe the world you want. We&apos;ll generate a visual you can animate.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3">
-                      <div className="grid grid-cols-3 gap-3">
-                        {isVideoLoading && (
-                          <div className="relative group">
-                            <div className="bg-[#272725] rounded-[8px] overflow-hidden aspect-video flex flex-col items-center justify-center gap-1 ">
-                              <i className="ri-loader-4-line text-white text-2xl animate-spin inline-block" />
-                              <p className="text-white text-sm">Generating</p>
-                            </div>
-                            <div className="mt-3 h-9" />
-                          </div>
-                        )}
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {((project as any)?.videoUrls as string[] || []).slice().reverse().map((url) => (
-                          <div key={url} className="flex flex-col">
-                            <div className="relative aspect-video cursor-pointer group" onClick={() => setLightboxUrl(url)}>
-                              <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover rounded-[8px]" />
-                              {/* Hover action buttons */}
-                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    setDownloadingUrl(url);
-                                    try {
-                                      const res = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
-                                      const blob = await res.blob();
-                                      const blobUrl = URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = blobUrl;
-                                      a.download = `video-${Date.now()}.mp4`;
-                                      a.click();
-                                      URL.revokeObjectURL(blobUrl);
-                                    } catch {
-                                      window.open(url, "_blank");
-                                    } finally {
-                                      setDownloadingUrl(null);
-                                    }
-                                  }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 disabled:opacity-50"
-                                  disabled={downloadingUrl === url}
-                                >
-                                  {downloadingUrl === url ? (
-                                    <i className="ri-loader-4-line text-xs animate-spin" />
-                                  ) : (
-                                    <i className="ri-download-line text-xs" />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
-                                >
-                                  <i className="ri-fullscreen-line text-sm" />
-                                </button>
-                              </div>
-                            </div>
-                            <button
-                              disabled={extractingVideoUrl === url}
-                              onClick={async () => {
-                                try {
-                                  setExtractingVideoUrl(url);
-                                  const res = await fetch("/api/extract-frames", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ projectId, videoUrl: url }),
-                                  });
-                                  if (!res.ok) throw new Error("Failed to extract frames");
-                                  const data = await res.json();
-                                  setExtractedZipUrl(data.zipUrl);
-
-                                  setActiveStageTab("SITE");
-                                } catch (e) {
-                                  toast.error("Extraction failed: " + String(e), { duration: Infinity });
-                                } finally {
-                                  setExtractingVideoUrl(null);
-                                }
-                              }}
-                              className="mt-3 w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
-                            >
-                              {extractingVideoUrl === url ? (
-                                <>
-                                  <i className="ri-loader-4-line animate-spin inline-block text-sm mr-1" />
-                                  <span>Preparing...</span>
-                                </>
-                              ) : (
-                                "Use as background"
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>) : (
+              {activeStageTab === "BACKGROUND" ? (
+                <BackgroundBuilderRight
+                  blocks={blocks}
+                  activeBlockIndex={activeBlockIndex}
+                  setActiveBlockIndex={setActiveBlockIndex}
+                  onAddBlock={handleAddBlock}
+                  onRemoveBlock={handleRemoveBlock}
+                  updateBlock={updateBlock}
+                />
+              ) : (
                 <>
                   <TabsContent value="preview" className="h-full m-0">
                     {activeFragment ? (

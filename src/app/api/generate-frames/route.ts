@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
   let prompt: string;
   let projectId: string;
   let model: string = "gemini-3.1-flash-image-preview";
+  let frameType: string = "START";
+  let blockIndex: number = 0;
   let imageBytes: Buffer | null = null;
   let imageMimeType = "image/png";
 
@@ -29,6 +31,8 @@ export async function POST(req: NextRequest) {
     prompt = (form.get("prompt") as string) ?? "";
     projectId = (form.get("projectId") as string) ?? "";
     model = (form.get("model") as string) || model;
+    frameType = (form.get("frameType") as string) || "START";
+    blockIndex = parseInt((form.get("blockIndex") as string) || "0", 10);
     const imageFile = form.get("image") as File | null;
     if (imageFile) {
       imageMimeType = imageFile.type || "image/png";
@@ -39,6 +43,8 @@ export async function POST(req: NextRequest) {
     prompt = body.prompt ?? "";
     projectId = body.projectId ?? "";
     model = body.model || model;
+    frameType = body.frameType || "START";
+    blockIndex = body.blockIndex !== undefined ? body.blockIndex : 0;
   }
 
   if (!prompt || !projectId) {
@@ -147,15 +153,18 @@ export async function POST(req: NextRequest) {
         where: { id: projectId },
         select: { sceneImageUrls: true },
       });
-      const existingUrls: string[] = Array.isArray(existing?.sceneImageUrls)
-        ? (existing.sceneImageUrls as string[])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existingUrls: unknown[] = Array.isArray(existing?.sceneImageUrls)
+        ? (existing.sceneImageUrls as unknown[])
         : [];
+
+      const newEntry = { url: publicUrl, type: frameType, blockIndex };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (prisma.project as any).update({
         where: { id: projectId },
         data: {
-          sceneImageUrls: [...existingUrls, publicUrl],
+          sceneImageUrls: [...existingUrls, newEntry],
           // Promote to active on first successful scene generation
           status: "active",
         },

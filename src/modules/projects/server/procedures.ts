@@ -117,14 +117,33 @@ export const projectsRouter = createTRPCRouter({
         data: { name: input.name.trim() },
       });
     }),
+  updatePrompts: protectedProcedure
+    .input(z.object({
+      projectId: z.string().min(1),
+      prompts: z.any(), // Array of { startPrompt, endPrompt, videoPrompt }
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await prisma.project.findUnique({
+        where: { id: input.projectId, userId: ctx.auth.userId },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+      return prisma.project.update({
+        where: { id: input.projectId },
+        data: { prompts: input.prompts },
+      });
+    }),
   startVideoGeneration: protectedProcedure
     .input(
       z.object({
         projectId: z.string().min(1),
         prompt: z.string(),
         imageUrl: z.string().optional(),
+        endImageUrl: z.string().optional(),
         imageBase64: z.string().optional(),
         model: z.string().optional(),
+        blockIndex: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -181,9 +200,11 @@ export const projectsRouter = createTRPCRouter({
           prompt: input.prompt,
           outputGcsUri,
           imageUrl,
+          endImageUrl: input.endImageUrl,
           imageBase64,
           model: input.model || "veo-3.1-lite-generate-001",
           userId: ctx.auth.userId,
+          blockIndex: input.blockIndex,
         },
       });
 

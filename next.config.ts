@@ -30,7 +30,7 @@ try {
 
 const nextConfig: NextConfig = {
   output: "standalone", // Required for Docker/Cloud Run deployment
-  serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static"],
+  serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static", "inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   outputFileTracingIncludes: {
     "/api/extract-frames": ["./node_modules/ffmpeg-static/**/*"],
   },

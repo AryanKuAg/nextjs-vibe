@@ -27,6 +27,7 @@ model Project {
   currentStage   String @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
   videoUrls      Json   @default("[]") // Array of all generated cinematic videos
   sceneImageUrls Json   @default("[]") // Array of all generated scene image URLs
+  prompts        Json   @default("[]") // Array of prompts for each block
 
   messages Message[]
 }

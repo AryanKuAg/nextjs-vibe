@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { dehydrate } from "@tanstack/react-query";
+import { HydrationBoundary } from "@/components/query-hydration-boundary";
 
 import { getQueryClient, trpc } from "@/trpc/server";
 

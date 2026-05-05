@@ -1,30 +1,8 @@
-import { Inngest, EventSchemas } from "inngest";
-
-type Events = {
-  "code-agent/run": {
-    data: {
-      projectId: string;
-      value: string;
-      videoUrl?: string; // Swapped from explicit Frame Generation
-      model?: string;
-      userId: string;
-    };
-  };
-  "veo/generate": {
-    data: {
-      projectId: string;
-      prompt: string;
-      outputGcsUri: string;
-      imageUrl?: string;
-      imageBase64?: string;
-      model?: string;
-      userId: string;
-    };
-  };
-};
+import { Inngest } from "inngest";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ 
   id: "vibe-development",
-  schemas: new EventSchemas().fromRecord<Events>()
+  eventKey: process.env.INNGEST_EVENT_KEY || "local",
+  isDev: process.env.NODE_ENV === "development"
 });

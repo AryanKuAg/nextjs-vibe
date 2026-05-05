@@ -888,13 +888,37 @@ export const veoGenerateFunction = inngest.createFunction(
             }
 
             if (gcsBucketName && gcsObjectPath) {
-              instances = [{
+              const instancePayload: Record<string, unknown> = {
                 prompt: prompt,
                 image: {
                   gcsUri: `gs://${gcsBucketName}/${gcsObjectPath}`,
                   mimeType: "image/jpeg" // usually JPEG from UI
                 }
-              }];
+              };
+
+              // Check for end image
+              if (event.data.endImageUrl) {
+                let endGcsBucketName = "";
+                let endGcsObjectPath = "";
+                const endStandardMatch = event.data.endImageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
+                const endCdnMatch = event.data.endImageUrl.match(/sites\.framerate\.space\/(.+)$/);
+                if (endStandardMatch) {
+                  endGcsBucketName = endStandardMatch[1];
+                  endGcsObjectPath = endStandardMatch[2];
+                } else if (endCdnMatch) {
+                  endGcsBucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
+                  endGcsObjectPath = endCdnMatch[1];
+                }
+
+                if (endGcsBucketName && endGcsObjectPath) {
+                  instancePayload.lastFrame = {
+                    gcsUri: `gs://${endGcsBucketName}/${endGcsObjectPath}`,
+                    mimeType: "image/jpeg"
+                  };
+                }
+              }
+
+              instances = [instancePayload];
             }
             //
           } else if (event.data.imageBase64) {
@@ -1009,13 +1033,15 @@ export const veoGenerateFunction = inngest.createFunction(
       await step.run("update-project-video-url", async () => {
         const existingProject = await prisma.project.findUnique({ where: { id: projectId } });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const existingUrls = Array.isArray((existingProject as any)?.videoUrls) ? (existingProject as any).videoUrls as string[] : [];
+        const existingUrls = Array.isArray((existingProject as any)?.videoUrls) ? (existingProject as any).videoUrls as unknown[] : [];
+
+        const newVideoEntry = { url: videoUri, blockIndex: event.data.blockIndex || 0 };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (prisma.project as any).update({
           where: { id: projectId },
           data: {
-            videoUrls: [...existingUrls, videoUri],
+            videoUrls: [...existingUrls, newVideoEntry],
             currentStage: "VIDEO"
           }
         });

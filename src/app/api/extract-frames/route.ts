@@ -49,33 +49,59 @@ export async function POST(req: NextRequest) {
       where: { id: projectId, userId },
     });
 
-    // Use the explicitly passed videoUrl from the client, or fallback to first project video
+    // Use all videos sorted by blockIndex
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const projectVideos = (project as any)?.videoUrls as string[] || [];
-    const videoUrl = bodyVideoUrl || projectVideos[0];
+    const projectVideos = (project as any)?.videoUrls as any[] || [];
+    const sortedVideos = [...projectVideos].sort((a, b) => (a.blockIndex || 0) - (b.blockIndex || 0));
+    const videoUrlsToProcess = bodyVideoUrl ? [bodyVideoUrl] : sortedVideos.map(v => typeof v === "string" ? v : v?.url).filter(Boolean);
 
-    if (!videoUrl) {
+    if (videoUrlsToProcess.length === 0) {
       return NextResponse.json(
         { error: "No video provided or found for this project" },
         { status: 404 }
       );
     }
 
-    // Download video from Vercel Blob into /tmp
-    const videoResponse = await fetch(videoUrl);
-    if (!videoResponse.ok) {
-      throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-    }
-    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
-
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `vibe-frames-${projectId}-`));
-    const videoPath = path.join(tmpDir, "video.mp4");
     const framesDir = path.join(tmpDir, "frames");
-    fs.writeFileSync(videoPath, videoBuffer);
     fs.mkdirSync(framesDir);
 
-    // First, probe the video duration using ffprobe
+    const videoPaths = [];
+    for (let i = 0; i < videoUrlsToProcess.length; i++) {
+      const videoResponse = await fetch(videoUrlsToProcess[i]);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to download video ${i}: ${videoResponse.statusText}`);
+      }
+      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+      const p = path.join(tmpDir, `video-${i}.mp4`);
+      fs.writeFileSync(p, videoBuffer);
+      videoPaths.push(p);
+    }
+
     const ffmpeg = await getFFmpeg();
+    
+    // Combine videos if there are multiple
+    let videoPath = videoPaths[0];
+    if (videoPaths.length > 1) {
+      const listPath = path.join(tmpDir, "list.txt");
+      const listContent = videoPaths.map(p => `file '${p}'`).join("\n");
+      fs.writeFileSync(listPath, listContent);
+      
+      const combinedVideoPath = path.join(tmpDir, "combined.mp4");
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg()
+          .input(listPath)
+          .inputOptions(["-f", "concat", "-safe", "0"])
+          .outputOptions(["-c", "copy"])
+          .output(combinedVideoPath)
+          .on("end", () => resolve())
+          .on("error", (err: Error) => reject(err))
+          .run();
+      });
+      videoPath = combinedVideoPath;
+    }
+
+    // First, probe the video duration using ffprobe
     // In Cloud Run (Alpine), ffprobe is installed system-wide via `apk add ffmpeg`.
     // Locally on macOS, we fall back to the ffprobe-static npm binary.
     // eslint-disable-next-line @typescript-eslint/no-require-imports

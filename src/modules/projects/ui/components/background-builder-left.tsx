@@ -40,9 +40,8 @@ const saveImageToIDB = async (key: string, file: File) => {
     const db = await openImagesDB();
     const tx = db.transaction("images", "readwrite");
     tx.objectStore("images").put(file, key);
-  } catch (e) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    console.error("Failed to save image to IDB:", e);
+  } catch (err) {
+    console.error("Failed to save image to IDB:", err);
   }
 };
 
@@ -55,8 +54,7 @@ const loadImageFromIDB = async (key: string): Promise<File | null> => {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
-  } catch (e) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch {
     return null;
   }
 };
@@ -66,8 +64,8 @@ const deleteImageFromIDB = async (key: string) => {
     const db = await openImagesDB();
     const tx = db.transaction("images", "readwrite");
     tx.objectStore("images").delete(key);
-  } catch (e) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch {
+    // ignore
   }
 };
 
@@ -126,6 +124,7 @@ export const BackgroundBuilderLeft = ({
         }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBlockIndex, isStart, isEnd, isVideo, imageKey]);
 
   const setUploadedImage = (file: File | null) => {

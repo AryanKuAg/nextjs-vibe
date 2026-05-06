@@ -175,7 +175,6 @@ export const ProjectView = ({ projectId }: Props) => {
     });
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -560,6 +559,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
     previousIsVideoLoading.current = isVideoLoading;
     previousVideoUrlsLength.current = currentVideoUrlsLength;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, refetchUsage]);
 
   const handleDownloadZip = () => {

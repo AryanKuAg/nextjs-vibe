@@ -130,8 +130,21 @@ export const ProjectView = ({ projectId }: Props) => {
       return newBlocks;
     });
     if (activeBlockIndex >= index) {
-      setActiveBlockIndex(Math.max(0, index - 1));
-      if (index === 1) setActiveBlockTab("START"); // if we go back to block 0, we can see START tab again
+      handleSetActiveBlockIndex(Math.max(0, index - 1));
+    }
+  };
+
+  const handleSetActiveBlockIndex = (index: number) => {
+    setActiveBlockIndex(index);
+    if (index > 0 && activeBlockTab === "START") {
+      setActiveBlockTab("END");
+    } else if (index === 0 && activeBlockTab === "END" && !blocks[0]?.endFrameUrl) {
+      // Optional: switch back to START if going back to 0? The original code had `if (index === 1) setActiveBlockTab("START");` inside handleRemoveBlock.
+      // Let's just do:
+    }
+    // Also from handleRemoveBlock:
+    if (index === 0 && activeBlockIndex > 0) {
+      setActiveBlockTab("START"); // revert to START when going back to the first box
     }
   };
 
@@ -139,6 +152,19 @@ export const ProjectView = ({ projectId }: Props) => {
     setBlocks(prev => {
       const newBlocks = [...prev];
       newBlocks[index] = { ...newBlocks[index], ...updates };
+
+      // Cascade inherited start frames for all subsequent blocks
+      for (let i = 1; i < newBlocks.length; i++) {
+        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+        if (newBlocks[i].startFrameUrl !== inheritedUrl) {
+          newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
+          if (inheritedUrl) {
+            // Keep history in sync with inherited frame
+            newBlocks[i].startFrameHistory = [...(newBlocks[i].startFrameHistory || []), inheritedUrl];
+          }
+        }
+      }
+
       return newBlocks;
     });
   };
@@ -284,12 +310,17 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Inherit start frame from the previous block's end frame if missing
       for (let i = 1; i < newBlocks.length; i++) {
-        if (!newBlocks[i].startFrameUrl) {
-          const inheritedUrl = newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl;
+        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+        
+        // If it's missing (or null) and we have an inherited URL, set it
+        if (!newBlocks[i].startFrameUrl && inheritedUrl) {
           newBlocks[i].startFrameUrl = inheritedUrl;
-          if (inheritedUrl && (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0)) {
+          if (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0) {
             newBlocks[i].startFrameHistory = [inheritedUrl];
           }
+        } else if (!inheritedUrl && newBlocks[i].startFrameUrl && i > 0) {
+          // If the previous block lost its video, we must wipe this inherited frame
+          newBlocks[i].startFrameUrl = null;
         }
       }
 
@@ -297,6 +328,82 @@ export const ProjectView = ({ projectId }: Props) => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id, hasRestored]);
+
+  // Sync background generated URLs (like videos from polling) continuously.
+  useEffect(() => {
+    if (!project || !hasRestored) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sceneUrls = ((project as any)?.sceneImageUrls as any[]) || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const videoUrls = ((project as any)?.videoUrls as any[]) || [];
+
+    setBlocks(prev => {
+      const newBlocks = prev.map(b => ({ ...b }));
+      let changed = false;
+
+      sceneUrls.forEach((item: unknown) => {
+        if (item && typeof item === "object") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parsed = item as any;
+          const bIdx = parsed.blockIndex || 0;
+          if (newBlocks[bIdx]) {
+            if (parsed.type === "END") {
+              if (newBlocks[bIdx].endFrameUrl !== parsed.url) {
+                newBlocks[bIdx].endFrameHistory = [...(newBlocks[bIdx].endFrameHistory || []), parsed.url];
+                newBlocks[bIdx].endFrameUrl = parsed.url;
+                newBlocks[bIdx].isGeneratingEnd = false;
+                changed = true;
+              }
+            } else {
+              if (newBlocks[bIdx].startFrameUrl !== parsed.url) {
+                newBlocks[bIdx].startFrameHistory = [...(newBlocks[bIdx].startFrameHistory || []), parsed.url];
+                newBlocks[bIdx].startFrameUrl = parsed.url;
+                newBlocks[bIdx].isGeneratingStart = false;
+                changed = true;
+              }
+            }
+          }
+        }
+      });
+
+      videoUrls.forEach((item: unknown) => {
+        if (item && typeof item === "object") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parsed = item as any;
+          const bIdx = parsed.blockIndex || 0;
+          if (newBlocks[bIdx]) {
+            if (newBlocks[bIdx].videoUrl !== parsed.url) {
+              newBlocks[bIdx].videoHistory = [...(newBlocks[bIdx].videoHistory || []), parsed.url];
+              newBlocks[bIdx].videoUrl = parsed.url;
+              newBlocks[bIdx].isGeneratingVideo = false;
+              changed = true;
+            }
+          }
+        }
+      });
+
+      if (changed) {
+        // Cascade start frame from previous block's end frame if missing
+        for (let i = 1; i < newBlocks.length; i++) {
+          const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+          
+          if (!newBlocks[i].startFrameUrl && inheritedUrl) {
+            newBlocks[i].startFrameUrl = inheritedUrl;
+            if (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0) {
+              newBlocks[i].startFrameHistory = [inheritedUrl];
+            }
+          } else if (!inheritedUrl && newBlocks[i].startFrameUrl && i > 0) {
+            newBlocks[i].startFrameUrl = null;
+          }
+        }
+        return newBlocks;
+      }
+
+      return prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.sceneImageUrls, project?.videoUrls, hasRestored]);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -388,13 +495,16 @@ export const ProjectView = ({ projectId }: Props) => {
         if (newVideoUrls.length > 0) {
           setBlocks(prev => {
             const newBlocks = [...prev];
-            // Find the last block or the block that is currently generating video
-            const generatingIndex = newBlocks.findIndex(b => b.isGeneratingVideo);
-            const targetIndex = generatingIndex !== -1 ? generatingIndex : newBlocks.length - 1;
-            
-            const targetBlock = newBlocks[targetIndex];
             const lastItem = newVideoUrls[newVideoUrls.length - 1];
             const finalUrl = typeof lastItem === "string" ? lastItem : lastItem?.url;
+            const targetIndex = typeof lastItem === "string" ? 0 : (lastItem?.blockIndex || 0);
+            
+            // Ensure array has enough blocks (rare edge case, but safe)
+            while (newBlocks.length <= targetIndex) {
+              newBlocks.push({ ...emptyBlock });
+            }
+            
+            const targetBlock = newBlocks[targetIndex];
             
             if (finalUrl) {
               const newHistory = [...(targetBlock.videoHistory || []), finalUrl];
@@ -405,6 +515,13 @@ export const ProjectView = ({ projectId }: Props) => {
                 videoHistory: newHistory,
                 isGeneratingVideo: false 
               };
+            }
+
+            // Also reset any stuck loaders
+            for (let i = 0; i < newBlocks.length; i++) {
+              if (i !== targetIndex) {
+                newBlocks[i] = { ...newBlocks[i], isGeneratingVideo: false };
+              }
             }
             return newBlocks;
           });
@@ -619,7 +736,7 @@ export const ProjectView = ({ projectId }: Props) => {
                 <BackgroundBuilderRight
                   blocks={blocks}
                   activeBlockIndex={activeBlockIndex}
-                  setActiveBlockIndex={setActiveBlockIndex}
+                  setActiveBlockIndex={handleSetActiveBlockIndex}
                   onAddBlock={handleAddBlock}
                   onRemoveBlock={handleRemoveBlock}
                   updateBlock={updateBlock}

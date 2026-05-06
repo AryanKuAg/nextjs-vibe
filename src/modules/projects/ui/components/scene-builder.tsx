@@ -155,7 +155,7 @@ export const SceneBuilder = ({
       onFrameGenerated(data.frameUrl);
     } catch (error: unknown) {
       const err = error as { message?: string };
-      if (err?.message?.toLowerCase().includes("credits") || err?.message?.toLowerCase().includes("too many requests")) {
+      if (err?.message?.toLowerCase().includes("credits")) {
         setShowCreditsModal(true);
       } else {
         toast.error(error instanceof Error ? error.message : "Something went wrong", { duration: Infinity });

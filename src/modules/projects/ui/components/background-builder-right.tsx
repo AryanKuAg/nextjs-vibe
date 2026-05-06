@@ -14,6 +14,8 @@ export interface VideoBlock {
   endFrameHistory?: string[];
   videoUrl: string | null;
   videoHistory?: string[];
+  startUploadedImage?: File | null;
+  endUploadedImage?: File | null;
   isGeneratingStart: boolean;
   isGeneratingEnd: boolean;
   isGeneratingVideo: boolean;
@@ -62,9 +64,9 @@ export const BackgroundBuilderRight = ({
   };
 
   const renderHistoryIndicator = (type: "START" | "END" | "VIDEO", url: string | null, history?: string[], block?: VideoBlock, index?: number) => {
-    if (!url || !history || history.length === 0 || !block || index === undefined) return null;
+    if (!url || !history || history.length <= 1 || !block || index === undefined) return null;
     const idx = history.indexOf(url);
-    if (idx === -1) return <span className="text-[#666] text-xs font-mono">1/1</span>;
+    if (idx === -1) return null;
     return (
       <div className="flex items-center gap-1">
         <button
@@ -92,13 +94,17 @@ export const BackgroundBuilderRight = ({
     const endTime = index === 0 ? 8 : startTime + 4;
     const duration = `${startTime}s - ${endTime}s`;
     const isActive = index === activeBlockIndex;
+    const isLocked = index > 0 && !blocks[index - 1].videoUrl;
     const showRemove = index > 0 && index === blocks.length - 1;
 
     return (
       <div
         key={index}
-        className="flex flex-col mb-12 max-w-4xl mx-auto w-full"
-        onClick={() => setActiveBlockIndex(index)}
+        className={cn(
+          "flex flex-col mb-12 max-w-4xl mx-auto w-full transition-opacity duration-200",
+          isLocked ? "opacity-30 pointer-events-none" : "cursor-pointer"
+        )}
+        onClick={() => !isLocked && setActiveBlockIndex(index)}
       >
         {index > 0 && (
           <div className="flex justify-center mb-2">
@@ -107,7 +113,7 @@ export const BackgroundBuilderRight = ({
         )}
         <div className={cn(
           "bg-[#272725] rounded-xl p-4 border transition-colors",
-          isActive ? "border-[#444]" : "opacity-80"
+          isActive ? "border-[#444]" : "border-transparent opacity-80"
         )}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white text-sm font-inconsolata">{title}</h3>
@@ -202,9 +208,10 @@ export const BackgroundBuilderRight = ({
         {blocks.length < 4 && (
           <button
             onClick={onAddBlock}
-            className="w-full py-4 mt-2 rounded-[12px] border border-[#282825] bg-transparent hover:bg-white/5 text-[#999] text-sm font-inconsolata transition-colors"
+            disabled={!blocks[blocks.length - 1].videoUrl}
+            className="w-full py-4 mt-2 rounded-[12px] border border-[#282825] bg-transparent hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent text-[#999] text-sm font-inconsolata transition-colors"
           >
-            Add another video
+            {blocks[blocks.length - 1].videoUrl ? "Add another video" : "Generate video above to add another"}
           </button>
         )}
       </div>

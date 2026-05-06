@@ -30,6 +30,8 @@ interface Props {
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
 }
 
+import { useState } from "react";
+
 export const BackgroundBuilderRight = ({
   blocks,
   activeBlockIndex,
@@ -38,33 +40,66 @@ export const BackgroundBuilderRight = ({
   onRemoveBlock,
   updateBlock
 }: Props) => {
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   const handleNavigate = (type: "START" | "END" | "VIDEO", direction: number, block: VideoBlock, index: number) => {
     if (type === "START" && block.startFrameHistory) {
-      const currentIdx = block.startFrameHistory.indexOf(block.startFrameUrl || "");
+      const history = Array.from(new Set(block.startFrameHistory));
+      const currentIdx = history.indexOf(block.startFrameUrl || "");
       if (currentIdx !== -1) {
-        const newIdx = (currentIdx + direction + block.startFrameHistory.length) % block.startFrameHistory.length;
-        updateBlock(index, { startFrameUrl: block.startFrameHistory[newIdx] });
+        const newIdx = (currentIdx + direction + history.length) % history.length;
+        updateBlock(index, { startFrameUrl: history[newIdx] });
       }
     }
     if (type === "END" && block.endFrameHistory) {
-      const currentIdx = block.endFrameHistory.indexOf(block.endFrameUrl || "");
+      const history = Array.from(new Set(block.endFrameHistory));
+      const currentIdx = history.indexOf(block.endFrameUrl || "");
       if (currentIdx !== -1) {
-        const newIdx = (currentIdx + direction + block.endFrameHistory.length) % block.endFrameHistory.length;
-        updateBlock(index, { endFrameUrl: block.endFrameHistory[newIdx] });
+        const newIdx = (currentIdx + direction + history.length) % history.length;
+        updateBlock(index, { endFrameUrl: history[newIdx] });
       }
     }
     if (type === "VIDEO" && block.videoHistory) {
-      const currentIdx = block.videoHistory.indexOf(block.videoUrl || "");
+      const history = Array.from(new Set(block.videoHistory));
+      const currentIdx = history.indexOf(block.videoUrl || "");
       if (currentIdx !== -1) {
-        const newIdx = (currentIdx + direction + block.videoHistory.length) % block.videoHistory.length;
-        updateBlock(index, { videoUrl: block.videoHistory[newIdx] });
+        const newIdx = (currentIdx + direction + history.length) % history.length;
+        updateBlock(index, { 
+          videoUrl: history[newIdx]
+        });
       }
     }
   };
 
-  const renderHistoryIndicator = (type: "START" | "END" | "VIDEO", url: string | null, history?: string[], block?: VideoBlock, index?: number) => {
-    if (!url || !history || history.length <= 1 || !block || index === undefined) return null;
+
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.error("Failed to download image", e);
+    }
+  };
+
+  const handleFullscreen = (e: React.MouseEvent, url: string) => {
+    setFullscreenImage(url);
+  };
+
+  const renderHistoryIndicator = (type: "START" | "END" | "VIDEO", url: string | null, rawHistory?: string[], block?: VideoBlock, index?: number) => {
+    if (!url || !rawHistory || rawHistory.length <= 1 || !block || index === undefined) return null;
+    if (type === "START" && index > 0) return null; // Hide history for inherited start frames
+    
+    const history = Array.from(new Set(rawHistory));
+    if (history.length <= 1) return null; // Don't show if there are no alternatives
+
     const idx = history.indexOf(url);
     if (idx === -1) return null;
     return (
@@ -90,8 +125,8 @@ export const BackgroundBuilderRight = ({
 
   const renderBlock = (block: VideoBlock, index: number) => {
     const title = `Video ${index + 1}`;
-    const startTime = index === 0 ? 0 : 8 + (index - 1) * 4;
-    const endTime = index === 0 ? 8 : startTime + 4;
+    const startTime = index * 4;
+    const endTime = startTime + 4;
     const duration = `${startTime}s - ${endTime}s`;
     const isActive = index === activeBlockIndex;
     const isLocked = index > 0 && !blocks[index - 1].videoUrl;
@@ -102,7 +137,7 @@ export const BackgroundBuilderRight = ({
         key={index}
         className={cn(
           "flex flex-col mb-12 max-w-4xl mx-auto w-full transition-opacity duration-200",
-          isLocked ? "opacity-30 pointer-events-none" : "cursor-pointer"
+          isLocked ? "opacity-40" : !isActive ? "cursor-pointer" : ""
         )}
         onClick={() => !isLocked && setActiveBlockIndex(index)}
       >
@@ -145,11 +180,31 @@ export const BackgroundBuilderRight = ({
                 {block.isGeneratingStart ? (
                   <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
                 ) : block.startFrameUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={block.startFrameUrl} alt="Start frame" className="w-full h-full object-cover" />
+                  <div className="relative w-full h-full group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={block.startFrameUrl} alt="Start frame" className="w-full h-full object-cover" />
+                    <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDownload(block.startFrameUrl!, `start-frame-${index + 1}.png`); }}
+                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                        title="Download image"
+                      >
+                        <i className="ri-download-2-line text-sm" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.startFrameUrl!); }}
+                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                        title="View Fullscreen"
+                      >
+                        <i className="ri-fullscreen-line text-sm" />
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <span className="text-[#666] text-xs font-inconsolata">
-                    {index > 0 ? `Last frame of video ${index} will appear here` : "Prompt to generate"}
+                    {index > 0 ? (
+                      `Last frame of video ${index} will appear here`
+                    ) : "Prompt to generate"}
                   </span>
                 )}
               </div>
@@ -165,10 +220,28 @@ export const BackgroundBuilderRight = ({
                 {block.isGeneratingEnd ? (
                   <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
                 ) : block.endFrameUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={block.endFrameUrl} alt="End frame" className="w-full h-full object-cover" />
+                  <div className="relative w-full h-full group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={block.endFrameUrl} alt="End frame" className="w-full h-full object-cover" />
+                    <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDownload(block.endFrameUrl!, `end-frame-${index + 1}.png`); }}
+                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                        title="Download image"
+                      >
+                        <i className="ri-download-2-line text-sm" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.endFrameUrl!); }}
+                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                        title="View Fullscreen"
+                      >
+                        <i className="ri-fullscreen-line text-sm" />
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <span className="text-[#666] text-xs font-inconsolata">Prompt to generate (Optional)</span>
+                  <span className="text-[#666] text-xs font-inconsolata">Prompt to generate</span>
                 )}
               </div>
             </div>
@@ -184,7 +257,7 @@ export const BackgroundBuilderRight = ({
               {block.isGeneratingVideo ? (
                 <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
               ) : block.videoUrl ? (
-                <video src={block.videoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                <video src={block.videoUrl} autoPlay loop muted playsInline controls className="w-full h-full object-cover" />
               ) : (
                 <span className="text-[#666] text-xs font-inconsolata">Preview your generated video here</span>
               )}
@@ -208,14 +281,40 @@ export const BackgroundBuilderRight = ({
         {blocks.length < 4 && (
           <button
             onClick={onAddBlock}
-            disabled={!blocks[blocks.length - 1].videoUrl}
-            className="w-full py-4 mt-2 rounded-[12px] border border-[#282825] bg-transparent hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent text-[#999] text-sm font-inconsolata transition-colors"
+            disabled={!blocks[blocks.length - 1]?.videoUrl}
+            className={cn(
+              "w-full py-4 mt-2 rounded-[12px] border border-[#282825] bg-transparent text-[#999] text-sm font-inconsolata transition-colors",
+              !blocks[blocks.length - 1]?.videoUrl
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-white/5"
+            )}
           >
-            {blocks[blocks.length - 1].videoUrl ? "Add another video" : "Generate video above to add another"}
+            Add another video
           </button>
         )}
       </div>
 
+      {/* Fullscreen Lightbox Modal */}
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center backdrop-blur-sm"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button
+            className="absolute top-6 right-6 text-white/70 hover:text-white p-2 transition-colors bg-black/40 rounded-full w-12 h-12 flex items-center justify-center backdrop-blur-md"
+            onClick={(e) => { e.stopPropagation(); setFullscreenImage(null); }}
+          >
+            <i className="ri-close-line text-2xl" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fullscreenImage}
+            alt="Fullscreen preview"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -943,7 +943,7 @@ export const veoGenerateFunction = inngest.createFunction(
             parameters: {
               aspectRatio: "16:9",
               resolution: "720p",
-              durationSeconds: 8,
+              durationSeconds: 4,
               includeAudio: false,
               generateAudio: false
             }

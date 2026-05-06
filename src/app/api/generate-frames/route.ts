@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const framePrompt = `Generate a vivid, cinematic image: ${prompt}. Make it visually stunning.`;
+    const framePrompt = prompt;
 
     // Build content parts — include image if provided
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

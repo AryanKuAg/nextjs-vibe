@@ -176,6 +176,9 @@ export const ProjectForm = () => {
       return;
     }
 
+    // Persist the selected model so the dashboard uses it for auto-submit
+    sessionStorage.setItem("pending_model", selectedModel);
+
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
       try {

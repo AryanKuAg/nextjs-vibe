@@ -26,6 +26,8 @@ import { StageIndicator } from "../components/stage-indicator";
 import { BackgroundBuilderLeft } from "../components/background-builder-left";
 import { BackgroundBuilderRight, VideoBlock, BlockTab } from "../components/background-builder-right";
 
+// Removed frame extraction since end frames are mandatory
+
 interface Props {
   projectId: string;
 };
@@ -111,10 +113,11 @@ export const ProjectView = ({ projectId }: Props) => {
     if (blocks.length < 4) {
       setBlocks(prev => {
         const lastBlock = prev[prev.length - 1];
+        const inheritedUrl = lastBlock.videoUrl ? (lastBlock.endFrameUrl || null) : null;
         const newBlock = { 
           ...emptyBlock,
-          startFrameUrl: lastBlock.endFrameUrl || lastBlock.startFrameUrl, // Inherit end frame of previous video
-          startFrameHistory: lastBlock.endFrameUrl ? [lastBlock.endFrameUrl] : (lastBlock.startFrameUrl ? [lastBlock.startFrameUrl] : []),
+          startFrameUrl: inheritedUrl,
+          startFrameHistory: inheritedUrl ? [inheritedUrl] : [],
         };
         return [...prev, newBlock];
       });
@@ -155,12 +158,15 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Cascade inherited start frames for all subsequent blocks
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
           if (inheritedUrl) {
-            // Keep history in sync with inherited frame
-            newBlocks[i].startFrameHistory = [...(newBlocks[i].startFrameHistory || []), inheritedUrl];
+            // Keep history in sync with inherited frame, preventing duplicates
+            const history = newBlocks[i].startFrameHistory || [];
+            if (!history.includes(inheritedUrl)) {
+              newBlocks[i].startFrameHistory = [...history, inheritedUrl];
+            }
           }
         }
       }
@@ -275,19 +281,28 @@ export const ProjectView = ({ projectId }: Props) => {
       sceneUrls.forEach((item: unknown) => {
         if (typeof item === "string") {
           ensureBlock(0);
-          newBlocks[0].startFrameHistory = [...(newBlocks[0].startFrameHistory || []), item];
-          newBlocks[0].startFrameUrl = item;
+          const history = newBlocks[0].startFrameHistory || [];
+          if (!history.includes(item)) {
+            newBlocks[0].startFrameHistory = [...history, item];
+            newBlocks[0].startFrameUrl = item;
+          }
         } else if (item && typeof item === "object") {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const parsed = item as any;
           const bIdx = parsed.blockIndex || 0;
           ensureBlock(bIdx);
           if (parsed.type === "END") {
-            newBlocks[bIdx].endFrameHistory = [...(newBlocks[bIdx].endFrameHistory || []), parsed.url];
-            newBlocks[bIdx].endFrameUrl = parsed.url;
+            const history = newBlocks[bIdx].endFrameHistory || [];
+            if (!history.includes(parsed.url)) {
+              newBlocks[bIdx].endFrameHistory = [...history, parsed.url];
+              newBlocks[bIdx].endFrameUrl = parsed.url;
+            }
           } else {
-            newBlocks[bIdx].startFrameHistory = [...(newBlocks[bIdx].startFrameHistory || []), parsed.url];
-            newBlocks[bIdx].startFrameUrl = parsed.url;
+            const history = newBlocks[bIdx].startFrameHistory || [];
+            if (!history.includes(parsed.url)) {
+              newBlocks[bIdx].startFrameHistory = [...history, parsed.url];
+              newBlocks[bIdx].startFrameUrl = parsed.url;
+            }
           }
         }
       });
@@ -296,31 +311,36 @@ export const ProjectView = ({ projectId }: Props) => {
       videoUrls.forEach((item: unknown) => {
         if (typeof item === "string") {
           ensureBlock(0);
-          newBlocks[0].videoHistory = [...(newBlocks[0].videoHistory || []), item];
-          newBlocks[0].videoUrl = item;
+          const history = newBlocks[0].videoHistory || [];
+          if (!history.includes(item)) {
+            newBlocks[0].videoHistory = [...history, item];
+            newBlocks[0].videoUrl = item;
+          }
         } else if (item && typeof item === "object") {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const parsed = item as any;
           const bIdx = parsed.blockIndex || 0;
           ensureBlock(bIdx);
-          newBlocks[bIdx].videoHistory = [...(newBlocks[bIdx].videoHistory || []), parsed.url];
-          newBlocks[bIdx].videoUrl = parsed.url;
+          const history = newBlocks[bIdx].videoHistory || [];
+          if (!history.includes(parsed.url)) {
+            newBlocks[bIdx].videoHistory = [...history, parsed.url];
+            newBlocks[bIdx].videoUrl = parsed.url;
+          }
         }
       });
 
       // Inherit start frame from the previous block's end frame if missing
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
         
-        // If it's missing (or null) and we have an inherited URL, set it
-        if (!newBlocks[i].startFrameUrl && inheritedUrl) {
+        if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i].startFrameUrl = inheritedUrl;
-          if (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0) {
-            newBlocks[i].startFrameHistory = [inheritedUrl];
+          if (inheritedUrl) {
+            const history = newBlocks[i].startFrameHistory || [];
+            if (!history.includes(inheritedUrl)) {
+              newBlocks[i].startFrameHistory = [...history, inheritedUrl];
+            }
           }
-        } else if (!inheritedUrl && newBlocks[i].startFrameUrl && i > 0) {
-          // If the previous block lost its video, we must wipe this inherited frame
-          newBlocks[i].startFrameUrl = null;
         }
       }
 
@@ -349,15 +369,17 @@ export const ProjectView = ({ projectId }: Props) => {
           const bIdx = parsed.blockIndex || 0;
           if (newBlocks[bIdx]) {
             if (parsed.type === "END") {
-              if (newBlocks[bIdx].endFrameUrl !== parsed.url) {
-                newBlocks[bIdx].endFrameHistory = [...(newBlocks[bIdx].endFrameHistory || []), parsed.url];
-                newBlocks[bIdx].endFrameUrl = parsed.url;
+              const history = newBlocks[bIdx].endFrameHistory || [];
+              if (!history.includes(parsed.url)) {
+                newBlocks[bIdx].endFrameHistory = [...history, parsed.url];
+                newBlocks[bIdx].endFrameUrl = parsed.url; // set the newest one as active
                 newBlocks[bIdx].isGeneratingEnd = false;
                 changed = true;
               }
             } else {
-              if (newBlocks[bIdx].startFrameUrl !== parsed.url) {
-                newBlocks[bIdx].startFrameHistory = [...(newBlocks[bIdx].startFrameHistory || []), parsed.url];
+              const history = newBlocks[bIdx].startFrameHistory || [];
+              if (!history.includes(parsed.url)) {
+                newBlocks[bIdx].startFrameHistory = [...history, parsed.url];
                 newBlocks[bIdx].startFrameUrl = parsed.url;
                 newBlocks[bIdx].isGeneratingStart = false;
                 changed = true;
@@ -373,8 +395,9 @@ export const ProjectView = ({ projectId }: Props) => {
           const parsed = item as any;
           const bIdx = parsed.blockIndex || 0;
           if (newBlocks[bIdx]) {
-            if (newBlocks[bIdx].videoUrl !== parsed.url) {
-              newBlocks[bIdx].videoHistory = [...(newBlocks[bIdx].videoHistory || []), parsed.url];
+            const history = newBlocks[bIdx].videoHistory || [];
+            if (!history.includes(parsed.url)) {
+              newBlocks[bIdx].videoHistory = [...history, parsed.url];
               newBlocks[bIdx].videoUrl = parsed.url;
               newBlocks[bIdx].isGeneratingVideo = false;
               changed = true;
@@ -386,15 +409,16 @@ export const ProjectView = ({ projectId }: Props) => {
       if (changed) {
         // Cascade start frame from previous block's end frame if missing
         for (let i = 1; i < newBlocks.length; i++) {
-          const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || newBlocks[i - 1].startFrameUrl) : null;
+          const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
           
-          if (!newBlocks[i].startFrameUrl && inheritedUrl) {
-            newBlocks[i].startFrameUrl = inheritedUrl;
-            if (!newBlocks[i].startFrameHistory || newBlocks[i].startFrameHistory!.length === 0) {
-              newBlocks[i].startFrameHistory = [inheritedUrl];
+          if (newBlocks[i].startFrameUrl !== inheritedUrl) {
+            newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
+            if (inheritedUrl) {
+              const history = newBlocks[i].startFrameHistory || [];
+              if (!history.includes(inheritedUrl)) {
+                newBlocks[i].startFrameHistory = [...history, inheritedUrl];
+              }
             }
-          } else if (!inheritedUrl && newBlocks[i].startFrameUrl && i > 0) {
-            newBlocks[i].startFrameUrl = null;
           }
         }
         return newBlocks;
@@ -404,6 +428,8 @@ export const ProjectView = ({ projectId }: Props) => {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.sceneImageUrls, project?.videoUrls, hasRestored]);
+
+
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -507,7 +533,10 @@ export const ProjectView = ({ projectId }: Props) => {
             const targetBlock = newBlocks[targetIndex];
             
             if (finalUrl) {
-              const newHistory = [...(targetBlock.videoHistory || []), finalUrl];
+              let newHistory = targetBlock.videoHistory || [];
+              if (!newHistory.includes(finalUrl)) {
+                newHistory = [...newHistory, finalUrl];
+              }
               
               newBlocks[targetIndex] = { 
                 ...targetBlock, 

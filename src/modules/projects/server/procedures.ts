@@ -82,6 +82,7 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
+          prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
           // Only create the initial message if the user provided a prompt
           ...(input.value.trim()
             ? {

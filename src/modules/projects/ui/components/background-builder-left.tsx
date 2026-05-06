@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -25,6 +26,51 @@ interface Props {
   isExtracting?: boolean;
 }
 
+const openImagesDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("vibe-images-db", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("images");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveImageToIDB = async (key: string, file: File) => {
+  try {
+    const db = await openImagesDB();
+    const tx = db.transaction("images", "readwrite");
+    tx.objectStore("images").put(file, key);
+  } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    console.error("Failed to save image to IDB:", e);
+  }
+};
+
+const loadImageFromIDB = async (key: string): Promise<File | null> => {
+  try {
+    const db = await openImagesDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction("images", "readonly");
+      const req = tx.objectStore("images").get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return null;
+  }
+};
+
+const deleteImageFromIDB = async (key: string) => {
+  try {
+    const db = await openImagesDB();
+    const tx = db.transaction("images", "readwrite");
+    tx.objectStore("images").delete(key);
+  } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  }
+};
+
 const MODELS = [
   { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7, type: "IMAGE" },
   { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14, type: "IMAGE" },
@@ -45,6 +91,10 @@ export const BackgroundBuilderLeft = ({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const isVideo = activeBlockTab === "VIDEO";
   const isStart = activeBlockTab === "START";
   const isEnd = activeBlockTab === "END";
@@ -64,10 +114,29 @@ export const BackgroundBuilderLeft = ({
 
   const prompt = isVideo ? (currentBlock.videoPrompt || "") : isStart ? (currentBlock.startPrompt || "") : (currentBlock.endPrompt || "");
   const uploadedImage = isStart ? currentBlock.startUploadedImage : isEnd ? currentBlock.endUploadedImage : null;
+  const imageKey = `project-${projectId}-block-${activeBlockIndex}-${isStart ? 'start' : 'end'}`;
+
+  useEffect(() => {
+    if (!isVideo && !uploadedImage) {
+      loadImageFromIDB(imageKey).then(file => {
+        if (file) {
+          updateBlock(activeBlockIndex, {
+            [isStart ? "startUploadedImage" : "endUploadedImage"]: file
+          });
+        }
+      });
+    }
+  }, [activeBlockIndex, isStart, isEnd, isVideo, imageKey]);
 
   const setUploadedImage = (file: File | null) => {
-    if (isStart) updateBlock(activeBlockIndex, { startUploadedImage: file });
-    else if (isEnd) updateBlock(activeBlockIndex, { endUploadedImage: file });
+    updateBlock(activeBlockIndex, {
+      [isStart ? "startUploadedImage" : "endUploadedImage"]: file || undefined
+    });
+    if (file) {
+      saveImageToIDB(imageKey, file);
+    } else {
+      deleteImageFromIDB(imageKey);
+    }
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -82,6 +151,7 @@ export const BackgroundBuilderLeft = ({
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasAutoSubmitted = useRef(false);
   
   const AVAILABLE_MODEL = availableModels.find(m => m.id === selectedModel) || availableModels[0];
 
@@ -110,6 +180,63 @@ export const BackgroundBuilderLeft = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Auto-submit when redirected from the home page with ?autoSubmit=true
+  // We wait until the prompt has been hydrated from DB into the block state
+  useEffect(() => {
+    const autoSubmit = searchParams.get("autoSubmit") === "true";
+    if (!autoSubmit || hasAutoSubmitted.current || isGenerating) return;
+
+    // prompt is derived from currentBlock, which gets populated from DB via ProjectView.
+    // Only fire once the prompt is actually available.
+    const currentPrompt = blocks[0]?.startPrompt || "";
+    if (!currentPrompt.trim()) return;
+
+    hasAutoSubmitted.current = true;
+
+    // Restore any pending uploaded image from sessionStorage (saved by project-form)
+    const pendingImageBase64 = sessionStorage.getItem("pending_image_base64");
+    const pendingImageName  = sessionStorage.getItem("pending_image_name");
+    const pendingImageType  = sessionStorage.getItem("pending_image_type");
+
+    const runAutoSubmit = async (imageFile?: File) => {
+      if (imageFile) {
+        updateBlock(0, { startUploadedImage: imageFile });
+        await saveImageToIDB(`project-${projectId}-block-0-start`, imageFile);
+      }
+      // Restore model selected on the landing page
+      const pendingModel = sessionStorage.getItem("pending_model");
+      if (pendingModel) {
+        setSelectedModel(pendingModel);
+        sessionStorage.removeItem("pending_model");
+      }
+      // Clean up URL so refreshing doesn't re-trigger
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("autoSubmit");
+      const newUrl = `${pathname}${params.toString() ? `?${params}` : ""}`;
+      router.replace(newUrl);
+      // Trigger start-frame generation with the pending model (bypasses state flush timing)
+      handleSubmit(pendingModel ?? undefined);
+    };
+
+    if (pendingImageBase64 && pendingImageName && pendingImageType) {
+      fetch(pendingImageBase64)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], pendingImageName, { type: pendingImageType });
+          sessionStorage.removeItem("pending_image_base64");
+          sessionStorage.removeItem("pending_image_name");
+          sessionStorage.removeItem("pending_image_type");
+          return runAutoSubmit(file);
+        })
+        .catch(() => runAutoSubmit());
+    } else {
+      runAutoSubmit();
+    }
+  // We intentionally depend on blocks[0]?.startPrompt so the effect
+  // re-runs when the DB data arrives after mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks[0]?.startPrompt, searchParams]);
+
   const startVideoGeneration = useMutation(
     trpc.projects.startVideoGeneration.mutationOptions({
       onSuccess: () => {
@@ -128,12 +255,19 @@ export const BackgroundBuilderLeft = ({
     })
   );
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (modelOverride?: string) => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
+    const effectiveModel = modelOverride || selectedModel;
 
     try {
       if (isVideo) {
+        if (!currentBlock.endFrameUrl) {
+          toast.error("Please generate an end frame first.");
+          setIsGenerating(false);
+          return;
+        }
+
         toast.info("Video generation started...");
         updateBlock(activeBlockIndex, { isGeneratingVideo: true });
 
@@ -142,7 +276,7 @@ export const BackgroundBuilderLeft = ({
           prompt,
           imageUrl: currentBlock.startFrameUrl || undefined,
           endImageUrl: currentBlock.endFrameUrl || undefined,
-          model: selectedModel,
+          model: effectiveModel,
           blockIndex: activeBlockIndex
         }).then(() => {
           setIsGenerating(false);
@@ -164,7 +298,7 @@ export const BackgroundBuilderLeft = ({
           const formData = new FormData();
           formData.append("prompt", prompt);
           formData.append("projectId", projectId);
-          formData.append("model", selectedModel);
+          formData.append("model", effectiveModel);
           formData.append("frameType", activeBlockTab);
           formData.append("blockIndex", activeBlockIndex.toString());
           formData.append("image", uploadedImage);
@@ -179,7 +313,7 @@ export const BackgroundBuilderLeft = ({
             body: JSON.stringify({ 
               prompt, 
               projectId, 
-              model: selectedModel,
+              model: effectiveModel,
               frameType: activeBlockTab,
               blockIndex: activeBlockIndex
             }),
@@ -197,11 +331,12 @@ export const BackgroundBuilderLeft = ({
         if (isStart) {
           const newHistory = [...(currentBlock.startFrameHistory || []), data.frameUrl];
           updateBlock(activeBlockIndex, { isGeneratingStart: false, startFrameUrl: data.frameUrl, startFrameHistory: newHistory });
+          onTabChange("END");
         } else {
           const newHistory = [...(currentBlock.endFrameHistory || []), data.frameUrl];
           updateBlock(activeBlockIndex, { isGeneratingEnd: false, endFrameUrl: data.frameUrl, endFrameHistory: newHistory });
+          onTabChange("VIDEO");
         }
-        setUploadedImage(null);
         setIsGenerating(false);
       }
     } catch (error: unknown) {
@@ -302,6 +437,22 @@ export const BackgroundBuilderLeft = ({
           <TextareaAutosize
             value={prompt}
             onChange={handlePromptChange}
+            onPaste={(e) => {
+              if (isVideo) return;
+              const items = e.clipboardData?.items;
+              if (items) {
+                for (let i = 0; i < items.length; i++) {
+                  if (items[i].type.indexOf("image") !== -1) {
+                    const file = items[i].getAsFile();
+                    if (file) {
+                      setUploadedImage(file);
+                      e.preventDefault();
+                      break;
+                    }
+                  }
+                }
+              }
+            }}
             placeholder={`Prompt to generate ${activeBlockTab.toLowerCase().replace('_', ' ')}`}
             minRows={3}
             maxRows={14}
@@ -371,7 +522,7 @@ export const BackgroundBuilderLeft = ({
               </div>
               <button
                 type="button"
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
                 disabled={shouldShowSpinner || (!prompt.trim())}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
               >

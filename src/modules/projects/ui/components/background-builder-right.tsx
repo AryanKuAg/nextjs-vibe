@@ -167,7 +167,7 @@ function GenerationOverlay({ isGenerating, type = "image" }: { isGenerating: boo
       </div>
       {/* Percentage */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
-        <span className="text-white font-inconsolata text-xl font-semibold tabular-nums">
+        <span className="text-white font-inconsolata text-sm tabular-nums">
           {Math.round(pct)}%
         </span>
         <div className="w-20 h-[2px] bg-[#333] rounded-full overflow-hidden">
@@ -308,21 +308,21 @@ export const BackgroundBuilderRight = ({
       <div
         key={index}
         className={cn(
-          "flex flex-col mb-12 max-w-4xl mx-auto w-full transition-opacity duration-200",
+          "flex flex-col mb-6 max-w-4xl mx-auto w-full transition-opacity duration-200",
           isLocked ? "opacity-40" : !isActive ? "cursor-pointer" : ""
         )}
         onClick={() => !isLocked && setActiveBlockIndex(index)}
       >
         {index > 0 && (
-          <div className="flex justify-center mb-2">
-            <span className="text-[#666666] text-xs font-mono">↓</span>
+          <div className="flex justify-center mb-6">
+            <img src="/arrow.svg" alt="arrow" className="w-3 h-auto opacity-70 rotate-90" />
           </div>
         )}
         <div className={cn(
-          "bg-[#272725] rounded-xl p-4 border transition-colors",
-          isActive ? "border-[#444]" : "border-transparent opacity-80"
+          "bg-[#282828] rounded-[16px] transition-colors max-w-[640px] mx-auto w-full overflow-hidden",
+          blocks.length > 1 && (isActive ? "border border-white" : "border border-transparent")
         )}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between p-3 border-b border-[#333333]">
             <h3 className="text-white text-sm font-inconsolata">{title}</h3>
             <div className="flex items-center gap-4">
               <span className="text-[#666] text-xs font-mono">{duration}</span>
@@ -341,146 +341,148 @@ export const BackgroundBuilderRight = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            {/* Start Frame */}
+          <div className="p-3 pt-3">
+            <div className="grid grid-cols-2 gap-3 mb-3 ">
+              {/* Start Frame */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-white text-sm font-inconsolata">Start frame</span>
+                  {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
+                </div>
+                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
+                  <GenerationOverlay isGenerating={block.isGeneratingStart} />
+                  {!block.isGeneratingStart && block.startFrameUrl ? (
+                    <div className="relative w-full h-full group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={block.startFrameUrl} alt="Start frame" className="w-full h-full object-cover" />
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownload(block.startFrameUrl!, `start-frame-${index + 1}.png`); }}
+                          className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                          title="Download image"
+                        >
+                          <i className="ri-download-2-line text-sm" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.startFrameUrl!); }}
+                          className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                          title="View Fullscreen"
+                        >
+                          <i className="ri-fullscreen-line text-sm" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : !block.isGeneratingStart ? (
+                    <span className="text-[#ccc] text-sm font-inconsolata">
+                      {index > 0 ? (
+                        `Last frame of video ${index} will appear here`
+                      ) : "Prompt to generate"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* End Frame */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-white text-sm font-inconsolata">End frame</span>
+                  {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
+                </div>
+                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
+                  <GenerationOverlay isGenerating={block.isGeneratingEnd} />
+                  {!block.isGeneratingEnd && block.endFrameUrl ? (
+                    <div className="relative w-full h-full group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={block.endFrameUrl} alt="End frame" className="w-full h-full object-cover" />
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownload(block.endFrameUrl!, `end-frame-${index + 1}.png`); }}
+                          className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                          title="Download image"
+                        >
+                          <i className="ri-download-2-line text-sm" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.endFrameUrl!); }}
+                          className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
+                          title="View Fullscreen"
+                        >
+                          <i className="ri-fullscreen-line text-sm" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : !block.isGeneratingEnd ? (
+                    <span className="text-[#ccc] text-sm font-inconsolata">Prompt to generate</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Video */}
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
-                <span className="text-[#999] text-xs font-inconsolata">Start frame</span>
-                {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
+                <span className="text-white text-sm font-inconsolata">Video</span>
+                {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
               </div>
-              <div className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
-                <GenerationOverlay isGenerating={block.isGeneratingStart} />
-                {!block.isGeneratingStart && block.startFrameUrl ? (
-                  <div className="relative w-full h-full group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={block.startFrameUrl} alt="Start frame" className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
+                onMouseEnter={() => {
+                  setHoveredVideoIndex(index);
+                  if (block.videoUrl) videoRefs.current[index]?.play();
+                }}
+                onMouseLeave={() => {
+                  setHoveredVideoIndex(null);
+                  if (block.videoUrl) {
+                    const v = videoRefs.current[index];
+                    if (v) { v.pause(); }
+                  }
+                }}
+              >
+                {block.isGeneratingVideo ? (
+                  <GenerationOverlay isGenerating={block.isGeneratingVideo} type="video" />
+                ) : block.videoUrl ? (
+                  <>
+                    <video
+                      ref={(el) => { videoRefs.current[index] = el; }}
+                      src={block.videoUrl}
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Hover overlay buttons */}
+                    <div className={cn(
+                      "absolute top-2 right-2 flex items-center gap-1.5 transition-opacity duration-150",
+                      hoveredVideoIndex === index ? "opacity-100" : "opacity-0"
+                    )}>
+                      {/* Download */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDownload(block.startFrameUrl!, `start-frame-${index + 1}.png`); }}
-                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
-                        title="Download image"
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDownloadVideo(block.videoUrl!, index); }}
+                        disabled={downloadingVideoIndex === index}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors disabled:opacity-50"
+                        title="Download video"
                       >
-                        <i className="ri-download-2-line text-sm" />
+                        {downloadingVideoIndex === index
+                          ? <i className="ri-loader-4-line text-sm animate-spin" />
+                          : <i className="ri-download-2-line text-sm" />
+                        }
                       </button>
+                      {/* Fullscreen */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.startFrameUrl!); }}
-                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
-                        title="View Fullscreen"
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); videoRefs.current[index]?.requestFullscreen?.(); }}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+                        title="Fullscreen"
                       >
                         <i className="ri-fullscreen-line text-sm" />
                       </button>
                     </div>
-                  </div>
-                ) : !block.isGeneratingStart ? (
-                  <span className="text-[#666] text-xs font-inconsolata">
-                    {index > 0 ? (
-                      `Last frame of video ${index} will appear here`
-                    ) : "Prompt to generate"}
-                  </span>
-                ) : null}
+                  </>
+                ) : (
+                  <span className="text-[#ccc] text-sm font-inconsolata">Preview your generated video here</span>
+                )}
               </div>
-            </div>
-
-            {/* End Frame */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[#999] text-xs font-inconsolata">End frame</span>
-                {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
-              </div>
-              <div className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
-                <GenerationOverlay isGenerating={block.isGeneratingEnd} />
-                {!block.isGeneratingEnd && block.endFrameUrl ? (
-                  <div className="relative w-full h-full group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={block.endFrameUrl} alt="End frame" className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDownload(block.endFrameUrl!, `end-frame-${index + 1}.png`); }}
-                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
-                        title="Download image"
-                      >
-                        <i className="ri-download-2-line text-sm" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleFullscreen(e, block.endFrameUrl!); }}
-                        className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors"
-                        title="View Fullscreen"
-                      >
-                        <i className="ri-fullscreen-line text-sm" />
-                      </button>
-                    </div>
-                  </div>
-                ) : !block.isGeneratingEnd ? (
-                  <span className="text-[#666] text-xs font-inconsolata">Prompt to generate</span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* Video */}
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <span className="text-[#999] text-xs font-inconsolata">Video</span>
-              {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
-            </div>
-            <div
-              className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
-              onMouseEnter={() => {
-                setHoveredVideoIndex(index);
-                if (block.videoUrl) videoRefs.current[index]?.play();
-              }}
-              onMouseLeave={() => {
-                setHoveredVideoIndex(null);
-                if (block.videoUrl) {
-                  const v = videoRefs.current[index];
-                  if (v) { v.pause(); }
-                }
-              }}
-            >
-              {block.isGeneratingVideo ? (
-                <GenerationOverlay isGenerating={block.isGeneratingVideo} type="video" />
-              ) : block.videoUrl ? (
-                <>
-                  <video
-                    ref={(el) => { videoRefs.current[index] = el; }}
-                    src={block.videoUrl}
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Hover overlay buttons */}
-                  <div className={cn(
-                    "absolute top-2 right-2 flex items-center gap-1.5 transition-opacity duration-150",
-                    hoveredVideoIndex === index ? "opacity-100" : "opacity-0"
-                  )}>
-                    {/* Download */}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleDownloadVideo(block.videoUrl!, index); }}
-                      disabled={downloadingVideoIndex === index}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors disabled:opacity-50"
-                      title="Download video"
-                    >
-                      {downloadingVideoIndex === index
-                        ? <i className="ri-loader-4-line text-sm animate-spin" />
-                        : <i className="ri-download-2-line text-sm" />
-                      }
-                    </button>
-                    {/* Fullscreen */}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); videoRefs.current[index]?.requestFullscreen?.(); }}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
-                      title="Fullscreen"
-                    >
-                      <i className="ri-fullscreen-line text-sm" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <span className="text-[#666] text-xs font-inconsolata">Preview your generated video here</span>
-              )}
             </div>
           </div>
         </div>
@@ -503,10 +505,10 @@ export const BackgroundBuilderRight = ({
             onClick={onAddBlock}
             disabled={!blocks[blocks.length - 1]?.videoUrl}
             className={cn(
-              "w-full py-4 mt-2 rounded-[12px] border border-[#282825] bg-transparent text-[#999] text-sm font-inconsolata transition-colors",
+              "w-full rounded-[8px] border border-[#2c2c2c] bg-transparent text-white text-sm font-inconsolata transition-colors h-[32px] max-w-[640px] mx-auto",
               !blocks[blocks.length - 1]?.videoUrl
                 ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-white/5"
+                : "hover:bg-[#282828]"
             )}
           >
             Add another video

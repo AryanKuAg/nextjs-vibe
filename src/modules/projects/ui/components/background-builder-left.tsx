@@ -423,7 +423,7 @@ export const BackgroundBuilderLeft = ({
                 "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
                 activeBlockTab === "START"
                   ? "bg-[#282828] text-white border-[#282828]"
-                  : "text-white border-[#2C2C2C] "
+                  : "text-white border-[#2C2C2C] hover:bg-[#282828]"
               )}
             >
               Start frame
@@ -435,7 +435,7 @@ export const BackgroundBuilderLeft = ({
               "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
               activeBlockTab === "END"
                 ? "bg-[#282828] text-white border-[#282828]"
-                : "text-white border-[#2C2C2C] "
+                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
             )}
           >
             End frame
@@ -446,7 +446,7 @@ export const BackgroundBuilderLeft = ({
               "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
               activeBlockTab === "VIDEO"
                 ? "bg-[#282828] text-white border-[#282828]"
-                : "text-white border-[#2C2C2C]"
+                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
             )}
           >
             Video
@@ -611,7 +611,7 @@ export const BackgroundBuilderLeft = ({
           </Button>
           <Button
             variant="ghost"
-            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c]"
+            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
             onClick={() => window.location.href = "/"}
           >
             Back to home

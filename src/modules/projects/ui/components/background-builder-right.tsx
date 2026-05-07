@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 export type BlockTab = "START" | "END" | "VIDEO";
 
@@ -315,7 +316,7 @@ export const BackgroundBuilderRight = ({
       >
         {index > 0 && (
           <div className="flex justify-center mb-6">
-            <img src="/arrow.svg" alt="arrow" className="w-3 h-auto opacity-70 rotate-90" />
+            <Image src="/arrow.svg" alt="arrow" width={12} height={12} className="opacity-70 rotate-90" />
           </div>
         )}
         <div className={cn(

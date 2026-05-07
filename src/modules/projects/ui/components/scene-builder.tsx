@@ -169,7 +169,7 @@ export const SceneBuilder = ({
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
-      <div className="flex flex-col h-full bg-[#1C1C1C] font-inconsolata">
+      <div className="flex flex-col h-full bg-background font-inconsolata">
         <div className="flex-1" />
 
         <div className="p-4 space-y-3">
@@ -269,7 +269,7 @@ export const SceneBuilder = ({
           </div>
 
           <Button
-            className="w-full rounded-[8px] bg-[#1C1C1C]! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
+            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
             onClick={onNext}
           >
             Skip

@@ -164,7 +164,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3 relative transition-all"
+          className="bg-[#282828] border border-[#2c2c2c] rounded-[16px] p-3 space-y-3 relative transition-all"
         >
           <FormField
             control={form.control}
@@ -174,9 +174,9 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
                 {...field}
                 disabled={isPending}
                 minRows={2}
-                maxRows={14}
-                className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px]"
-                placeholder="Prompt here"
+                maxRows={12}
+                className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[36px] placeholder:text-[#737373]"
+                placeholder="Prompt to generate website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -187,7 +187,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             )}
           />
 
-          <div className="flex items-center gap-x-2">
+          <div className="flex items-center gap-x-1">
             <div className="relative" ref={dropdownRef}>
               <div
                 className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
@@ -198,7 +198,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
               </div>
 
               {modelDropdownOpen && (
-                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
+                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#333333] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
                   {MODELS.map((model) => (
                     <button
                       key={model.id}
@@ -221,7 +221,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
               type="button"
               onClick={handleEnhancePrompt}
               disabled={isEnhancing}
-              className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              className="h-8 px-2 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
               title="Magic Wand - Enhance Prompt"
             >
               {isEnhancing ? (
@@ -232,8 +232,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
             </button>
 
             <div className="flex gap-2 ml-auto">
-              <div className="flex items-center gap-1 text-[#CCCCCC]">
-                <i className="ri-sparkling-fill text-white text-sm" />
+              <div className="flex items-center gap-1 text-white">
+                <i className="ri-sparkling-2-fill text-white text-sm" />
                 <span className="text-sm font-medium">
                   {isFollowUp ? FOLLOW_UP_COST : MODELS.find(m => m.id === selectedModel)?.credits}
                 </span>

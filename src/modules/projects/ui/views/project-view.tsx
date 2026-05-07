@@ -106,7 +106,7 @@ export const ProjectView = ({ projectId }: Props) => {
     // Signal that restore is done — batched with setBlocks above so
     // the save effect always sees the correct block array on its first run.
     setHasRestored(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount (client-only)
 
   const handleAddBlock = () => {
@@ -114,7 +114,7 @@ export const ProjectView = ({ projectId }: Props) => {
       setBlocks(prev => {
         const lastBlock = prev[prev.length - 1];
         const inheritedUrl = lastBlock.videoUrl ? (lastBlock.endFrameUrl || null) : null;
-        const newBlock = { 
+        const newBlock = {
           ...emptyBlock,
           startFrameUrl: inheritedUrl,
           startFrameHistory: inheritedUrl ? [inheritedUrl] : [],
@@ -336,7 +336,7 @@ export const ProjectView = ({ projectId }: Props) => {
       // Inherit start frame from the previous block's end frame if missing
       for (let i = 1; i < newBlocks.length; i++) {
         const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
-        
+
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i].startFrameUrl = inheritedUrl;
           if (inheritedUrl) {
@@ -414,7 +414,7 @@ export const ProjectView = ({ projectId }: Props) => {
         // Cascade start frame from previous block's end frame if missing
         for (let i = 1; i < newBlocks.length; i++) {
           const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
-          
+
           if (newBlocks[i].startFrameUrl !== inheritedUrl) {
             newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
             if (inheritedUrl) {
@@ -430,7 +430,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
       return prev;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.sceneImageUrls, project?.videoUrls, hasRestored]);
 
 
@@ -468,7 +468,7 @@ export const ProjectView = ({ projectId }: Props) => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasRestored, project?.id, blocks]);
 
   // const cancelVideoGeneration = useMutation(
@@ -506,7 +506,7 @@ export const ProjectView = ({ projectId }: Props) => {
     if (previousIsVideoLoading.current && !isVideoLoading) {
       if (currentVideoUrlsLength === previousVideoUrlsLength.current) {
         toast.error("Video generation failed. This usually happens if your prompt triggers the AI safety filters, or inputs were invalid. Please tweak your prompt and try again.", { duration: Infinity });
-        
+
         setBlocks(prev => {
           const newBlocks = [...prev];
           const generatingIndex = newBlocks.findIndex(b => b.isGeneratingVideo);
@@ -518,7 +518,7 @@ export const ProjectView = ({ projectId }: Props) => {
       } else {
         toast.success("Video generated successfully!");
         refetchUsage();
-        
+
         // Find the block that was generating and update it
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newVideoUrls = ((project as any)?.videoUrls as any[] || []);
@@ -528,25 +528,25 @@ export const ProjectView = ({ projectId }: Props) => {
             const lastItem = newVideoUrls[newVideoUrls.length - 1];
             const finalUrl = typeof lastItem === "string" ? lastItem : lastItem?.url;
             const targetIndex = typeof lastItem === "string" ? 0 : (lastItem?.blockIndex || 0);
-            
+
             // Ensure array has enough blocks (rare edge case, but safe)
             while (newBlocks.length <= targetIndex) {
               newBlocks.push({ ...emptyBlock });
             }
-            
+
             const targetBlock = newBlocks[targetIndex];
-            
+
             if (finalUrl) {
               let newHistory = targetBlock.videoHistory || [];
               if (!newHistory.includes(finalUrl)) {
                 newHistory = [...newHistory, finalUrl];
               }
-              
-              newBlocks[targetIndex] = { 
-                ...targetBlock, 
-                videoUrl: finalUrl, 
+
+              newBlocks[targetIndex] = {
+                ...targetBlock,
+                videoUrl: finalUrl,
                 videoHistory: newHistory,
-                isGeneratingVideo: false 
+                isGeneratingVideo: false
               };
             }
 
@@ -564,7 +564,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
     previousIsVideoLoading.current = isVideoLoading;
     previousVideoUrlsLength.current = currentVideoUrlsLength;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, refetchUsage]);
 
   const handleDownloadZip = () => {
@@ -648,7 +648,7 @@ export const ProjectView = ({ projectId }: Props) => {
           defaultSize={sidebarDefaultSize}
           minSize={sidebarMinSize}
           maxSize={sidebarMaxSize}
-          className="flex flex-col min-h-0 bg-[#1C1C1C]"
+          className="flex flex-col min-h-0 bg-background"
         >
           <ErrorBoundary fallback={<p>Project header error</p>}>
             <Suspense fallback={<p>Loading project...</p>}>
@@ -696,7 +696,7 @@ export const ProjectView = ({ projectId }: Props) => {
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
           minSize={30}
-          className="bg-[#1C1C1C] relative"
+          className="bg-background relative"
         >
           <Tabs
             className="h-full flex flex-col gap-0"
@@ -704,19 +704,19 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2.5  gap-x-2 bg-[#1C1C1C] h-[56px] shrink-0 border-b">
+            <div className="w-full flex items-center p-2.5  gap-x-2 bg-background h-[56px] shrink-0 border-b">
               {activeStageTab === "SITE" && (
                 <>
                   <TabsList className="h-8 p-0.5 rounded-[8px] bg-[#272725]">
-                    <TabsTrigger value="preview" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-[#1C1C1C]">
+                    <TabsTrigger value="preview" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-background">
                       <i className="ri-eye-line" />
                     </TabsTrigger>
-                    <TabsTrigger value="code" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-[#1C1C1C]">
+                    <TabsTrigger value="code" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-background">
                       <i className="ri-code-line" />
                     </TabsTrigger>
                   </TabsList>
                   <Button
-                    className="h-8 rounded-[8px] px-2 bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                    className="h-8 rounded-[8px] px-2 bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
                     onClick={handleDownloadZip}
                     disabled={!activeFragment?.files || isDownloading}
                   >
@@ -727,13 +727,13 @@ export const ProjectView = ({ projectId }: Props) => {
                   {displayUrl && (
                     <div className="flex items-center gap-2">
                       <Button
-                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
                         onClick={() => setFragmentKey((prev) => prev + 1)}
                       >
                         <i className="ri-refresh-line" />
                       </Button>
                       <Button
-                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
                         asChild
                       >
                         <a href={displayUrl} target="_blank" rel="noopener noreferrer">
@@ -741,7 +741,7 @@ export const ProjectView = ({ projectId }: Props) => {
                         </a>
                       </Button>
                       <Button
-                        className="h-8 w-8 p-0 rounded-[8px] bg-[#1C1C1C] hover:bg-[#1C1C1C] border-[0.5px] border-[#3B3B3B]"
+                        className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
                         onClick={handleCopyUrl}
                       >
                         {copiedUrl ? <i className="ri-check-line text-white" /> : <i className="ri-file-copy-line" />}
@@ -750,9 +750,10 @@ export const ProjectView = ({ projectId }: Props) => {
                   )}
                 </>
               )}
-              <div className="ml-auto flex items-center gap-x-2">
-                <div className="bg-[#272725]  rounded-[8px] px-3 py-2 text-sm text-white">
-                  {usage ? `${usage?.remainingCredits ?? 0}/${usage?.totalCredits ?? 0} credits left` : "Loading credits..."}
+              <div className="ml-auto flex items-center gap-x-1">
+                <div className="bg-[#282828]  rounded-full px-3 py-2 text-sm text-white">
+                  <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
+                  {usage ? `${Number(usage?.remainingCredits).toLocaleString()} credits` : "Loading credits..."}
                 </div>
                 {usage?.plan === "free" && (
                   <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">
@@ -765,7 +766,7 @@ export const ProjectView = ({ projectId }: Props) => {
               </div>
             </div>
 
-            <div className="flex-1 relative overflow-hidden bg-[#1C1C1C]">
+            <div className="flex-1 relative overflow-hidden bg-background">
               {activeStageTab === "BACKGROUND" ? (
                 <BackgroundBuilderRight
                   blocks={blocks}
@@ -783,7 +784,7 @@ export const ProjectView = ({ projectId }: Props) => {
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                         <h2 className="text-sm text-white mb-1">Build site</h2>
-                        <p className="text-xs text-white/30 leading-relaxed">
+                        <p className="text-sm text-[#737373] leading-relaxed">
                           Your website preview will appear here
                         </p>
                       </div>

@@ -70,8 +70,10 @@ export const ProjectHeader = ({ projectId }: Props) => {
 
   return (
     <header className="p-2.5 flex justify-between items-center border-b h-[56px] shrink-0">
-      <div className="flex items-center gap-1.5 pl-2">
-        <Image src="/logo.png" alt="framerate" width={24} height={24} />
+      <div className="flex items-center gap-3 pl-2">
+        <Link href="/">
+          <Image src="/logo.png" alt="framerate" width={24} height={24} />
+        </Link>
 
         {isEditing ? (
           <input
@@ -93,27 +95,6 @@ export const ProjectHeader = ({ projectId }: Props) => {
             {renameMutation.isPending ? nameValue : project.name}
           </button>
         )}
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity w-6 h-6 p-0"
-            >
-              <i className="ri-arrow-down-s-line text-base text-white" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="bottom" align="start">
-
-            <DropdownMenuItem asChild>
-              <Link href="/">
-                <i className="ri-arrow-left-s-line" />
-                <span>Go to Dashboard</span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </header>
   );

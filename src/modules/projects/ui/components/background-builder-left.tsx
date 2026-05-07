@@ -105,7 +105,7 @@ export const BackgroundBuilderLeft = ({
 
   const currentBlock = blocks[activeBlockIndex] || {};
 
-  const isCurrentTabGenerating = 
+  const isCurrentTabGenerating =
     (isStart && currentBlock.isGeneratingStart) ||
     (isEnd && currentBlock.isGeneratingEnd) ||
     (isVideo && currentBlock.isGeneratingVideo);
@@ -126,7 +126,7 @@ export const BackgroundBuilderLeft = ({
         }
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBlockIndex, isStart, isEnd, isVideo, imageKey]);
 
   const setUploadedImage = (file: File | null) => {
@@ -185,12 +185,12 @@ export const BackgroundBuilderLeft = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasAutoSubmitted = useRef(false);
-  
+
   const AVAILABLE_MODEL = availableModels.find(m => m.id === selectedModel) || availableModels[0];
 
   useEffect(() => {
     setSelectedModel(availableModels[0].id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVideo]);
 
   useEffect(() => {
@@ -198,7 +198,7 @@ export const BackgroundBuilderLeft = ({
       e.preventDefault();
       if (!isVideo) setIsDragging(true);
     };
-    
+
     window.addEventListener("dragover", handleDragOver);
     return () => window.removeEventListener("dragover", handleDragOver);
   }, [isVideo]);
@@ -228,8 +228,8 @@ export const BackgroundBuilderLeft = ({
 
     // Restore any pending uploaded image from sessionStorage (saved by project-form)
     const pendingImageBase64 = sessionStorage.getItem("pending_image_base64");
-    const pendingImageName  = sessionStorage.getItem("pending_image_name");
-    const pendingImageType  = sessionStorage.getItem("pending_image_type");
+    const pendingImageName = sessionStorage.getItem("pending_image_name");
+    const pendingImageType = sessionStorage.getItem("pending_image_type");
 
     const runAutoSubmit = async (imageFile?: File) => {
       if (imageFile) {
@@ -265,9 +265,9 @@ export const BackgroundBuilderLeft = ({
     } else {
       runAutoSubmit();
     }
-  // We intentionally depend on blocks[0]?.startPrompt so the effect
-  // re-runs when the DB data arrives after mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // We intentionally depend on blocks[0]?.startPrompt so the effect
+    // re-runs when the DB data arrives after mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks[0]?.startPrompt, searchParams]);
 
   const startVideoGeneration = useMutation(
@@ -319,7 +319,7 @@ export const BackgroundBuilderLeft = ({
 
       } else {
         toast.info("Image generation started...");
-        
+
         if (isStart) {
           updateBlock(activeBlockIndex, { isGeneratingStart: true });
         } else {
@@ -343,9 +343,9 @@ export const BackgroundBuilderLeft = ({
           res = await fetch("/api/generate-frames", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              prompt, 
-              projectId, 
+            body: JSON.stringify({
+              prompt,
+              projectId,
               model: effectiveModel,
               frameType: activeBlockTab,
               blockIndex: activeBlockIndex
@@ -360,7 +360,7 @@ export const BackgroundBuilderLeft = ({
 
         const data = await res.json();
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        
+
         if (isStart) {
           const newHistory = [...(currentBlock.startFrameHistory || []), data.frameUrl];
           updateBlock(activeBlockIndex, { isGeneratingStart: false, startFrameUrl: data.frameUrl, startFrameHistory: newHistory });
@@ -389,9 +389,9 @@ export const BackgroundBuilderLeft = ({
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
-      
+
       {isDragging && !isVideo && (
-        <div 
+        <div
           className="fixed inset-0 z-[9999] bg-[#000000]/90 flex flex-col items-center justify-center backdrop-blur-sm"
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
@@ -413,15 +413,17 @@ export const BackgroundBuilderLeft = ({
         </div>
       )}
 
-      <div className="flex flex-col h-full bg-[#1C1C1C] relative p-4 space-y-4">
+      <div className="flex flex-col h-full bg-background relative p-3 ">
         <div className="flex-1" />
-        <div className="flex items-center gap-2 bg-[#272725] p-1 rounded-[8px] mt-4">
+        <div className="flex items-center gap-2 rounded-[8px] mt-4 text-sm">
           {activeBlockIndex === 0 && (
             <button
               onClick={() => onTabChange("START")}
               className={cn(
-                "flex-1 text-center py-2 text-sm rounded-[6px] transition-colors",
-                activeBlockTab === "START" ? "bg-[#3B3B3B] text-white" : "text-white/50 hover:text-white"
+                "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
+                activeBlockTab === "START"
+                  ? "bg-[#282828] text-white border-[#282828]"
+                  : "text-white border-[#2C2C2C] hover:bg-[#282828]"
               )}
             >
               Start frame
@@ -430,8 +432,10 @@ export const BackgroundBuilderLeft = ({
           <button
             onClick={() => onTabChange("END")}
             className={cn(
-              "flex-1 text-center py-2 text-sm rounded-[6px] transition-colors",
-              activeBlockTab === "END" ? "bg-[#3B3B3B] text-white" : "text-white/50 hover:text-white"
+              "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
+              activeBlockTab === "END"
+                ? "bg-[#282828] text-white border-[#282828]"
+                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
             )}
           >
             End frame
@@ -439,148 +443,153 @@ export const BackgroundBuilderLeft = ({
           <button
             onClick={() => onTabChange("VIDEO")}
             className={cn(
-              "flex-1 text-center py-2 text-sm rounded-[6px] transition-colors",
-              activeBlockTab === "VIDEO" ? "bg-[#3B3B3B] text-white" : "text-white/50 hover:text-white"
+              "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
+              activeBlockTab === "VIDEO"
+                ? "bg-[#282828] text-white border-[#282828]"
+                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
             )}
           >
             Video
           </button>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-white text-sm font-inconsolata">Editing video {activeBlockIndex + 1}</span>
-          <span className="text-white/30 text-xs font-mono">
-            {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
-          </span>
-        </div>
+        <div className="bg-[#282828] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
+          <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b-0 border-[#282825]">
+            <span className="text-white text-sm font-inconsolata">Editing video {activeBlockIndex + 1}</span>
+            <span className="text-white/30 text-xs font-mono">
+              {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
+            </span>
+          </div>
 
-        <div className="bg-[#272725] border border-[#282825] rounded-[8px] p-3 space-y-3 mt-4">
-          {uploadedImage && (
-            <div className="relative inline-block mt-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={URL.createObjectURL(uploadedImage)} alt="Uploaded" className="h-16 w-16 object-cover rounded-[6px]" />
-              <button 
-                onClick={() => setUploadedImage(null)}
-                className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full w-5 h-5 flex items-center justify-center border border-[#3b3b3b] hover:bg-[#3b3b3b] transition-colors"
-              >
-                <i className="ri-close-line text-xs" />
-              </button>
-            </div>
-          )}
-          <TextareaAutosize
-            value={prompt}
-            onChange={handlePromptChange}
-            onPaste={(e) => {
-              if (isVideo) return;
-              const items = e.clipboardData?.items;
-              if (items) {
-                for (let i = 0; i < items.length; i++) {
-                  if (items[i].type.indexOf("image") !== -1) {
-                    const file = items[i].getAsFile();
-                    if (file) {
-                      setUploadedImage(file);
-                      e.preventDefault();
-                      break;
+          <div className="p-3 space-y-3  border-t border-[#2c2c2c] rounded-[16px]">
+
+            {uploadedImage && (
+              <div className="relative inline-block mt-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={URL.createObjectURL(uploadedImage)} alt="Uploaded" className="h-16 w-16 object-cover rounded-[6px]" />
+                <button
+                  onClick={() => setUploadedImage(null)}
+                  className="absolute -top-2 -right-2 bg-background text-white rounded-full w-5 h-5 flex items-center justify-center border border-[#3b3b3b] hover:bg-[#3b3b3b] transition-colors"
+                >
+                  <i className="ri-close-line text-xs" />
+                </button>
+              </div>
+            )}
+            <TextareaAutosize
+              value={prompt}
+              onChange={handlePromptChange}
+              onPaste={(e) => {
+                if (isVideo) return;
+                const items = e.clipboardData?.items;
+                if (items) {
+                  for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf("image") !== -1) {
+                      const file = items[i].getAsFile();
+                      if (file) {
+                        setUploadedImage(file);
+                        e.preventDefault();
+                        break;
+                      }
                     }
                   }
                 }
-              }
-            }}
-            placeholder={`Prompt to generate ${activeBlockTab.toLowerCase().replace('_', ' ')}`}
-            minRows={3}
-            maxRows={14}
-            className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[80px]"
-            disabled={isGenerating}
-          />
+              }}
+              placeholder={{ START: "Prompt to generate start frame", END: "Prompt to generate end frame", VIDEO: "Prompt to generate video" }[activeBlockTab]}
+              minRows={2}
+              maxRows={12}
+              className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[35px]"
+              disabled={isGenerating}
+            />
 
-          <div className="flex items-center gap-x-2">
-            {!isVideo && (
-              <>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setUploadedImage(e.target.files[0]);
-                    }
-                    e.target.value = "";
-                  }}
-                />
+            <div className="flex items-center gap-x-1">
+              {!isVideo && (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setUploadedImage(e.target.files[0]);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white  transition-colors"
+                    title="Upload image"
+                  >
+                    <i className="ri-add-line text-lg" />
+                  </button>
+                </>
+              )}
+              <div className="relative" ref={dropdownRef}>
+                <div
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white  transition-colors cursor-pointer"
+                  onClick={() => setModelDropdownOpen((o) => !o)}
+                >
+                  {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
+                  <span>{AVAILABLE_MODEL?.label}</span>
+                  <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                </div>
+
+                {modelDropdownOpen && (
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                    {availableModels.map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5",
+                          selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        )}
+                      >
+                        <span>{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {isVideo && (
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-8 w-8 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors"
-                  title="Upload image"
+                  onClick={handleEnhancePrompt}
+                  disabled={isEnhancing}
+                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                  title="Magic Wand - Enhance Prompt"
                 >
-                  <i className="ri-add-line text-lg" />
+                  {isEnhancing ? (
+                    <i className="ri-loader-4-line animate-spin text-[15px]" />
+                  ) : (
+                    <i className="ri-magic-line text-[15px]" />
+                  )}
                 </button>
-              </>
-            )}
-            <div className="relative" ref={dropdownRef}>
-              <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={() => setModelDropdownOpen((o) => !o)}
-              >
-                {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
-                <span>{AVAILABLE_MODEL?.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
-              </div>
-
-              {modelDropdownOpen && (
-                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
-                  {availableModels.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                      className={cn(
-                        "w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5",
-                        selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                      )}
-                    >
-                      <span>{model.label}</span>
-                      {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
-                    </button>
-                  ))}
-                </div>
               )}
-            </div>
 
-            {isVideo && (
-              <button
-                type="button"
-                onClick={handleEnhancePrompt}
-                disabled={isEnhancing}
-                className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
-                title="Magic Wand - Enhance Prompt"
-              >
-                {isEnhancing ? (
-                  <i className="ri-loader-4-line animate-spin text-[15px]" />
-                ) : (
-                  <i className="ri-magic-line text-[15px]" />
-                )}
-              </button>
-            )}
-            
-            <div className="flex gap-2 ml-auto">
-              <div className="flex items-center gap-1 text-[#CCCCCC]">
-                <i className="ri-sparkling-fill text-white text-sm" />
-                <span className="text-sm font-medium">{AVAILABLE_MODEL?.credits}</span>
+              <div className="flex gap-2 ml-auto">
+                <div className="flex items-center gap-1 text-white">
+                  <i className="ri-sparkling-2-fill text-white text-sm" />
+                  <span className="text-sm font-medium">{AVAILABLE_MODEL?.credits}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSubmit()}
+                  disabled={shouldShowSpinner || (!prompt.trim())}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                >
+                  {shouldShowSpinner ? (
+                    <i className="ri-loader-4-line animate-spin inline-block text-[#1C1C1C]" />
+                  ) : (
+                    <i className="ri-arrow-right-line text-[#1C1C1C]" />
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleSubmit()}
-                disabled={shouldShowSpinner || (!prompt.trim())}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
-              >
-                {shouldShowSpinner ? (
-                  <i className="ri-loader-4-line animate-spin inline-block text-[#1C1C1C]" />
-                ) : (
-                  <i className="ri-arrow-right-line text-[#1C1C1C]" />
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -589,20 +598,20 @@ export const BackgroundBuilderLeft = ({
 
         <div className="space-y-3 mt-auto">
           <Button
-            className="w-full rounded-[8px] bg-white text-black font-inconsolata text-sm h-9 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
+            className="w-full rounded-[8px] bg-white text-black font-inconsolata text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
             disabled={isExtracting || !blocks.every((block) => !!block.videoUrl)}
           >
             {isExtracting ? (
               <>
-                <i className="ri-loader-4-line animate-spin mr-2" />
+                <i className="ri-loader-4-line animate-spin" />
                 Extracting frames...
               </>
             ) : "Proceed"}
           </Button>
           <Button
             variant="ghost"
-            className="w-full text-white/50 hover:text-white font-inconsolata"
+            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
             onClick={() => window.location.href = "/"}
           >
             Back to home

@@ -37,11 +37,11 @@ export default function DashboardRedirectPage() {
     } else {
       createProject.mutate({ value: "" });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, projects]);
 
   return (
-    <div className="min-h-screen bg-[#1C1C1C] flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <i className="ri-loader-4-line text-3xl text-white animate-spin" />
         <p className="text-sm text-[#8A8A8A] font-inconsolata">Taking you to your dashboard...</p>

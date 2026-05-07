@@ -31,7 +31,7 @@ const LegalFooter = () => (
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#1C1C1C] font-inconsolata">
+    <div className="min-h-screen bg-background font-inconsolata">
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <Link href="/" className="flex items-center gap-2 mb-11">

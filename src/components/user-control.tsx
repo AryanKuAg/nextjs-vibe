@@ -31,9 +31,9 @@ export const UserControl = ({ showName }: Props) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none flex items-center gap-2">
-        <Avatar className="h-[36px] w-[36px] rounded-md transition-opacity hover:opacity-80">
+        <Avatar className="h-[36px] w-[36px] rounded-full transition-opacity hover:opacity-80">
           <AvatarImage src={user.imageUrl} />
-          <AvatarFallback className="rounded-md bg-[#F1336E] text-white">
+          <AvatarFallback className="rounded-full bg-[#F1336E] text-white">
             {user.firstName?.charAt(0) || user.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase()}
           </AvatarFallback>
         </Avatar>
@@ -67,7 +67,7 @@ export const UserControl = ({ showName }: Props) => {
 
         <DropdownMenuItem
           onClick={() => router.push('/projects')}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg focus:text-white"
+          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg focus:text-white"
         >
           <i className="ri-folder-2-line text-[#8A8A88] text-lg" />
           <span className="text-[15px] font-medium text-[#EBEBEB]">Projects</span>
@@ -75,7 +75,7 @@ export const UserControl = ({ showName }: Props) => {
 
         <DropdownMenuItem
           onClick={() => router.push('/manage')}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg focus:text-white"
+          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg focus:text-white"
         >
           <i className="ri-user-line text-[#8A8A88] text-lg" />
           <span className="text-[15px] font-medium text-[#EBEBEB]">Manage account</span>
@@ -83,7 +83,7 @@ export const UserControl = ({ showName }: Props) => {
 
         <DropdownMenuItem
           onClick={() => signOut({ redirectUrl: '/' })}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-[#1C1C1C] focus:bg-[#1C1C1C] rounded-lg mt-1 focus:text-white"
+          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg mt-1 focus:text-white"
         >
           <i className="ri-logout-box-r-line text-[#8A8A88] text-lg" />
           <span className="text-[15px] font-medium text-[#EBEBEB]">Sign out</span>

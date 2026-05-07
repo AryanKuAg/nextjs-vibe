@@ -30,7 +30,124 @@ interface Props {
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
 }
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+
+// ─── Fake progress hook ────────────────────────────────────────────────────────
+function useGenerationProgress(isGenerating: boolean) {
+  const [pct, setPct] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isGenerating) {
+      setPct(0);
+      // Slowly climb: faster at start, decelerates near 89%
+      intervalRef.current = setInterval(() => {
+        setPct((prev) => {
+          if (prev >= 89) return prev;
+          const increment = Math.max(0.05, (89 - prev) * 0.005);
+          return Math.min(89, prev + increment);
+        });
+      }, 1200);
+    } else {
+      // Done – snap to 100 briefly then reset
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setPct(100);
+      const t = setTimeout(() => setPct(0), 600);
+      return () => clearTimeout(t);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [isGenerating]);
+
+  return pct;
+}
+
+// ─── Shimmer overlay shown while generating ────────────────────────────────────
+function GenerationOverlay({ isGenerating }: { isGenerating: boolean }) {
+  const pct = useGenerationProgress(isGenerating);
+  if (!isGenerating && pct === 0) return null;
+  return (
+    <>
+      <style>{`
+        @keyframes blob-1 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          33%      { transform: translate(20%,  -15%) scale(1.15); }
+          66%      { transform: translate(-10%, 20%)  scale(0.9);  }
+        }
+        @keyframes blob-2 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          33%      { transform: translate(-25%, 10%)  scale(1.1);  }
+          66%      { transform: translate(15%, -20%)  scale(0.95); }
+        }
+        @keyframes blob-3 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          33%      { transform: translate(10%,  25%)  scale(0.9);  }
+          66%      { transform: translate(-20%,-10%)  scale(1.2);  }
+        }
+        @keyframes blob-4 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          50%      { transform: translate(-15%, 15%)  scale(1.05); }
+        }
+        @keyframes blob-5 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          40%      { transform: translate(18%,  12%)  scale(1.1);  }
+          70%      { transform: translate(-8%,  -18%) scale(0.88); }
+        }
+        @keyframes blob-6 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          35%      { transform: translate(-20%, -12%) scale(1.08); }
+          65%      { transform: translate(12%,  18%)  scale(0.92); }
+        }
+        @keyframes blob-7 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          50%      { transform: translate(22%,  -8%)  scale(1.12); }
+        }
+        @keyframes blob-8 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          45%      { transform: translate(-15%, -15%) scale(1.15); }
+        }
+        .gen-blob {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(36px);
+          mix-blend-mode: screen;
+        }
+        .gen-blob-1 { width:75%; height:65%; top:-20%; left:-15%;  opacity:0.35; background:radial-gradient(circle, #b0b0b0 0%, transparent 70%); animation: blob-1  7s ease-in-out infinite; }
+        .gen-blob-2 { width:60%; height:55%; top:35%;  left:38%;   opacity:0.28; background:radial-gradient(circle, #d4d4d4 0%, transparent 70%); animation: blob-2  9s ease-in-out infinite; }
+        .gen-blob-3 { width:65%; height:60%; top:45%;  left:-10%;  opacity:0.30; background:radial-gradient(circle, #9a9a9a 0%, transparent 70%); animation: blob-3  8s ease-in-out infinite; }
+        .gen-blob-4 { width:50%; height:45%; top:-15%; left:50%;   opacity:0.25; background:radial-gradient(circle, #c8c8c8 0%, transparent 70%); animation: blob-4 11s ease-in-out infinite; }
+        .gen-blob-5 { width:55%; height:50%; top:15%;  left:25%;   opacity:0.22; background:radial-gradient(circle, #e0e0e0 0%, transparent 70%); animation: blob-5 10s ease-in-out infinite; }
+        .gen-blob-6 { width:50%; height:55%; top:60%;  left:30%;   opacity:0.27; background:radial-gradient(circle, #acacac 0%, transparent 70%); animation: blob-6  6s ease-in-out infinite; }
+        .gen-blob-7 { width:45%; height:40%; top:5%;   left:65%;   opacity:0.20; background:radial-gradient(circle, #bebebe 0%, transparent 70%); animation: blob-7 12s ease-in-out infinite; }
+        .gen-blob-8 { width:65%; height:60%; top:50%;  left:50%;   opacity:0.35; background:radial-gradient(circle, #ffffff 0%, transparent 70%); animation: blob-8  9s ease-in-out infinite; }
+      `}</style>
+      {/* Dark base */}
+      <div className="absolute inset-0 bg-[#111111]" />
+      {/* Blobs */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="gen-blob gen-blob-1" />
+        <div className="gen-blob gen-blob-2" />
+        <div className="gen-blob gen-blob-3" />
+        <div className="gen-blob gen-blob-4" />
+        <div className="gen-blob gen-blob-5" />
+        <div className="gen-blob gen-blob-6" />
+        <div className="gen-blob gen-blob-7" />
+        <div className="gen-blob gen-blob-8" />
+      </div>
+      {/* Percentage */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+        <span className="text-white font-inconsolata text-xl font-semibold tabular-nums">
+          {Math.round(pct)}%
+        </span>
+        <div className="w-20 h-[2px] bg-[#333] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-white rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
 
 export const BackgroundBuilderRight = ({
   blocks,
@@ -200,9 +317,8 @@ export const BackgroundBuilderRight = ({
                 {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
               </div>
               <div className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
-                {block.isGeneratingStart ? (
-                  <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
-                ) : block.startFrameUrl ? (
+                <GenerationOverlay isGenerating={block.isGeneratingStart} />
+                {!block.isGeneratingStart && block.startFrameUrl ? (
                   <div className="relative w-full h-full group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={block.startFrameUrl} alt="Start frame" className="w-full h-full object-cover" />
@@ -223,13 +339,13 @@ export const BackgroundBuilderRight = ({
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : !block.isGeneratingStart ? (
                   <span className="text-[#666] text-xs font-inconsolata">
                     {index > 0 ? (
                       `Last frame of video ${index} will appear here`
                     ) : "Prompt to generate"}
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -240,9 +356,8 @@ export const BackgroundBuilderRight = ({
                 {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
               </div>
               <div className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
-                {block.isGeneratingEnd ? (
-                  <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
-                ) : block.endFrameUrl ? (
+                <GenerationOverlay isGenerating={block.isGeneratingEnd} />
+                {!block.isGeneratingEnd && block.endFrameUrl ? (
                   <div className="relative w-full h-full group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={block.endFrameUrl} alt="End frame" className="w-full h-full object-cover" />
@@ -263,9 +378,9 @@ export const BackgroundBuilderRight = ({
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : !block.isGeneratingEnd ? (
                   <span className="text-[#666] text-xs font-inconsolata">Prompt to generate</span>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -291,7 +406,7 @@ export const BackgroundBuilderRight = ({
               }}
             >
               {block.isGeneratingVideo ? (
-                <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
+                <GenerationOverlay isGenerating={block.isGeneratingVideo} />
               ) : block.videoUrl ? (
                 <>
                   <video

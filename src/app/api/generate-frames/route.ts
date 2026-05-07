@@ -87,16 +87,10 @@ export async function POST(req: NextRequest) {
       model,
       contents: [{ role: "user", parts: userParts }],
       config: {
-        maxOutputTokens: 32768,
+        maxOutputTokens: 8192,
         temperature: 1,
         topP: 0.95,
-        responseModalities: ["IMAGE"],
-        thinkingConfig: { thinkingLevel: "HIGH" },
-        imageConfig: {
-          aspectRatio: "16:9",
-          numberOfImages: 1,
-          imageSize: "1K",
-        },
+        responseModalities: ["IMAGE", "TEXT"],
         safetySettings: [
           { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },
           { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "OFF" },
@@ -109,19 +103,24 @@ export async function POST(req: NextRequest) {
     // Collect the streamed image data
     let imageBase64 = "";
     let mimeType = "image/png";
+    let textOut = "";
 
     for await (const chunk of streamingResp) {
+      console.log("DEBUG CHUNK:", JSON.stringify(chunk, null, 2));
       const parts = chunk.candidates?.[0]?.content?.parts ?? [];
       for (const part of parts) {
         if (part.inlineData?.data) {
           imageBase64 += part.inlineData.data;
           mimeType = part.inlineData.mimeType ?? mimeType;
+        } else if (part.text) {
+          textOut += part.text;
         }
       }
     }
 
     if (!imageBase64) {
-      throw new Error("Imagen returned no image data");
+      console.error("No image data. Text received instead:", textOut);
+      throw new Error("Imagen returned no image data. Text: " + textOut);
     }
 
     // Convert base64 to Buffer and upload to Google Cloud Storage

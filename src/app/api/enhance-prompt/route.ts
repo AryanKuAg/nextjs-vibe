@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = await req.json();
-    const { prompt, type, projectId, activeVideoUrls, extractedZipUrl } = payload;
+    const { prompt, type, projectId } = payload;
 
     if (!type || !["video", "code"].includes(type)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
@@ -113,9 +113,7 @@ Return ONLY the enhanced prompt. Do not include any conversational text, quotes,
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
       }
 
-      const zipUrl = extractedZipUrl || activeVideoUrls?.[0]; // Fallback for debugging, but typically extractedZipUrl is in payload
-      
-      let base64Images: string[] = [];
+      const base64Images: string[] = [];
 
       if (payload.extractedZipUrl) {
         const zipResponse = await fetch(payload.extractedZipUrl);

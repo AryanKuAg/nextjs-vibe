@@ -143,7 +143,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1C1C1C] text-white font-inconsolata flex flex-col font-mono selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-inconsolata flex flex-col font-mono selection:bg-[#F1336E]/30">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
         <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">
@@ -159,8 +159,9 @@ export default function ProjectsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="bg-[#2A2A28] rounded-[8px] px-3 py-1.5 text-sm text-white">
-            {usage ? `${usage.remainingCredits.toLocaleString()}/${usage.totalCredits.toLocaleString()} credits left` : "Loading credits..."}
+          <div className="bg-[#282828] rounded-full px-3 py-1.5 text-sm text-white">
+            <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
+            {usage ? `${Number(usage.remainingCredits).toLocaleString()} credits` : "Loading credits..."}
           </div>
           <UserControl showName={false} />
         </div>

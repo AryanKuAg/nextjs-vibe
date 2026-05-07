@@ -323,7 +323,7 @@ export const ProjectForm = () => {
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#1C1C1C] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-background border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
                     {MODELS.map((model) => (
                       <button
                         key={model.id}

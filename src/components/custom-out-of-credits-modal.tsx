@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import { PLANS, PricingCard } from "@/modules/home/ui/components/pricing-section";
 import { usePathname } from "next/navigation";
@@ -37,10 +38,10 @@ export const CustomOutOfCreditsModal = ({ isOpen, onClose }: CustomOutOfCreditsM
 
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-10">
-          <div className="flex items-center gap-2 mb-8">
+          <Link href="/" className="flex items-center gap-2 mb-8">
             <Image src="/logo.png" alt="Logo" width={24} height={24} />
             <span className="text-white font-[500] text-[20px] font-space-grotesk tracking-tight">framerate</span>
-          </div>
+          </Link>
 
           <h2 className="text-3xl md:text-[40px] text-white font-inconsolata mb-4 tracking-tight font-[500]">Upgrade to keep creating</h2>
           <p className="text-neutral-400 text-sm leading-sm font-inconsolata mx-auto">

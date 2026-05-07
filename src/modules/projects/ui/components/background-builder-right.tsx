@@ -42,7 +42,7 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
     if (isGenerating) {
       wasGenerating.current = true;
       setPct(0);
-      
+
       const updateIntervalMs = 500;
       // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
       const baseFraction = type === "video" ? 0.015 : 0.05;
@@ -51,16 +51,16 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
         setPct((prev) => {
           const remaining = 99 - prev;
           let fraction = baseFraction;
-          
+
           const chance = Math.random();
           // 10% chance for a burst
           if (chance < 0.10) {
-            fraction *= 4; 
-          } 
+            fraction *= 4;
+          }
           // 25% chance to stall/slow down
           else if (chance < 0.35) {
             fraction *= 0.1;
-          } 
+          }
           // Normal variance
           else {
             fraction *= (0.7 + Math.random() * 0.6);
@@ -68,12 +68,12 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
 
           // Always add at least a tiny bit so it never completely freezes
           const increment = Math.max(0.15, remaining * fraction);
-          
+
           // If we hit 99, just creep infinitely by 0.01 so the underlying bar never technically stops
           if (prev + increment >= 99) {
-             return Math.min(99.9, prev + 0.01);
+            return Math.min(99.9, prev + 0.01);
           }
-          
+
           return prev + increment;
         });
       }, updateIntervalMs);
@@ -236,7 +236,7 @@ export const BackgroundBuilderRight = ({
       const currentIdx = history.indexOf(block.videoUrl || "");
       if (currentIdx !== -1) {
         const newIdx = (currentIdx + direction + history.length) % history.length;
-        updateBlock(index, { 
+        updateBlock(index, {
           videoUrl: history[newIdx]
         });
       }
@@ -268,7 +268,7 @@ export const BackgroundBuilderRight = ({
   const renderHistoryIndicator = (type: "START" | "END" | "VIDEO", url: string | null, rawHistory?: string[], block?: VideoBlock, index?: number) => {
     if (!url || !rawHistory || rawHistory.length <= 1 || !block || index === undefined) return null;
     if (type === "START" && index > 0) return null; // Hide history for inherited start frames
-    
+
     const history = Array.from(new Set(rawHistory));
     if (history.length <= 1) return null; // Don't show if there are no alternatives
 
@@ -348,7 +348,7 @@ export const BackgroundBuilderRight = ({
                 <span className="text-[#999] text-xs font-inconsolata">Start frame</span>
                 {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
               </div>
-              <div className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
+              <div className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
                 <GenerationOverlay isGenerating={block.isGeneratingStart} />
                 {!block.isGeneratingStart && block.startFrameUrl ? (
                   <div className="relative w-full h-full group">
@@ -387,7 +387,7 @@ export const BackgroundBuilderRight = ({
                 <span className="text-[#999] text-xs font-inconsolata">End frame</span>
                 {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
               </div>
-              <div className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
+              <div className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
                 <GenerationOverlay isGenerating={block.isGeneratingEnd} />
                 {!block.isGeneratingEnd && block.endFrameUrl ? (
                   <div className="relative w-full h-full group">
@@ -424,7 +424,7 @@ export const BackgroundBuilderRight = ({
               {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
             </div>
             <div
-              className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
+              className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
               onMouseEnter={() => {
                 setHoveredVideoIndex(index);
                 if (block.videoUrl) videoRefs.current[index]?.play();
@@ -489,7 +489,7 @@ export const BackgroundBuilderRight = ({
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#1C1C1C] overflow-y-auto custom-scrollbar relative p-8">
+    <div className="flex-1 h-full flex flex-col bg-background overflow-y-auto custom-scrollbar relative p-8">
 
       {/* Top Toggle */}
 

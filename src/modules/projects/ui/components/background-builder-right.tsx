@@ -33,37 +33,69 @@ interface Props {
 import { useState, useRef, useEffect } from "react";
 
 // ─── Fake progress hook ────────────────────────────────────────────────────────
-function useGenerationProgress(isGenerating: boolean) {
+function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = "image") {
   const [pct, setPct] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wasGenerating = useRef(false);
 
   useEffect(() => {
     if (isGenerating) {
+      wasGenerating.current = true;
       setPct(0);
-      // Slowly climb: faster at start, decelerates near 89%
+      
+      const updateIntervalMs = 500;
+      // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
+      const baseFraction = type === "video" ? 0.015 : 0.05;
+
       intervalRef.current = setInterval(() => {
         setPct((prev) => {
-          if (prev >= 89) return prev;
-          const increment = Math.max(0.05, (89 - prev) * 0.005);
-          return Math.min(89, prev + increment);
+          const remaining = 99 - prev;
+          let fraction = baseFraction;
+          
+          const chance = Math.random();
+          // 10% chance for a burst
+          if (chance < 0.10) {
+            fraction *= 4; 
+          } 
+          // 25% chance to stall/slow down
+          else if (chance < 0.35) {
+            fraction *= 0.1;
+          } 
+          // Normal variance
+          else {
+            fraction *= (0.7 + Math.random() * 0.6);
+          }
+
+          // Always add at least a tiny bit so it never completely freezes
+          const increment = Math.max(0.15, remaining * fraction);
+          
+          // If we hit 99, just creep infinitely by 0.01 so the underlying bar never technically stops
+          if (prev + increment >= 99) {
+             return Math.min(99.9, prev + 0.01);
+          }
+          
+          return prev + increment;
         });
-      }, 1200);
+      }, updateIntervalMs);
     } else {
-      // Done – snap to 100 briefly then reset
       if (intervalRef.current) clearInterval(intervalRef.current);
-      setPct(100);
-      const t = setTimeout(() => setPct(0), 600);
-      return () => clearTimeout(t);
+      // Only flash 100% if we were actually generating — not on initial mount
+      if (wasGenerating.current) {
+        wasGenerating.current = false;
+        setPct(100);
+        const t = setTimeout(() => setPct(0), 600);
+        return () => clearTimeout(t);
+      }
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isGenerating]);
+  }, [isGenerating, type]);
 
   return pct;
 }
 
 // ─── Shimmer overlay shown while generating ────────────────────────────────────
-function GenerationOverlay({ isGenerating }: { isGenerating: boolean }) {
-  const pct = useGenerationProgress(isGenerating);
+function GenerationOverlay({ isGenerating, type = "image" }: { isGenerating: boolean; type?: "image" | "video" }) {
+  const pct = useGenerationProgress(isGenerating, type);
   if (!isGenerating && pct === 0) return null;
   return (
     <>
@@ -406,7 +438,7 @@ export const BackgroundBuilderRight = ({
               }}
             >
               {block.isGeneratingVideo ? (
-                <GenerationOverlay isGenerating={block.isGeneratingVideo} />
+                <GenerationOverlay isGenerating={block.isGeneratingVideo} type="video" />
               ) : block.videoUrl ? (
                 <>
                   <video

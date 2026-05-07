@@ -4,8 +4,9 @@
  */
 
 export const MODEL_COSTS: Record<string, number> = {
-  "veo-3.1-lite-generate-001": 25,
-  "veo-3.1-fast-generate-001": 65,
+  "veo-3.1-lite-generate-001": 12,
+  "veo-3.1-fast-generate-001": 32,
+  "veo-3.1-generate-001": 80,
   "gemini-3.1-flash-image-preview": 7,
   "gemini-3-pro-image-preview": 14,
   "gemini-3.1-pro-preview": 100,

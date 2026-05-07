@@ -7,8 +7,9 @@ import { useTRPC } from "@/trpc/client";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 
 const MODELS = [
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 25 },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 65 },
+  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 12 },
+  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 32 },
+  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", credits: 80 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];

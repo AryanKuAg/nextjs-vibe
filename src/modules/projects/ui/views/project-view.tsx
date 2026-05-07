@@ -784,7 +784,7 @@ export const ProjectView = ({ projectId }: Props) => {
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                         <h2 className="text-sm text-white mb-1">Build site</h2>
-                        <p className="text-xs text-white/30 leading-relaxed">
+                        <p className="text-sm text-[#737373] leading-relaxed">
                           Your website preview will appear here
                         </p>
                       </div>

@@ -604,7 +604,7 @@ export const BackgroundBuilderLeft = ({
           >
             {isExtracting ? (
               <>
-                <i className="ri-loader-4-line animate-spin mr-2" />
+                <i className="ri-loader-4-line animate-spin" />
                 Extracting frames...
               </>
             ) : "Proceed"}

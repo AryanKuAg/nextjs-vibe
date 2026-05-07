@@ -30,7 +30,7 @@ interface Props {
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
 }
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export const BackgroundBuilderRight = ({
   blocks,
@@ -41,6 +41,29 @@ export const BackgroundBuilderRight = ({
   updateBlock
 }: Props) => {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [hoveredVideoIndex, setHoveredVideoIndex] = useState<number | null>(null);
+  const [downloadingVideoIndex, setDownloadingVideoIndex] = useState<number | null>(null);
+  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+
+  const handleDownloadVideo = async (url: string, index: number) => {
+    setDownloadingVideoIndex(index);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `video-${index + 1}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.error("Video download failed", e);
+    } finally {
+      setDownloadingVideoIndex(null);
+    }
+  };
 
   const handleNavigate = (type: "START" | "END" | "VIDEO", direction: number, block: VideoBlock, index: number) => {
     if (type === "START" && block.startFrameHistory) {
@@ -253,11 +276,61 @@ export const BackgroundBuilderRight = ({
               <span className="text-[#999] text-xs font-inconsolata">Video</span>
               {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
             </div>
-            <div className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative">
+            <div
+              className="aspect-video bg-[#1C1C1C] rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
+              onMouseEnter={() => {
+                setHoveredVideoIndex(index);
+                if (block.videoUrl) videoRefs.current[index]?.play();
+              }}
+              onMouseLeave={() => {
+                setHoveredVideoIndex(null);
+                if (block.videoUrl) {
+                  const v = videoRefs.current[index];
+                  if (v) { v.pause(); }
+                }
+              }}
+            >
               {block.isGeneratingVideo ? (
                 <i className="ri-loader-4-line text-[#666] text-2xl animate-spin" />
               ) : block.videoUrl ? (
-                <video src={block.videoUrl} autoPlay loop muted playsInline controls className="w-full h-full object-cover" />
+                <>
+                  <video
+                    ref={(el) => { videoRefs.current[index] = el; }}
+                    src={block.videoUrl}
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Hover overlay buttons */}
+                  <div className={cn(
+                    "absolute top-2 right-2 flex items-center gap-1.5 transition-opacity duration-150",
+                    hoveredVideoIndex === index ? "opacity-100" : "opacity-0"
+                  )}>
+                    {/* Download */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDownloadVideo(block.videoUrl!, index); }}
+                      disabled={downloadingVideoIndex === index}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors disabled:opacity-50"
+                      title="Download video"
+                    >
+                      {downloadingVideoIndex === index
+                        ? <i className="ri-loader-4-line text-sm animate-spin" />
+                        : <i className="ri-download-2-line text-sm" />
+                      }
+                    </button>
+                    {/* Fullscreen */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); videoRefs.current[index]?.requestFullscreen?.(); }}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm transition-colors"
+                      title="Fullscreen"
+                    >
+                      <i className="ri-fullscreen-line text-sm" />
+                    </button>
+                  </div>
+                </>
               ) : (
                 <span className="text-[#666] text-xs font-inconsolata">Preview your generated video here</span>
               )}

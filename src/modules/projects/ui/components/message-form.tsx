@@ -38,6 +38,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Detect follow-up: any existing SITE-stage message means this is a follow-up prompt
@@ -98,6 +99,34 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
       }
     },
   }));
+
+  const handleEnhancePrompt = async () => {
+    setIsEnhancing(true);
+    try {
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: form.getValues().value,
+          type: "code",
+          projectId,
+          extractedZipUrl,
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.prompt) {
+        form.setValue("value", data.prompt, { shouldValidate: true });
+        toast.success("Prompt enhanced successfully!");
+      } else {
+        toast.error("Failed to enhance prompt: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred while enhancing prompt");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (stage === "SITE") {
@@ -187,6 +216,21 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
                 </div>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={handleEnhancePrompt}
+              disabled={isEnhancing}
+              className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              title="Magic Wand - Enhance Prompt"
+            >
+              {isEnhancing ? (
+                <i className="ri-loader-4-line animate-spin text-[15px]" />
+              ) : (
+                <i className="ri-magic-line text-[15px]" />
+              )}
+            </button>
+
             <div className="flex gap-2 ml-auto">
               <div className="flex items-center gap-1 text-[#CCCCCC]">
                 <i className="ri-sparkling-fill text-white text-sm" />

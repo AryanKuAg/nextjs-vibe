@@ -189,12 +189,17 @@ export const ProjectView = ({ projectId }: Props) => {
       return;
     }
 
+    // Collect the currently active video URL per block (in order)
+    const activeVideoUrls = blocks
+      .map(b => b.videoUrl)
+      .filter((url): url is string => !!url);
+
     try {
       setIsExtracting(true);
       const res = await fetch("/api/extract-frames", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId })
+        body: JSON.stringify({ projectId, activeVideoUrls })
       });
       if (res.ok) {
         const data = await res.json();

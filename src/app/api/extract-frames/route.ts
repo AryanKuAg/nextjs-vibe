@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json() as { projectId: string; videoUrl?: string; frameCount?: number };
-    const { projectId, videoUrl: bodyVideoUrl } = body;
+    const body = await req.json() as { projectId: string; videoUrl?: string; frameCount?: number; activeVideoUrls?: string[] };
+    const { projectId, videoUrl: bodyVideoUrl, activeVideoUrls } = body;
 
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
@@ -49,11 +49,21 @@ export async function POST(req: NextRequest) {
       where: { id: projectId, userId },
     });
 
-    // Use all videos sorted by blockIndex
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const projectVideos = (project as any)?.videoUrls as any[] || [];
-    const sortedVideos = [...projectVideos].sort((a, b) => (a.blockIndex || 0) - (b.blockIndex || 0));
-    const videoUrlsToProcess = bodyVideoUrl ? [bodyVideoUrl] : sortedVideos.map(v => typeof v === "string" ? v : v?.url).filter(Boolean);
+    let videoUrlsToProcess: string[];
+
+    if (activeVideoUrls && activeVideoUrls.length > 0) {
+      // Use the exact videos currently active in the UI (one per block, user-selected)
+      videoUrlsToProcess = activeVideoUrls;
+    } else if (bodyVideoUrl) {
+      // Single video override (legacy usage)
+      videoUrlsToProcess = [bodyVideoUrl];
+    } else {
+      // Fallback: pull from DB sorted by blockIndex (takes first video per block)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const projectVideos = (project as any)?.videoUrls as any[] || [];
+      const sortedVideos = [...projectVideos].sort((a, b) => (a.blockIndex || 0) - (b.blockIndex || 0));
+      videoUrlsToProcess = sortedVideos.map(v => typeof v === "string" ? v : v?.url).filter(Boolean);
+    }
 
     if (videoUrlsToProcess.length === 0) {
       return NextResponse.json(

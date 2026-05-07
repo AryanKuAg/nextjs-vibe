@@ -72,8 +72,9 @@ const deleteImageFromIDB = async (key: string) => {
 const MODELS = [
   { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7, type: "IMAGE" },
   { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14, type: "IMAGE" },
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", emoji: "", credits: 25, type: "VIDEO" },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", emoji: "", credits: 65, type: "VIDEO" },
+  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", emoji: "", credits: 12, type: "VIDEO" },
+  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", emoji: "", credits: 32, type: "VIDEO" },
+  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", emoji: "", credits: 80, type: "VIDEO" },
 ];
 
 export const BackgroundBuilderLeft = ({

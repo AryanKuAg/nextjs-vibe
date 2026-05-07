@@ -980,8 +980,9 @@ export const veoGenerateFunction = inngest.createFunction(
         while (!isDone) {
           await new Promise(r => setTimeout(r, 15000));
 
+          const targetModel = model || "veo-3.1-lite-generate-001";
           const token = await tokenHelper();
-          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/veo-3.1-lite-generate-001:fetchPredictOperation`;
+          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/${targetModel}:fetchPredictOperation`;
 
           const result = await fetch(url, {
             method: 'POST',

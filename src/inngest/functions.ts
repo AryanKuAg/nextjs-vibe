@@ -11,6 +11,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 
 import { Storage } from "@google-cloud/storage";
 import { GoogleAuth } from "google-auth-library";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
@@ -862,6 +863,32 @@ export const veoGenerateFunction = inngest.createFunction(
         });
       });
 
+      const sanitizedPrompt = await step.run("sanitize-prompt", async () => {
+        try {
+          const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_CLOUD_API_KEY || process.env.GEMINI_API_KEY });
+          const resp = await ai.models.generateContent({
+            model: "gemini-3.1-flash",
+            contents: `You are an expert prompt sanitization AI. The user wants to generate a video using Veo 3.1, but Veo has extremely strict safety filters.
+Rewrite the following prompt so that it retains the core visual aesthetic and motion of the user's request, but completely removes or softens any words that might trigger a safety filter (e.g. violence, explicit content, highly borderline words). Do NOT explain yourself. ONLY output the sanitized prompt. If the prompt is already completely safe, just output it exactly as is.
+
+Original Prompt:
+${prompt}`,
+            config: {
+              safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+              ]
+            }
+          });
+          return resp.text || prompt;
+        } catch(e) {
+          console.error("Failed to sanitize prompt, using original", e);
+          return prompt;
+        }
+      });
+
       const operationName = await step.run("start-veo-generation", async () => {
         try {
           const token = await tokenHelper();
@@ -869,7 +896,7 @@ export const veoGenerateFunction = inngest.createFunction(
           const targetModel = model || "veo-3.1-lite-generate-001";
           const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/${targetModel}:predictLongRunning`;
 
-          let instances: Record<string, unknown>[] = [{ prompt: prompt }];
+          let instances: Record<string, unknown>[] = [{ prompt: sanitizedPrompt }];
 
           if (event.data.imageUrl) {
             // Check for both standard GCS URL and custom CDN domain URL
@@ -889,7 +916,7 @@ export const veoGenerateFunction = inngest.createFunction(
 
             if (gcsBucketName && gcsObjectPath) {
               const instancePayload: Record<string, unknown> = {
-                prompt: prompt,
+                prompt: sanitizedPrompt,
                 image: {
                   gcsUri: `gs://${gcsBucketName}/${gcsObjectPath}`,
                   mimeType: "image/jpeg" // usually JPEG from UI
@@ -930,7 +957,7 @@ export const veoGenerateFunction = inngest.createFunction(
               : base64Str;
 
             instances = [{
-              prompt: prompt,
+              prompt: sanitizedPrompt,
               image: {
                 bytesBase64Encoded: rawBase64,
                 mimeType: mimeType

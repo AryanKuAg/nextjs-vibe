@@ -753,7 +753,7 @@ export const ProjectView = ({ projectId }: Props) => {
               <div className="ml-auto flex items-center gap-x-1">
                 <div className="bg-[#282828]  rounded-full px-3 py-2 text-sm text-white">
                   <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
-                  {usage ? `${Number(usage?.remainingCredits).toLocaleString()} credits` : "Loading credits..."}
+                  {usage ? `${Number(usage?.remainingCredits).toLocaleString("en-US")} credits` : "Loading credits..."}
                 </div>
                 {usage?.plan === "free" && (
                   <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">

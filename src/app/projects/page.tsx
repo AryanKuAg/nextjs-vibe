@@ -161,7 +161,7 @@ export default function ProjectsPage() {
         <div className="flex items-center gap-4">
           <div className="bg-[#282828] rounded-full px-3 py-1.5 text-sm text-white">
             <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
-            {usage ? `${Number(usage.remainingCredits).toLocaleString()} credits` : "Loading credits..."}
+            {usage ? `${Number(usage.remainingCredits).toLocaleString("en-US")} credits` : "Loading credits..."}
           </div>
           <UserControl showName={false} />
         </div>
@@ -179,9 +179,13 @@ export default function ProjectsPage() {
             </div>
           ) : projects && projects.length > 0 ? (
             <div className="grid grid-cols-2 gap-6">
-              {(projects as { id: string; name: string; sceneImageUrls?: string[] | null }[]).map((project) => {
+              {(projects as { id: string; name: string; sceneImageUrls?: Array<string | { url?: string }> | null }[]).map((project) => {
                 const thumbnails = Array.isArray(project.sceneImageUrls) ? project.sceneImageUrls : [];
-                const thumbnail = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1] : null;
+                let thumbnail: string | null = null;
+                if (thumbnails.length > 0) {
+                  const lastItem = thumbnails[thumbnails.length - 1];
+                  thumbnail = typeof lastItem === "string" ? lastItem : (lastItem?.url || null);
+                }
                 return (
                   <ProjectCard
                     key={project.id}

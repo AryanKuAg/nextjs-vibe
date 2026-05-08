@@ -83,6 +83,7 @@ export default function RootLayout({
       <TRPCReactProvider>
         <html lang="en" suppressHydrationWarning>
           <body
+            suppressHydrationWarning
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
           >
             <Script

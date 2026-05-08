@@ -42,11 +42,32 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.auth.userId,
         },
         orderBy: {
-          updatedAt: "desc",
+          createdAt: "desc",
         },
+        include: {
+          _count: {
+            select: { messages: true }
+          }
+        }
       });
 
-      return projects;
+      const emptyProjectIds = projects.filter(p => {
+        const hasMessages = p._count.messages > 0;
+        const sceneUrls = Array.isArray(p.sceneImageUrls) ? p.sceneImageUrls : [];
+        const videos = Array.isArray(p.videoUrls) ? p.videoUrls : [];
+        // If it has no media, no messages, and is not currently generating anything
+        return !hasMessages && sceneUrls.length === 0 && videos.length === 0 && p.currentStage === "SCENE";
+      }).map(p => p.id);
+
+      if (emptyProjectIds.length > 0) {
+        // Fire and forget background deletion for clean up
+        prisma.project.deleteMany({
+          where: { id: { in: emptyProjectIds } }
+        }).catch(err => console.error("Failed to delete empty projects:", err));
+      }
+
+      // Return only the non-empty projects to the client immediately
+      return projects.filter(p => !emptyProjectIds.includes(p.id));
     }),
   create: protectedProcedure
     .input(

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         maxOutputTokens: 8192,
         temperature: 1,
         topP: 0.95,
-        responseModalities: ["IMAGE", "TEXT"],
+        responseModalities: ["IMAGE"],
         safetySettings: [
           { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },
           { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "OFF" },

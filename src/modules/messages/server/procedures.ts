@@ -56,16 +56,21 @@ export const messagesRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      try {
-        await consumeCredits(10);
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
-        } else {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message: "You have run out of credits"
-          });
+      // Synthetic sentinel messages (e.g. retry/error injections from the UI) skip credits and AI
+      const isSyntheticMessage = input.model === "system-error";
+
+      if (!isSyntheticMessage) {
+        try {
+          await consumeCredits(10);
+        } catch (error) {
+          if (error instanceof Error) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
+          } else {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS",
+              message: "You have run out of credits"
+            });
+          }
         }
       }
 
@@ -73,7 +78,7 @@ export const messagesRouter = createTRPCRouter({
         data: {
           projectId: existingProject.id,
           content: input.value,
-          role: "USER",
+          role: isSyntheticMessage ? "ASSISTANT" : "USER",
           type: "RESULT",
           stage: input.stage,
         },
@@ -82,7 +87,7 @@ export const messagesRouter = createTRPCRouter({
       // We ONLY fire the code-agent directly if we're in the old flow or triggered explicitly.
       // With the new 3-stage flow, code-agent is fired via projects.buildSite instead,
       // but if an existing project UI uses this for regular chat, we still fire it.
-      if (input.stage === "SITE") {
+      if (input.stage === "SITE" && !isSyntheticMessage) {
         await inngest.send({
           name: "code-agent/run",
           data: {

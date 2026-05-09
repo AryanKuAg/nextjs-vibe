@@ -146,9 +146,9 @@ export async function POST(req: NextRequest) {
       ffmpeg(videoPath)
         .outputOptions([
           `-vf fps=${exactFps.toFixed(6)}`,
-          "-q:v 3", // 2-31 scale (lower is better). 3 provides higher quality for generated frames.
+          "-compression_level 0", // PNG: 0 = no compression (fastest, lossless, largest files)
         ])
-        .output(path.join(framesDir, "frame-%04d.jpg"))
+        .output(path.join(framesDir, "frame-%04d.png"))
         .on("end", () => resolve())
         .on("error", (err: Error) => reject(err))
         .run();
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
 
     const frameFiles = fs
       .readdirSync(framesDir)
-      .filter((f) => f.endsWith(".jpg"))
+      .filter((f) => f.endsWith(".png"))
       .sort();
 
     if (frameFiles.length === 0) {

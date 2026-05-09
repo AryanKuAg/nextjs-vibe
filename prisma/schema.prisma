@@ -28,6 +28,7 @@ model Project {
   videoUrls      Json   @default("[]") // Array of all generated cinematic videos
   sceneImageUrls Json   @default("[]") // Array of all generated scene image URLs
   prompts        Json   @default("[]") // Array of prompts for each block
+  frameCount     Int?   // The total number of frames extracted for the project
 
   messages Message[]
 }

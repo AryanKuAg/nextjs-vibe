@@ -24,6 +24,7 @@ interface Props {
   projectId: string;
   stage?: "SCENE" | "VIDEO" | "SITE";
   extractedZipUrl?: string | null;
+  extractedFrameCount?: number;
 };
 
 const formSchema = z.object({
@@ -32,7 +33,7 @@ const formSchema = z.object({
     .max(10000, { message: "Value is too long" }),
 })
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
@@ -135,6 +136,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl }: Prop
           value: values.value,
           projectId,
           videoUrl: extractedZipUrl || undefined,
+          frameCount: extractedFrameCount,
           model: selectedModel,
           isFollowUp,
         });

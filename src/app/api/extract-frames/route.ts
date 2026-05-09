@@ -136,17 +136,17 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    // Compute the exact fps to always produce exactly 450 frames from any video length
-    const TARGET_FRAMES = 450;
+    // Compute the exact fps to produce exactly 40 frames per second of video length
+    const TARGET_FRAMES = Math.round(videoDuration * 40);
     const exactFps = TARGET_FRAMES / videoDuration;
     console.log(`[extract-frames] Video duration: ${videoDuration}s. Target FPS: ${exactFps.toFixed(4)} to produce ${TARGET_FRAMES} frames.`);
 
-    // Extract exactly 450 evenly-spaced frames using ffmpeg
+    // Extract exactly TARGET_FRAMES evenly-spaced frames using ffmpeg
     await new Promise<void>((resolve, reject) => {
       ffmpeg(videoPath)
         .outputOptions([
           `-vf fps=${exactFps.toFixed(6)}`,
-          "-q:v 5", // 2-31 scale (lower is better). 5 provides very high quality without massive file sizes.
+          "-q:v 3", // 2-31 scale (lower is better). 3 provides higher quality for generated frames.
         ])
         .output(path.join(framesDir, "frame-%04d.jpg"))
         .on("end", () => resolve())
@@ -189,12 +189,17 @@ export async function POST(req: NextRequest) {
     const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
     const zipUrl = `${cdnBase}/${fileToUpload}`;
 
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { frameCount: frameFiles.length }
+    });
+
     // Clean up tmp files
     fs.rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = null;
 
     console.log(`[extract-frames] Zipped ${frameFiles.length} frames for project ${projectId} -> ${zipUrl}`);
-    return NextResponse.json({ zipUrl });
+    return NextResponse.json({ zipUrl, frameCount: frameFiles.length });
   } catch (err) {
     console.error("[extract-frames] Error:", err);
     // Cleanup on error

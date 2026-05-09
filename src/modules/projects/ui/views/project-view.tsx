@@ -596,9 +596,18 @@ export const ProjectView = ({ projectId }: Props) => {
       const resolvedZipUrl = extractedZipUrl || (project?.id ? `${cdnBase}/frames/${project.id}/frames.zip` : null);
       if (resolvedZipUrl) {
         try {
-          // Proxy via our server route to avoid CORS issues fetching GCS directly
-          const proxyUrl = `/api/proxy-zip?url=${encodeURIComponent(resolvedZipUrl)}`;
-          const res = await fetch(proxyUrl);
+          // Fetch directly from storage bucket since it supports CORS, 
+          // bypassing Vercel's 4.5MB serverless response limit
+          let fetchUrl = resolvedZipUrl;
+          // Ensure we hit storage.googleapis.com directly if the CDN doesn't forward CORS headers
+          if (!fetchUrl.includes("storage.googleapis.com")) {
+             const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space';
+             const pathParts = new URL(resolvedZipUrl).pathname.split('/').filter(Boolean);
+             const pathKey = pathParts.slice(pathParts.indexOf('frames')).join('/');
+             fetchUrl = `https://storage.googleapis.com/${bucketName}/${pathKey}`;
+          }
+
+          const res = await fetch(fetchUrl);
           if (res.ok) {
             const zipBuffer = await res.arrayBuffer();
             const framesZip = await JSZip.loadAsync(zipBuffer);
@@ -608,7 +617,7 @@ export const ProjectView = ({ projectId }: Props) => {
               zip.file(`public/${relativePath}`, fileData);
             }
           } else {
-            console.warn("[Download ZIP] proxy-zip returned non-ok:", res.status);
+            console.warn("[Download ZIP] Direct fetch returned non-ok:", res.status);
           }
         } catch (e) {
           console.error("[Download ZIP] Failed to merge frames zip:", e);

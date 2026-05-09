@@ -104,10 +104,15 @@ export async function POST(req: NextRequest) {
     let imageBase64 = "";
     let mimeType = "image/png";
     let textOut = "";
+    let finishReason = "";
 
     for await (const chunk of streamingResp) {
       console.log("DEBUG CHUNK:", JSON.stringify(chunk, null, 2));
-      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      const candidate = chunk.candidates?.[0];
+      if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+        finishReason = candidate.finishReason;
+      }
+      const parts = candidate?.content?.parts ?? [];
       for (const part of parts) {
         if (part.inlineData?.data) {
           imageBase64 += part.inlineData.data;
@@ -120,7 +125,11 @@ export async function POST(req: NextRequest) {
 
     if (!imageBase64) {
       console.error("No image data. Text received instead:", textOut);
-      throw new Error("Imagen returned no image data. Text: " + textOut);
+      let errorMsg = `Imagen returned no image data. Text: ${textOut}`;
+      if (finishReason) {
+         errorMsg = `Image generation was blocked by Google API. Reason: ${finishReason}. Please modify your prompt.`;
+      }
+      throw new Error(errorMsg);
     }
 
     // Convert base64 to Buffer and upload to Google Cloud Storage

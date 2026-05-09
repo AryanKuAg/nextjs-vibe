@@ -39,13 +39,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
-    const storage = new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT,
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      },
-    });
+    const storage = new Storage(
+      process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+        ? {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            credentials: {
+              client_email: process.env.GOOGLE_CLIENT_EMAIL,
+              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+            },
+          }
+        : {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          }
+    );
 
     const file = storage.bucket(parsed.bucketName).file(parsed.filePath);
     const [buffer] = await file.download();

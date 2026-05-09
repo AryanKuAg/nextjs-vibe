@@ -669,6 +669,8 @@ export const ProjectView = ({ projectId }: Props) => {
             currentStage={currentStage}
             activeTab={activeStageTab}
             onStageClick={(stage) => setActiveStageTab(stage)}
+            hasFrames={!!extractedZipUrl || extractedFrameCount !== undefined}
+            hasMessages={!!project?.messages?.length}
           />
 
           {activeStageTab === "BACKGROUND" && (

@@ -126,13 +126,19 @@ export async function POST(req: NextRequest) {
     // Convert base64 to Buffer and upload to Google Cloud Storage
     const imageBuffer = Buffer.from(imageBase64, "base64");
     const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-    const storage = new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT,
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }
-    });
+    const storage = new Storage(
+      process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+        ? {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            credentials: {
+              client_email: process.env.GOOGLE_CLIENT_EMAIL,
+              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+            },
+          }
+        : {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          }
+    );
     const bucket = storage.bucket(bucketName);
 
     const fileName = `frames/${projectId}/frame-${Date.now()}.png`;

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
-import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini } from "@inngest/agent-kit";
+import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini, anthropic } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
 import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
+import { NonRetriableError } from "inngest";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
@@ -15,6 +16,18 @@ import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
+
+
+
+const checkCancellation = async (projectId: string) => {
+  const pCheck = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { messages: { orderBy: { createdAt: "desc" }, take: 1 } }
+  });
+  if (pCheck?.messages?.[0]?.content === "Generation was manually stopped.") {
+    throw new NonRetriableError("Generation was manually stopped.");
+  }
+};
 
 function geminiVertexKey(modelName: string) {
   // Use the API key from your environment variable
@@ -60,6 +73,36 @@ function geminiVertexKey(modelName: string) {
   return baseModel;
 }
 
+function anthropicVertexKey(modelName: string, bearerToken: string | null | undefined) {
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || "spatial-492511";
+  
+  const baseModel = anthropic({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: modelName as any,
+    defaultParameters: {
+      max_tokens: 8192,
+    }
+  });
+
+  baseModel.url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/publishers/anthropic/models/${modelName}:streamRawPredict`;
+  
+  baseModel.headers = {
+    "Authorization": `Bearer ${bearerToken}`,
+    "Content-Type": "application/json; charset=utf-8",
+  };
+  
+  const originalOnCall = baseModel.onCall;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  baseModel.onCall = (options, body: any) => {
+    if (originalOnCall) {
+      originalOnCall(options, body);
+    }
+    body.anthropic_version = "vertex-2023-10-16";
+  };
+
+  return baseModel;
+}
+
 interface AgentState {
   summary: string;
   files: { [path: string]: string };
@@ -70,16 +113,19 @@ export const codeAgentFunction = inngest.createFunction(
     id: "code-agent",
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
+      
       // Guarantee the UI un-jams by writing a fallback Assistant message
       await step.run("unjam-ui", async () => {
-        await prisma.message.create({
-          data: {
-            projectId: projectId,
-            content: `The code agent encountered a critical infrastructure error and exhausted all retries. The error was: ${error.message}. Please send another prompt to try again.`,
-            role: "ASSISTANT",
-            type: "RESULT",
-          }
-        }).catch(err => console.error("Failed to write unjam message", err));
+        if (error.message !== "Generation was manually stopped.") {
+          await prisma.message.create({
+            data: {
+              projectId: projectId,
+              content: `The code agent encountered a critical infrastructure error and exhausted all retries. The error was: ${error.message}. Please send another prompt to try again.`,
+              role: "ASSISTANT",
+              type: "RESULT",
+            }
+          }).catch(err => console.error("Failed to write unjam message", err));
+        }
 
         await prisma.project.update({
           where: { id: projectId },
@@ -88,13 +134,37 @@ export const codeAgentFunction = inngest.createFunction(
       });
     }
   },
-  { event: "code-agent/run" },
+  {
+    event: "code-agent/run",
+    cancelOn: [
+      {
+        event: "code-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
     const project = await step.run("get-project", async () => {
       return await prisma.project.findUnique({
         where: { id: event.data.projectId }
       });
     });
+
+    const bearerToken = await step.run("get-gcp-token", async () => {
+      const auth = new GoogleAuth({
+        scopes: ['https://www.googleapis.com/auth/cloud-platform']
+      });
+      const client = await auth.getClient();
+      const token = await client.getAccessToken();
+      return token.token;
+    });
+
+    const getModel = (modelName: string) => {
+      if (modelName.includes("claude") || modelName.includes("sonnet")) {
+        return anthropicVertexKey(modelName, bearerToken);
+      }
+      return geminiVertexKey(modelName);
+    };
 
     const sandboxId = await step.run("get-sandbox-id", async () => {
       let sandbox;
@@ -314,7 +384,7 @@ export const codeAgentFunction = inngest.createFunction(
         system: PROMPT,
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
-        model: geminiVertexKey(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -387,11 +457,13 @@ To achieve this securely and perfectly:
       maxIter: 5,
       defaultState: state,
       router: async ({ network }) => {
+        await checkCancellation(event.data.projectId);
+        await checkCancellation(event.data.projectId);
         // If we have a summary, we are done! Return nothing to stop the loop.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: geminiVertexKey("gemini-3-flash-preview"),
+      defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -411,6 +483,7 @@ To achieve this securely and perfectly:
     let attempt = 1;
 
     while (!isBuildSuccessful && attempt <= maxRetries) {
+      await checkCancellation(event.data.projectId);
       // Step A: Check the build
       const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
@@ -508,7 +581,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: geminiVertexKey("gemini-3-flash-preview"),
+        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -529,10 +602,11 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
+        await checkCancellation(event.data.projectId);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: geminiVertexKey("gemini-3-flash-preview"),
+        defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -576,14 +650,14 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: geminiVertexKey("gemini-3-flash-preview"),
+      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: geminiVertexKey("gemini-3-flash-preview"),
+      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);

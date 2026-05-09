@@ -10,7 +10,7 @@ export const MODEL_COSTS: Record<string, number> = {
   "gemini-3.1-flash-image-preview": 7,
   "gemini-3-pro-image-preview": 14,
   "gemini-3.1-pro-preview": 100,
-  "gemini-3.1-flash-lite-preview": 80,
+  "claude-sonnet-4-6": 100,
 };
 
 // Follow-up prompts (when a conversation already exists) cost a flat 10 credits

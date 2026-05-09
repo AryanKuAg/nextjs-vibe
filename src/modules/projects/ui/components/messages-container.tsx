@@ -148,7 +148,13 @@ export const MessagesContainer = ({
       </div>
       <div className="relative p-3 pt-1">
         <div className="absolute -top-6 left-0 right-0 h-6 pointer-events-none" />
-        <MessageForm projectId={projectId} stage={stage} extractedZipUrl={extractedZipUrl} extractedFrameCount={extractedFrameCount} />
+        <MessageForm 
+          projectId={projectId} 
+          stage={stage} 
+          extractedZipUrl={extractedZipUrl} 
+          extractedFrameCount={extractedFrameCount} 
+          isGenerating={isLastMessageUser && !isStuck}
+        />
         {onBack && (
           <button
             type="button"

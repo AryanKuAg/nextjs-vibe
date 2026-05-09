@@ -19,13 +19,19 @@ export async function POST(req: NextRequest) {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    const storage = new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT,
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-    });
+    const storage = new Storage(
+      process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+        ? {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            credentials: {
+              client_email: process.env.GOOGLE_CLIENT_EMAIL,
+              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+            },
+          }
+        : {
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          }
+    );
 
     const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
     const bucket = storage.bucket(bucketName);

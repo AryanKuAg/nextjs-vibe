@@ -13,8 +13,9 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { FOLLOW_UP_COST } from "@/lib/pricing";
 
 const MODELS = [
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 100 },
-  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite", credits: 80 }
+  // TODO: Uncomment Claude model once Vertex AI quota increase is approved
+  // { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", credits: 100 },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 100 }
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -25,6 +26,7 @@ interface Props {
   stage?: "SCENE" | "VIDEO" | "SITE";
   extractedZipUrl?: string | null;
   extractedFrameCount?: number;
+  isGenerating?: boolean;
 };
 
 const formSchema = z.object({
@@ -33,7 +35,7 @@ const formSchema = z.object({
     .max(10000, { message: "Value is too long" }),
 })
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
@@ -65,6 +67,13 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
       value: "",
     },
   });
+
+  const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
+    onSuccess: () => {
+      toast.success("Generation stopped");
+      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
+    }
+  }));
 
   const buildSite = useMutation(trpc.projects.buildSite.mutationOptions({
     onSuccess: () => {
@@ -158,7 +167,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   };
 
   const isPending = createMessage.isPending || buildSite.isPending;
-  const isButtonDisabled = isPending || !form.formState.isValid;
+  const isButtonDisabled = isPending || (!form.formState.isValid && !isGenerating);
 
   return (
     <>
@@ -240,17 +249,28 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   {isFollowUp ? FOLLOW_UP_COST : MODELS.find(m => m.id === selectedModel)?.credits}
                 </span>
               </div>
-              <button
-                type="submit"
-                disabled={isButtonDisabled}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
-              >
-                {isPending ? (
-                  <i className="ri-loader-4-line animate-spin inline-block" />
-                ) : (
-                  <i className="ri-arrow-up-line text-[#1C1C1C]" />
-                )}
-              </button>
+              {isGenerating ? (
+                <button
+                  type="button"
+                  onClick={() => cancelGeneration.mutate({ projectId })}
+                  disabled={cancelGeneration.isPending}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent text-[#fefefe]  transition-all shadow-sm active:scale-95 border border-[#333333]"
+                >
+                  <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isButtonDisabled}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] disabled:bg-[#666666] disabled:text-[#444] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                >
+                  {isPending ? (
+                    <i className="ri-loader-4-line animate-spin inline-block" />
+                  ) : (
+                    <i className="ri-arrow-up-line" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>

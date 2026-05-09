@@ -60,8 +60,8 @@ export const projectsRouter = createTRPCRouter({
       }).map(p => p.id);
 
       if (emptyProjectIds.length > 0) {
-        // Fire and forget background deletion for clean up
-        prisma.project.deleteMany({
+        // Await deletion to ensure it completes before the serverless function suspends
+        await prisma.project.deleteMany({
           where: { id: { in: emptyProjectIds } }
         }).catch(err => console.error("Failed to delete empty projects:", err));
       }
@@ -80,9 +80,9 @@ export const projectsRouter = createTRPCRouter({
         await consumeCredits(0); // Project metadata creation is free; generation is charged separately
       } catch (error) {
         if (error instanceof Error) {
-          throw new TRPCError({ 
-            code: "BAD_REQUEST", 
-            message: error.message 
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message
           });
         } else {
           throw new TRPCError({
@@ -107,15 +107,15 @@ export const projectsRouter = createTRPCRouter({
           // Only create the initial message if the user provided a prompt
           ...(input.value.trim()
             ? {
-                messages: {
-                  create: {
-                    content: input.value,
-                    role: "USER",
-                    type: "RESULT",
-                    stage: "SCENE",
-                  },
+              messages: {
+                create: {
+                  content: input.value,
+                  role: "USER",
+                  type: "RESULT",
+                  stage: "SCENE",
                 },
-              }
+              },
+            }
             : {}),
         },
       });
@@ -174,7 +174,7 @@ export const projectsRouter = createTRPCRouter({
 
       const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
       const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
-      
+
       let imageUrl = input.imageUrl;
       let imageBase64 = input.imageBase64;
 
@@ -194,18 +194,18 @@ export const projectsRouter = createTRPCRouter({
         const mimeType = match ? match[1] : "image/jpeg";
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-        
+
         const ext = mimeType.split("/")[1] || "jpg";
         const fileName = `frames/${input.projectId}/upload-${Date.now()}.${ext}`;
         const file = bucket.file(fileName);
-        
+
         await file.save(buffer, {
           metadata: { contentType: mimeType },
         });
-        
+
         const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
         imageUrl = `${cdnUrl}/${fileName}`;
-        
+
         // Remove base64 so it doesn't get sent to Inngest
         imageBase64 = undefined;
       }
@@ -279,12 +279,36 @@ export const projectsRouter = createTRPCRouter({
 
       await prisma.project.update({
         where: { id: input.projectId },
-        data: { 
+        data: {
           currentStage: "SITE",
         },
       });
 
       return createdMessage;
+    }),
+  cancelGeneration: protectedProcedure
+    .input(z.object({
+      projectId: z.string().uuid(),
+    }))
+    .mutation(async ({ input }) => {
+      // Stop the Inngest run
+      await inngest.send({
+        name: "code-agent/cancel",
+        data: { projectId: input.projectId }
+      });
+
+      // Inject a cancellation message to unblock the UI
+      await prisma.message.create({
+        data: {
+          projectId: input.projectId,
+          role: "ASSISTANT",
+          content: "Generation was manually stopped.",
+          type: "ERROR",
+          stage: "SITE"
+        }
+      });
+
+      return { success: true };
     }),
   cancelVideoGeneration: protectedProcedure
     .input(z.object({

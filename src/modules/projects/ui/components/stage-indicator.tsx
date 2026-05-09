@@ -7,6 +7,8 @@ interface Props {
   currentStage: Stage | "SCENE" | "VIDEO" | "GENERATING_VIDEO";
   activeTab: Stage;
   onStageClick: (stage: Stage) => void;
+  hasFrames?: boolean;
+  hasMessages?: boolean;
 }
 
 const STAGES = [
@@ -14,13 +16,12 @@ const STAGES = [
   { id: "SITE", label: "02 Build website" },
 ];
 
-export const StageIndicator = ({ currentStage, activeTab, onStageClick }: Props) => {
+export const StageIndicator = ({ activeTab, onStageClick, hasFrames, hasMessages }: Props) => {
   const activeIndex = STAGES.findIndex((s) => s.id === activeTab);
-  // For unlocking, if currentStage is SITE, SITE is unlocked. 
-  // We can assume BACKGROUND is always unlocked.
+  
   const isUnlocked = (idx: number) => {
     if (idx === 0) return true;
-    if (idx === 1) return currentStage === "SITE";
+    if (idx === 1) return hasFrames || hasMessages;
     return false;
   };
 

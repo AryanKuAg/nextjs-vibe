@@ -181,13 +181,19 @@ export const projectsRouter = createTRPCRouter({
       // Inngest payload limit is ~1MB. Upload base64 image to GCS first.
       if (imageBase64) {
         const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage({
-          projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          credentials: {
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-          },
-        });
+        const storage = new Storage(
+          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+            ? {
+                projectId: process.env.GOOGLE_CLOUD_PROJECT,
+                credentials: {
+                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+                },
+              }
+            : {
+                projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              }
+        );
 
         const bucket = storage.bucket(bucketName);
         const match = imageBase64.match(/^data:(image\/[^;]+);/);

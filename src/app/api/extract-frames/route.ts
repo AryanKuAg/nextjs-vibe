@@ -89,14 +89,14 @@ export async function POST(req: NextRequest) {
     }
 
     const ffmpeg = await getFFmpeg();
-    
+
     // Combine videos if there are multiple
     let videoPath = videoPaths[0];
     if (videoPaths.length > 1) {
       const listPath = path.join(tmpDir, "list.txt");
       const listContent = videoPaths.map(p => `file '${p}'`).join("\n");
       fs.writeFileSync(listPath, listContent);
-      
+
       const combinedVideoPath = path.join(tmpDir, "combined.mp4");
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
@@ -146,9 +146,9 @@ export async function POST(req: NextRequest) {
       ffmpeg(videoPath)
         .outputOptions([
           `-vf fps=${exactFps.toFixed(6)}`,
-          "-compression_level 0", // PNG: 0 = no compression (fastest, lossless, largest files)
+          "-q:v 2", // 2-31 scale (lower is better). 3 provides higher quality for generated frames.
         ])
-        .output(path.join(framesDir, "frame-%04d.png"))
+        .output(path.join(framesDir, "frame-%04d.jpg"))
         .on("end", () => resolve())
         .on("error", (err: Error) => reject(err))
         .run();
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
 
     const frameFiles = fs
       .readdirSync(framesDir)
-      .filter((f) => f.endsWith(".png"))
+      .filter((f) => f.endsWith(".jpg"))
       .sort();
 
     if (frameFiles.length === 0) {
@@ -176,15 +176,15 @@ export async function POST(req: NextRequest) {
     const storage = new Storage(
       process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
         ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-            },
-          }
+          projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          credentials: {
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+          },
+        }
         : {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          }
+          projectId: process.env.GOOGLE_CLOUD_PROJECT,
+        }
     );
 
     const bucket = storage.bucket(bucketName);
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
     console.error("[extract-frames] Error:", err);
     // Cleanup on error
     if (tmpDir) {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { }
     }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

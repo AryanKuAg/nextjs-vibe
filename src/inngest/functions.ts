@@ -151,9 +151,19 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     const bearerToken = await step.run("get-gcp-token", async () => {
-      const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/cloud-platform']
-      });
+      const auth = new GoogleAuth(
+        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+          ? {
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              },
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            }
+          : {
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            }
+      );
       const client = await auth.getClient();
       const token = await client.getAccessToken();
       return token.token;
@@ -713,13 +723,19 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 
       const files = JSON.parse(cmdResult.stdout);
       const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const storage = new Storage({
-        projectId: process.env.GOOGLE_CLOUD_PROJECT,
-        credentials: {
-          client_email: process.env.GOOGLE_CLIENT_EMAIL,
-          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }
-      });
+      const storage = new Storage(
+        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+          ? {
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              },
+            }
+          : {
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            }
+      );
 
       const bucket = storage.bucket(bucketName);
       const sitePrefix = `sites/${event.data.projectId}/`;
@@ -918,13 +934,19 @@ export const veoGenerateFunction = inngest.createFunction(
     const cost = MODEL_COSTS[model as string] || 25;
 
     const tokenHelper = async () => {
-      const auth = new GoogleAuth({
-        credentials: {
-          client_email: process.env.GOOGLE_CLIENT_EMAIL,
-          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        },
-        scopes: ['https://www.googleapis.com/auth/cloud-platform']
-      });
+      const auth = new GoogleAuth(
+        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+          ? {
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              },
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            }
+          : {
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            }
+      );
       const client = await auth.getClient();
       const { token } = await client.getAccessToken();
       return token;
@@ -1114,13 +1136,19 @@ ${prompt}`,
 
         console.log(`[Veo Pipeline] Pushing 8s Master Video to GCS natively to bypass node limits...`);
         const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-        const storage = new Storage({
-          projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          credentials: {
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-          }
-        });
+        const storage = new Storage(
+          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+            ? {
+                projectId: process.env.GOOGLE_CLOUD_PROJECT,
+                credentials: {
+                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                },
+              }
+            : {
+                projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              }
+        );
 
         const bucket = storage.bucket(bucketName);
         const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;

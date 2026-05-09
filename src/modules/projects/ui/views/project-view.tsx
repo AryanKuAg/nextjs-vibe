@@ -176,6 +176,9 @@ export const ProjectView = ({ projectId }: Props) => {
   };
 
   const [extractedZipUrl, setExtractedZipUrl] = useState<string | null>(null);
+  const [extractedFrameCount, setExtractedFrameCount] = useState<number | undefined>(
+    (project as { frameCount?: number | null })?.frameCount ?? undefined
+  );
   const [isExtracting, setIsExtracting] = useState(false);
 
   const handleProceed = async () => {
@@ -204,6 +207,7 @@ export const ProjectView = ({ projectId }: Props) => {
       if (res.ok) {
         const data = await res.json();
         setExtractedZipUrl(data.zipUrl);
+        setExtractedFrameCount(data.frameCount);
         toast.success("Frames extracted successfully!");
       } else {
         let errorMsg = res.statusText;
@@ -231,9 +235,14 @@ export const ProjectView = ({ projectId }: Props) => {
       } else {
         setActiveStageTab("BACKGROUND");
       }
+      
+      const frameCount = (project as { frameCount?: number | null })?.frameCount;
+      if (frameCount && extractedFrameCount === undefined) {
+        setExtractedFrameCount(frameCount);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.currentStage]);
+  }, [project?.currentStage, (project as { frameCount?: number | null })?.frameCount]);
 
   // Merge URL history and prompt data from DB into the existing blocks.
   // Block COUNT is already set correctly from the localStorage restore above.
@@ -684,6 +693,7 @@ export const ProjectView = ({ projectId }: Props) => {
                   setActiveFragment={setActiveFragment}
                   stage="SITE"
                   extractedZipUrl={extractedZipUrl}
+                  extractedFrameCount={extractedFrameCount}
                   onBack={() => setActiveStageTab("BACKGROUND")}
                 />
               </Suspense>

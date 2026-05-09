@@ -237,6 +237,7 @@ export const projectsRouter = createTRPCRouter({
       projectId: z.string().min(1),
       value: z.string(),
       videoUrl: z.string().optional().nullable(),
+      frameCount: z.number().optional(),
       model: z.string().optional(),
       isFollowUp: z.boolean().optional(),
     }))
@@ -270,6 +271,7 @@ export const projectsRouter = createTRPCRouter({
           value: input.value,
           projectId: input.projectId,
           videoUrl: input.videoUrl ?? undefined,
+          frameCount: input.frameCount,
           model: input.model,
           userId: ctx.auth.userId,
         },

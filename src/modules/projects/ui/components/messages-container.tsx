@@ -23,8 +23,9 @@ export const MessagesContainer = ({
   setActiveFragment,
   stage = "SITE",
   extractedZipUrl,
+  extractedFrameCount,
   onBack,
-}: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, onBack?: () => void }) => {
+}: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, extractedFrameCount?: number, onBack?: () => void }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -147,7 +148,7 @@ export const MessagesContainer = ({
       </div>
       <div className="relative p-3 pt-1">
         <div className="absolute -top-6 left-0 right-0 h-6 pointer-events-none" />
-        <MessageForm projectId={projectId} stage={stage} extractedZipUrl={extractedZipUrl} />
+        <MessageForm projectId={projectId} stage={stage} extractedZipUrl={extractedZipUrl} extractedFrameCount={extractedFrameCount} />
         {onBack && (
           <button
             type="button"

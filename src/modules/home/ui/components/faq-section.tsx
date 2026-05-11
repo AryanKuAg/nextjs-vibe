@@ -70,9 +70,12 @@ export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questio
 
   return (
     <>
-      <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-10 leading-[40px]">
-        {title}
-      </h2>
+      <div className="flex flex-col items-center mb-10">
+        <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-4 leading-[40px]">
+          {title}
+        </h2>
+        <p className="text-center font-mono text-[#8A8A88] text-sm">Got questions? We’ve got answers.</p>
+      </div>
       <div className="flex flex-col gap-3">
         {faqs.map((faq, i) => (
           <FAQItem

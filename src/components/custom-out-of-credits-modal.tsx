@@ -25,7 +25,7 @@ export const CustomOutOfCreditsModal = ({ isOpen, onClose }: CustomOutOfCreditsM
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
       <div
-        className="bg-neutral-900 rounded-[16px] w-full max-w-[1200px] p-6 md:p-16 md:pt-10  relative overflow-y-auto max-h-[90vh]"
+        className="bg-background rounded-[16px] w-full max-w-[1200px] p-6 md:p-16 md:pt-10  relative overflow-y-auto max-h-[90vh]"
         style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
       >
         <button

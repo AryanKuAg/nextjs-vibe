@@ -171,6 +171,11 @@ export const ProjectForm = () => {
   );
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (window.innerWidth < 768) {
+      setShowSignInModal(true);
+      return;
+    }
+
     if (!userId) {
       setShowSignInModal(true);
       return;
@@ -239,7 +244,7 @@ export const ProjectForm = () => {
           onSubmit={form.handleSubmit(onSubmit)}
           className={cn(
             "relative rounded-2xl overflow-hidden transition-all min-h-[148px]",
-            "bg-neutral-900 w-full md:w-[720px]!",
+            "bg-background w-full md:w-[720px]!",
             isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
@@ -342,20 +347,7 @@ export const ProjectForm = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={async () => {
-                  if (!userId) {
-                    setShowSignInModal(true);
-                  } else {
-                    await createProject.mutateAsync({ value: "" });
-                  }
-                }}
-                className="hidden h-8 px-2.5 sm:flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-white hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <span>Go to dashboard</span>
-              </button>
+
               <div className="flex gap-2 ml-auto">
                 <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
                   <i className="ri-sparkling-fill text-white text-sm" />

@@ -54,7 +54,7 @@ export const Footer = () => {
       />
       <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-inconsolata">
         {/* Rounded card container */}
-        <div className="bg-neutral-800 rounded-[16px] border border-neutral-700 shadow-sm backdrop-blur-sm px-5 py-6 md:px-10 md:pt-[40px] md:pb-8">
+        <div className="bg-[#282828] rounded-[16px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8">
           {/* Main grid row */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 md:gap-12 mb-6 md:mb-10">
             {/* Left: Logo + description */}
@@ -69,13 +69,9 @@ export const Footer = () => {
             </div>
 
             {/* Right: Nav columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16">
-              <div className="hidden md:block">
-
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
               <div>
-                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Links</h4>
+                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Product</h4>
                 <div className="flex flex-col gap-2 items-start">
                   <button
                     onClick={handleDashboardClick}
@@ -85,16 +81,25 @@ export const Footer = () => {
                     Dashboard
                   </button>
                   <Link href="/pricing" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Pricing</Link>
+                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Affiliate</Link>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm  text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Legal</h4>
+                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Links</h4>
+                <div className="flex flex-col gap-2 items-start">
+                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Blog</Link>
+                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Changelog</Link>
+                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Help center</Link>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Legal</h4>
                 <div className="flex flex-col gap-2">
-                  <Link href="/terms" className="text-sm text-white">Terms of service</Link>
-                  <Link href="/privacy" className="text-sm text-white">Privacy policy</Link>
-                  <Link href="/cookies" className="text-sm text-white">Cookie policy</Link>
-                  <Link href="/compliance" className="text-sm text-white">Compliance overview</Link>
+                  <Link href="/terms" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Terms of service</Link>
+                  <Link href="/privacy" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Privacy policy</Link>
+                  <Link href="/cookies" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Cookie policy</Link>
                 </div>
               </div>
             </div>

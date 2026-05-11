@@ -149,31 +149,24 @@ const UserAvatarButton = ({ mobile = false }: { mobile?: boolean }) => {
   }
 
   return (
-    <div className="flex items-center gap-2.5 transition-opacity group">
-      {/* Vertical divider */}
-      <div className="w-px h-5 bg-[#3B3B38]" />
-      {/* Avatar — profile photo or initial fallback */}
-      <DropdownMenu>
-        <DropdownMenuTrigger className="outline-none">
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={initial}
-              width={28}
-              height={28}
-              className="w-7 h-7 rounded-full object-cover flex-shrink-0 ml-[10px]"
-            />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ml-[10px]">
-              {initial}
-            </div>
-          )}
-        </DropdownMenuTrigger>
-        {dropdownContent}
-      </DropdownMenu>
-      {/* Label */}
-      <button onClick={() => signOut({ redirectUrl: "/" })} className="text-sm text-[#cccccc] group-hover:text-white transition-colors font-inconsolata mr-[10px]">Sign out</button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="outline-none flex-shrink-0">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={initial}
+            width={36}
+            height={36}
+            className="w-[36px] h-[36px] rounded-[10px] object-cover"
+          />
+        ) : (
+          <div className="w-[36px] h-[36px] rounded-[10px] bg-pink-500 flex items-center justify-center text-white text-[15px] font-bold">
+            {initial}
+          </div>
+        )}
+      </DropdownMenuTrigger>
+      {dropdownContent}
+    </DropdownMenu>
   );
 };
 
@@ -228,9 +221,9 @@ export const PillNavbar = () => {
         onClose={() => setShowSignInModal(false)}
       />
 
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 w-full px-4 md:max-w-fit">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 w-full px-4 md:max-w-[600px] lg:max-w-fit">
         <div className="flex flex-col gap-2 relative w-full">
-          <div className="flex items-center justify-between md:justify-normal md:gap-20 h-[52px] px-2 bg-background rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          <div className="flex items-center justify-between md:justify-normal gap-16 h-[52px] px-2 bg-background rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
             {/* Left side: Logo */}
             <Link href="/" className="flex items-center gap-2 pl-2">
               <Image src="/logo.png" alt="framerate" width={24} height={24} />
@@ -252,11 +245,18 @@ export const PillNavbar = () => {
             {/* Right: Auth & Hamburger */}
             <div className="flex items-center gap-2 h-[36px] text-nowrap">
               {/* Desktop Auth */}
-              <div className="hidden md:flex items-center h-[36px]">
+              <div className="hidden md:flex items-center gap-2 h-[36px]">
                 <SignedOut>
                   <GoogleSignInButton />
                 </SignedOut>
                 <SignedIn>
+                  <button
+                    onClick={handleDashboardClick}
+                    disabled={isPending}
+                    className="flex items-center justify-center px-4 h-[36px] rounded-[8px] border border-[#2c2c2c] text-[15px] font-[400] text-white hover:bg-[#282828] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Dashboard
+                  </button>
                   <UserAvatarButton />
                 </SignedIn>
               </div>

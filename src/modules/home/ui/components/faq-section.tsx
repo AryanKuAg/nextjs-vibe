@@ -36,10 +36,10 @@ export interface FAQItem {
 /* ─── FAQItem ────────────────────────────────────────────────────────── */
 const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onToggle: () => void }) => {
   return (
-    <div className="rounded-[16px] overflow-hidden font-inconsolata border border-neutral-700  shadow-sm backdrop-blur-sm">
+    <div className="rounded-[16px] overflow-hidden font-inconsolata">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 text-left text-sm text-white font-[400] bg-neutral-800 transition-colors "
+        className="w-full flex items-center justify-between p-4 text-left text-sm text-white font-[400] bg-[#282828] transition-colors "
       >
         <span className="text-sm leading-[20px]">{q}</span>
         <i className={`ri-arrow-down-s-line text-white transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -48,7 +48,7 @@ const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onTogg
         className="overflow-hidden"
         style={{ maxHeight: isOpen ? "500px" : "0px", opacity: isOpen ? 1 : 0 }}
       >
-        <div className="bg-neutral-800">
+        <div className="bg-[#282828]">
           <div className="mx-4 border-t border-white/10" />
           <div className="px-4 py-3 text-sm text-neutral-400 leading-[20px]">
             {a}

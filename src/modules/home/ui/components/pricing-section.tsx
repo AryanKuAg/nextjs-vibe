@@ -51,7 +51,7 @@ export const PricingCard = ({ title, desc, price, features, className }: Pricing
   };
 
   return (
-    <div className={cn("flex flex-col bg-neutral-800 rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata", className)}>
+    <div className={cn("flex flex-col bg-[#282828] rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata", className)}>
       <h3 className="text-2xl text-white mb-0">{title}</h3>
       <p className="text-sm text-neutral-400 mb-8">{desc}</p>
       <div className="flex items-end gap-2 mb-6">

@@ -47,12 +47,12 @@ interface FeatureCardProps {
 }
 
 const FeatureCard = ({ step, title, description, children }: FeatureCardProps) => (
-  <div className="flex flex-col gap-2 group p-2 bg-neutral-800 rounded-[16px] font-inconsolata border border-neutral-700 shadow-sm backdrop-blur-sm">
-    <div className="relative aspect-[5/2] bg-neutral-800  overflow-hidden p-3">
+  <div className="flex flex-col gap-2 group p-2 bg-[#282828] rounded-[16px] font-inconsolata">
+    <div className="relative aspect-[5/2] bg-[#282828]  overflow-hidden p-3">
       {children}
     </div>
     <div className="flex flex-col">
-      <div className="text-sm text-[#CCCCCC] pl-2 pb-2">{step}</div>
+      <div className="text-sm text-[#CCCCCC] pl-2 pb-1">{step}</div>
       <h3 className="text-[16px] text-white font-[500] pl-2">{title}</h3>
       <p className="text-[14px] text-[#CCCCCC] pl-2">{description}</p>
     </div>
@@ -62,7 +62,7 @@ const FeatureCard = ({ step, title, description, children }: FeatureCardProps) =
 
 const Page = () => {
   return (
-    <div className="min-h-screen bg-neutral-900 selection:bg-white/20 pb-0 flex flex-col">
+    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col">
       <PillNavbar />
 
       {/* Hero Section */}
@@ -88,7 +88,7 @@ const Page = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="group p-2 bg-neutral-800 rounded-[16px] font-inconsolata">
+          <div className="group p-2 bg-[#282828] rounded-[16px] font-inconsolata">
             <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden flex items-end ">
               <a
                 href="https://bit.ly/4f7EoPq"
@@ -101,11 +101,11 @@ const Page = () => {
             </div>
           </div>
 
-          <div className="p-2 bg-neutral-800 rounded-[16px] font-inconsolata">
+          <div className="p-2 bg-[#282828] rounded-[16px] font-inconsolata">
             <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden" />
           </div>
 
-          <div className="p-2 bg-neutral-800 rounded-[16px] font-inconsolata">
+          <div className="p-2 bg-[#282828] rounded-[16px] font-inconsolata">
             <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden" />
           </div>
         </div>

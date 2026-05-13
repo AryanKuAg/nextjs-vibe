@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
+import { MODEL_COSTS } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
@@ -70,12 +71,14 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7, type: "IMAGE" },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14, type: "IMAGE" },
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", emoji: "", credits: 12, type: "VIDEO" },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", emoji: "", credits: 32, type: "VIDEO" },
-  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", emoji: "", credits: 80, type: "VIDEO" },
-];
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "🍌", type: "IMAGE" },
+  { id: "replicate-gpt-2", label: "GPT 2", emoji: "🍌", type: "IMAGE" },
+  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
+  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO" },
+  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO" },
+  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO" },
+].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
   activeBlockIndex,
@@ -180,7 +183,7 @@ export const BackgroundBuilderLeft = ({
   };
 
   const availableModels = MODELS.filter((m) => m.type === (isVideo ? "VIDEO" : "IMAGE"));
-  const [selectedModel, setSelectedModel] = useState(availableModels[0].id);
+  const [selectedModel, setSelectedModel] = useState(availableModels[0]?.id || "");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

@@ -19,8 +19,8 @@ interface Props {
 }
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14 },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
+  { id: "replicate-gpt-2", label: "GPT 2", emoji: "🍌", credits: 3 },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -37,7 +37,7 @@ export const SceneBuilder = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

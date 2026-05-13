@@ -6,6 +6,7 @@ import { Footer } from "@/modules/home/ui/components/footer";
 import { PricingSection } from "@/modules/home/ui/components/pricing-section";
 import { FAQSection } from "@/modules/home/ui/components/faq-section";
 import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
+import { ComparisonSection } from "@/modules/home/ui/components/comparison-section";
 
 
 /* ─── Page ─────────────────────────────────────────────────────────── */
@@ -28,6 +29,10 @@ export default function PricingPage() {
       <section className="pb-20 px-6 max-w-7xl mx-auto w-full">
         <PricingSection />
       </section>
+
+      {/* Comparison */}
+      <ComparisonSection />
+
       {/* FAQ */}
       <section className="py-[60px] md:py-20 px-6 max-w-2xl mx-auto w-full">
         <FAQSection />

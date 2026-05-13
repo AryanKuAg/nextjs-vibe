@@ -4,13 +4,14 @@
  */
 
 export const MODEL_COSTS: Record<string, number> = {
-  "veo-3.1-lite-generate-001": 12,
-  "veo-3.1-fast-generate-001": 32,
-  "veo-3.1-generate-001": 80,
-  "gemini-3.1-flash-image-preview": 7,
-  "gemini-3-pro-image-preview": 14,
-  "gemini-3.1-pro-preview": 100,
-  "claude-sonnet-4-6": 100,
+  "replicate-nb-2": 7,
+  "replicate-gpt-2": 3,
+  "replicate-kling-v2.5-turbo-pro": 34,
+  "replicate-prunaai/p-video": 40,
+  "replicate-prunaai/p-video-draft": 15,
+  "openrouter-seedance-2": 60,
+  "openrouter-seedance-2-fast": 48,
+  "openrouter-google/gemini-3.1-pro-preview": 65,
 };
 
 // Follow-up prompts (when a conversation already exists) cost a flat 10 credits

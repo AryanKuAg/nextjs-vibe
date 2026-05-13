@@ -5,14 +5,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { MODEL_COSTS } from "@/lib/pricing";
 
-const MODELS = [
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 12 },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 32 },
-  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", credits: 80 },
+const MODEL_IDS = [
+  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro" },
+  { id: "replicate-prunaai/p-video", label: "Pruna P-Video" },
+  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0" },
+  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast" },
 ] as const;
 
-type ModelId = typeof MODELS[number]["id"];
+type ModelId = typeof MODEL_IDS[number]["id"];
+
+const MODELS = MODEL_IDS.map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 interface Props {
   projectId: string;
@@ -29,7 +34,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("veo-3.1-lite-generate-001");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-kling-v2.5-turbo-pro");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

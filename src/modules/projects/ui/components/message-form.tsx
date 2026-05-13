@@ -1,6 +1,8 @@
+"use client";
+
 import { z } from "zod";
 import { toast } from "sonner";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
@@ -10,16 +12,11 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
-import { FOLLOW_UP_COST } from "@/lib/pricing";
+import { FOLLOW_UP_COST, MODEL_COSTS } from "@/lib/pricing";
 
-const MODELS = [
-  // TODO: Uncomment Claude model once Vertex AI quota increase is approved
-  // { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", credits: 100 },
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", credits: 100 }
-] as const;
-
-type ModelId = typeof MODELS[number]["id"];
-
+const MODEL_ID = "openrouter-google/gemini-3.1-pro-preview" as const;
+const MODEL_LABEL = "Gemini 3.1 Pro Preview";
+const MODEL_CREDITS = MODEL_COSTS[MODEL_ID] ?? 65;
 
 interface Props {
   projectId: string;
@@ -35,14 +32,47 @@ const formSchema = z.object({
     .max(10000, { message: "Value is too long" }),
 })
 
+const processImageFile = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+      reject(new Error("Unsupported format. Use JPEG, PNG, WebP, or GIF."));
+      return;
+    }
+    if (file.size > 7 * 1024 * 1024) {
+      reject(new Error("Image must be under 7MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.9));
+        } else {
+          resolve(ev.target?.result as string);
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.readAsDataURL(file);
+  });
+
 export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-pro-preview");
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Detect follow-up: any existing SITE-stage message means this is a follow-up prompt
   const { data: existingMessages } = useQuery({
@@ -51,21 +81,9 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   });
   const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      value: "",
-    },
+    defaultValues: { value: "" },
   });
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
@@ -78,6 +96,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const buildSite = useMutation(trpc.projects.buildSite.mutationOptions({
     onSuccess: () => {
       form.reset();
+      setUploadedDataUrl(null);
       queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
       queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
       queryClient.invalidateQueries(trpc.usage.status.queryOptions());
@@ -94,12 +113,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const createMessage = useMutation(trpc.messages.create.mutationOptions({
     onSuccess: () => {
       form.reset();
-      queryClient.invalidateQueries(
-        trpc.messages.getMany.queryOptions({ projectId, stage }),
-      );
-      queryClient.invalidateQueries(
-        trpc.usage.status.queryOptions()
-      );
+      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
+      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
     },
     onError: (error) => {
       if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
@@ -116,12 +131,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
       const res = await fetch("/api/enhance-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: form.getValues().value,
-          type: "code",
-          projectId,
-          extractedZipUrl,
-        })
+        body: JSON.stringify({ prompt: form.getValues().value, type: "code", projectId, extractedZipUrl })
       });
       const data = await res.json();
       if (res.ok && data.prompt) {
@@ -138,6 +148,38 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
     }
   };
 
+  const handleFile = useCallback(async (file: File) => {
+    try {
+      const dataUrl = await processImageFile(file);
+      setUploadedDataUrl(dataUrl);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load image.");
+    }
+  }, []);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) handleFile(file);
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (stage === "SITE") {
       try {
@@ -146,8 +188,9 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           projectId,
           videoUrl: extractedZipUrl || undefined,
           frameCount: extractedFrameCount,
-          model: selectedModel,
+          model: MODEL_ID,
           isFollowUp,
+          imageDataUrl: uploadedDataUrl ?? undefined,
         });
       } catch {
         // Error is handled in the mutation's onError callback
@@ -158,7 +201,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           value: values.value,
           projectId,
           stage,
-          model: selectedModel,
+          model: MODEL_ID,
         });
       } catch {
         // Error is handled in the mutation's onError callback
@@ -172,11 +215,42 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={handleImageSelect}
+      />
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="bg-[#282828] border border-[#2c2c2c] rounded-[16px] p-3 space-y-3 relative transition-all"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`bg-[#282828] border rounded-[16px] p-3 space-y-3 relative transition-all ${
+            isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
+          }`}
         >
+          {/* Image preview — same style as video-builder */}
+          {uploadedDataUrl && (
+            <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={uploadedDataUrl}
+                alt="Attached image"
+                className="w-16 h-16 rounded-[4px] object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => setUploadedDataUrl(null)}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white/50 hover:text-white border border-white/10 text-xs"
+              >
+                <i className="ri-close-line" />
+              </button>
+            </div>
+          )}
+
           <FormField
             control={form.control}
             name="value"
@@ -199,35 +273,23 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           />
 
           <div className="flex items-center gap-x-1">
-            <div className="relative" ref={dropdownRef}>
-              <div
-                className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={() => setModelDropdownOpen((o) => !o)}
-              >
-                <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
-              </div>
+            {/* + Image attach button — before model name */}
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isPending}
+              className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50 text-base leading-none"
+              title="Attach image"
+            >
+              +
+            </button>
 
-              {modelDropdownOpen && (
-                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#333333] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
-                  {MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                        }`}
-                    >
-                      <div className="flex w-full items-center font-inconsolata">
-                        <span>{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+            {/* Model label */}
+            <div className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white/70 select-none">
+              <span>{MODEL_LABEL}</span>
             </div>
 
+            {/* Enhance prompt */}
             <button
               type="button"
               onClick={handleEnhancePrompt}
@@ -246,7 +308,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
               <div className="flex items-center gap-1 text-white">
                 <i className="ri-sparkling-2-fill text-white text-sm" />
                 <span className="text-sm font-medium">
-                  {isFollowUp ? FOLLOW_UP_COST : MODELS.find(m => m.id === selectedModel)?.credits}
+                  {isFollowUp ? FOLLOW_UP_COST : MODEL_CREDITS}
                 </span>
               </div>
               {isGenerating ? (
@@ -254,7 +316,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent text-[#fefefe]  transition-all shadow-sm active:scale-95 border border-[#333333]"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent text-[#fefefe] transition-all shadow-sm active:scale-95 border border-[#333333]"
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>

@@ -10,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 const pool = globalForPrisma.pgPool || new Pool({ 
   connectionString: process.env.DATABASE_URL,
   max: 10,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 15000, // increased to 15s to allow for DB cold starts
   idleTimeoutMillis: 30000
 })
 const adapter = new PrismaPg(pool)
@@ -18,8 +18,8 @@ const adapter = new PrismaPg(pool)
 export const prisma = globalForPrisma.prisma || new PrismaClient({ 
   adapter,
   transactionOptions: {
-    maxWait: 5000,
-    timeout: 10000,
+    maxWait: 15000, // increased to match pool connection timeout
+    timeout: 20000,
   }
 })
 

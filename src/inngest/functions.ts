@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
-import { createAgent, createTool, createNetwork, type Tool, type Message, createState, gemini, anthropic } from "@inngest/agent-kit";
+import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
 import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
@@ -11,8 +11,8 @@ import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
 import { Storage } from "@google-cloud/storage";
-import { GoogleAuth } from "google-auth-library";
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
+
+
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
@@ -29,79 +29,7 @@ const checkCancellation = async (projectId: string) => {
   }
 };
 
-function geminiVertexKey(modelName: string) {
-  // Use the API key from your environment variable
-  const apiKey = process.env.GOOGLE_CLOUD_API_KEY! || process.env.GEMINI_API_KEY!;
 
-  const baseModel = gemini({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    model: modelName as any,
-    apiKey: apiKey,
-    // This perfectly matches your working curl:
-    // It creates: https://aiplatform.googleapis.com/v1/publishers/google/models/{modelName}:generateContent?key={apiKey}
-    baseUrl: "https://aiplatform.googleapis.com/v1/publishers/google/",
-  });
-
-  const originalOnCall = baseModel.onCall;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  baseModel.onCall = (options, body: any) => {
-    if (originalOnCall) {
-      originalOnCall(options, body);
-    }
-
-    // Gemini 3 preview models enforce cryptographic thoughtSignatures on all past function calls.
-    // Inngest agent-kit drops these signatures when formatting generic messages.
-    // To bypass the 400 ERROR, we flatten all historical function calls into conversational text.
-    if (body.contents) {
-      for (const content of body.contents) {
-        if (content.parts) {
-          for (const part of content.parts) {
-            if (part.functionCall) {
-              part.text = `[Used tool: ${part.functionCall.name} with args: ${JSON.stringify(part.functionCall.args)}]`;
-              delete part.functionCall;
-            }
-            if (part.functionResponse) {
-              part.text = `[Tool ${part.functionResponse.name} returned: ${JSON.stringify(part.functionResponse.response)}]`;
-              delete part.functionResponse;
-            }
-          }
-        }
-      }
-    }
-  };
-
-  return baseModel;
-}
-
-function anthropicVertexKey(modelName: string, bearerToken: string | null | undefined) {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT || "spatial-492511";
-  
-  const baseModel = anthropic({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    model: modelName as any,
-    defaultParameters: {
-      max_tokens: 8192,
-    }
-  });
-
-  baseModel.url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/publishers/anthropic/models/${modelName}:streamRawPredict`;
-  
-  baseModel.headers = {
-    "Authorization": `Bearer ${bearerToken}`,
-    "Content-Type": "application/json; charset=utf-8",
-  };
-  
-  const originalOnCall = baseModel.onCall;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  baseModel.onCall = (options, body: any) => {
-    if (originalOnCall) {
-      originalOnCall(options, body);
-    }
-    body.anthropic_version = "vertex-2023-10-16";
-  };
-
-  return baseModel;
-}
 
 interface AgentState {
   summary: string;
@@ -150,30 +78,15 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-    const bearerToken = await step.run("get-gcp-token", async () => {
-      const auth = new GoogleAuth(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            }
-          : {
-              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            }
-      );
-      const client = await auth.getClient();
-      const token = await client.getAccessToken();
-      return token.token;
-    });
+
 
     const getModel = (modelName: string) => {
-      if (modelName.includes("claude") || modelName.includes("sonnet")) {
-        return anthropicVertexKey(modelName, bearerToken);
-      }
-      return geminiVertexKey(modelName);
+      // Fallback if OpenRouter models are passed
+      return openai({
+        model: modelName.replace("openrouter-", ""),
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        baseUrl: "https://openrouter.ai/api/v1",
+      });
     };
 
     const sandboxId = await step.run("get-sandbox-id", async () => {
@@ -454,6 +367,11 @@ To achieve this securely and perfectly:
 === END SCROLL ANIMATION REQUIREMENT ===
 
 ` + currentPrompt;
+    }
+
+    // Inject image reference into the prompt when a user attaches an image
+    if (event.data.imageDataUrl) {
+      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nImage (base64 data URL): ${event.data.imageDataUrl}\n\n` + currentPrompt;
     }
 
     // --- 1. INITIAL GENERATION (The Creator) ---
@@ -933,25 +851,6 @@ export const veoGenerateFunction = inngest.createFunction(
     const { projectId, prompt, model, userId } = event.data;
     const cost = MODEL_COSTS[model as string] || 25;
 
-    const tokenHelper = async () => {
-      const auth = new GoogleAuth(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            }
-          : {
-              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            }
-      );
-      const client = await auth.getClient();
-      const { token } = await client.getAccessToken();
-      return token;
-    };
-
     try {
       await step.run("update-project-stage-generating", async () => {
         await prisma.project.update({
@@ -960,182 +859,178 @@ export const veoGenerateFunction = inngest.createFunction(
         });
       });
 
-      const sanitizedPrompt = await step.run("sanitize-prompt", async () => {
-        try {
-          const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_CLOUD_API_KEY || process.env.GEMINI_API_KEY });
-          const resp = await ai.models.generateContent({
-            model: "gemini-3.1-flash",
-            contents: `You are an expert prompt sanitization AI. The user wants to generate a video using Veo 3.1, but Veo has extremely strict safety filters.
-Rewrite the following prompt so that it retains the core visual aesthetic and motion of the user's request, but completely removes or softens any words that might trigger a safety filter (e.g. violence, explicit content, highly borderline words). Do NOT explain yourself. ONLY output the sanitized prompt. If the prompt is already completely safe, just output it exactly as is.
+      const videoUri = await step.run("generate-video", async () => {
+        let base64VideoData: string | null = null;
+        let finalVideoUrl: string | null = null;
 
-Original Prompt:
-${prompt}`,
-            config: {
-              safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-              ]
-            }
+        if (model.includes("replicate-")) {
+          const Replicate = (await import("replicate")).default;
+          const replicate = new Replicate({
+            auth: process.env.REPLICATE_API_KEY!,
           });
-          return resp.text || prompt;
-        } catch (e) {
-          console.error("Failed to sanitize prompt, using original", e);
-          return prompt;
-        }
-      });
 
-      const operationName = await step.run("start-veo-generation", async () => {
-        try {
-          const token = await tokenHelper();
-          const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-          const targetModel = model || "veo-3.1-lite-generate-001";
-          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/us-central1/publishers/google/models/${targetModel}:predictLongRunning`;
+          let targetModel: `${string}/${string}` = "kwaivgi/kling-v2.5-turbo-pro"; // default fallback
+          if (model === "replicate-kling-v2.5-turbo-pro") {
+            targetModel = "kwaivgi/kling-v2.5-turbo-pro";
+          } else if (model === "replicate-prunaai/p-video-draft") {
+            targetModel = "prunaai/p-video";
+          } else if (model.includes("/")) {
+            targetModel = model.replace("replicate-", "") as `${string}/${string}`;
+          }
 
-          let instances: Record<string, unknown>[] = [{ prompt: sanitizedPrompt }];
+          const input: Record<string, unknown> = { prompt };
+          
+          if (targetModel === "prunaai/p-video") {
+            input.fps = 24;
+            input.draft = model === "replicate-prunaai/p-video-draft";
+            input.no_op = false;
+            input.duration = 4;
+            input.resolution = "720p";
+            input.save_audio = false;
+            input.aspect_ratio = "16:9";
+            input.prompt_upsampling = false;
+            input.disable_safety_filter = true;
 
+            if (event.data.imageUrl) {
+               input.image = event.data.imageUrl;
+            }
+            if (event.data.endImageUrl) {
+               input.last_frame_image = event.data.endImageUrl;
+            }
+          } else if (targetModel === "kwaivgi/kling-v2.5-turbo-pro") {
+            input.duration = 5;
+            input.aspect_ratio = "16:9";
+            if (event.data.imageUrl) {
+               input.start_image = event.data.imageUrl;
+            }
+            if (event.data.endImageUrl) {
+               input.end_image = event.data.endImageUrl;
+            }
+          } else {
+            // Generic fallback for other models
+            if (event.data.imageUrl) {
+               input.image = event.data.imageUrl;
+               input.start_image = event.data.imageUrl;
+            }
+            if (event.data.endImageUrl) {
+               input.end_image = event.data.endImageUrl;
+            }
+          }
+
+          console.log(`[Video Pipeline] Starting Replicate model: ${targetModel}`);
+          const output = await replicate.run(targetModel, { input });
+          
+          const outputItem = Array.isArray(output) ? output[0] : output;
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (outputItem && typeof outputItem === "object" && typeof (outputItem as any).url === "function") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            finalVideoUrl = (outputItem as any).url().toString();
+          } else if (typeof outputItem === "string") {
+            finalVideoUrl = outputItem;
+          }
+
+          if (!finalVideoUrl) {
+            throw new Error(`Invalid Replicate output: ${JSON.stringify(output)}`);
+          }
+
+          // Fetch the video buffer to upload to GCS
+          const res = await fetch(finalVideoUrl);
+          if (!res.ok) throw new Error(`Failed to download Replicate video: ${res.statusText}`);
+          const arrayBuffer = await res.arrayBuffer();
+          base64VideoData = Buffer.from(arrayBuffer).toString("base64");
+
+        } else if (model.includes("openrouter-")) {
+          let actualModel = model.replace("openrouter-", "");
+          if (actualModel === "seedance-2") {
+             actualModel = "bytedance/seedance-2.0";
+          } else if (actualModel === "seedance-2-fast") {
+             actualModel = "bytedance/seedance-2.0-fast";
+          }
+          console.log(`[Video Pipeline] Starting OpenRouter video model: ${actualModel}`);
+          
+          const frame_images = [];
           if (event.data.imageUrl) {
-            // Check for both standard GCS URL and custom CDN domain URL
-            let gcsBucketName = "";
-            let gcsObjectPath = "";
-
-            const standardMatch = event.data.imageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
-            const cdnMatch = event.data.imageUrl.match(/sites\.framerate\.space\/(.+)$/);
-
-            if (standardMatch) {
-              gcsBucketName = standardMatch[1];
-              gcsObjectPath = standardMatch[2];
-            } else if (cdnMatch) {
-              gcsBucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
-              gcsObjectPath = cdnMatch[1];
-            }
-
-            if (gcsBucketName && gcsObjectPath) {
-              const instancePayload: Record<string, unknown> = {
-                prompt: sanitizedPrompt,
-                image: {
-                  gcsUri: `gs://${gcsBucketName}/${gcsObjectPath}`,
-                  mimeType: "image/jpeg" // usually JPEG from UI
-                }
-              };
-
-              // Check for end image
-              if (event.data.endImageUrl) {
-                let endGcsBucketName = "";
-                let endGcsObjectPath = "";
-                const endStandardMatch = event.data.endImageUrl.match(/storage\.googleapis\.com\/([^\/]+)\/(.+)$/);
-                const endCdnMatch = event.data.endImageUrl.match(/sites\.framerate\.space\/(.+)$/);
-                if (endStandardMatch) {
-                  endGcsBucketName = endStandardMatch[1];
-                  endGcsObjectPath = endStandardMatch[2];
-                } else if (endCdnMatch) {
-                  endGcsBucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
-                  endGcsObjectPath = endCdnMatch[1];
-                }
-
-                if (endGcsBucketName && endGcsObjectPath) {
-                  instancePayload.lastFrame = {
-                    gcsUri: `gs://${endGcsBucketName}/${endGcsObjectPath}`,
-                    mimeType: "image/jpeg"
-                  };
-                }
-              }
-
-              instances = [instancePayload];
-            }
-            //
-          } else if (event.data.imageBase64) {
-            const base64Str = event.data.imageBase64;
-            const match = base64Str.match(/^data:(image\/[^;]+);/);
-            const mimeType = match ? match[1] : "image/png";
-            const rawBase64 = base64Str.includes("base64,")
-              ? base64Str.split("base64,")[1]
-              : base64Str;
-
-            instances = [{
-              prompt: sanitizedPrompt,
-              image: {
-                bytesBase64Encoded: rawBase64,
-                mimeType: mimeType
-              }
-            }];
+            frame_images.push({
+              type: "image_url",
+              image_url: { url: event.data.imageUrl },
+              frame_type: "first_frame"
+            });
+          }
+          if (event.data.endImageUrl) {
+            frame_images.push({
+              type: "image_url",
+              image_url: { url: event.data.endImageUrl },
+              frame_type: "last_frame"
+            });
           }
 
-          const payload = {
-            instances,
-            parameters: {
-              aspectRatio: "16:9",
-              resolution: "720p",
-              durationSeconds: 4,
-              includeAudio: false,
-              generateAudio: false
-            }
-          };
-
-          const result = await fetch(url, {
-            method: 'POST',
+          const res = await fetch("https://openrouter.ai/api/v1/videos", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+              "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              "Content-Type": "application/json"
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+              model: actualModel,
+              prompt: prompt,
+              audio: false,
+              generate_audio: false, // Added as fallback for different providers
+              ...(frame_images.length > 0 ? { frame_images } : {})
+            })
           });
 
-          const data = await result.json();
+          const data = await res.json();
+          if (!res.ok) throw new Error(`OpenRouter Error: ${JSON.stringify(data)}`);
+          
+          const pollingUrl = data.polling_url;
+          if (!pollingUrl) throw new Error(`OpenRouter returned no polling URL: ${JSON.stringify(data)}`);
 
-          if (!result.ok) {
-            throw new Error(JSON.stringify(data));
-          }
+          console.log(`[Video Pipeline] Polling OpenRouter: ${pollingUrl}`);
+          
+          while (true) {
+            const pollResponse = await fetch(pollingUrl, {
+              headers: {
+                "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              },
+            });
+            const statusData = await pollResponse.json();
 
-          return data.name; // operation name
-        } catch (err: unknown) {
-          throw new Error((err as Error)?.message || String(err));
-        }
-      });
-
-      // Poll Initial LRO
-      const videoUri = await step.run("poll-veo", async () => {
-        let base64VideoData: string | null | undefined = null;
-        let isDone = false;
-
-        console.log(`[Veo Pipeline] Polling Phase 1...`);
-        // Phase 1 Polling
-        while (!isDone) {
-          await new Promise(r => setTimeout(r, 15000));
-
-          const targetModel = model || "veo-3.1-lite-generate-001";
-          const token = await tokenHelper();
-          const url = `https://us-central1-aiplatform.googleapis.com/v1beta1/projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/us-central1/publishers/google/models/${targetModel}:fetchPredictOperation`;
-
-          const result = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ operationName })
-          });
-
-          const data = await result.json();
-          if (!result.ok) throw new Error(JSON.stringify(data));
-
-          if (data.done) {
-            isDone = true;
-            if (data.error) throw new Error(JSON.stringify(data.error));
-
-            base64VideoData = data.response?.videos?.[0]?.bytesBase64Encoded;
-
-            if (!base64VideoData) {
-              const filterReasons = data.response?.raiMediaFilteredReasons;
-              const reasonStr = filterReasons ? filterReasons.join(", ") : JSON.stringify(data.response);
-              throw new Error(`Veo finished but returned no video format! Raw response: ${reasonStr}`);
+            if (statusData.status === "completed") {
+              const urls = statusData.unsigned_urls ?? [];
+              if (urls.length === 0) {
+                 throw new Error("OpenRouter completed but returned no video URLs.");
+              }
+              finalVideoUrl = urls[0];
+              break;
             }
+
+            if (statusData.status === "failed") {
+              throw new Error(`OpenRouter Generation Failed: ${statusData.error ?? "Unknown error"}`);
+            }
+
+            // Wait 5 seconds before polling again
+            await new Promise((resolve) => setTimeout(resolve, 5000));
           }
+
+          // Fetch the video buffer to upload to GCS
+          const videoRes = await fetch(finalVideoUrl!, {
+            headers: {
+              "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`
+            }
+          });
+          if (!videoRes.ok) throw new Error(`Failed to download OpenRouter video: ${videoRes.statusText}`);
+          const arrayBuffer = await videoRes.arrayBuffer();
+          base64VideoData = Buffer.from(arrayBuffer).toString("base64");
+        } else {
+          throw new Error(`Unsupported model: ${model}`);
         }
 
-        console.log(`[Veo Pipeline] Pushing 8s Master Video to GCS natively to bypass node limits...`);
+        if (!base64VideoData) throw new Error("No video data retrieved");
+
+        console.log(`[Video Pipeline] Pushing Video to GCS natively to bypass node limits...`);
         const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
+        const { Storage } = await import("@google-cloud/storage");
         const storage = new Storage(
           process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
             ? {
@@ -1154,7 +1049,7 @@ ${prompt}`,
         const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
         const fileFinal = bucket.file(finalOutputName);
 
-        const bufferFinal = Buffer.from(base64VideoData!, 'base64');
+        const bufferFinal = Buffer.from(base64VideoData, 'base64');
         await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
 
         const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;

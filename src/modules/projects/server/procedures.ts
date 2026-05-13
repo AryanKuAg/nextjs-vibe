@@ -246,6 +246,7 @@ export const projectsRouter = createTRPCRouter({
       frameCount: z.number().optional(),
       model: z.string().optional(),
       isFollowUp: z.boolean().optional(),
+      imageDataUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -280,6 +281,7 @@ export const projectsRouter = createTRPCRouter({
           frameCount: input.frameCount,
           model: input.model,
           userId: ctx.auth.userId,
+          imageDataUrl: input.imageDataUrl,
         },
       });
 

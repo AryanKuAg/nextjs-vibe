@@ -34,7 +34,7 @@ const HeroVideo = () => {
     return () => { container.innerHTML = ""; };
   }, []);
 
-  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e]" />;
+  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
 };
 
 
@@ -66,22 +66,19 @@ const Page = () => {
       <PillNavbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
+      <section className="relative min-h-[100vh] flex flex-col items-center justify-end pb-6 md:pb-[40px] px-4 overflow-hidden">
         <HeroVideo />
 
-
-        <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
-          <h1 className="text-4xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
-            Build 3D websites<br />10x faster with AI
+        <div className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center">
+          <h1 className="text-4xl md:text-5xl text-white font-inconsolata text-center leading-[1] drop-shadow-2xl font-[500] mb-8 md:mb-[40px]">
+            Ship 3D websites<br />in minutes with AI
           </h1>
-          <div className="w-full mx-auto md:px-12">
-            <ProjectForm />
-          </div>
+          <ProjectForm />
         </div>
       </section>
 
       {/* Real Sites Section */}
-      <section id="sites" className="py-[60px] md:py-20 px-6 max-w-7xl mx-auto w-full">
+      <section id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
           <h2 className="text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500] mb-4">Real sites. Generated.</h2>
           <p className="text-center font-mono text-[#8A8A88] text-sm">Turn ideas into polished, interactive websites in minutes, not weeks.</p>
@@ -112,7 +109,7 @@ const Page = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-[60px] md:py-20 px-6 max-w-7xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
           <h2 className="mb-4 text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500]">How it works?</h2>
           <p className="text-center font-mono text-[#8A8A88] text-sm">From prompt to cinematic website in just three simple steps.</p>
@@ -165,7 +162,7 @@ const Page = () => {
         <PricingSection title="Pricing" />
       </section> */}
 
-      <section className="py-[60px] md:py-20 px-6 max-w-2xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-2xl mx-auto w-full">
         <FAQSection />
       </section>
 

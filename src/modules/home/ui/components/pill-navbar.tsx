@@ -221,9 +221,9 @@ export const PillNavbar = () => {
         onClose={() => setShowSignInModal(false)}
       />
 
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 w-full px-4 md:max-w-[600px] lg:max-w-fit">
+      <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-20 w-full px-4 md:max-w-[600px] lg:max-w-fit">
         <div className="flex flex-col gap-2 relative w-full">
-          <div className="flex items-center justify-between md:justify-normal gap-16 h-[52px] px-2 bg-background rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          <div className="flex items-center justify-between md:justify-normal gap-16 h-[52px] px-2 bg-black rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
             {/* Left side: Logo */}
             <Link href="/" className="flex items-center gap-2 pl-2">
               <Image src="/logo.png" alt="framerate" width={24} height={24} />
@@ -253,7 +253,7 @@ export const PillNavbar = () => {
                   <button
                     onClick={handleDashboardClick}
                     disabled={isPending}
-                    className="flex items-center justify-center px-4 h-[36px] rounded-[8px] border border-[#2c2c2c] text-[15px] font-[400] text-white hover:bg-[#282828] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center px-4 h-[36px] rounded-[8px] border border-[#212121] text-[15px] font-[400] text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Dashboard
                   </button>
@@ -262,7 +262,7 @@ export const PillNavbar = () => {
               </div>
 
               {/* Mobile Auth & Hamburger */}
-              <div className="flex md:hidden items-center gap-2 pr-1">
+              <div className="flex md:hidden items-center gap-2 md:pr-1">
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="flex items-center justify-center w-[36px] h-[36px] rounded-[10px] border border-[#2A2A2A] text-white hover:bg-[#282828] transition-colors"
@@ -286,33 +286,33 @@ export const PillNavbar = () => {
 
           {/* Mobile Dropdown Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden w-full bg-[#1C1C1C] rounded-[20px] p-2 flex flex-col font-inconsolata border border-[#2A2A2A]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
+            <div className="md:hidden w-full bg-[#212121] rounded-[16px] p-3 flex flex-col font-inconsolata border border-[#2A2A2A]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
               <div className="flex flex-col text-[#E0E0E0] text-[15px]">
                 <SignedIn>
-                  <button onClick={handleSitesClick} className="w-full text-left px-4 py-3.5 rounded-[12px] hover:bg-white/5 transition-colors">
+                  <button onClick={handleSitesClick} className="w-full text-left px-3 py-2.5 rounded-[12px] hover:bg-white/5 transition-colors">
                     Sites
                   </button>
                 </SignedIn>
                 <SignedOut>
-                  <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-3.5 rounded-[12px] hover:bg-white/5 transition-colors">
+                  <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-3 py-2.5 rounded-[12px] hover:bg-white/5 transition-colors">
                     Examples
                   </Link>
                 </SignedOut>
-                <Link href="/pricing" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-3.5 rounded-[12px] hover:bg-white/5 transition-colors">
+                <Link href="/pricing" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-3 py-2.5 rounded-[12px] hover:bg-white/5 transition-colors">
                   Pricing
                 </Link>
-                <Link href="mailto:teamframerate@gmail.com" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-3.5 rounded-[12px] hover:bg-white/5 transition-colors mb-2">
+                <Link href="mailto:teamframerate@gmail.com" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-3 py-2.5 rounded-[12px] hover:bg-white/5 transition-colors mb-2">
                   Contact
                 </Link>
 
-                <div className="px-2 pb-2">
+                <div className="">
                   <SignedOut>
                     <GoogleSignInButton fullWidth />
                   </SignedOut>
                   <SignedIn>
                     <button
                       onClick={(e) => { setIsMobileMenuOpen(false); handleDashboardClick(e); }}
-                      className="w-full bg-transparent border border-[#3B3B38] text-white py-3 rounded-[12px] font-[500] text-[15px] flex items-center justify-center transition-colors hover:bg-white/5"
+                      className="w-full bg-transparent border border-[#2c2c2c] text-white py-3 rounded-[8px] font-[500] text-[15px] flex items-center justify-center transition-colors hover:bg-white/5 h-[36px]"
                     >
                       Dashboard
                     </button>

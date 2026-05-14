@@ -16,7 +16,6 @@ import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
-  { id: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];

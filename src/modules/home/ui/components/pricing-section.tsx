@@ -12,9 +12,10 @@ export interface PricingCardProps {
   price: string;
   features: string[];
   className?: string;
+  isPopular?: boolean;
 }
 
-export const PricingCard = ({ title, desc, price, features, className }: PricingCardProps) => {
+export const PricingCard = ({ title, desc, price, features, className, isPopular }: PricingCardProps) => {
   const [loading, setLoading] = useState(false);
   const { isSignedIn } = useAuth();
   const clerk = useClerk();
@@ -51,17 +52,22 @@ export const PricingCard = ({ title, desc, price, features, className }: Pricing
   };
 
   return (
-    <div className={cn("flex flex-col bg-[#282828] rounded-[16px] shadow-sm backdrop-blur-sm border border-neutral-700 p-4 font-inconsolata", className)}>
+    <div className={cn("relative flex flex-col bg-[#282828] rounded-[16px] p-4 font-inconsolata", isPopular && "border border-white", className)}>
+      {isPopular && (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[13px] font-mono">
+          MOST POPULAR
+        </div>
+      )}
       <h3 className="text-2xl text-white mb-0">{title}</h3>
-      <p className="text-sm text-neutral-400 mb-8">{desc}</p>
-      <div className="flex items-end gap-2 mb-6">
+      <p className="text-sm text-neutral-400 mb-4">{desc}</p>
+      <div className="flex items-end gap-2 mb-4">
         <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
         <span className="text-sm text-neutral-400 mb-1.5 leading-[1]">Billed monthly</span>
       </div>
       <button
         onClick={handleCheckout}
         disabled={loading}
-        className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-8 disabled:opacity-50 transition-opacity"
+        className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-4 disabled:opacity-50 transition-opacity"
       >
         {loading ? "Redirecting..." : `Get ${title.toLowerCase()}`}
       </button>
@@ -94,6 +100,7 @@ export const PLANS: PricingCardProps[] = [
     title: "Plus",
     desc: "For power creators and freelancers",
     price: "39",
+    isPopular: true,
     features: [
       "3,000 credits / mo",
       "~300 Images or ~40 Videos",
@@ -137,7 +144,7 @@ export const PricingSection = ({ title }: PricingSectionProps) => {
           {title}
         </h2>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-4">
         {PLANS.map((plan) => (
           <PricingCard
             key={plan.title}

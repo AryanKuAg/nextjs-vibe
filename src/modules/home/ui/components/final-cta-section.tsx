@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -75,11 +75,26 @@ export const FinalCTASection = () => {
 
     const isPending = createProject.isPending;
 
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) {
+        return (
+            <section className="py-[60px] md:py-20 px-4 sm:px-6 flex flex-col items-center text-center font-inconsolata">
+                <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
+                <p className="text-sm text-neutral-400 mb-[40px]">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
+                <div className="flex gap-2 min-h-[36px]" />
+            </section>
+        );
+    }
+
     return (
         <section className="py-[60px] md:py-20 px-6 flex flex-col items-center text-center font-inconsolata">
             <h2 className="text-3xl md:text-[40px] leading-[40px] text-white mb-3 font-[500]">Ready to build your first 3D site?</h2>
             <p className="text-sm text-neutral-400 mb-[40px]">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
-            <div className="flex gap-2 min-h-[36px]" suppressHydrationWarning>
+            <div className="flex gap-2 min-h-[36px]">
                 <SignedOut>
                     <GoogleSignInButton />
                 </SignedOut>

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import fs from "fs";
@@ -19,23 +18,41 @@ async function getFFmpeg() {
     ffmpegBinaryPath = path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg" + ext);
   }
   ffmpeg.setFfmpegPath(ffmpegBinaryPath);
-  
+
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   let ffprobePath: string = require("ffprobe-static").path;
   try {
     const systemPath = execSync("which ffprobe").toString().trim();
     if (systemPath) ffprobePath = systemPath;
-  } catch {}
+  } catch { }
   ffmpeg.setFfprobePath(ffprobePath);
-  
+
   return ffmpeg;
 }
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
-});
+// Helper: call OpenRouter chat completions (OpenAI-compatible)
+async function callOpenRouter(messages: object[], model = "openai/gpt-5.4"): Promise<string> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://framerate.space",
+      "X-Title": "Framerate",
+    },
+    body: JSON.stringify({ model, messages }),
+  });
 
-export const maxDuration = 60; // 60s is enough for text generation and 5 frames extraction
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OpenRouter error ${res.status}: ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content?.trim() || "";
+}
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   let tmpDir: string | null = null;
@@ -52,49 +69,101 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let contents: any[] = [];
-
+    // ── VIDEO PROMPT ENHANCEMENT ───────────────────────────────────────────────
     if (type === "video") {
       const { startFrameUrl, endFrameUrl } = payload;
-      
-      const systemInstruction = `You are an expert prompt engineer for cinematic AI video generation. The user wants to generate a highly cinematic, dynamic, and continuous one-take video based on a starting frame. Analyze the visual style and any user instructions provided, and write a detailed, descriptive prompt for a high-end AI video generator. 
 
-Study the following examples of high-quality prompts for inspiration on camera movement and cinematic style:
-- The camera begins far from the snowy Christmas village, In a single smooth motion, the camera swoops, accelerating as it approach toward the town, as it reaches the street level, the camera begins weaving dynamically through the environment, turning sharply around building corners, gliding low over rooftops, dipping beneath hanging garlands and string lights, sliding between narrow alleys, and pauses in front of an character who is intensely focused on building a snowman on an empty village street. No music, no narration, no voices. Ambient SFX only: soft winter breeze, faint village ambience, subtle snow drift.
-- Camera turns around and pans away from the girl making the snowman and goes left and turns passing through the village market activities and in continuous one-take momentum approaches intensely focused christmas carolers singing in a group. All intensity comes from camera movement only. No voice, no narration. No music.
-- One continuous, unbroken shot. The camera begins on a tight, intimate shot of two people walking and talking outside in the snowy village square. Without cutting, the camera begins to lift upward, gathering speed as it transitions out of the close-up. The camera moves with dynamic, fluid momentum. The camera continues accelerating upward, curving around chimneys, rooftops, and glowing windows while always preserving the fixed village layout. The shot expands from close-up -> mid-level streetscape -> higher sweeping view, until the camera finally ascends into a majestic overhead shot of the entire snowy Christmas village glowing against the winter landscape. All intensity comes from camera movement only. No added characters or objects. Ambient SFX only: soft winter wind, faint distant village sounds, drifting snow. No music, no narration, no voices
-- One continuous shot. Starting from a high vantage point above the glowing Christmas village, the camera turns and pushes forward passing the christmas tree on the right and glides out into the open North Pole landscape. It travels smoothly over snow-covered trees, frozen hills, and soft drifting snow, illuminated by vibrant northern lights. The motion and maintains it's speed. The camera weaves between frosted pines, skims over open white fields, and moves through pockets of glowing aurora light across the sky. No added objects or characters. Ambient SFX only: soft winter wind, distant snow drift. No music, no narration, no voices.
-- Keep the same visual style, same lighting, and same environment as the reference image. Do not change any objects or layout. Camera turns around and flies through the workshop. Dive through openings, weave between conveyor lines, slice past machinery, and sprint across the factory floor. Sharp directional shifts, rapid angle changes, tight close passes, and wide sweeps. Continuous one-take momentum with relentless kinetic motion. All intensity comes from camera movement only.
+      const systemInstruction = `You are an expert cinematic AI video prompt engineer specialized in start-frame to end-frame continuous shot generation.
 
-If the user provided a prompt, enhance it using the cinematic movement patterns seen in the examples. If the user provided no prompt, write a brand new cinematic prompt based on the visual style of the provided image (start frame).
-IMPORTANT: Keep the generated prompt extremely concise, punchy, and straight to the point (maximum 40 words). Focus only on the core action, subject, and camera movement. Avoid overly flowery or redundant language.
-Return ONLY the final enhanced prompt. Do not include quotes, explanations, or conversational text.`;
+Your task is to generate highly realistic, seamless one-take cinematic video prompts for AI video models like Veo, Kling, Seedance, or Runway.
 
-      const Replicate = (await import("replicate")).default;
-      const replicate = new Replicate({
-        auth: process.env.REPLICATE_API_KEY,
-      });
+The user may provide:
 
-      const input: {
-        prompt: string;
-        system_prompt: string;
-        max_tokens: number;
-        image?: string;
-      } = {
-        prompt: prompt ? `User prompt: ${prompt}` : "Please describe a cinematic camera movement through this scene.",
-        system_prompt: systemInstruction,
-        max_tokens: 8192,
-        ...( (startFrameUrl || endFrameUrl) ? { image: startFrameUrl || endFrameUrl } : {} )
-      };
+* a start frame
+* an end frame
+* optional movement instructions
 
-      const output = await replicate.run("anthropic/claude-4.5-sonnet", { input });
-      
-      // The output schema is an array of strings (iterator)
-      const enhancedPrompt = Array.isArray(output) ? output.join("") : String(output);
+Your job is to describe ONLY physically realistic camera movement that can naturally connect both frames.
 
-      return NextResponse.json({ prompt: enhancedPrompt.trim() });
-    } else if (type === "code") {
+Rules:
+
+* The shot must feel like one continuous real camera take
+* Preserve the exact same environment, objects, lighting, geometry, and scene layout from the reference images
+* NEVER introduce new objects, characters, effects, particles, lighting sources, or scene changes unless visible in the frames
+* NEVER describe transformations, morphing, blending, dissolves, generation, material changes, or magical transitions
+* NEVER allow objects to disappear, reappear, reshape, duplicate, or mutate
+* Treat all movement like a real drone, crane, dolly, handheld gimbal, or tracking vehicle shot
+* Emphasize stable geometry, realistic parallax, and physical camera motion
+* If needed, explicitly state:
+
+  * “same environment remains continuously visible”
+  * “no morphing”
+  * “no transforming objects”
+  * “no generated transitions”
+  * “no warping”
+* Movement should be motivated only by:
+
+  * pushing forward
+  * pulling backward
+  * orbital movement
+  * crane up/down
+  * spiraling descent
+  * lateral tracking
+  * 120/180 degree turns
+  * low altitude glide
+  * realistic camera tilt/pan
+
+Prompt style:
+
+* Extremely concise
+* Cinematic
+* Direct
+* Maximum 80 words
+* No flowery writing
+* No storytelling
+* Focus entirely on camera motion and scene continuity
+
+Good prompt structure:
+
+1. Camera movement
+2. Subject/environment continuity
+3. End frame reveal
+4. Strict anti-morphing constraints
+5. Ambient audio
+
+Always end prompts with strict continuity constraints like:
+“Same environment remains continuously visible throughout. Absolutely no morphing, no transforming objects, no generated transitions, no warping, no disappearing or reappearing elements.”
+
+Then finish with:
+“No humans. No narration. No voice. No music. Ambient SFX only.`;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const userContent: any[] = [];
+
+      const userText = prompt
+        ? `User prompt: ${prompt}\n\nAnalyze the provided frame(s) and generate a cinematic video prompt.`
+        : "Analyze the provided frame(s) and generate a cinematic camera movement prompt for a seamless one-take video.";
+      userContent.push({ type: "text", text: userText });
+
+      const imageUrl = startFrameUrl || endFrameUrl;
+      if (imageUrl) {
+        userContent.push({ type: "image_url", image_url: { url: imageUrl } });
+      }
+      if (endFrameUrl && endFrameUrl !== startFrameUrl) {
+        userContent.push({ type: "image_url", image_url: { url: endFrameUrl } });
+      }
+
+      const messages = [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userContent.length === 1 ? userContent[0].text : userContent },
+      ];
+
+      const enhancedPrompt = await callOpenRouter(messages);
+      return NextResponse.json({ prompt: enhancedPrompt });
+    }
+
+    // ── CODE PROMPT ENHANCEMENT ────────────────────────────────────────────────
+    if (type === "code") {
       if (!projectId) {
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
       }
@@ -106,36 +175,34 @@ Return ONLY the final enhanced prompt. Do not include quotes, explanations, or c
         if (!zipResponse.ok) {
           return NextResponse.json({ error: "Failed to download frames zip" }, { status: 400 });
         }
-        
+
         const JSZip = (await import("jszip")).default;
         const zipBuffer = await zipResponse.arrayBuffer();
         const zip = await JSZip.loadAsync(zipBuffer);
-        
-        // Get all files, sort them alphabetically (they should be numbered frame-0001.jpg etc)
+
         const allFiles = Object.values(zip.files)
           .filter(f => !f.dir && f.name.endsWith(".jpg"))
           .sort((a, b) => a.name.localeCompare(b.name));
-          
+
         if (allFiles.length > 0) {
-          // Select 5 evenly spaced frames (or however many we have if < 5)
           const numFramesToExtract = Math.min(5, allFiles.length);
           const selectedFiles = [];
           for (let i = 0; i < numFramesToExtract; i++) {
             const index = Math.floor(i * (allFiles.length - 1) / (numFramesToExtract - 1 || 1));
             selectedFiles.push(allFiles[index]);
           }
-          
+
           for (const file of selectedFiles) {
             const buffer = await file.async("nodebuffer");
             base64Images.push(buffer.toString("base64"));
           }
         }
       } else {
-        // Fallback to ffmpeg extraction if no zip URL is provided
+        // Fallback: ffmpeg extraction from project videos
         const project = await prisma.project.findUnique({
           where: { id: projectId, userId },
         });
-        
+
         if (!project) {
           return NextResponse.json({ error: "Project not found" }, { status: 404 });
         }
@@ -157,19 +224,19 @@ Return ONLY the final enhanced prompt. Do not include quotes, explanations, or c
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `enhance-frames-`));
         const ffmpeg = await getFFmpeg();
         let frameCounter = 0;
-        
+
         const framesPerVideo = Math.max(1, Math.floor(5 / videoUrlsToProcess.length));
-        
+
         for (let i = 0; i < videoUrlsToProcess.length; i++) {
           if (frameCounter >= 5) break;
-          
+
           const videoUrl = videoUrlsToProcess[i];
           const videoResponse = await fetch(videoUrl);
           if (!videoResponse.ok) continue;
-          
+
           const videoPath = path.join(tmpDir, `video-${i}.mp4`);
           fs.writeFileSync(videoPath, Buffer.from(await videoResponse.arrayBuffer()));
-          
+
           const videoDuration = await new Promise<number>((resolve) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ffmpeg.ffprobe(videoPath, (err: any, metadata: any) => {
@@ -180,7 +247,7 @@ Return ONLY the final enhanced prompt. Do not include quotes, explanations, or c
 
           const framesToExtract = i === videoUrlsToProcess.length - 1 ? 5 - frameCounter : framesPerVideo;
           const exactFps = framesToExtract / videoDuration;
-          
+
           await new Promise<void>((resolve, reject) => {
             ffmpeg(videoPath)
               .outputOptions([
@@ -192,7 +259,7 @@ Return ONLY the final enhanced prompt. Do not include quotes, explanations, or c
               .on("error", (err: Error) => reject(err))
               .run();
           });
-          
+
           frameCounter += framesToExtract;
         }
 
@@ -203,50 +270,47 @@ Return ONLY the final enhanced prompt. Do not include quotes, explanations, or c
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const parts: any[] = [];
-      const systemInstruction = `You are an expert web designer and developer. 
-You are given ${base64Images.length} frames from the videos the user has generated. Based on these frames, decide on a cool, modern theme for a website that perfectly matches the aesthetics of the frames.
-If the user provided a prompt, enhance it with the theme and suggest specific sections.
-If no prompt was provided, create a comprehensive prompt describing a modern website with sample sections according to the theme of the frames.
-CRITICAL DESIGN CONSTRAINT: The prompt must instruct the generator to build a highly minimal, transparent UI. Because the website will feature a beautiful AI-generated video background, NO opaque boxes, solid containers, or heavy backgrounds should block the view. All text, sections, and UI elements must float cleanly and elegantly over the background so the cinematic video remains completely visible at all times.
-IMPORTANT: When defining website sections or headers, use plain human-readable titles (e.g. "OVERTURE", "MANIFESTATIONS"). Do NOT use non-human characters or programming-like syntax such as "//", "/*", "_", etc.
-Return ONLY the enhanced prompt string. Do not include any other text, explanations, or markdown blocks.`;
+      const systemInstruction = `
+You are an expert web designer and developer. You are given ${base64Images.length} frames from videos the user has generated. Analyze the frames and decide on a luxury, cinematic theme that perfectly matches their aesthetics — consider mood, color palette, time of day, culture, and atmosphere.
 
-      parts.push({ text: systemInstruction });
-      parts.push({ text: `User prompt: ${prompt || ""}` });
+If the user provided a prompt, enhance it with the detected theme and define specific sections. If no prompt was provided, invent a compelling concept (a place, brand, experience, or philosophy) that feels native to the visuals.
+
+Build a single-page HTML website prompt with the following rules: full-screen video/image background, all sections completely transparent — no cards, no boxes, no solid or semi-solid backgrounds — all text and UI float directly over the cinematic scene. Use elegant Google Fonts pairing suited to the theme. Define 5–6 sections that alternate strictly left-aligned and right-aligned (never centered except hero and footer), with at least 20vh of vertical breathing room between each. Each section contains only a heading, 1–3 lines of body text, and occasionally a ghost outline CTA button — nothing more. No borders, no shadows, no decorative containers. Scroll fade-in on each section via Intersection Observer. Mobile responsive. Output as a single HTML file.
+
+Section names must be plain human-readable words (e.g. PHILOSOPHY, THE OFFERING, A PLACE APART). Do not use slashes, underscores, asterisks, or code-like syntax in section names. Return ONLY the final prompt string with no explanation, preamble, or markdown.`;
+
+      // Build OpenRouter vision message with base64 frames
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const userContent: any[] = [
+        { type: "text", text: `User prompt: ${prompt || ""}` },
+      ];
 
       for (const base64 of base64Images) {
-        parts.push({
-          inlineData: {
-            data: base64,
-            mimeType: "image/jpeg"
-          }
+        userContent.push({
+          type: "image_url",
+          image_url: { url: `data:image/jpeg;base64,${base64}` },
         });
       }
-      
-      contents = parts;
-    }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        temperature: 0.7,
+      const messages = [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userContent },
+      ];
+
+      const enhancedPrompt = await callOpenRouter(messages);
+
+      if (tmpDir) {
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { }
       }
-    });
 
-    const enhancedPrompt = response.text?.trim() || prompt;
-    
-    if (tmpDir) {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      return NextResponse.json({ prompt: enhancedPrompt });
     }
 
-    return NextResponse.json({ prompt: enhancedPrompt });
+    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   } catch (err) {
     console.error("[enhance-prompt] Error:", err);
     if (tmpDir) {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { }
     }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

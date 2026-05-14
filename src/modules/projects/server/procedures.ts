@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COST } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -230,7 +230,7 @@ export const projectsRouter = createTRPCRouter({
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,
-          model: input.model || "veo-3.1-lite-generate-001",
+          model: input.model || "replicate-kling-v2.5-turbo-pro",
           userId: ctx.auth.userId,
           blockIndex: input.blockIndex,
         },
@@ -246,6 +246,7 @@ export const projectsRouter = createTRPCRouter({
       frameCount: z.number().optional(),
       model: z.string().optional(),
       isFollowUp: z.boolean().optional(),
+      imageDataUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -256,9 +257,9 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Follow-up prompts (conversation already has messages) cost only 10 credits.
-      // First-time generation costs 100 (Pro) or 80 (Flash).
-      const cost = input.isFollowUp ? FOLLOW_UP_COST : (MODEL_COSTS[input.model || ""] || 100);
+      // Follow-up prompts cost varies by model.
+      // First-time generation costs 80 credits.
+      const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
       await checkCredits(cost);
 
       const createdMessage = await prisma.message.create({
@@ -280,6 +281,7 @@ export const projectsRouter = createTRPCRouter({
           frameCount: input.frameCount,
           model: input.model,
           userId: ctx.auth.userId,
+          imageDataUrl: input.imageDataUrl,
         },
       });
 

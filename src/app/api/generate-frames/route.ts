@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import Replicate from "replicate";
 import { Storage } from "@google-cloud/storage";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { checkCredits, consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
-});
+
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -18,7 +16,7 @@ export async function POST(req: NextRequest) {
   // Support both JSON (text-only) and FormData (with optional image)
   let prompt: string;
   let projectId: string;
-  let model: string = "gemini-3.1-flash-image-preview";
+  let model: string = "replicate-nb-2";
   let frameType: string = "START";
   let blockIndex: number = 0;
   let imageBytes: Buffer | null = null;
@@ -70,83 +68,85 @@ export async function POST(req: NextRequest) {
   try {
     const framePrompt = prompt;
 
-    // Build content parts — include image if provided
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userParts: any[] = [];
-    if (imageBytes) {
-      userParts.push({
-        inlineData: {
-          data: imageBytes.toString("base64"),
-          mimeType: imageMimeType,
-        },
-      });
-    }
-    userParts.push({ text: framePrompt });
-
-    const streamingResp = await ai.models.generateContentStream({
-      model,
-      contents: [{ role: "user", parts: userParts }],
-      config: {
-        maxOutputTokens: 8192,
-        temperature: 1,
-        topP: 0.95,
-        responseModalities: ["IMAGE"],
-        safetySettings: [
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "OFF" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "OFF" },
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "OFF" },
-        ],
-      } as Parameters<typeof ai.models.generateContentStream>[0]["config"],
+    // Use Replicate to generate the image
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_KEY!,
     });
 
-    // Collect the streamed image data
-    let imageBase64 = "";
-    let mimeType = "image/png";
-    let textOut = "";
-    let finishReason = "";
+    // Map the internal model ID to actual Replicate models
+    let replicateModel: `${string}/${string}` = "black-forest-labs/flux-schnell"; // default fallback
+    if (model === "replicate-nb-2") {
+      replicateModel = "google/nano-banana-2";
+    } else if (model.includes("/")) {
+      replicateModel = model as `${string}/${string}`;
+    }
 
-    for await (const chunk of streamingResp) {
-      console.log("DEBUG CHUNK:", JSON.stringify(chunk, null, 2));
-      const candidate = chunk.candidates?.[0];
-      if (candidate?.finishReason && candidate.finishReason !== "STOP") {
-        finishReason = candidate.finishReason;
-      }
-      const parts = candidate?.content?.parts ?? [];
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          imageBase64 += part.inlineData.data;
-          mimeType = part.inlineData.mimeType ?? mimeType;
-        } else if (part.text) {
-          textOut += part.text;
-        }
+    const input: Record<string, unknown> = {
+      prompt: framePrompt,
+    };
+
+    if (model === "bytedance/seedream-4.5") {
+      input.aspect_ratio = "16:9";
+      input.size = "2K";
+    } else if (model === "replicate-nb-2") {
+      input.aspect_ratio = "16:9";
+      input.output_format = "png";
+      input.resolution = "1K";
+    } else {
+      input.go_fast = true;
+      input.num_outputs = 1;
+      input.aspect_ratio = "16:9";
+      input.output_format = "png";
+    }
+
+    if (imageBytes) {
+      const base64Image = `data:${imageMimeType};base64,${imageBytes.toString("base64")}`;
+      if (model === "replicate-nb-2" || model === "bytedance/seedream-4.5") {
+        input.image_input = [base64Image];
+      } else {
+        input.image = base64Image;
       }
     }
 
-    if (!imageBase64) {
-      console.error("No image data. Text received instead:", textOut);
-      let errorMsg = `Imagen returned no image data. Text: ${textOut}`;
-      if (finishReason) {
-         errorMsg = `Image generation was blocked by Google API. Reason: ${finishReason}. Please modify your prompt.`;
-      }
-      throw new Error(errorMsg);
+    const output = await replicate.run(replicateModel, { input });
+
+    const outputItem = Array.isArray(output) ? output[0] : output;
+
+    let imageUrl = "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (outputItem && typeof outputItem === "object" && typeof (outputItem as any).url === "function") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      imageUrl = (outputItem as any).url().toString();
+    } else if (typeof outputItem === "string") {
+      imageUrl = outputItem;
     }
 
-    // Convert base64 to Buffer and upload to Google Cloud Storage
-    const imageBuffer = Buffer.from(imageBase64, "base64");
+    if (!imageUrl) {
+      throw new Error(`Replicate returned invalid output: ${JSON.stringify(output)}`);
+    }
+
+    // Fetch the generated image from Replicate
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image from Replicate: ${imageResponse.statusText}`);
+    }
+
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    const mimeType = imageResponse.headers.get("content-type") || "image/png";
     const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
     const storage = new Storage(
       process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
         ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-            },
-          }
+          projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          credentials: {
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+          },
+        }
         : {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          }
+          projectId: process.env.GOOGLE_CLOUD_PROJECT,
+        }
     );
     const bucket = storage.bucket(bucketName);
 

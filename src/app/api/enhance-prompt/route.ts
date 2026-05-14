@@ -58,56 +58,42 @@ export async function POST(req: NextRequest) {
     if (type === "video") {
       const { startFrameUrl, endFrameUrl } = payload;
       
-      let systemInstruction = `You are an expert prompt engineer for video generation. 
-The user has provided a prompt. Enhance this prompt to be highly cinematic, detailed, and descriptive. Make it suitable for a high-end AI video generator. 
-If the prompt is empty or just a few words, expand it into a full scene description.
-Return ONLY the enhanced prompt. Do not include any conversational text, quotes, or explanations.`;
+      const systemInstruction = `You are an expert prompt engineer for cinematic AI video generation. The user wants to generate a highly cinematic, dynamic, and continuous one-take video based on a starting frame. Analyze the visual style and any user instructions provided, and write a detailed, descriptive prompt for a high-end AI video generator. 
 
-      if (startFrameUrl || endFrameUrl) {
-        systemInstruction = `You are an expert prompt engineer for video generation. 
-The user is generating a transitional video between provided images (a start frame, an end frame, or both). 
-Based on the provided images and the user's prompt (if any), generate a highly cinematic, detailed, and descriptive prompt for a high-end AI video generator that logically transitions or animates from the start state to the end state.
-Return ONLY the enhanced prompt. Do not include any conversational text, quotes, or explanations.`;
-      }
+Study the following examples of high-quality prompts for inspiration on camera movement and cinematic style:
+- The camera begins far from the snowy Christmas village, In a single smooth motion, the camera swoops, accelerating as it approach toward the town, as it reaches the street level, the camera begins weaving dynamically through the environment, turning sharply around building corners, gliding low over rooftops, dipping beneath hanging garlands and string lights, sliding between narrow alleys, and pauses in front of an character who is intensely focused on building a snowman on an empty village street. No music, no narration, no voices. Ambient SFX only: soft winter breeze, faint village ambience, subtle snow drift.
+- Camera turns around and pans away from the girl making the snowman and goes left and turns passing through the village market activities and in continuous one-take momentum approaches intensely focused christmas carolers singing in a group. All intensity comes from camera movement only. No voice, no narration. No music.
+- One continuous, unbroken shot. The camera begins on a tight, intimate shot of two people walking and talking outside in the snowy village square. Without cutting, the camera begins to lift upward, gathering speed as it transitions out of the close-up. The camera moves with dynamic, fluid momentum. The camera continues accelerating upward, curving around chimneys, rooftops, and glowing windows while always preserving the fixed village layout. The shot expands from close-up -> mid-level streetscape -> higher sweeping view, until the camera finally ascends into a majestic overhead shot of the entire snowy Christmas village glowing against the winter landscape. All intensity comes from camera movement only. No added characters or objects. Ambient SFX only: soft winter wind, faint distant village sounds, drifting snow. No music, no narration, no voices
+- One continuous shot. Starting from a high vantage point above the glowing Christmas village, the camera turns and pushes forward passing the christmas tree on the right and glides out into the open North Pole landscape. It travels smoothly over snow-covered trees, frozen hills, and soft drifting snow, illuminated by vibrant northern lights. The motion and maintains it's speed. The camera weaves between frosted pines, skims over open white fields, and moves through pockets of glowing aurora light across the sky. No added objects or characters. Ambient SFX only: soft winter wind, distant snow drift. No music, no narration, no voices.
+- Keep the same visual style, same lighting, and same environment as the reference image. Do not change any objects or layout. Camera turns around and flies through the workshop. Dive through openings, weave between conveyor lines, slice past machinery, and sprint across the factory floor. Sharp directional shifts, rapid angle changes, tight close passes, and wide sweeps. Continuous one-take momentum with relentless kinetic motion. All intensity comes from camera movement only.
+
+If the user provided a prompt, enhance it using the cinematic movement patterns seen in the examples. If the user provided no prompt, write a brand new cinematic prompt based on the visual style of the provided image (start frame).
+IMPORTANT: Keep the generated prompt extremely concise, punchy, and straight to the point (maximum 40 words). Focus only on the core action, subject, and camera movement. Avoid overly flowery or redundant language.
+Return ONLY the final enhanced prompt. Do not include quotes, explanations, or conversational text.`;
+
+      const Replicate = (await import("replicate")).default;
+      const replicate = new Replicate({
+        auth: process.env.REPLICATE_API_KEY,
+      });
+
+      const input: {
+        prompt: string;
+        system_prompt: string;
+        max_tokens: number;
+        image?: string;
+      } = {
+        prompt: prompt ? `User prompt: ${prompt}` : "Please describe a cinematic camera movement through this scene.",
+        system_prompt: systemInstruction,
+        max_tokens: 8192,
+        ...( (startFrameUrl || endFrameUrl) ? { image: startFrameUrl || endFrameUrl } : {} )
+      };
+
+      const output = await replicate.run("anthropic/claude-4.5-sonnet", { input });
       
-      contents.push({ text: systemInstruction });
-      contents.push({ text: `User prompt: ${prompt || "A cinematic scene"}` });
+      // The output schema is an array of strings (iterator)
+      const enhancedPrompt = Array.isArray(output) ? output.join("") : String(output);
 
-      if (startFrameUrl) {
-        try {
-          const res = await fetch(startFrameUrl);
-          if (res.ok) {
-            const buffer = Buffer.from(await res.arrayBuffer());
-            contents.push({ text: "Start frame:" });
-            contents.push({
-              inlineData: {
-                data: buffer.toString("base64"),
-                mimeType: res.headers.get("content-type") || "image/jpeg"
-              }
-            });
-          }
-        } catch (e) {
-          console.error("Failed to fetch startFrameUrl for enhancement", e);
-        }
-      }
-
-      if (endFrameUrl) {
-        try {
-          const res = await fetch(endFrameUrl);
-          if (res.ok) {
-            const buffer = Buffer.from(await res.arrayBuffer());
-            contents.push({ text: "End frame:" });
-            contents.push({
-              inlineData: {
-                data: buffer.toString("base64"),
-                mimeType: res.headers.get("content-type") || "image/jpeg"
-              }
-            });
-          }
-        } catch (e) {
-          console.error("Failed to fetch endFrameUrl for enhancement", e);
-        }
-      }
+      return NextResponse.json({ prompt: enhancedPrompt.trim() });
     } else if (type === "code") {
       if (!projectId) {
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
@@ -223,6 +209,7 @@ Return ONLY the enhanced prompt. Do not include any conversational text, quotes,
 You are given ${base64Images.length} frames from the videos the user has generated. Based on these frames, decide on a cool, modern theme for a website that perfectly matches the aesthetics of the frames.
 If the user provided a prompt, enhance it with the theme and suggest specific sections.
 If no prompt was provided, create a comprehensive prompt describing a modern website with sample sections according to the theme of the frames.
+CRITICAL DESIGN CONSTRAINT: The prompt must instruct the generator to build a highly minimal, transparent UI. Because the website will feature a beautiful AI-generated video background, NO opaque boxes, solid containers, or heavy backgrounds should block the view. All text, sections, and UI elements must float cleanly and elegantly over the background so the cinematic video remains completely visible at all times.
 IMPORTANT: When defining website sections or headers, use plain human-readable titles (e.g. "OVERTURE", "MANIFESTATIONS"). Do NOT use non-human characters or programming-like syntax such as "//", "/*", "_", etc.
 Return ONLY the enhanced prompt string. Do not include any other text, explanations, or markdown blocks.`;
 

@@ -45,18 +45,23 @@ export async function POST(req: NextRequest) {
       } else {
         console.error("Missing userId or plan in webhook metadata", metadata);
       }
-    } else if (payload.type === "subscription.canceled" || payload.event === "subscription.canceled") {
+    } else if (payload.type === "subscription.canceled" || payload.event === "subscription.canceled" || payload.type === "subscription.cancelled" || payload.event === "subscription.cancelled") {
       const data = payload.data || payload;
       const metadata = data.payment_link_metadata || data.metadata || {};
       const userId = metadata.userId;
 
       if (userId) {
         console.log(`Downgrading user ${userId} due to canceled subscription`);
+        
+        // When DodoPayments officially cancels the subscription (which typically 
+        // happens at the end of the billing cycle when canceled via the portal),
+        // we reset their plan to free and drop their credits to the free tier limit (15).
         await prisma.usage.update({
           where: { key: userId },
           data: {
             plan: "free",
-            subscriptionId: null
+            subscriptionId: null,
+            credits: 15 // Reset to free tier
           }
         });
       }

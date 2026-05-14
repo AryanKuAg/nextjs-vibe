@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
+import { MODEL_COSTS } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
@@ -70,12 +71,14 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7, type: "IMAGE" },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14, type: "IMAGE" },
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", emoji: "", credits: 12, type: "VIDEO" },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", emoji: "", credits: 32, type: "VIDEO" },
-  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", emoji: "", credits: 80, type: "VIDEO" },
-];
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
+  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
+  { id: "replicate-prunaai/p-video", label: "Pruna", emoji: "", type: "VIDEO" },
+  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO" },
+  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO" },
+].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
   activeBlockIndex,
@@ -180,7 +183,7 @@ export const BackgroundBuilderLeft = ({
   };
 
   const availableModels = MODELS.filter((m) => m.type === (isVideo ? "VIDEO" : "IMAGE"));
-  const [selectedModel, setSelectedModel] = useState(availableModels[0].id);
+  const [selectedModel, setSelectedModel] = useState(availableModels[0]?.id || "");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,7 +305,7 @@ export const BackgroundBuilderLeft = ({
         }
 
         toast.info("Video generation started...");
-        updateBlock(activeBlockIndex, { isGeneratingVideo: true });
+        updateBlock(activeBlockIndex, { isGeneratingVideo: true, generatingVideoModel: effectiveModel });
 
         startVideoGeneration.mutateAsync({
           projectId,
@@ -528,16 +531,16 @@ export const BackgroundBuilderLeft = ({
               )}
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white  transition-colors cursor-pointer"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
-                  <span>{AVAILABLE_MODEL?.label}</span>
+                  <span className="whitespace-nowrap">{AVAILABLE_MODEL?.label}</span>
                   <i className="ri-arrow-down-s-line mt-0.5 text-white" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
                     {availableModels.map((model) => (
                       <button
                         key={model.id}
@@ -548,8 +551,8 @@ export const BackgroundBuilderLeft = ({
                           selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                         )}
                       >
-                        <span>{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                        <span className="whitespace-nowrap">{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                       </button>
                     ))}
                   </div>
@@ -561,7 +564,7 @@ export const BackgroundBuilderLeft = ({
                   type="button"
                   onClick={handleEnhancePrompt}
                   disabled={isEnhancing}
-                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
                   title="Magic Wand - Enhance Prompt"
                 >
                   {isEnhancing ? (

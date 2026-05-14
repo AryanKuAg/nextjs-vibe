@@ -5,14 +5,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { MODEL_COSTS } from "@/lib/pricing";
 
-const MODELS = [
-  { id: "veo-3.1-lite-generate-001", label: "Veo 3.1 Lite", credits: 12 },
-  { id: "veo-3.1-fast-generate-001", label: "Veo 3.1 Fast", credits: 32 },
-  { id: "veo-3.1-generate-001", label: "Veo 3.1 Quality", credits: 80 },
+const MODEL_IDS = [
+  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro" },
+  { id: "replicate-prunaai/p-video", label: "Pruna" },
+  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0" },
+  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast" },
 ] as const;
 
-type ModelId = typeof MODELS[number]["id"];
+type ModelId = typeof MODEL_IDS[number]["id"];
+
+const MODELS = MODEL_IDS.map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 interface Props {
   projectId: string;
@@ -29,7 +34,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("veo-3.1-lite-generate-001");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-kling-v2.5-turbo-pro");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -197,15 +202,15 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
             <div className="flex items-center gap-x-2">
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer tracking-[0em]"
+                  className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer tracking-[0em] whitespace-nowrap"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                  <span className="whitespace-nowrap">{MODELS.find((m) => m.id === selectedModel)?.label}</span>
                   <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
                     {MODELS.map((model) => (
                       <button
                         key={model.id}
@@ -214,9 +219,9 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
-                        <div className="flex w-full items-center font-inconsolata">
-                          <span>{model.label}</span>
-                          {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                        <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
+                          <span className="whitespace-nowrap">{model.label}</span>
+                          {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                         </div>
                       </button>
                     ))}

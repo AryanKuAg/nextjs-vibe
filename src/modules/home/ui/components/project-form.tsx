@@ -17,8 +17,8 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
 const MODELS = [
-  { id: "gemini-3.1-flash-image-preview", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
-  { id: "gemini-3-pro-image-preview", label: "Nano Banana Pro", emoji: "🍌", credits: 14 },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", credits: 7 },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", credits: 4 },
 ] as const;
 
 const SUGGESTED_PROMPTS = [
@@ -56,7 +56,7 @@ export const ProjectForm = () => {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gemini-3.1-flash-image-preview");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);

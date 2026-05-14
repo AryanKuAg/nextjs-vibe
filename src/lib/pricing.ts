@@ -4,14 +4,19 @@
  */
 
 export const MODEL_COSTS: Record<string, number> = {
-  "veo-3.1-lite-generate-001": 12,
-  "veo-3.1-fast-generate-001": 32,
-  "veo-3.1-generate-001": 80,
-  "gemini-3.1-flash-image-preview": 7,
-  "gemini-3-pro-image-preview": 14,
-  "gemini-3.1-pro-preview": 100,
-  "claude-sonnet-4-6": 100,
+  "replicate-nb-2": 7,
+  "bytedance/seedream-4.5": 4,
+  "replicate-kling-v2.5-turbo-pro": 35,
+  "replicate-prunaai/p-video": 8,
+  "replicate-prunaai/p-video-draft": 2,
+  "openrouter-seedance-2": 60,
+  "openrouter-seedance-2-fast": 48,
+  "openrouter-google/gemini-3.1-pro-preview": 80,
+  "anthropic/claude-sonnet-4.6": 80,
 };
 
-// Follow-up prompts (when a conversation already exists) cost a flat 10 credits
-export const FOLLOW_UP_COST = 10;
+// Follow-up prompts (when a conversation already exists)
+export const FOLLOW_UP_COSTS: Record<string, number> = {
+  "openrouter-google/gemini-3.1-pro-preview": 15,
+  "anthropic/claude-sonnet-4.6": 25,
+};

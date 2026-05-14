@@ -223,7 +223,7 @@ export const PillNavbar = () => {
 
       <div className="fixed top-6 left-1/2 -translate-x-1/2 z-20 w-full px-4 md:max-w-[600px] lg:max-w-fit">
         <div className="flex flex-col gap-2 relative w-full">
-          <div className="flex items-center justify-between md:justify-normal gap-16 h-[52px] px-2 bg-background rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          <div className="flex items-center justify-between md:justify-normal gap-16 h-[52px] px-2 bg-black rounded-[16px] font-inconsolata" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
             {/* Left side: Logo */}
             <Link href="/" className="flex items-center gap-2 pl-2">
               <Image src="/logo.png" alt="framerate" width={24} height={24} />
@@ -253,7 +253,7 @@ export const PillNavbar = () => {
                   <button
                     onClick={handleDashboardClick}
                     disabled={isPending}
-                    className="flex items-center justify-center px-4 h-[36px] rounded-[8px] border border-[#2c2c2c] text-[15px] font-[400] text-white hover:bg-[#282828] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center px-4 h-[36px] rounded-[8px] border border-[#212121] text-[15px] font-[400] text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Dashboard
                   </button>

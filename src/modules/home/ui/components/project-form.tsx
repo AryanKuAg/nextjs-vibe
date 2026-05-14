@@ -315,13 +315,13 @@ export const ProjectForm = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-neutral-800 hover:bg-white/5 text-white transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-[#2c2c2c] hover:bg-white/5 text-white transition-colors"
               >
                 <i className="ri-add-line text-base" />
               </button>
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-neutral-800 text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#2c2c2c] text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   <span>{MODELS.find((m) => m.id === selectedModel)?.emoji}</span>
@@ -368,7 +368,7 @@ export const ProjectForm = () => {
                   {isPending ? (
                     <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
                   ) : (
-                    <i className="ri-arrow-up-line text-[16px]" />
+                    <i className="ri-arrow-up-line text-[16px] rotate-90" />
                   )}
                 </button>
               </div>

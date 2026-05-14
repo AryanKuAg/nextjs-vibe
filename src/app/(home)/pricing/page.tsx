@@ -16,17 +16,17 @@ export default function PricingPage() {
       <PillNavbar />
 
       {/* Hero */}
-      <section className="pt-40 pb-12 px-6 flex flex-col items-center text-center font-inconsolata">
+      <section className="pt-40 pb-12 px-4 md:px-6 flex flex-col items-center text-center font-inconsolata">
         <h1 className="text-3xl md:text-5xl text-white font-[500] leading-[1] mb-4">
-          Build 3D websites<br />with a single prompt
+          Simple, transparent pricing
         </h1>
         <p className="text-sm text-[#cccccc]">
-          The fastest way to go from a text prompt to a live, production-ready 3D website.
+          Flexible plans built for hobbyists, creators, and teams.
         </p>
       </section>
 
       {/* Pricing Cards */}
-      <section className="pb-20 px-6 max-w-7xl mx-auto w-full">
+      <section className="pb-20 px-4 max-w-7xl mx-auto w-full">
         <PricingSection />
       </section>
 
@@ -34,7 +34,7 @@ export default function PricingPage() {
       <ComparisonSection />
 
       {/* FAQ */}
-      <section className="py-[60px] md:py-20 px-6 max-w-2xl mx-auto w-full">
+      <section className="py-[60px] md:py-20 px-4 max-w-2xl mx-auto w-full">
         <FAQSection />
       </section>
 

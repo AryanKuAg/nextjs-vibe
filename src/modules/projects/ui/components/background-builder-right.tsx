@@ -20,6 +20,7 @@ export interface VideoBlock {
   isGeneratingStart: boolean;
   isGeneratingEnd: boolean;
   isGeneratingVideo: boolean;
+  generatingVideoModel?: string;
 }
 
 interface Props {
@@ -34,7 +35,7 @@ interface Props {
 import { useState, useRef, useEffect } from "react";
 
 // ─── Fake progress hook ────────────────────────────────────────────────────────
-function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = "image") {
+function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = "image", modelId?: string) {
   const [pct, setPct] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wasGenerating = useRef(false);
@@ -46,7 +47,11 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
 
       const updateIntervalMs = 500;
       // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
-      const baseFraction = type === "video" ? 0.015 : 0.05;
+      let baseFraction = type === "video" ? 0.015 : 0.05;
+      
+      if (modelId === "replicate-kling-v2.5-turbo-pro") {
+        baseFraction = 0.003; // Kling takes ~3 mins, so slow it down significantly
+      }
 
       intervalRef.current = setInterval(() => {
         setPct((prev) => {
@@ -95,8 +100,8 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
 }
 
 // ─── Shimmer overlay shown while generating ────────────────────────────────────
-function GenerationOverlay({ isGenerating, type = "image" }: { isGenerating: boolean; type?: "image" | "video" }) {
-  const pct = useGenerationProgress(isGenerating, type);
+function GenerationOverlay({ isGenerating, type = "image", modelId }: { isGenerating: boolean; type?: "image" | "video", modelId?: string }) {
+  const pct = useGenerationProgress(isGenerating, type, modelId);
   if (!isGenerating && pct === 0) return null;
   return (
     <>
@@ -429,7 +434,17 @@ export const BackgroundBuilderRight = ({
                 className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
                 onMouseEnter={() => {
                   setHoveredVideoIndex(index);
-                  if (block.videoUrl) videoRefs.current[index]?.play();
+                  if (block.videoUrl) {
+                    const v = videoRefs.current[index];
+                    if (v) {
+                      const playPromise = v.play();
+                      if (playPromise !== undefined) {
+                        playPromise.catch(() => {
+                          // Ignore auto-play interruption errors
+                        });
+                      }
+                    }
+                  }
                 }}
                 onMouseLeave={() => {
                   setHoveredVideoIndex(null);
@@ -440,7 +455,7 @@ export const BackgroundBuilderRight = ({
                 }}
               >
                 {block.isGeneratingVideo ? (
-                  <GenerationOverlay isGenerating={block.isGeneratingVideo} type="video" />
+                  <GenerationOverlay isGenerating={block.isGeneratingVideo} type="video" modelId={block.generatingVideoModel} />
                 ) : block.videoUrl ? (
                   <>
                     <video

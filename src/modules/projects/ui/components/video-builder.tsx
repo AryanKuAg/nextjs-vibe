@@ -9,7 +9,7 @@ import { MODEL_COSTS } from "@/lib/pricing";
 
 const MODEL_IDS = [
   { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro" },
-  { id: "replicate-prunaai/p-video", label: "Pruna P-Video" },
+  { id: "replicate-prunaai/p-video", label: "Pruna" },
   { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
   { id: "openrouter-seedance-2", label: "Seedance 2.0" },
   { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast" },

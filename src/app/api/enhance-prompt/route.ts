@@ -68,6 +68,7 @@ Study the following examples of high-quality prompts for inspiration on camera m
 - Keep the same visual style, same lighting, and same environment as the reference image. Do not change any objects or layout. Camera turns around and flies through the workshop. Dive through openings, weave between conveyor lines, slice past machinery, and sprint across the factory floor. Sharp directional shifts, rapid angle changes, tight close passes, and wide sweeps. Continuous one-take momentum with relentless kinetic motion. All intensity comes from camera movement only.
 
 If the user provided a prompt, enhance it using the cinematic movement patterns seen in the examples. If the user provided no prompt, write a brand new cinematic prompt based on the visual style of the provided image (start frame).
+IMPORTANT: Keep the generated prompt extremely concise, punchy, and straight to the point (maximum 40 words). Focus only on the core action, subject, and camera movement. Avoid overly flowery or redundant language.
 Return ONLY the final enhanced prompt. Do not include quotes, explanations, or conversational text.`;
 
       const Replicate = (await import("replicate")).default;

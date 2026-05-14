@@ -252,6 +252,21 @@ export const codeAgentFunction = inngest.createFunction(
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
                 for (const file of files) {
+                  if (!file || !file.path || typeof file.path !== "string" || file.path.trim() === "") {
+                    console.warn("Skipping file write, invalid or empty path:", file?.path);
+                    continue;
+                  }
+                  if (typeof file.content !== "string") {
+                    file.content = String(file.content || "");
+                  }
+                  
+                  // Ensure parent directory exists before writing to prevent missing directory errors
+                  const dirParts = file.path.split('/');
+                  if (dirParts.length > 1) {
+                    const dir = dirParts.slice(0, -1).join('/');
+                    await sandbox.commands.run(`mkdir -p "${dir}"`);
+                  }
+
                   await sandbox.files.write(file.path, file.content);
                   await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;

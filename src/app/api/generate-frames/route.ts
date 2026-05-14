@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     if (model === "bytedance/seedream-4.5") {
       input.aspect_ratio = "16:9";
-      input.output_format = "png";
+      input.size = "2K";
     } else if (model === "replicate-nb-2") {
       input.aspect_ratio = "16:9";
       input.output_format = "png";
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     if (imageBytes) {
       const base64Image = `data:${imageMimeType};base64,${imageBytes.toString("base64")}`;
-      if (model === "replicate-nb-2") {
+      if (model === "replicate-nb-2" || model === "bytedance/seedream-4.5") {
         input.image_input = [base64Image];
       } else {
         input.image = base64Image;

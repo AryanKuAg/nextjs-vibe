@@ -74,7 +74,7 @@ const MODELS = [
   { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
   { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
   { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
-  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO" },
+  { id: "replicate-prunaai/p-video", label: "Pruna", emoji: "", type: "VIDEO" },
   { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
   { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO" },
   { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO" },
@@ -305,7 +305,7 @@ export const BackgroundBuilderLeft = ({
         }
 
         toast.info("Video generation started...");
-        updateBlock(activeBlockIndex, { isGeneratingVideo: true });
+        updateBlock(activeBlockIndex, { isGeneratingVideo: true, generatingVideoModel: effectiveModel });
 
         startVideoGeneration.mutateAsync({
           projectId,

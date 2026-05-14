@@ -17,6 +17,7 @@
     "@google/genai": "^1.48.0",
     "@hookform/resolvers": "^5.1.1",
     "@inngest/agent-kit": "0.13.2",
+    "@openrouter/sdk": "^0.12.35",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@radix-ui/react-accordion": "^1.2.11",

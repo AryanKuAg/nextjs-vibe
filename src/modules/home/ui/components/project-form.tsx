@@ -16,10 +16,12 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
+import { MODEL_COSTS } from "@/lib/pricing";
+
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", credits: 7 },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", credits: 4 },
-] as const;
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "" },
+].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 const SUGGESTED_PROMPTS = [
   {

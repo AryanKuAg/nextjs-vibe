@@ -41,7 +41,7 @@ const stats = [
 
 export const ComparisonSection = () => {
   return (
-    <section className="py-[60px] md:py-24 px-6 max-w-4xl mx-auto w-full font-inconsolata">
+    <section className="py-[60px] md:py-24 px-6 max-w-[640px] mx-auto w-full font-inconsolata">
       {/* Header */}
       <div className="flex flex-col items-center text-center mb-12">
         <p className="text-xs tracking-[0.18em] uppercase text-[#8A8A88] mb-4">
@@ -61,13 +61,13 @@ export const ComparisonSection = () => {
         {/* Column headers */}
         <div className="grid grid-cols-[1fr_1fr_1fr] border-b border-white/[0.06]">
           <div className="px-5 py-3" />
-          <div className="px-5 py-3 text-xs text-[#8A8A88] border-l border-white/[0.06]">
-            Freelancer / Agency
+          <div className="px-5 py-3 text-xs text-[#8A8A88] border-l border-white/[0.06] flex items-center">
+            <span>Freelancer / Agency</span>
+
           </div>
           <div className="px-5 py-3 border-l border-white/[0.06] flex items-center gap-2">
             {/* Framerate brand cell */}
-            <span className="text-base">✳️</span>
-            <span className="text-sm text-white font-[500]">framerate</span>
+            <img src="/framerate_logo_long.png" alt="framerate" className="h-4 object-contain" />
           </div>
         </div>
 

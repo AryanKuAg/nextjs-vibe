@@ -230,7 +230,7 @@ export const projectsRouter = createTRPCRouter({
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,
-          model: input.model || "veo-3.1-lite-generate-001",
+          model: input.model || "replicate-kling-v2.5-turbo-pro",
           userId: ctx.auth.userId,
           blockIndex: input.blockIndex,
         },

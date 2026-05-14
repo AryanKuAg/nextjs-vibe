@@ -933,20 +933,52 @@ export const veoGenerateFunction = inngest.createFunction(
           }
 
           console.log(`[Video Pipeline] Starting Replicate model: ${targetModel}`);
-          const output = await replicate.run(targetModel, { input });
-          
-          const outputItem = Array.isArray(output) ? output[0] : output;
-          
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if (outputItem && typeof outputItem === "object" && typeof (outputItem as any).url === "function") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            finalVideoUrl = (outputItem as any).url().toString();
+
+          // Use predictions.create + poll to avoid non-serializable FileRef objects
+          // replicate.run() may return FileRef objects that crash Inngest's JSON step serialization
+          const prediction = await replicate.predictions.create({
+            model: targetModel,
+            input,
+          });
+
+          console.log(`[Video Pipeline] Prediction created: ${prediction.id}, polling...`);
+
+          // Poll until completed or failed
+          let completedPrediction = prediction;
+          const maxWaitMs = 5 * 60 * 1000; // 5 min timeout
+          const startTime = Date.now();
+          while (
+            completedPrediction.status !== "succeeded" &&
+            completedPrediction.status !== "failed" &&
+            completedPrediction.status !== "canceled"
+          ) {
+            if (Date.now() - startTime > maxWaitMs) {
+              throw new Error(`Replicate prediction ${prediction.id} timed out after 5 minutes`);
+            }
+            await new Promise((r) => setTimeout(r, 5000));
+            completedPrediction = await replicate.predictions.get(prediction.id);
+            console.log(`[Video Pipeline] Prediction status: ${completedPrediction.status}`);
+          }
+
+          if (completedPrediction.status !== "succeeded") {
+            throw new Error(`Replicate prediction failed: ${JSON.stringify(completedPrediction.error)}`);
+          }
+
+          // Extract URL as a plain string — no FileRef objects allowed here
+          const rawOutput = completedPrediction.output;
+          const outputItem = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
+
+          if (outputItem && typeof outputItem === "object" && typeof (outputItem as { url?: () => string }).url === "function") {
+            finalVideoUrl = (outputItem as { url: () => string }).url().toString();
           } else if (typeof outputItem === "string") {
             finalVideoUrl = outputItem;
+          } else if (outputItem && typeof outputItem === "object" && "url" in outputItem) {
+            // Handle plain URL objects from newer Replicate SDK versions
+            finalVideoUrl = String((outputItem as { url: string }).url);
           }
 
           if (!finalVideoUrl) {
-            throw new Error(`Invalid Replicate output: ${JSON.stringify(output)}`);
+            throw new Error(`Invalid Replicate output: ${JSON.stringify(rawOutput)}`);
           }
 
           // Fetch the video buffer to upload to GCS

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { toast } from "sonner";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
@@ -12,11 +12,14 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
-import { FOLLOW_UP_COST, MODEL_COSTS } from "@/lib/pricing";
+import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 
-const MODEL_ID = "openrouter-google/gemini-3.1-pro-preview" as const;
-const MODEL_LABEL = "Gemini 3.1 Pro Preview";
-const MODEL_CREDITS = MODEL_COSTS[MODEL_ID] ?? 65;
+const MODELS = [
+  { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+  { id: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+] as const;
+
+type ModelId = typeof MODELS[number]["id"];
 
 interface Props {
   projectId: string;
@@ -72,6 +75,23 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelId>("openrouter-google/gemini-3.1-pro-preview");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const SELECTED_MODEL_DATA = MODELS.find((m) => m.id === selectedModel) || MODELS[0];
+  const MODEL_CREDITS = MODEL_COSTS[selectedModel] ?? 65;
+  const FOLLOW_UP_CREDITS = FOLLOW_UP_COSTS[selectedModel] ?? 10;
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Detect follow-up: any existing SITE-stage message means this is a follow-up prompt
@@ -188,7 +208,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           projectId,
           videoUrl: extractedZipUrl || undefined,
           frameCount: extractedFrameCount,
-          model: MODEL_ID,
+          model: selectedModel,
           isFollowUp,
           imageDataUrl: uploadedDataUrl ?? undefined,
         });
@@ -201,7 +221,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           value: values.value,
           projectId,
           stage,
-          model: MODEL_ID,
+          model: selectedModel,
         });
       } catch {
         // Error is handled in the mutation's onError callback
@@ -228,9 +248,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#282828] border rounded-[16px] p-3 space-y-3 relative transition-all ${
-            isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
-          }`}
+          className={`bg-[#282828] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
+            }`}
         >
           {/* Image preview — same style as video-builder */}
           {uploadedDataUrl && (
@@ -284,9 +303,37 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
               +
             </button>
 
-            {/* Model label */}
-            <div className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white/70 select-none">
-              <span>{MODEL_LABEL}</span>
+            {/* Model Selector Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <div
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer whitespace-nowrap"
+                onClick={() => setModelDropdownOpen((o) => !o)}
+              >
+                <span className="whitespace-nowrap">{SELECTED_MODEL_DATA.label}</span>
+                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+              </div>
+
+              {modelDropdownOpen && (
+                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
+                  {MODELS.map((model) => (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedModel(model.id);
+                        setModelDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        }`}
+                    >
+                      <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
+                        <span className="whitespace-nowrap">{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Enhance prompt */}
@@ -308,7 +355,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
               <div className="flex items-center gap-1 text-white">
                 <i className="ri-sparkling-2-fill text-white text-sm" />
                 <span className="text-sm font-medium">
-                  {isFollowUp ? FOLLOW_UP_COST : MODEL_CREDITS}
+                  {isFollowUp ? FOLLOW_UP_CREDITS : MODEL_CREDITS}
                 </span>
               </div>
               {isGenerating ? (

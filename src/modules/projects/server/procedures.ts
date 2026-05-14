@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COST } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -257,9 +257,9 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Follow-up prompts (conversation already has messages) cost only 10 credits.
-      // First-time generation costs 100 (Pro) or 80 (Flash).
-      const cost = input.isFollowUp ? FOLLOW_UP_COST : (MODEL_COSTS[input.model || ""] || 100);
+      // Follow-up prompts cost varies by model.
+      // First-time generation costs 80 credits.
+      const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
       await checkCredits(cost);
 
       const createdMessage = await prisma.message.create({

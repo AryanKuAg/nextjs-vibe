@@ -202,15 +202,15 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
             <div className="flex items-center gap-x-2">
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer tracking-[0em]"
+                  className="h-8 pl-2.5 pr-2 flex items-center gap-1 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer tracking-[0em] whitespace-nowrap"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                  <span className="whitespace-nowrap">{MODELS.find((m) => m.id === selectedModel)?.label}</span>
                   <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
                     {MODELS.map((model) => (
                       <button
                         key={model.id}
@@ -219,9 +219,9 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
-                        <div className="flex w-full items-center font-inconsolata">
-                          <span>{model.label}</span>
-                          {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                        <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
+                          <span className="whitespace-nowrap">{model.label}</span>
+                          {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                         </div>
                       </button>
                     ))}

@@ -71,8 +71,9 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "🍌", type: "IMAGE" },
-  { id: "replicate-gpt-2", label: "GPT 2", emoji: "🍌", type: "IMAGE" },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
+  { id: "openai/gpt-image-2", label: "GPT Image 2", emoji: "", type: "IMAGE" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
   { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
   { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO" },
   { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
@@ -531,16 +532,16 @@ export const BackgroundBuilderLeft = ({
               )}
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white  transition-colors cursor-pointer"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
-                  <span>{AVAILABLE_MODEL?.label}</span>
+                  <span className="whitespace-nowrap">{AVAILABLE_MODEL?.label}</span>
                   <i className="ri-arrow-down-s-line mt-0.5 text-white" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
                     {availableModels.map((model) => (
                       <button
                         key={model.id}
@@ -551,8 +552,8 @@ export const BackgroundBuilderLeft = ({
                           selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                         )}
                       >
-                        <span>{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
+                        <span className="whitespace-nowrap">{model.label}</span>
+                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                       </button>
                     ))}
                   </div>
@@ -564,7 +565,7 @@ export const BackgroundBuilderLeft = ({
                   type="button"
                   onClick={handleEnhancePrompt}
                   disabled={isEnhancing}
-                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-[#CCCCCC] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
                   title="Magic Wand - Enhance Prompt"
                 >
                   {isEnhancing ? (

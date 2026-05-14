@@ -78,23 +78,35 @@ export async function POST(req: NextRequest) {
     if (model === "replicate-nb-2") {
       // NOTE: Replace with your actual Nano Banana 2 model ID
       replicateModel = "black-forest-labs/flux-schnell";
-    } else if (model === "replicate-gpt-2") {
-      // NOTE: Replace with your actual GPT 2 model ID
-      replicateModel = "black-forest-labs/flux-dev";
     } else if (model.includes("/")) {
       replicateModel = model as `${string}/${string}`;
     }
 
     const input: Record<string, unknown> = {
       prompt: framePrompt,
-      go_fast: true,
-      num_outputs: 1,
-      aspect_ratio: "16:9",
-      output_format: "png",
     };
 
+    if (model === "openai/gpt-image-2") {
+      input.quality = "low";
+      input.aspect_ratio = "3:2";
+      input.output_format = "webp";
+    } else if (model === "bytedance/seedream-4.5") {
+      input.aspect_ratio = "16:9";
+      input.output_format = "png";
+    } else {
+      input.go_fast = true;
+      input.num_outputs = 1;
+      input.aspect_ratio = "16:9";
+      input.output_format = "png";
+    }
+
     if (imageBytes) {
-      input.image = `data:${imageMimeType};base64,${imageBytes.toString("base64")}`;
+      const base64Image = `data:${imageMimeType};base64,${imageBytes.toString("base64")}`;
+      if (model === "openai/gpt-image-2") {
+        input.input_images = [base64Image];
+      } else {
+        input.image = base64Image;
+      }
     }
 
     const output = await replicate.run(replicateModel, { input });

@@ -17,8 +17,9 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "🍌", credits: 7 },
-  { id: "replicate-gpt-2", label: "GPT 2", emoji: "🤖", credits: 3 },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", credits: 7 },
+  { id: "openai/gpt-image-2", label: "GPT Image 2", emoji: "", credits: 1 },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", credits: 4 },
 ] as const;
 
 const SUGGESTED_PROMPTS = [

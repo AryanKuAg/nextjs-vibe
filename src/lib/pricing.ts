@@ -5,7 +5,6 @@
 
 export const MODEL_COSTS: Record<string, number> = {
   "replicate-nb-2": 7,
-  "openai/gpt-image-2": 1,
   "bytedance/seedream-4.5": 4,
   "replicate-kling-v2.5-turbo-pro": 28,
   "replicate-prunaai/p-video": 16,

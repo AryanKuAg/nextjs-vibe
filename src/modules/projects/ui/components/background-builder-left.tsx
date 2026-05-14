@@ -72,7 +72,6 @@ const deleteImageFromIDB = async (key: string) => {
 
 const MODELS = [
   { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
-  { id: "openai/gpt-image-2", label: "GPT Image 2", emoji: "", type: "IMAGE" },
   { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
   { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
   { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO" },

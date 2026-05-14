@@ -76,8 +76,7 @@ export async function POST(req: NextRequest) {
     // Map the internal model ID to actual Replicate models
     let replicateModel: `${string}/${string}` = "black-forest-labs/flux-schnell"; // default fallback
     if (model === "replicate-nb-2") {
-      // NOTE: Replace with your actual Nano Banana 2 model ID
-      replicateModel = "black-forest-labs/flux-schnell";
+      replicateModel = "google/nano-banana-2";
     } else if (model.includes("/")) {
       replicateModel = model as `${string}/${string}`;
     }
@@ -86,13 +85,13 @@ export async function POST(req: NextRequest) {
       prompt: framePrompt,
     };
 
-    if (model === "openai/gpt-image-2") {
-      input.quality = "low";
-      input.aspect_ratio = "3:2";
-      input.output_format = "webp";
-    } else if (model === "bytedance/seedream-4.5") {
+    if (model === "bytedance/seedream-4.5") {
       input.aspect_ratio = "16:9";
       input.output_format = "png";
+    } else if (model === "replicate-nb-2") {
+      input.aspect_ratio = "16:9";
+      input.output_format = "png";
+      input.resolution = "1K";
     } else {
       input.go_fast = true;
       input.num_outputs = 1;
@@ -102,8 +101,8 @@ export async function POST(req: NextRequest) {
 
     if (imageBytes) {
       const base64Image = `data:${imageMimeType};base64,${imageBytes.toString("base64")}`;
-      if (model === "openai/gpt-image-2") {
-        input.input_images = [base64Image];
+      if (model === "replicate-nb-2") {
+        input.image_input = [base64Image];
       } else {
         input.image = base64Image;
       }

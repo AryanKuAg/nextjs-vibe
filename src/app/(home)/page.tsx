@@ -34,7 +34,7 @@ const HeroVideo = () => {
     return () => { container.innerHTML = ""; };
   }, []);
 
-  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e]" />;
+  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
 };
 
 
@@ -66,17 +66,14 @@ const Page = () => {
       <PillNavbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-[100vh] flex flex-col items-center justify-center pt-24 pb-12 px-4 overflow-hidden">
+      <section className="relative min-h-[100vh] flex flex-col items-center justify-end pb-[40px] px-4 overflow-hidden">
         <HeroVideo />
 
-
-        <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
-          <h1 className="text-4xl md:text-5xl text-white font-inconsolata text-center leading-[1] mb-[40px] drop-shadow-2xl font-[500]">
-            Build 3D websites<br />10x faster with AI
+        <div className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center">
+          <h1 className="text-4xl md:text-5xl text-white font-inconsolata text-center leading-[1] drop-shadow-2xl font-[500] mb-[40px]">
+            Ship 3D websites<br />in minutes with AI
           </h1>
-          <div className="w-full mx-auto md:px-12">
-            <ProjectForm />
-          </div>
+          <ProjectForm />
         </div>
       </section>
 

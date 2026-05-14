@@ -47,7 +47,7 @@ export const ComparisonSection = () => {
         <p className="text-xs tracking-[0.18em] uppercase text-[#8A8A88] mb-4">
           Why Framerate?
         </p>
-        <h2 className="text-3xl md:text-5xl text-white font-[500] leading-[1.1] mb-5 whitespace-nowrap">
+        <h2 className="text-3xl md:text-5xl text-white font-[500] leading-[1.1] mb-5 md:whitespace-nowrap">
           Agencies take weeks.<br />
           Framerate ships in minutes.
         </h2>

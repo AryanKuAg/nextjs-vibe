@@ -25,20 +25,20 @@ const MODELS = [
 
 const SUGGESTED_PROMPTS = [
   {
-    label: "Celestial Nebula",
-    prompt: "Embark on a visual journey through a breathtaking, hyper-realistic 3D cosmic nebula masterpiece. Imagine swirling vortices of iridescent purple, deep sapphire, and molten gold gases colliding in a chaotic yet harmonious celestial dance that spans light-years. Countless glittering star clusters and distant spiral galaxies pierce through thick, volumetric clouds, creating a sense of unfathomable scale. Ethereal, shimmering dust trails weave through the composition, catching cinematic rim lighting from a nearby dying sun, creating brilliant highlights and deep, velvety shadows. The scene utilizes multi-layered transparency and refraction to build immense space depth. Rendered in 8K ultra-resolution using Octane Render, it features realistic light scatter, gravitational lensing effects, and an expansive, awe-inspiring atmosphere that captures the sheer majesty of the universe."
+    label: "Frosted village",
+    prompt: "Miniature snowy Christmas village at blue hour, cozy glowing cottages covered in snow, massive illuminated Christmas tree in the center, warm golden lights everywhere, dreamy cinematic atmosphere, soft depth of field, tilt shift look, ultra detailed, magical winter wonderland, realistic 3D render."
   },
   {
-    label: "Sacred Zen Sanctuary",
-    prompt: "Step into an ultra-minimalist 3D Zen garden sanctuary, rendered with obsessive attention to every microscopic detail. Perfectly raked concentric sand patterns create a mesmerizing sense of eternal flow around weathered basalt monoliths, which are covered in intricate moss textures and morning dew. A single, ancient bonsai tree stands as a poignant focal point, its delicate, hand-sculpted leaves catching the soft, golden-hour morning sunlight. The scene is populated with photorealistic pebbles of varying mineral types, clean architectural lines of a dark charred-cedar wooden deck, and a background of soft-focus bamboo swaying in a digital breeze. Utilizing studio-quality global illumination, subtle lens flares, and a serene, meditative atmosphere, this high-end architectural render boasts physically accurate shadows and crisp, 8K textures."
+    label: "Aurora dreamscape",
+    prompt: "Dreamlike arctic night landscape, glowing aurora borealis in deep blue sky, snowy hills with tall dark pine trees, reflective frozen lake in foreground, magical bioluminescent flower field with pink, purple, blue and orange glowing plants, tiny floating fireflies, cinematic lighting, ultra detailed, fantasy atmosphere, soft mist, vibrant glow, wide shot, surreal nature, 3D render style, highly immersive."
   },
   {
-    label: "Neon Isometric Lab",
-    prompt: "Welcome to a state-of-the-art 3D isometric technology workspace of the year 2099. Floating holographic interfaces pulse with vibrant neon cyan and electric magenta code snippets, casting dynamic, colorful light onto sleek, matte-black metallic surfaces and brushed aluminum frames. The desk is cluttered with high-poly futuristic gadgets, translucent glass tablets showing complex internal circuitry, and ergonomic carbon-fiber furniture with glowing orange accents. Soft ambient occlusion and real-time ray-traced reflections bring a tangible sense of reality to every corner. The aesthetic is playfully professional, featuring tiny floating data particles and microscopic dust motes dancing in the light. Octane Render 8K output, featuring shallow depth of field, volumetric light rays from hidden LED strips, and a polished, high-tech 'Silicon Valley' vibe."
+    label: "Floating monoliths",
+    prompt: "Massive floating stone structures above a misty landscape, surreal cinematic environment, glowing ambient light, dreamy atmosphere, soft fog, reflective water, minimal fantasy world, ultra detailed, immersive 3D render style."
   },
   {
-    label: "Bioluminescent Dreamwood",
-    prompt: "Descend into an immersive, enchanted 3D forest at midnight, a world brimming with bioluminescent life and ancient mystery. Massive, millennium-old trees with glowing blue fungal veins tower over a lush carpet of iridescent ferns and floating spores that drift like underwater snow. Soft, silvery moonlight filters through the dense, multi-layered canopy, creating dramatic volumetric god-rays and sharp, spindly silhouettes against the dark woods. Fireflies leave long-exposure neon light trails through the misty, moisture-rich air. The environment is incredibly rich with procedural wet moss textures, sparkling crystal formations emerging from the soil, and magical particles that react to invisible atmospheric currents. This Unreal Engine 5 style hyper-realistic environment features complex parallax mapping, ray-traced global illumination, and a deep, hauntingly beautiful fantasy atmosphere."
+    label: "Ember valley",
+    prompt: "Dark fantasy valley filled with glowing orange flora, volcanic atmosphere, floating embers, cinematic lighting, reflective river, towering silhouettes, surreal immersive world, ultra detailed 3D render style."
   }
 ];
 

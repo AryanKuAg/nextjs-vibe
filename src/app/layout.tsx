@@ -49,9 +49,9 @@ export const metadata: Metadata = {
     siteName: "Framerate",
     images: [
       {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
+        url: "/social_preview.png",
+        width: 2400,
+        height: 1260,
         alt: "Framerate – Build 3D Websites with AI",
       },
     ],
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Framerate – Build 3D Websites with AI",
     description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
-    images: ["/og-image.png"],
+    images: ["/social_preview.png"],
   },
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",

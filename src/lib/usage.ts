@@ -3,9 +3,9 @@ import { prisma } from "@/lib/db";
 
 export const PLAN_CREDITS: Record<string, number> = {
   free: 15,
-  basic: 1200,
-  plus: 3000,
-  pro: 5500,
+  basic: 500,
+  plus: 2000,
+  pro: 3500,
 };
 
 export { MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/pricing";

@@ -54,7 +54,7 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
   return (
     <div className={cn("relative flex flex-col bg-[#282828] rounded-[16px] p-4 font-inconsolata", isPopular && "border border-white", className)}>
       {isPopular && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[13px] font-mono">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono">
           MOST POPULAR
         </div>
       )}
@@ -67,9 +67,14 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
       <button
         onClick={handleCheckout}
         disabled={loading}
-        className="w-full h-[36px] bg-white text-black rounded-lg text-sm font-[500] mb-4 disabled:opacity-50 transition-opacity"
+        className={cn(
+          "w-full h-[36px] rounded-lg text-sm font-[500] mb-4 disabled:opacity-50 transition-all",
+          isPopular
+            ? "bg-white hover:bg-white/90 text-black"
+            : "bg-[#333333] hover:bg-[#444444] text-white"
+        )}
       >
-        {loading ? "Redirecting..." : `Get ${title.toLowerCase()}`}
+        {loading ? "Redirecting..." : `Get started`}
       </button>
       <div className="flex flex-col gap-1">
         {features.map((f, i) => (

@@ -86,39 +86,42 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
 export const PLANS: PricingCardProps[] = [
   {
     title: "Basic",
-    desc: "For hobbyists and explorers",
-    price: "19",
+    desc: "Perfect for personal projects",
+    price: "15",
     features: [
-      "1,200 credits / mo",
-      "~120 Images or ~15 Videos",
-      "~12 Pro Website Builds",
-      "Neon DB & GCP Hosting",
-      "Veo 3.1 & Nano Banana Pro"
+      "500 credits / month",
+      "40 images and 20 videos",
+      "Seedream 4.5 & Pruna Video",
+      "2 website",
+      "Export websites",
+      "Standard generation"
     ],
   },
   {
     title: "Plus",
-    desc: "For power creators and freelancers",
+    desc: "Built for active creators",
     price: "39",
     isPopular: true,
     features: [
-      "3,000 credits / mo",
-      "~300 Images or ~40 Videos",
-      "~30 Pro Website Builds",
-      "Priority Sandboxes (E2B)",
-      "Veo 3.1 & Nano Banana Pro"
+      "2,000 credits / month",
+      "160 images and 80 videos",
+      "Nano Banana 2 & Seedance 2.0",
+      "10 websites",
+      "Export websites",
+      "Priority generation"
     ],
   },
   {
     title: "Pro",
-    desc: "For agencies and AI startups",
+    desc: "Made for teams and studios",
     price: "59",
     features: [
-      "5,500 credits / mo",
-      "~550 Images or ~75 Videos",
-      "~55 Pro Website Builds",
-      "Long-running Sessions (1hr+)",
-      "Veo 3.1 & Nano Banana Pro"
+      "3,500 credits / month",
+      "240 images and 160 videos",
+      "Nano Banana 2 & Seedance 2.0",
+      "40 websites",
+      "Export websites",
+      "Priority generation"
     ],
   },
 ];

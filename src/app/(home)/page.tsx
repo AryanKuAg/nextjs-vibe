@@ -85,26 +85,47 @@ const Page = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="group p-2 bg-[#282828] rounded-[16px] font-inconsolata">
-            <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden flex items-end ">
-              <a
-                href="https://bit.ly/4f7EoPq"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16"
-              >
+          <a
+            href="https://storage.googleapis.com/sites.framerate.space/sites/cb0b14d4-2546-49aa-9999-90dbbc0c83cc/index.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block rounded-[16px] font-inconsolata overflow-hidden relative"
+          >
+            <div className="relative aspect-[2880/1800] w-full bg-transparent">
+              <Image src="/giftmas.png" alt="Giftmas" fill className="object-cover scale-[1.01]" />
+              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
                 Preview
-              </a>
+              </div>
             </div>
-          </div>
+          </a>
 
-          <div className="p-2 bg-[#282828] rounded-[16px] font-inconsolata">
-            <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden" />
-          </div>
+          <a
+            href="https://f1-master-framerate.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block rounded-[16px] font-inconsolata overflow-hidden relative"
+          >
+            <div className="relative aspect-[2880/1800] w-full bg-transparent">
+              <Image src="/f1-master.png" alt="F1 Master" fill className="object-cover scale-[1.01]" />
+              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
+                Preview
+              </div>
+            </div>
+          </a>
 
-          <div className="p-2 bg-[#282828] rounded-[16px] font-inconsolata">
-            <div className="relative aspect-[4/3] md:aspect-video  rounded-[8px] overflow-hidden" />
-          </div>
+          <a
+            href="https://aviator-fr.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block rounded-[16px] font-inconsolata overflow-hidden relative"
+          >
+            <div className="relative aspect-[2880/1800] w-full bg-transparent">
+              <Image src="/aviator.png" alt="Aviator" fill className="object-cover scale-[1.01]" />
+              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
+                Preview
+              </div>
+            </div>
+          </a>
         </div>
       </section>
 

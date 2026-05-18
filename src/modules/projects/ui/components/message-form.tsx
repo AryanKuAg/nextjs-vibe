@@ -16,6 +16,8 @@ import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+  { id: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+  { id: "moonshotai/kimi-k2.6", label: "Kimi k2.6" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];

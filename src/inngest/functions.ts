@@ -130,11 +130,51 @@ export const codeAgentFunction = inngest.createFunction(
       return messageWithFragment.fragment;
     });
 
+    const initialFiles = await step.run("get-initial-files", async () => {
+      let files: Record<string, string> = {};
+      if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
+        files = latestFragment.files as Record<string, string>;
+      }
+      
+      // If it's a new project (no files), load templates
+      if (Object.keys(files).length === 0) {
+        const fs = await import("fs");
+        const path = await import("path");
+        const templatesDir = path.join(process.cwd(), "src", "templates");
+        
+        const readDirRecursive = (dir: string) => {
+          if (!fs.existsSync(dir)) return;
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              readDirRecursive(fullPath);
+            } else {
+              const relativePath = path.relative(templatesDir, fullPath);
+              files[`src/${relativePath}`] = fs.readFileSync(fullPath, "utf-8");
+            }
+          }
+        };
+        readDirRecursive(templatesDir);
+      }
+      
+      // ALWAYS dynamically replace frame count, even on follow-up prompts
+      if (event.data.frameCount) {
+        const frameContent = files["src/constants/frames.ts"];
+        if (frameContent) {
+          files["src/constants/frames.ts"] = frameContent.replace(
+            /export const TOTAL_FRAMES = \d+;/,
+            `export const TOTAL_FRAMES = ${event.data.frameCount};`
+          );
+        }
+      }
+
+      return files;
+    });
+
     await step.run("hydrate-sandbox", async () => {
-      // Skip hydration if there are no previous files (first run or prior failure).
-      // An empty files object {} means nothing useful to seed.
-      const filesObj = latestFragment?.files as Record<string, string> | undefined;
-      const hasFiles = filesObj && typeof filesObj === "object" && Object.keys(filesObj).length > 0;
+      const filesObj = initialFiles;
+      const hasFiles = Object.keys(filesObj).length > 0;
 
       if (!hasFiles) {
         console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
@@ -145,6 +185,19 @@ export const codeAgentFunction = inngest.createFunction(
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
+        
+        // We MUST still update the frames.ts file in case the user extracted new frames
+        // between prompts, otherwise the hot sandbox will retain the old frame count.
+        if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
+          try {
+            const sandbox = await getSandbox(sandboxId);
+            await sandbox.files.write("src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
+            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
+          } catch (e) {
+            console.error("Failed to update frames.ts in hot sandbox", e);
+          }
+        }
+
         return null;
       }
 
@@ -186,11 +239,6 @@ export const codeAgentFunction = inngest.createFunction(
 
       return formattedMessages.reverse();
     });
-
-    let initialFiles = {};
-    if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
-      initialFiles = latestFragment.files;
-    }
 
     const state = createState<AgentState>(
       {
@@ -360,26 +408,32 @@ export const codeAgentFunction = inngest.createFunction(
     }
 
     if (event.data.videoUrl) {
-      const frameCount = event.data.frameCount || 450;
-      currentPrompt = `=== SCROLL ANIMATION REQUIREMENT (CRITICAL) ===
-You MUST build an Apple-style, butter-smooth scroll-scrub animation utilizing a high-performance Frame Sequence directly mapped to the Canvas! 
-To achieve this securely and perfectly:
-1. A background pipeline natively populates the \`public/\` folder with exactly ${frameCount} highly compressed JPG files named \`frame-0001.jpg\` through \`frame-${String(frameCount).padStart(4, "0")}.jpg\`. DO NOT modify package.json for this.
-2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the ${frameCount} image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / ${frameCount} — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out. **CRITICAL**: BOTH \`img.onload\` AND \`img.onerror\` MUST increment the loaded counter identically — a failed/404 frame still counts as "loaded" for preloader purposes. Additionally, add a 30-second hard timeout that force-completes the preloader regardless. This ensures the site is ALWAYS visible even if some frames fail to load.
-3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar PERFECTLY HORIZONTALLY CENTERED at the top of the screen. Use ONLY this exact inline style on the nav element: \`style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}\`. DO NOT use \`left: 0\`, \`right: 0\`, \`width: 100%\` or \`margin: auto\` — those break centering. Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Sign up' button on the right. The pill must have \`width: fit-content\` and \`min-width: 600px\`.
-4. In your \`scroll-sequence.tsx\` or main application file, the architectural layout MUST be:
-   - A global container with a dynamically calculated height to enforce the scrollable area.
-   - A perfectly fixed background \`<canvas>\` that fills the entire screen underneath EVERYTHING. You MUST use exactly this class: \`<canvas className="fixed top-0 left-0 w-screen h-screen object-cover -z-10 pointer-events-none" />\`
-   - ALL normal sections (Hero, Features, Pricing, Footer), AS WELL AS the root containers, MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! 
-   - CRITICAL FOREGROUND RULE: Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page sections, \`main\`, or \`div\` wrappers. If you put a solid background color on your sections, you will completely hide the \`<canvas>\` behind them! Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) if you need readable contrast for text.
-   - **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. This includes hero overlays, gradient overlays, dark tint layers, and any fixed/absolute element covering the canvas area. The canvas images MUST ALWAYS be fully visible and NEVER obscured by any background or overlay div. Violating this rule makes the canvas animation completely invisible.
-5. Pre-load all ${frameCount} image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-${String(frameCount).padStart(4, "0")}.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! **CRITICAL PATH RULES**: NEVER use \`import.meta.url\` to construct frame paths — \`import.meta.url\` resolves relative to the JS bundle file inside \`assets/\`, NOT the page, resulting in broken \`assets/frame-0001.jpg\` paths. NEVER use absolute root paths like \`/frame-0001.jpg\`. ALWAYS use plain string literals: \`img.src = './frame-0001.jpg'\` or template literals \`\`./frame-\${idx}.jpg\`\`. These resolve correctly relative to the page URL regardless of where the JS bundle lives.
-6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to ${frameCount}. 
-   - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame ${frameCount}.
-   - **NO OVER-SCROLL**: The canvas drawing logic MUST clamp the frame index: \`Math.min(${frameCount}, Math.max(1, calculatedIndex))\`. If the user scrolls all the way down, the frame stops strictly at ${frameCount}. The page itself must NOT have arbitrary extra whitespace at the bottom causing over-scroll. Make sure the height of the container perfectly fits the sections so the footer is the absolute end of the document.
-7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
-8. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-=== END SCROLL ANIMATION REQUIREMENT ===
+      currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
+The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
+You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
+
+Specifically, you ALREADY HAVE:
+1. \`src/components/CanvasScroll.tsx\` - Handles the high-performance background frame rendering.
+2. \`src/components/Preloader.tsx\` - A full-screen aura loading state.
+3. \`src/components/Navbar.tsx\` - A default pill-shaped navigation bar.
+4. \`src/components/headers/\` - A directory containing alternative header templates (\`DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`).
+5. \`src/store/useStore.ts\` - Global state management for frames.
+6. \`src/App.tsx\` - The layout wrapper that combines these components.
+
+YOUR ONLY JOB:
+1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
+2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
+3. CHOOSE A HEADER: You can modify \`src/components/Navbar.tsx\` to match the site's brand, OR you can completely replace it by importing one of the templates from \`src/components/headers/\` into \`src/App.tsx\` (e.g. use \`DotNav\` or \`FullWidthNav\` instead if it fits the vibe better!). You have full creative freedom over the navigation design.
+4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
+5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
+6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
+7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
+8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
+9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
+10. **CRITICAL IMPORT RULE**: You MUST use relative imports (e.g. \`../components/Navbar.tsx\`)! NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
+
+DO NOT recreate the Preloader, CanvasScroll, or Zustand store. Just use the provided template and focus purely on the frontend UI and content sections!
+=== END TEMPLATE ARCHITECTURE INSTRUCTION ===
 
 ` + currentPrompt;
     }

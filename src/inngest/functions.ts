@@ -78,7 +78,13 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-
+    let videoUrl = event.data.videoUrl;
+    if (!videoUrl && event.data.frameCount) {
+      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
+      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+      videoUrl = `${cdnBase}/frames/${event.data.projectId}/frames.zip`;
+      console.log(`DEBUG: Reconstructed deterministic videoUrl from project ID: ${videoUrl}`);
+    }
 
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
@@ -163,7 +169,7 @@ export const codeAgentFunction = inngest.createFunction(
         const frameContent = files["src/constants/frames.ts"];
         if (frameContent) {
           files["src/constants/frames.ts"] = frameContent.replace(
-            /export const TOTAL_FRAMES = \d+;/,
+            /export const TOTAL_FRAMES = \d+;?/,
             `export const TOTAL_FRAMES = ${event.data.frameCount};`
           );
         }
@@ -407,7 +413,7 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
-    if (event.data.videoUrl) {
+    if (videoUrl) {
       currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
 The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
 You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
@@ -430,7 +436,10 @@ YOUR ONLY JOB:
 7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
 8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
 9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-10. **CRITICAL IMPORT RULE**: You MUST use relative imports (e.g. \`../components/Navbar.tsx\`)! NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
+10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
+11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
+12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections. Do not output just a title and subtitle. Add features, bullet points, statistics, testimonials, pricing tiers, and dense paragraph text so the layout feels complete and variant.
+13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
 
 DO NOT recreate the Preloader, CanvasScroll, or Zustand store. Just use the provided template and focus purely on the frontend UI and content sections!
 === END TEMPLATE ARCHITECTURE INSTRUCTION ===
@@ -487,9 +496,9 @@ DO NOT recreate the Preloader, CanvasScroll, or Zustand store. Just use the prov
           const sandbox = await getSandbox(sandboxId);
           await sandbox.commands.run("rm -rf dist");
 
-          if (event.data.videoUrl) {
+          if (videoUrl) {
             console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
             if (zipResult.exitCode !== 0) {
               console.error("ZIP FETCH ERR:", zipResult.stderr);
               throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
@@ -748,10 +757,10 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 
       // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
       // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
-      if (event.data.videoUrl) {
+      if (videoUrl) {
         console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
         const JSZip = (await import("jszip")).default;
-        const zipResponse = await fetch(event.data.videoUrl);
+        const zipResponse = await fetch(videoUrl);
         if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
         const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
         const zip = await JSZip.loadAsync(zipBuffer);
@@ -787,9 +796,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
 
-      if (event.data.videoUrl) {
+      if (videoUrl) {
         console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
+        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
         if (devZipResult.exitCode !== 0) {
           throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
         }

@@ -439,8 +439,8 @@ DO NOT recreate the Preloader, CanvasScroll, or Zustand store. Just use the prov
     }
 
     // Inject image reference into the prompt when a user attaches an image
-    if (event.data.imageDataUrl) {
-      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nImage (base64 data URL): ${event.data.imageDataUrl}\n\n` + currentPrompt;
+    if (event.data.imageUrl) {
+      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
     }
 
     // --- 1. INITIAL GENERATION (The Creator) ---

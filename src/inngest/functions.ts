@@ -246,10 +246,22 @@ export const codeAgentFunction = inngest.createFunction(
       return formattedMessages.reverse();
     });
 
+    const previousFiles = await step.run("get-previous-files", async () => {
+      if (!event.data.isFollowUp) return null;
+      
+      const latestMessage = await prisma.message.findFirst({
+        where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
+        orderBy: { createdAt: "desc" },
+        include: { fragment: true }
+      });
+      
+      return (latestMessage?.fragment?.files as Record<string, string>) || null;
+    });
+
     const state = createState<AgentState>(
       {
         summary: "",
-        files: initialFiles as Record<string, string>,
+        files: previousFiles || (initialFiles as Record<string, string>),
       },
       {
         messages: previousMessages,
@@ -438,10 +450,10 @@ YOUR ONLY JOB:
 9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
 10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
 11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections. Do not output just a title and subtitle. Add features, bullet points, statistics, testimonials, pricing tiers, and dense paragraph text so the layout feels complete and variant.
+12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
 13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
 
-DO NOT recreate the Preloader, CanvasScroll, or Zustand store. Just use the provided template and focus purely on the frontend UI and content sections!
+DO NOT recreate the Preloader, CanvasScroll, or Zustand store. When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
 === END TEMPLATE ARCHITECTURE INSTRUCTION ===
 
 ` + currentPrompt;

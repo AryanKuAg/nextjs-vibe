@@ -317,9 +317,25 @@ export const codeAgentFunction = inngest.createFunction(
               try {
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
+
+                const PROTECTED_FILES = [
+                  "src/components/CanvasScroll.tsx",
+                  "src/components/Preloader.tsx",
+                  "src/store/useStore.ts",
+                  "src/constants/frames.ts",
+                  "src/components/headers/DotNav.tsx",
+                  "src/components/headers/FullWidthNav.tsx",
+                  "src/components/headers/PillNav.tsx",
+                ];
+
                 for (const file of files) {
                   if (!file || !file.path || typeof file.path !== "string" || file.path.trim() === "") {
                     console.warn("Skipping file write, invalid or empty path:", file?.path);
+                    continue;
+                  }
+
+                  if (PROTECTED_FILES.includes(file.path)) {
+                    console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
                     continue;
                   }
                   if (typeof file.content !== "string") {
@@ -452,8 +468,15 @@ YOUR ONLY JOB:
 11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
 12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
 13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
+14. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
+    - \`src/components/CanvasScroll.tsx\`
+    - \`src/components/Preloader.tsx\`
+    - \`src/store/useStore.ts\`
+    - \`src/constants/frames.ts\`
+    - \`src/components/headers/DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`
+    DO NOT attempt to modify these files. DO NOT recreate them.
 
-DO NOT recreate the Preloader, CanvasScroll, or Zustand store. When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
+When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
 === END TEMPLATE ARCHITECTURE INSTRUCTION ===
 
 ` + currentPrompt;

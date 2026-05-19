@@ -341,6 +341,20 @@ export const codeAgentFunction = inngest.createFunction(
                   if (typeof file.content !== "string") {
                     file.content = String(file.content || "");
                   }
+
+                  // Strict enforcement for App.tsx integrity
+                  if (file.path === "src/App.tsx") {
+                    const c = file.content;
+                    if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
+                    }
+                    if (/\{\/\*\s*<CanvasScroll/i.test(c) || /\/\/\s*import.*CanvasScroll/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out CanvasScroll in App.tsx. Do NOT comment it out.");
+                    }
+                    if (/\{\/\*\s*<Preloader/i.test(c) || /\/\/\s*import.*Preloader/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
+                    }
+                  }
                   
                   // Ensure parent directory exists before writing to prevent missing directory errors
                   const dirParts = file.path.split('/');
@@ -538,6 +552,28 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
               console.error("ZIP FETCH ERR:", zipResult.stderr);
               throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
             }
+          }
+
+          console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
+          const checkStructureScript = `
+const fs = require('fs');
+if (fs.existsSync('src/App.tsx')) {
+  const c = fs.readFileSync('src/App.tsx', 'utf8');
+  const hasCanvas = c.includes('<CanvasScroll');
+  const hasPreloader = c.includes('<Preloader');
+  const canvasCommented = c.match(/\\{\\/\\*\\s*<CanvasScroll/);
+  const preloaderCommented = c.match(/\\{\\/\\*\\s*<Preloader/);
+  
+  if (!hasCanvas || !hasPreloader || canvasCommented || preloaderCommented) {
+    console.error('CRITICAL ERROR: App.tsx is missing <CanvasScroll /> or <Preloader />, or they are commented out. They MUST be present and active.');
+    process.exit(1);
+  }
+}
+`;
+          await sandbox.files.write("/app/check-structure.js", checkStructureScript);
+          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
+          if (structCheck.exitCode !== 0) {
+            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
           }
 
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);

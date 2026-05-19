@@ -368,8 +368,9 @@ export const codeAgentFunction = inngest.createFunction(
                   updated[file.path] = file.content;
                 }
                 return { updated };
-              } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-                return { error: `File write failed: ${e.message || String(e)}` };
+              } catch (e) {
+                const err = e as Error;
+                return { error: `File write failed: ${err.message || String(err)}` };
               }
             });
 
@@ -583,8 +584,9 @@ if (fs.existsSync('src/App.tsx')) {
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
+          } catch (tsErr) {
+            const err = tsErr as { stdout?: string, stderr?: string };
+            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
             return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
           }
 
@@ -628,14 +630,16 @@ fixPaths(process.argv[2]);
 
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
-          } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
+          } catch (buildErr) {
+            const err = buildErr as { stdout?: string, stderr?: string };
+            const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
           }
 
           return { success: true, error: "" };
-        } catch (infraErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-          return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };
+        } catch (infraErr) {
+          const err = infraErr as Error;
+          return { success: false, error: `Sandbox Execution Error: ${err.message || String(err)}` };
         }
       });
 

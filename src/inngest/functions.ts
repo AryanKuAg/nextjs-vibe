@@ -367,17 +367,21 @@ export const codeAgentFunction = inngest.createFunction(
                   await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
-                return updated;
-              } catch (e) {
-                throw new Error(`File write failed: ${e}`);
+                return { updated };
+              } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                return { error: `File write failed: ${e.message || String(e)}` };
               }
             });
 
+            if (updatedFiles && 'error' in updatedFiles) {
+              return updatedFiles.error || "File write failed";
+            }
+
             // 2. Safely mutate the state OUTSIDE the step
-            if (updatedFiles && network) {
+            if (updatedFiles && 'updated' in updatedFiles && network) {
               network.state.data.files = {
                 ...(network.state.data.files || {}),
-                ...updatedFiles,
+                ...updatedFiles.updated,
               };
             }
             return `Successfully updated files`;

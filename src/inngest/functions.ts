@@ -187,21 +187,55 @@ export const codeAgentFunction = inngest.createFunction(
         return null;
       }
 
+      const PROTECTED_FILES = [
+        "src/components/CanvasScroll.tsx",
+        "src/components/Preloader.tsx",
+        "src/store/useStore.ts",
+        "src/constants/frames.ts",
+        "src/components/headers/DotNav.tsx",
+        "src/components/headers/FullWidthNav.tsx",
+        "src/components/headers/PillNav.tsx",
+      ];
+
+      // Helper function to write a file absolute to /home/user and ensure directory exists
+      const writeSandboxFile = async (sandbox: Sandbox, filePath: string, content: string) => {
+        const absolutePath = filePath.startsWith('/') ? filePath : `/home/user/${filePath}`;
+        const dirParts = filePath.split('/');
+        if (dirParts.length > 1 && !filePath.startsWith('/')) {
+          const dir = dirParts.slice(0, -1).join('/');
+          await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
+        }
+        await sandbox.files.write(absolutePath, content);
+      };
+
       // If the returned sandboxId exactly matches the one previously saved in the DB, 
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
 
-        // We MUST still update the frames.ts file in case the user extracted new frames
-        // between prompts, otherwise the hot sandbox will retain the old frame count.
-        if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
-          try {
-            const sandbox = await getSandbox(sandboxId);
-            await sandbox.files.write("src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
-            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
-          } catch (e) {
-            console.error("Failed to update frames.ts in hot sandbox", e);
+        try {
+          const sandbox = await getSandbox(sandboxId);
+          const fs = await import("fs");
+          const path = await import("path");
+          
+          // Ensure all protected template files are present and correct in the hot sandbox
+          for (const file of PROTECTED_FILES) {
+            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
+            if (fs.existsSync(templatePath)) {
+              const content = fs.readFileSync(templatePath, "utf-8");
+              await writeSandboxFile(sandbox, file, content);
+              console.log(`DEBUG: Force-wrote template file ${file} to hot sandbox`);
+            }
           }
+
+          // We MUST still update the frames.ts file in case the user extracted new frames
+          // between prompts, otherwise the hot sandbox will retain the old frame count.
+          if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
+            await writeSandboxFile(sandbox, "src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
+            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
+          }
+        } catch (e) {
+          console.error("Failed to ensure template files in hot sandbox", e);
         }
 
         return null;
@@ -209,16 +243,35 @@ export const codeAgentFunction = inngest.createFunction(
 
       const sandbox = await getSandbox(sandboxId);
       let written = 0;
-      for (const [path, content] of Object.entries(filesObj)) {
+      
+      // Ensure directory structure and write all files
+      for (const [filePath, content] of Object.entries(filesObj)) {
         if (typeof content === "string") {
           try {
-            await sandbox.files.write(path, content);
+            await writeSandboxFile(sandbox, filePath, content);
             written++;
           } catch (e) {
-            console.error(`Failed to hydrate file ${path}`, e);
+            console.error(`Failed to hydrate file ${filePath}`, e);
           }
         }
       }
+
+      // Also force-write the templates just to be safe on fresh sandbox
+      try {
+        const fs = await import("fs");
+        const path = await import("path");
+        for (const file of PROTECTED_FILES) {
+          const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
+          if (fs.existsSync(templatePath)) {
+            const content = fs.readFileSync(templatePath, "utf-8");
+            await writeSandboxFile(sandbox, file, content);
+            console.log(`DEBUG: Force-wrote template file ${file} to new sandbox`);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to ensure template files on new sandbox hydration", e);
+      }
+
       console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
     });
 
@@ -360,11 +413,11 @@ export const codeAgentFunction = inngest.createFunction(
                   const dirParts = file.path.split('/');
                   if (dirParts.length > 1) {
                     const dir = dirParts.slice(0, -1).join('/');
-                    await sandbox.commands.run(`mkdir -p "${dir}"`);
+                    await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
                   }
 
-                  await sandbox.files.write(file.path, file.content);
-                  await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
+                  await sandbox.files.write(`/home/user/${file.path}`, file.content);
+                  await sandbox.commands.run(`touch "/home/user/${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
                 return { updated };
@@ -401,8 +454,9 @@ export const codeAgentFunction = inngest.createFunction(
               try {
                 const sandbox = await getSandbox(sandboxId);
                 const contents = [];
-                for (const file of files) {
-                  const content = await sandbox.files.read(file);
+                 for (const file of files) {
+                  const absolutePath = file.startsWith('/') ? file : `/home/user/${file}`;
+                  const content = await sandbox.files.read(absolutePath);
                   contents.push({ path: file, content });
                 }
                 return JSON.stringify(contents);
@@ -568,7 +622,9 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
             if (fs.existsSync(templatePath)) {
               try {
                 const content = fs.readFileSync(templatePath, "utf-8");
-                await sandbox.files.write(file, content);
+                const dir = path.dirname(file);
+                await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
+                await sandbox.files.write(`/home/user/${file}`, content);
                 console.log(`DEBUG: Force-wrote template file ${file} to sandbox`);
               } catch (e) {
                 console.error(`Failed to force-write template file ${file}`, e);

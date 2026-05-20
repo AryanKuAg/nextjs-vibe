@@ -550,6 +550,32 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
           const sandbox = await getSandbox(sandboxId);
           await sandbox.commands.run("rm -rf dist");
 
+          // Ensure all protected template files are present and correct in the sandbox
+          const PROTECTED_FILES = [
+            "src/components/CanvasScroll.tsx",
+            "src/components/Preloader.tsx",
+            "src/store/useStore.ts",
+            "src/constants/frames.ts",
+            "src/components/headers/DotNav.tsx",
+            "src/components/headers/FullWidthNav.tsx",
+            "src/components/headers/PillNav.tsx",
+          ];
+          
+          const fs = await import("fs");
+          const path = await import("path");
+          for (const file of PROTECTED_FILES) {
+            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
+            if (fs.existsSync(templatePath)) {
+              try {
+                const content = fs.readFileSync(templatePath, "utf-8");
+                await sandbox.files.write(file, content);
+                console.log(`DEBUG: Force-wrote template file ${file} to sandbox`);
+              } catch (e) {
+                console.error(`Failed to force-write template file ${file}`, e);
+              }
+            }
+          }
+
           if (videoUrl) {
             console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
             const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
@@ -605,6 +631,70 @@ function fixPaths(dir) {
     else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
+
+      // Fix missing Lucide brand icons
+      const brandIcons = ['Github', 'Twitter', 'Linkedin', 'Facebook', 'Instagram', 'Youtube'];
+      let importedBrands = [];
+      const importRegex = /import\\s+\\{([^}]+)\\}\\s+from\\s+["']lucide-react["']/g;
+      let match;
+      let newContent = content;
+      while ((match = importRegex.exec(content)) !== null) {
+        const fullImportStatement = match[0];
+        const importedItemsStr = match[1];
+        const items = importedItemsStr.split(',').map(item => item.trim());
+        const remainingItems = [];
+        let statementChanged = false;
+        
+        for (const item of items) {
+          const name = item.split(/\\s+as\\s+/)[0].trim();
+          if (brandIcons.includes(name)) {
+            importedBrands.push(item);
+            statementChanged = true;
+          } else {
+            remainingItems.push(item);
+          }
+        }
+        
+        if (statementChanged) {
+          let replacement = '';
+          if (remainingItems.length > 0) {
+            replacement = \`import { \${remainingItems.join(', ')} } from "lucide-react"\`;
+          }
+          newContent = newContent.replace(fullImportStatement, replacement);
+        }
+      }
+      
+      if (importedBrands.length > 0) {
+        let svgDeclarations = '\\n// Inject missing brand icons from older Lucide versions\\n';
+        for (const item of importedBrands) {
+          const parts = item.split(/\\s+as\\s+/);
+          const originalName = parts[0].trim();
+          const localName = parts[1] ? parts[1].trim() : originalName;
+          let svgPath = '';
+          if (originalName === 'Github') {
+            svgPath = '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" />';
+          } else if (originalName === 'Twitter') {
+            svgPath = '<path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />';
+          } else if (originalName === 'Linkedin') {
+            svgPath = '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" />';
+          } else if (originalName === 'Facebook') {
+            svgPath = '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />';
+          } else if (originalName === 'Instagram') {
+            svgPath = '<rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />';
+          } else if (originalName === 'Youtube') {
+            svgPath = '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />';
+          }
+          svgDeclarations += \`const \${localName} = (props) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    \${svgPath}
+  </svg>
+);\\n\`;
+        }
+        newContent = newContent + svgDeclarations;
+        content = newContent;
+        changed = true;
+      }
+
       // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
       if (content.match(/(["'\\\`])\\/assets\\/frame-/g)) {
         content = content.replace(/(["'\\\`])\\/assets\\/frame-/g, '$1./frame-');

@@ -606,18 +606,18 @@ function fixPaths(dir) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
       // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\\\/assets\\\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\\\/assets\\\\/frame-/g, '$1./frame-');
+      if (content.match(/(["'\\\`])\\/assets\\/frame-/g)) {
+        content = content.replace(/(["'\\\`])\\/assets\\/frame-/g, '$1./frame-');
         changed = true;
       }
       // Strip assets/ prefix if import.meta.url was used
       if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\\\/frame-/g, 'frame-');
+        content = content.replace(/assets\\/frame-/g, 'frame-');
         changed = true;
       }
       // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\\\/frame-/g, '$1./frame-');
+      if (content.match(/(["'\\\`])\\/frame-/g)) {
+        content = content.replace(/(["'\\\`])\\/frame-/g, '$1./frame-');
         changed = true;
       }
       if (changed) fs.writeFileSync(p, content);

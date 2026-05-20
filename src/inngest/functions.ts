@@ -41,7 +41,7 @@ export const codeAgentFunction = inngest.createFunction(
     id: "code-agent",
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
-      
+
       // Guarantee the UI un-jams by writing a fallback Assistant message
       await step.run("unjam-ui", async () => {
         if (error.message !== "Generation was manually stopped.") {
@@ -141,13 +141,13 @@ export const codeAgentFunction = inngest.createFunction(
       if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
         files = latestFragment.files as Record<string, string>;
       }
-      
+
       // If it's a new project (no files), load templates
       if (Object.keys(files).length === 0) {
         const fs = await import("fs");
         const path = await import("path");
         const templatesDir = path.join(process.cwd(), "src", "templates");
-        
+
         const readDirRecursive = (dir: string) => {
           if (!fs.existsSync(dir)) return;
           const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -163,7 +163,7 @@ export const codeAgentFunction = inngest.createFunction(
         };
         readDirRecursive(templatesDir);
       }
-      
+
       // ALWAYS dynamically replace frame count, even on follow-up prompts
       if (event.data.frameCount) {
         const frameContent = files["src/constants/frames.ts"];
@@ -191,7 +191,7 @@ export const codeAgentFunction = inngest.createFunction(
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
-        
+
         // We MUST still update the frames.ts file in case the user extracted new frames
         // between prompts, otherwise the hot sandbox will retain the old frame count.
         if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
@@ -248,13 +248,13 @@ export const codeAgentFunction = inngest.createFunction(
 
     const previousFiles = await step.run("get-previous-files", async () => {
       if (!event.data.isFollowUp) return null;
-      
+
       const latestMessage = await prisma.message.findFirst({
         where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
         orderBy: { createdAt: "desc" },
         include: { fragment: true }
       });
-      
+
       return (latestMessage?.fragment?.files as Record<string, string>) || null;
     });
 
@@ -355,7 +355,7 @@ export const codeAgentFunction = inngest.createFunction(
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
                     }
                   }
-                  
+
                   // Ensure parent directory exists before writing to prevent missing directory errors
                   const dirParts = file.path.split('/');
                   if (dirParts.length > 1) {
@@ -692,7 +692,7 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
-        await checkCancellation(event.data.projectId);
+          await checkCancellation(event.data.projectId);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
@@ -806,15 +806,15 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       const storage = new Storage(
         process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
           ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-            }
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            credentials: {
+              client_email: process.env.GOOGLE_CLIENT_EMAIL,
+              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            },
+          }
           : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          }
       );
 
       const bucket = storage.bucket(bucketName);
@@ -1052,7 +1052,7 @@ export const veoGenerateFunction = inngest.createFunction(
           }
 
           const input: Record<string, unknown> = { prompt };
-          
+
           if (targetModel === "prunaai/p-video") {
             input.fps = 24;
             input.draft = model === "replicate-prunaai/p-video-draft";
@@ -1065,28 +1065,28 @@ export const veoGenerateFunction = inngest.createFunction(
             input.disable_safety_filter = true;
 
             if (event.data.imageUrl) {
-               input.image = event.data.imageUrl;
+              input.image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.last_frame_image = event.data.endImageUrl;
+              input.last_frame_image = event.data.endImageUrl;
             }
           } else if (targetModel === "kwaivgi/kling-v2.5-turbo-pro") {
             input.duration = 5;
             input.aspect_ratio = "16:9";
             if (event.data.imageUrl) {
-               input.start_image = event.data.imageUrl;
+              input.start_image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.end_image = event.data.endImageUrl;
+              input.end_image = event.data.endImageUrl;
             }
           } else {
             // Generic fallback for other models
             if (event.data.imageUrl) {
-               input.image = event.data.imageUrl;
-               input.start_image = event.data.imageUrl;
+              input.image = event.data.imageUrl;
+              input.start_image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.end_image = event.data.endImageUrl;
+              input.end_image = event.data.endImageUrl;
             }
           }
 
@@ -1148,12 +1148,12 @@ export const veoGenerateFunction = inngest.createFunction(
         } else if (model.includes("openrouter-")) {
           let actualModel = model.replace("openrouter-", "");
           if (actualModel === "seedance-2") {
-             actualModel = "bytedance/seedance-2.0";
+            actualModel = "bytedance/seedance-2.0";
           } else if (actualModel === "seedance-2-fast") {
-             actualModel = "bytedance/seedance-2.0-fast";
+            actualModel = "bytedance/seedance-2.0-fast";
           }
           console.log(`[Video Pipeline] Starting OpenRouter video model: ${actualModel}`);
-          
+
           const frame_images = [];
           if (event.data.imageUrl) {
             frame_images.push({
@@ -1187,12 +1187,12 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const data = await res.json();
           if (!res.ok) throw new Error(`OpenRouter Error: ${JSON.stringify(data)}`);
-          
+
           const pollingUrl = data.polling_url;
           if (!pollingUrl) throw new Error(`OpenRouter returned no polling URL: ${JSON.stringify(data)}`);
 
           console.log(`[Video Pipeline] Polling OpenRouter: ${pollingUrl}`);
-          
+
           while (true) {
             const pollResponse = await fetch(pollingUrl, {
               headers: {
@@ -1204,7 +1204,7 @@ export const veoGenerateFunction = inngest.createFunction(
             if (statusData.status === "completed") {
               const urls = statusData.unsigned_urls ?? [];
               if (urls.length === 0) {
-                 throw new Error("OpenRouter completed but returned no video URLs.");
+                throw new Error("OpenRouter completed but returned no video URLs.");
               }
               finalVideoUrl = urls[0];
               break;
@@ -1239,15 +1239,15 @@ export const veoGenerateFunction = inngest.createFunction(
         const storage = new Storage(
           process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
             ? {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                credentials: {
-                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-                },
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              },
+            }
             : {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            }
         );
 
         const bucket = storage.bucket(bucketName);

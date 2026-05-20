@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-    
+
     // In a production environment, verify the webhook signature here 
     // using DodoPayments webhook utilities or crypto.
     // const secret = process.env.DODO_WEBHOOK_SECRET;
@@ -13,30 +13,30 @@ export async function POST(req: NextRequest) {
     console.log("Dodo Payments Webhook received:", payload);
 
     // Common event types indicating successful payment/subscription
-    const isSuccessEvent = 
-      payload.type === "payment.succeeded" || 
-      payload.type === "subscription.active" || 
+    const isSuccessEvent =
+      payload.type === "payment.succeeded" ||
+      payload.type === "subscription.active" ||
       payload.type === "subscription.renewed" ||
-      payload.event === "payment.succeeded" || 
-      payload.event === "subscription.active" || 
+      payload.event === "payment.succeeded" ||
+      payload.event === "subscription.active" ||
       payload.event === "subscription.renewed";
 
     if (isSuccessEvent) {
       // Dodo Payments payloads have metadata either inside `data` or nested inside `data.metadata` / `data.payment_link_metadata`
       const data = payload.data || payload;
       const metadata = data.payment_link_metadata || data.metadata || {};
-      
+
       const userId = metadata.userId;
       const plan = metadata.plan;
 
       if (userId && plan) {
         console.log(`Updating usage for user ${userId} to plan ${plan}`);
-        
+
         const subscriptionId = data.subscription_id || data.id;
         const { syncCredits } = await import("@/lib/usage");
-        
+
         await syncCredits(userId, plan.toLowerCase());
-        
+
         // Ensure subscriptionId is saved
         await prisma.usage.update({
           where: { key: userId },
@@ -52,16 +52,16 @@ export async function POST(req: NextRequest) {
 
       if (userId) {
         console.log(`Downgrading user ${userId} due to canceled subscription`);
-        
+
         // When DodoPayments officially cancels the subscription (which typically 
         // happens at the end of the billing cycle when canceled via the portal),
-        // we reset their plan to free and drop their credits to the free tier limit (15).
+        // we reset their plan to free and drop their credits to the free tier limit (0).
         await prisma.usage.update({
           where: { key: userId },
           data: {
             plan: "free",
             subscriptionId: null,
-            credits: 15 // Reset to free tier
+            credits: 0 // Reset to free tier
           }
         });
       }

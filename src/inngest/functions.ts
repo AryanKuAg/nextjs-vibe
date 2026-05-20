@@ -41,7 +41,7 @@ export const codeAgentFunction = inngest.createFunction(
     id: "code-agent",
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
-      
+
       // Guarantee the UI un-jams by writing a fallback Assistant message
       await step.run("unjam-ui", async () => {
         if (error.message !== "Generation was manually stopped.") {
@@ -141,13 +141,13 @@ export const codeAgentFunction = inngest.createFunction(
       if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
         files = latestFragment.files as Record<string, string>;
       }
-      
+
       // If it's a new project (no files), load templates
       if (Object.keys(files).length === 0) {
         const fs = await import("fs");
         const path = await import("path");
         const templatesDir = path.join(process.cwd(), "src", "templates");
-        
+
         const readDirRecursive = (dir: string) => {
           if (!fs.existsSync(dir)) return;
           const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -163,7 +163,7 @@ export const codeAgentFunction = inngest.createFunction(
         };
         readDirRecursive(templatesDir);
       }
-      
+
       // ALWAYS dynamically replace frame count, even on follow-up prompts
       if (event.data.frameCount) {
         const frameContent = files["src/constants/frames.ts"];
@@ -191,7 +191,7 @@ export const codeAgentFunction = inngest.createFunction(
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
-        
+
         // We MUST still update the frames.ts file in case the user extracted new frames
         // between prompts, otherwise the hot sandbox will retain the old frame count.
         if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
@@ -248,13 +248,13 @@ export const codeAgentFunction = inngest.createFunction(
 
     const previousFiles = await step.run("get-previous-files", async () => {
       if (!event.data.isFollowUp) return null;
-      
+
       const latestMessage = await prisma.message.findFirst({
         where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
         orderBy: { createdAt: "desc" },
         include: { fragment: true }
       });
-      
+
       return (latestMessage?.fragment?.files as Record<string, string>) || null;
     });
 
@@ -355,7 +355,7 @@ export const codeAgentFunction = inngest.createFunction(
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
                     }
                   }
-                  
+
                   // Ensure parent directory exists before writing to prevent missing directory errors
                   const dirParts = file.path.split('/');
                   if (dirParts.length > 1) {
@@ -602,22 +602,17 @@ function fixPaths(dir) {
   for (const f of fs.readdirSync(dir)) {
     const p = path.join(dir, f);
     if (fs.statSync(p).isDirectory()) fixPaths(p);
-    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
+    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html')) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
-      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\\\/assets\\\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\\\/assets\\\\/frame-/g, '$1./frame-');
+      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\/frame-/g, '$1./frame-');
         changed = true;
       }
       // Strip assets/ prefix if import.meta.url was used
       if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\\\/frame-/g, 'frame-');
-        changed = true;
-      }
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\\\/frame-/g, '$1./frame-');
+        content = content.replace(/assets\\/frame-/g, 'frame-');
         changed = true;
       }
       if (changed) fs.writeFileSync(p, content);
@@ -692,7 +687,7 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
-        await checkCancellation(event.data.projectId);
+          await checkCancellation(event.data.projectId);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
@@ -769,6 +764,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       const extractionScript = [
         "const fs = require('fs');",
         "const path = require('path');",
+        "const IMAGE_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.ico','.mp4','.woff','.woff2']);",
         "function getFiles(dir, fileList) {",
         "  fileList = fileList || {};",
         "  if (!fs.existsSync(dir)) return fileList;",
@@ -778,9 +774,8 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         "    if (fs.statSync(p).isDirectory()) {",
         "      getFiles(p, fileList);",
         "    } else {",
-        "      var name = items[i].toLowerCase();",
-        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
-        "      if (!isFrame) {",
+        "      var ext = path.extname(items[i]).toLowerCase();",
+        "      if (!IMAGE_EXTS.has(ext)) {",
         "        var key = p.split(path.sep).join('/').replace('dist/', '');",
         "        fileList[key] = fs.readFileSync(p).toString('base64');",
         "      }",
@@ -806,15 +801,15 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       const storage = new Storage(
         process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
           ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-            }
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            credentials: {
+              client_email: process.env.GOOGLE_CLIENT_EMAIL,
+              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            },
+          }
           : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+          }
       );
 
       const bucket = storage.bucket(bucketName);
@@ -830,22 +825,11 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
           let contentType = "application/octet-stream";
-          const lowerPath = relativePath.toLowerCase();
-          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
-          else if (lowerPath.endsWith(".css")) contentType = "text/css";
-          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (lowerPath.endsWith(".json")) contentType = "application/json";
-          else if (lowerPath.endsWith(".png")) contentType = "image/png";
-          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
-          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
-          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
-          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
-          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
-          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
-          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
-          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
-          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
+          if (relativePath.endsWith(".html")) contentType = "text/html; charset=utf-8";
+          else if (relativePath.endsWith(".js")) contentType = "application/javascript";
+          else if (relativePath.endsWith(".css")) contentType = "text/css";
+          else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
+          else if (relativePath.endsWith(".json")) contentType = "application/json";
           await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
         }));
       }
@@ -1052,7 +1036,7 @@ export const veoGenerateFunction = inngest.createFunction(
           }
 
           const input: Record<string, unknown> = { prompt };
-          
+
           if (targetModel === "prunaai/p-video") {
             input.fps = 24;
             input.draft = model === "replicate-prunaai/p-video-draft";
@@ -1065,28 +1049,28 @@ export const veoGenerateFunction = inngest.createFunction(
             input.disable_safety_filter = true;
 
             if (event.data.imageUrl) {
-               input.image = event.data.imageUrl;
+              input.image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.last_frame_image = event.data.endImageUrl;
+              input.last_frame_image = event.data.endImageUrl;
             }
           } else if (targetModel === "kwaivgi/kling-v2.5-turbo-pro") {
             input.duration = 5;
             input.aspect_ratio = "16:9";
             if (event.data.imageUrl) {
-               input.start_image = event.data.imageUrl;
+              input.start_image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.end_image = event.data.endImageUrl;
+              input.end_image = event.data.endImageUrl;
             }
           } else {
             // Generic fallback for other models
             if (event.data.imageUrl) {
-               input.image = event.data.imageUrl;
-               input.start_image = event.data.imageUrl;
+              input.image = event.data.imageUrl;
+              input.start_image = event.data.imageUrl;
             }
             if (event.data.endImageUrl) {
-               input.end_image = event.data.endImageUrl;
+              input.end_image = event.data.endImageUrl;
             }
           }
 
@@ -1148,12 +1132,12 @@ export const veoGenerateFunction = inngest.createFunction(
         } else if (model.includes("openrouter-")) {
           let actualModel = model.replace("openrouter-", "");
           if (actualModel === "seedance-2") {
-             actualModel = "bytedance/seedance-2.0";
+            actualModel = "bytedance/seedance-2.0";
           } else if (actualModel === "seedance-2-fast") {
-             actualModel = "bytedance/seedance-2.0-fast";
+            actualModel = "bytedance/seedance-2.0-fast";
           }
           console.log(`[Video Pipeline] Starting OpenRouter video model: ${actualModel}`);
-          
+
           const frame_images = [];
           if (event.data.imageUrl) {
             frame_images.push({
@@ -1187,12 +1171,12 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const data = await res.json();
           if (!res.ok) throw new Error(`OpenRouter Error: ${JSON.stringify(data)}`);
-          
+
           const pollingUrl = data.polling_url;
           if (!pollingUrl) throw new Error(`OpenRouter returned no polling URL: ${JSON.stringify(data)}`);
 
           console.log(`[Video Pipeline] Polling OpenRouter: ${pollingUrl}`);
-          
+
           while (true) {
             const pollResponse = await fetch(pollingUrl, {
               headers: {
@@ -1204,7 +1188,7 @@ export const veoGenerateFunction = inngest.createFunction(
             if (statusData.status === "completed") {
               const urls = statusData.unsigned_urls ?? [];
               if (urls.length === 0) {
-                 throw new Error("OpenRouter completed but returned no video URLs.");
+                throw new Error("OpenRouter completed but returned no video URLs.");
               }
               finalVideoUrl = urls[0];
               break;
@@ -1239,15 +1223,15 @@ export const veoGenerateFunction = inngest.createFunction(
         const storage = new Storage(
           process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
             ? {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                credentials: {
-                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-                },
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              },
+            }
             : {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            }
         );
 
         const bucket = storage.bucket(bucketName);

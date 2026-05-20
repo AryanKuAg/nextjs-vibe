@@ -142,12 +142,12 @@ export const codeAgentFunction = inngest.createFunction(
         files = latestFragment.files as Record<string, string>;
       }
 
-      // If it's a new project (no files), load templates
-      if (Object.keys(files).length === 0) {
-        const fs = await import("fs");
-        const path = await import("path");
-        const templatesDir = path.join(process.cwd(), "src", "templates");
+      // If it's a new project (no files), load all templates. Otherwise, always enforce golden templates.
+      const fs = await import("fs");
+      const path = await import("path");
+      const templatesDir = path.join(process.cwd(), "src", "templates");
 
+      if (Object.keys(files).length === 0) {
         const readDirRecursive = (dir: string) => {
           if (!fs.existsSync(dir)) return;
           const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -162,6 +162,23 @@ export const codeAgentFunction = inngest.createFunction(
           }
         };
         readDirRecursive(templatesDir);
+      } else {
+        // Enforce golden templates on follow-ups to keep them synced and prevent dummy components
+        const PROTECTED_FILES = [
+          "src/components/CanvasScroll.tsx",
+          "src/components/Preloader.tsx",
+          "src/store/useStore.ts",
+          "src/constants/frames.ts",
+          "src/components/headers/DotNav.tsx",
+          "src/components/headers/FullWidthNav.tsx",
+          "src/components/headers/PillNav.tsx",
+        ];
+        for (const file of PROTECTED_FILES) {
+          const templatePath = path.join(templatesDir, file.replace("src/", ""));
+          if (fs.existsSync(templatePath)) {
+            files[file] = fs.readFileSync(templatePath, "utf-8");
+          }
+        }
       }
 
       // ALWAYS dynamically replace frame count, even on follow-up prompts
@@ -687,6 +704,55 @@ function fixPaths(dir) {
     else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
+
+      // Fix App.tsx dummy declarations
+      if (f === 'App.tsx') {
+        let originalContent = content;
+        
+        // Remove dummy definitions
+        const dummyPatterns = [
+          /const\s+Preloader\s*=\s*\(\)\s*=>\s*null;?/g,
+          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*null;?/g,
+          /function\s+Preloader\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
+          /function\s+CanvasScroll\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
+          /const\s+Preloader\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
+          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
+          /\/\/ Dummy components to satisfy imports/g,
+          /\/\/ Dummy components?/g,
+        ];
+        for (const pattern of dummyPatterns) {
+          content = content.replace(pattern, '');
+        }
+
+        // Fix default to named imports
+        content = content.replace(/import\s+Preloader\s+from\s+["']([^"']+)["']/g, 'import { Preloader } from "$1"');
+        content = content.replace(/import\s+CanvasScroll\s+from\s+["']([^"']+)["']/g, 'import { CanvasScroll } from "$1"');
+        content = content.replace(/import\s+Navbar\s+from\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
+        content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
+
+        // Fix alias paths
+        content = content.replace(/@\/components\/Preloader/g, './components/Preloader');
+        content = content.replace(/@\/components\/CanvasScroll/g, './components/CanvasScroll');
+        content = content.replace(/@\/store\/useStore/g, './store/useStore');
+        content = content.replace(/@\/components\/Navbar/g, './components/Navbar');
+
+        // Ensure imports exist
+        const requiredImports = [
+          { name: 'Preloader', path: './components/Preloader' },
+          { name: 'CanvasScroll', path: './components/CanvasScroll' },
+          { name: 'useStore', path: './store/useStore' }
+        ];
+
+        for (const req of requiredImports) {
+          if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {
+            content = 'import { ' + req.name + ' } from "' + req.path + '";\\n' + content;
+          }
+        }
+        
+        if (content !== originalContent) {
+          changed = true;
+        }
+      }
 
       // Fix missing Lucide brand icons
       const brandIcons = ['Github', 'Twitter', 'Linkedin', 'Facebook', 'Instagram', 'Youtube'];

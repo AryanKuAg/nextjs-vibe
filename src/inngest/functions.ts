@@ -78,7 +78,13 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-
+    let videoUrl = event.data.videoUrl;
+    if (!videoUrl && event.data.frameCount) {
+      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
+      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
+      videoUrl = `${cdnBase}/frames/${event.data.projectId}/frames.zip`;
+      console.log(`DEBUG: Reconstructed deterministic videoUrl from project ID: ${videoUrl}`);
+    }
 
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
@@ -130,11 +136,51 @@ export const codeAgentFunction = inngest.createFunction(
       return messageWithFragment.fragment;
     });
 
+    const initialFiles = await step.run("get-initial-files", async () => {
+      let files: Record<string, string> = {};
+      if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
+        files = latestFragment.files as Record<string, string>;
+      }
+      
+      // If it's a new project (no files), load templates
+      if (Object.keys(files).length === 0) {
+        const fs = await import("fs");
+        const path = await import("path");
+        const templatesDir = path.join(process.cwd(), "src", "templates");
+        
+        const readDirRecursive = (dir: string) => {
+          if (!fs.existsSync(dir)) return;
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              readDirRecursive(fullPath);
+            } else {
+              const relativePath = path.relative(templatesDir, fullPath);
+              files[`src/${relativePath}`] = fs.readFileSync(fullPath, "utf-8");
+            }
+          }
+        };
+        readDirRecursive(templatesDir);
+      }
+      
+      // ALWAYS dynamically replace frame count, even on follow-up prompts
+      if (event.data.frameCount) {
+        const frameContent = files["src/constants/frames.ts"];
+        if (frameContent) {
+          files["src/constants/frames.ts"] = frameContent.replace(
+            /export const TOTAL_FRAMES = \d+;?/,
+            `export const TOTAL_FRAMES = ${event.data.frameCount};`
+          );
+        }
+      }
+
+      return files;
+    });
+
     await step.run("hydrate-sandbox", async () => {
-      // Skip hydration if there are no previous files (first run or prior failure).
-      // An empty files object {} means nothing useful to seed.
-      const filesObj = latestFragment?.files as Record<string, string> | undefined;
-      const hasFiles = filesObj && typeof filesObj === "object" && Object.keys(filesObj).length > 0;
+      const filesObj = initialFiles;
+      const hasFiles = Object.keys(filesObj).length > 0;
 
       if (!hasFiles) {
         console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
@@ -145,6 +191,19 @@ export const codeAgentFunction = inngest.createFunction(
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
+        
+        // We MUST still update the frames.ts file in case the user extracted new frames
+        // between prompts, otherwise the hot sandbox will retain the old frame count.
+        if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
+          try {
+            const sandbox = await getSandbox(sandboxId);
+            await sandbox.files.write("src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
+            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
+          } catch (e) {
+            console.error("Failed to update frames.ts in hot sandbox", e);
+          }
+        }
+
         return null;
       }
 
@@ -187,15 +246,22 @@ export const codeAgentFunction = inngest.createFunction(
       return formattedMessages.reverse();
     });
 
-    let initialFiles = {};
-    if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
-      initialFiles = latestFragment.files;
-    }
+    const previousFiles = await step.run("get-previous-files", async () => {
+      if (!event.data.isFollowUp) return null;
+      
+      const latestMessage = await prisma.message.findFirst({
+        where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
+        orderBy: { createdAt: "desc" },
+        include: { fragment: true }
+      });
+      
+      return (latestMessage?.fragment?.files as Record<string, string>) || null;
+    });
 
     const state = createState<AgentState>(
       {
         summary: "",
-        files: initialFiles as Record<string, string>,
+        files: previousFiles || (initialFiles as Record<string, string>),
       },
       {
         messages: previousMessages,
@@ -251,13 +317,43 @@ export const codeAgentFunction = inngest.createFunction(
               try {
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
+
+                const PROTECTED_FILES = [
+                  "src/components/CanvasScroll.tsx",
+                  "src/components/Preloader.tsx",
+                  "src/store/useStore.ts",
+                  "src/constants/frames.ts",
+                  "src/components/headers/DotNav.tsx",
+                  "src/components/headers/FullWidthNav.tsx",
+                  "src/components/headers/PillNav.tsx",
+                ];
+
                 for (const file of files) {
                   if (!file || !file.path || typeof file.path !== "string" || file.path.trim() === "") {
                     console.warn("Skipping file write, invalid or empty path:", file?.path);
                     continue;
                   }
+
+                  if (PROTECTED_FILES.includes(file.path)) {
+                    console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
+                    continue;
+                  }
                   if (typeof file.content !== "string") {
                     file.content = String(file.content || "");
+                  }
+
+                  // Strict enforcement for App.tsx integrity
+                  if (file.path === "src/App.tsx") {
+                    const c = file.content;
+                    if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
+                    }
+                    if (/\{\/\*\s*<CanvasScroll/i.test(c) || /\/\/\s*import.*CanvasScroll/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out CanvasScroll in App.tsx. Do NOT comment it out.");
+                    }
+                    if (/\{\/\*\s*<Preloader/i.test(c) || /\/\/\s*import.*Preloader/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
+                    }
                   }
                   
                   // Ensure parent directory exists before writing to prevent missing directory errors
@@ -271,17 +367,22 @@ export const codeAgentFunction = inngest.createFunction(
                   await sandbox.commands.run(`touch "${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
-                return updated;
+                return { updated };
               } catch (e) {
-                throw new Error(`File write failed: ${e}`);
+                const err = e as Error;
+                return { error: `File write failed: ${err.message || String(err)}` };
               }
             });
 
+            if (updatedFiles && 'error' in updatedFiles) {
+              return updatedFiles.error || "File write failed";
+            }
+
             // 2. Safely mutate the state OUTSIDE the step
-            if (updatedFiles && network) {
+            if (updatedFiles && 'updated' in updatedFiles && network) {
               network.state.data.files = {
                 ...(network.state.data.files || {}),
-                ...updatedFiles,
+                ...updatedFiles.updated,
               };
             }
             return `Successfully updated files`;
@@ -359,34 +460,50 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
-    if (event.data.videoUrl) {
-      const frameCount = event.data.frameCount || 450;
-      currentPrompt = `=== SCROLL ANIMATION REQUIREMENT (CRITICAL) ===
-You MUST build an Apple-style, butter-smooth scroll-scrub animation utilizing a high-performance Frame Sequence directly mapped to the Canvas! 
-To achieve this securely and perfectly:
-1. A background pipeline natively populates the \`public/\` folder with exactly ${frameCount} highly compressed JPG files named \`frame-0001.jpg\` through \`frame-${String(frameCount).padStart(4, "0")}.jpg\`. DO NOT modify package.json for this.
-2. **AURA PRELOADER**: You MUST build an ultra-premium, full-screen black Loading Screen overlay. It must display a massive numeric percentage (0% -> 100%) that physically tracks the actual network loading of the ${frameCount} image \`Image\` objects. Below it, include a pristine progress bar and text exactly like: "Loading all frames {current} / ${frameCount} — full scroll unlocks at 100%". The site must NOT be scrollable or visible until the preloader fully completes and fades out. **CRITICAL**: BOTH \`img.onload\` AND \`img.onerror\` MUST increment the loaded counter identically — a failed/404 frame still counts as "loaded" for preloader purposes. Additionally, add a 30-second hard timeout that force-completes the preloader regardless. This ensures the site is ALWAYS visible even if some frames fail to load.
-3. **PILL NAV MENU**: The Header/Navbar MUST NOT be full-width. It must be a floating, pill-shaped (fully rounded corners), glassmorphic black translucent bar PERFECTLY HORIZONTALLY CENTERED at the top of the screen. Use ONLY this exact inline style on the nav element: \`style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}\`. DO NOT use \`left: 0\`, \`right: 0\`, \`width: 100%\` or \`margin: auto\` — those break centering. Inside it: Brand Name on the left, navigation links in the middle, and a solid white 'Sign up' button on the right. The pill must have \`width: fit-content\` and \`min-width: 600px\`.
-4. In your \`scroll-sequence.tsx\` or main application file, the architectural layout MUST be:
-   - A global container with a dynamically calculated height to enforce the scrollable area.
-   - A perfectly fixed background \`<canvas>\` that fills the entire screen underneath EVERYTHING. You MUST use exactly this class: \`<canvas className="fixed top-0 left-0 w-screen h-screen object-cover -z-10 pointer-events-none" />\`
-   - ALL normal sections (Hero, Features, Pricing, Footer), AS WELL AS the root containers, MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! 
-   - CRITICAL FOREGROUND RULE: Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page sections, \`main\`, or \`div\` wrappers. If you put a solid background color on your sections, you will completely hide the \`<canvas>\` behind them! Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) if you need readable contrast for text.
-   - **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. This includes hero overlays, gradient overlays, dark tint layers, and any fixed/absolute element covering the canvas area. The canvas images MUST ALWAYS be fully visible and NEVER obscured by any background or overlay div. Violating this rule makes the canvas animation completely invisible.
-5. Pre-load all ${frameCount} image paths STRICTLY USING RELATIVE PATHS from \`./frame-0001.jpg\` -> \`./frame-${String(frameCount).padStart(4, "0")}.jpg\` into Javascript \`Image\` objects. Update the Preloader state as they load! **CRITICAL PATH RULES**: NEVER use \`import.meta.url\` to construct frame paths — \`import.meta.url\` resolves relative to the JS bundle file inside \`assets/\`, NOT the page, resulting in broken \`assets/frame-0001.jpg\` paths. NEVER use absolute root paths like \`/frame-0001.jpg\`. ALWAYS use plain string literals: \`img.src = './frame-0001.jpg'\` or template literals \`\`./frame-\${idx}.jpg\`\`. These resolve correctly relative to the page URL regardless of where the JS bundle lives.
-6. **DYNAMIC SCROLL MAPPING**: Map \`window.scrollY\` strictly proportional to the maximum scrollable document height (which MUST be \`document.documentElement.scrollHeight - window.innerHeight\`). The Frame Index must map precisely from 1 to ${frameCount}. 
-   - **CRITICAL MATH**: When the user hits the absolute bottom of the page (where the Footer is fully visible), \`window.scrollY\` equals \`document.documentElement.scrollHeight - window.innerHeight\`, which MUST map exactly to Frame ${frameCount}.
-   - **NO OVER-SCROLL**: The canvas drawing logic MUST clamp the frame index: \`Math.min(${frameCount}, Math.max(1, calculatedIndex))\`. If the user scrolls all the way down, the frame stops strictly at ${frameCount}. The page itself must NOT have arbitrary extra whitespace at the bottom causing over-scroll. Make sure the height of the container perfectly fits the sections so the footer is the absolute end of the document.
-7. Animate your transparent HTML sections fading in and out using Framer Motion tightly synchronized with the Canvas scroll depth!
-8. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-=== END SCROLL ANIMATION REQUIREMENT ===
+    if (videoUrl) {
+      currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
+The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
+You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
+
+Specifically, you ALREADY HAVE:
+1. \`src/components/CanvasScroll.tsx\` - Handles the high-performance background frame rendering.
+2. \`src/components/Preloader.tsx\` - A full-screen aura loading state.
+3. \`src/components/Navbar.tsx\` - A default pill-shaped navigation bar.
+4. \`src/components/headers/\` - A directory containing alternative header templates (\`DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`).
+5. \`src/store/useStore.ts\` - Global state management for frames.
+6. \`src/App.tsx\` - The layout wrapper that combines these components.
+
+YOUR ONLY JOB:
+1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
+2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
+3. CHOOSE A HEADER: You can modify \`src/components/Navbar.tsx\` to match the site's brand, OR you can completely replace it by importing one of the templates from \`src/components/headers/\` into \`src/App.tsx\` (e.g. use \`DotNav\` or \`FullWidthNav\` instead if it fits the vibe better!). You have full creative freedom over the navigation design.
+4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
+5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
+6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
+7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
+8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
+9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
+10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
+11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
+12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
+13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
+14. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
+    - \`src/components/CanvasScroll.tsx\`
+    - \`src/components/Preloader.tsx\`
+    - \`src/store/useStore.ts\`
+    - \`src/constants/frames.ts\`
+    - \`src/components/headers/DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`
+    DO NOT attempt to modify these files. DO NOT recreate them.
+
+When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
+=== END TEMPLATE ARCHITECTURE INSTRUCTION ===
 
 ` + currentPrompt;
     }
 
     // Inject image reference into the prompt when a user attaches an image
-    if (event.data.imageDataUrl) {
-      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nImage (base64 data URL): ${event.data.imageDataUrl}\n\n` + currentPrompt;
+    if (event.data.imageUrl) {
+      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
     }
 
     // --- 1. INITIAL GENERATION (The Creator) ---
@@ -433,20 +550,43 @@ To achieve this securely and perfectly:
           const sandbox = await getSandbox(sandboxId);
           await sandbox.commands.run("rm -rf dist");
 
-          if (event.data.videoUrl) {
+          if (videoUrl) {
             console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
             if (zipResult.exitCode !== 0) {
               console.error("ZIP FETCH ERR:", zipResult.stderr);
               throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
             }
           }
 
+          console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
+          const checkStructureScript = `
+const fs = require('fs');
+if (fs.existsSync('src/App.tsx')) {
+  const c = fs.readFileSync('src/App.tsx', 'utf8');
+  const hasCanvas = c.includes('<CanvasScroll');
+  const hasPreloader = c.includes('<Preloader');
+  const canvasCommented = c.match(/\\{\\/\\*\\s*<CanvasScroll/);
+  const preloaderCommented = c.match(/\\{\\/\\*\\s*<Preloader/);
+  
+  if (!hasCanvas || !hasPreloader || canvasCommented || preloaderCommented) {
+    console.error('CRITICAL ERROR: App.tsx is missing <CanvasScroll /> or <Preloader />, or they are commented out. They MUST be present and active.');
+    process.exit(1);
+  }
+}
+`;
+          await sandbox.files.write("/app/check-structure.js", checkStructureScript);
+          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
+          if (structCheck.exitCode !== 0) {
+            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+          }
+
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            const tsErrorLog = ((tsErr.stdout || "") + "\n" + (tsErr.stderr || "")).trim();
+          } catch (tsErr) {
+            const err = tsErr as { stdout?: string, stderr?: string };
+            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
             return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
           }
 
@@ -462,17 +602,22 @@ function fixPaths(dir) {
   for (const f of fs.readdirSync(dir)) {
     const p = path.join(dir, f);
     if (fs.statSync(p).isDirectory()) fixPaths(p);
-    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html')) {
+    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\/frame-/g, '$1./frame-');
+      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\\\/assets\\\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\\\/assets\\\\/frame-/g, '$1./frame-');
         changed = true;
       }
       // Strip assets/ prefix if import.meta.url was used
       if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\/frame-/g, 'frame-');
+        content = content.replace(/assets\\\\/frame-/g, 'frame-');
+        changed = true;
+      }
+      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\\\/frame-/g, '$1./frame-');
         changed = true;
       }
       if (changed) fs.writeFileSync(p, content);
@@ -490,14 +635,16 @@ fixPaths(process.argv[2]);
 
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
-          } catch (buildErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            const viteErrorLog = ((buildErr.stdout || "") + "\n" + (buildErr.stderr || "")).trim();
+          } catch (buildErr) {
+            const err = buildErr as { stdout?: string, stderr?: string };
+            const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
             return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
           }
 
           return { success: true, error: "" };
-        } catch (infraErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-          return { success: false, error: `Sandbox Execution Error: ${infraErr.message || String(infraErr)}` };
+        } catch (infraErr) {
+          const err = infraErr as Error;
+          return { success: false, error: `Sandbox Execution Error: ${err.message || String(err)}` };
         }
       });
 
@@ -622,7 +769,6 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       const extractionScript = [
         "const fs = require('fs');",
         "const path = require('path');",
-        "const IMAGE_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.ico','.mp4','.woff','.woff2']);",
         "function getFiles(dir, fileList) {",
         "  fileList = fileList || {};",
         "  if (!fs.existsSync(dir)) return fileList;",
@@ -632,8 +778,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         "    if (fs.statSync(p).isDirectory()) {",
         "      getFiles(p, fileList);",
         "    } else {",
-        "      var ext = path.extname(items[i]).toLowerCase();",
-        "      if (!IMAGE_EXTS.has(ext)) {",
+        "      var name = items[i].toLowerCase();",
+        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
+        "      if (!isFrame) {",
         "        var key = p.split(path.sep).join('/').replace('dist/', '');",
         "        fileList[key] = fs.readFileSync(p).toString('base64');",
         "      }",
@@ -683,21 +830,32 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
           let contentType = "application/octet-stream";
-          if (relativePath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (relativePath.endsWith(".js")) contentType = "application/javascript";
-          else if (relativePath.endsWith(".css")) contentType = "text/css";
-          else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (relativePath.endsWith(".json")) contentType = "application/json";
+          const lowerPath = relativePath.toLowerCase();
+          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
+          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
+          else if (lowerPath.endsWith(".css")) contentType = "text/css";
+          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
+          else if (lowerPath.endsWith(".json")) contentType = "application/json";
+          else if (lowerPath.endsWith(".png")) contentType = "image/png";
+          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
+          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
+          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
+          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
+          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
+          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
+          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
+          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
+          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
           await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
         }));
       }
 
       // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
       // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
-      if (event.data.videoUrl) {
+      if (videoUrl) {
         console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
         const JSZip = (await import("jszip")).default;
-        const zipResponse = await fetch(event.data.videoUrl);
+        const zipResponse = await fetch(videoUrl);
         if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
         const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
         const zip = await JSZip.loadAsync(zipBuffer);
@@ -733,9 +891,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
 
-      if (event.data.videoUrl) {
+      if (videoUrl) {
         console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${event.data.videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
+        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
         if (devZipResult.exitCode !== 0) {
           throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
         }

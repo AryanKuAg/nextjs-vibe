@@ -602,17 +602,22 @@ function fixPaths(dir) {
   for (const f of fs.readdirSync(dir)) {
     const p = path.join(dir, f);
     if (fs.statSync(p).isDirectory()) fixPaths(p);
-    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html')) {
+    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\`])\\/frame-/g)) {
-        content = content.replace(/(["'\`])\\/frame-/g, '$1./frame-');
+      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\\\/assets\\\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\\\/assets\\\\/frame-/g, '$1./frame-');
         changed = true;
       }
       // Strip assets/ prefix if import.meta.url was used
       if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\/frame-/g, 'frame-');
+        content = content.replace(/assets\\\\/frame-/g, 'frame-');
+        changed = true;
+      }
+      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
+      if (content.match(/(["'\`])\\\\/frame-/g)) {
+        content = content.replace(/(["'\`])\\\\/frame-/g, '$1./frame-');
         changed = true;
       }
       if (changed) fs.writeFileSync(p, content);
@@ -764,7 +769,6 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
       const extractionScript = [
         "const fs = require('fs');",
         "const path = require('path');",
-        "const IMAGE_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.ico','.mp4','.woff','.woff2']);",
         "function getFiles(dir, fileList) {",
         "  fileList = fileList || {};",
         "  if (!fs.existsSync(dir)) return fileList;",
@@ -774,8 +778,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         "    if (fs.statSync(p).isDirectory()) {",
         "      getFiles(p, fileList);",
         "    } else {",
-        "      var ext = path.extname(items[i]).toLowerCase();",
-        "      if (!IMAGE_EXTS.has(ext)) {",
+        "      var name = items[i].toLowerCase();",
+        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
+        "      if (!isFrame) {",
         "        var key = p.split(path.sep).join('/').replace('dist/', '');",
         "        fileList[key] = fs.readFileSync(p).toString('base64');",
         "      }",
@@ -825,11 +830,22 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
           let contentType = "application/octet-stream";
-          if (relativePath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (relativePath.endsWith(".js")) contentType = "application/javascript";
-          else if (relativePath.endsWith(".css")) contentType = "text/css";
-          else if (relativePath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (relativePath.endsWith(".json")) contentType = "application/json";
+          const lowerPath = relativePath.toLowerCase();
+          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
+          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
+          else if (lowerPath.endsWith(".css")) contentType = "text/css";
+          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
+          else if (lowerPath.endsWith(".json")) contentType = "application/json";
+          else if (lowerPath.endsWith(".png")) contentType = "image/png";
+          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
+          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
+          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
+          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
+          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
+          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
+          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
+          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
+          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
           await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
         }));
       }

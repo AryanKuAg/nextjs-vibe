@@ -272,40 +272,6 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
-      // Inngest has a 7MB payload limit. Upload imageDataUrl to GCS first and
-      // pass only the public CDN URL so Inngest never receives raw bytes.
-      let imageUrl: string | undefined;
-      if (input.imageDataUrl) {
-        const { Storage } = await import("@google-cloud/storage");
-        const bucketName = process.env.GCS_BUCKET_NAME || "sites.framerate.space";
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                credentials: {
-                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-                },
-              }
-            : { projectId: process.env.GOOGLE_CLOUD_PROJECT }
-        );
-
-        const bucket = storage.bucket(bucketName);
-        const match = input.imageDataUrl.match(/^data:(image\/[^;]+);/);
-        const mimeType = match ? match[1] : "image/jpeg";
-        const base64Data = input.imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
-        const buffer = Buffer.from(base64Data, "base64");
-
-        const ext = mimeType.split("/")[1] || "jpg";
-        const fileName = `frames/${input.projectId}/ref-upload-${Date.now()}.${ext}`;
-        const file = bucket.file(fileName);
-
-        await file.save(buffer, { metadata: { contentType: mimeType } });
-
-        const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
-        imageUrl = `${cdnUrl}/${fileName}`;
-      }
-
       await inngest.send({
         name: "code-agent/run",
         data: {
@@ -315,7 +281,7 @@ export const projectsRouter = createTRPCRouter({
           frameCount: input.frameCount,
           model: input.model,
           userId: ctx.auth.userId,
-          imageUrl,   // public GCS URL — never raw base64
+          imageDataUrl: input.imageDataUrl,
         },
       });
 

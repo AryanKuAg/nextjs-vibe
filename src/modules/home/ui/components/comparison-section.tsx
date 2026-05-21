@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-
 /* ─── ComparisonSection ──────────────────────────────────────────────────
    Comparison table + stat pills placed between PricingSection and FAQSection
    on the /pricing page. Matches the Framerate dark design system.
@@ -68,7 +66,7 @@ export const ComparisonSection = () => {
           </div>
           <div className="px-5 py-3 flex items-center gap-2">
             {/* Framerate brand cell */}
-            <Image src="/framerate_logo_long.png" alt="framerate" width={96} height={16} className="h-4 w-auto object-contain" />
+            <img src="/framerate_logo_long.png" alt="framerate" className="h-4 object-contain" />
           </div>
         </div>
 

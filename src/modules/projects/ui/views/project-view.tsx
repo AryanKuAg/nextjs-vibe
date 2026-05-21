@@ -592,6 +592,8 @@ export const ProjectView = ({ projectId }: Props) => {
       });
 
       // Merge extracted frames (public/ folder) if available
+      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || 'sites.framerate.space'}`;
+      const resolvedZipUrl = extractedZipUrl || (project?.id ? `${cdnBase}/frames/${project.id}/frames.zip` : null);
       if (resolvedZipUrl) {
         try {
           // Fetch directly from storage bucket since it supports CORS, 
@@ -655,8 +657,6 @@ export const ProjectView = ({ projectId }: Props) => {
 
   if (!project) return null;
 
-  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space'}`;
-  const resolvedZipUrl = extractedZipUrl || (project?.id ? `${cdnBase}/frames/${project.id}/frames.zip` : null);
   const currentStage = project.currentStage as Stage;
 
   return (
@@ -703,7 +703,7 @@ export const ProjectView = ({ projectId }: Props) => {
                   activeFragment={activeFragment}
                   setActiveFragment={setActiveFragment}
                   stage="SITE"
-                  extractedZipUrl={resolvedZipUrl}
+                  extractedZipUrl={extractedZipUrl}
                   extractedFrameCount={extractedFrameCount}
                   onBack={() => setActiveStageTab("BACKGROUND")}
                 />

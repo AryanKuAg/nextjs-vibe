@@ -94,7 +94,7 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
       }
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isGenerating, type, modelId]);
+  }, [isGenerating, type]);
 
   return pct;
 }

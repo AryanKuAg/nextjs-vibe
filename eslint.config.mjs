@@ -12,8 +12,7 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    // generated/ and templates/ are not production app code — skip linting them
-    ignores: ["**/generated/*", "src/templates/**"]
+    ignores: ["**/generated/*"]
   },
 ];
 

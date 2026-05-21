@@ -16,8 +16,6 @@ import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
-  { id: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-  { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -40,6 +38,10 @@ const processImageFile = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
       reject(new Error("Unsupported format. Use JPEG, PNG, WebP, or GIF."));
+      return;
+    }
+    if (file.size > 7 * 1024 * 1024) {
+      reject(new Error("Image must be under 7MB."));
       return;
     }
     const reader = new FileReader();
@@ -306,11 +308,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                 className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer whitespace-nowrap"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
-                <span className="whitespace-nowrap">
-                  {SELECTED_MODEL_DATA.label.length > 14
-                    ? SELECTED_MODEL_DATA.label.substring(0, 14) + "..."
-                    : SELECTED_MODEL_DATA.label}
-                </span>
+                <span className="whitespace-nowrap">{SELECTED_MODEL_DATA.label}</span>
                 <i className="ri-arrow-down-s-line mt-0.5 text-white" />
               </div>
 

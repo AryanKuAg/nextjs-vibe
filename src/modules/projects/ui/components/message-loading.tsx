@@ -16,14 +16,26 @@ const ShimmerMessages = () => {
   ];
 
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const startTime = Date.now();
+
+    const messageInterval = setInterval(() => {
       setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
     }, 2000);
 
-    return () => clearInterval(interval);
+    const timerInterval = setInterval(() => {
+      setElapsedMs(Date.now() - startTime);
+    }, 10);
+
+    return () => {
+      clearInterval(messageInterval);
+      clearInterval(timerInterval);
+    };
   }, [messages.length]);
+
+  const timeString = `${(elapsedMs / 1000).toFixed(1)}s`;
 
   return (
     <div className="flex items-start pl-1 gap-2.5">
@@ -36,8 +48,9 @@ const ShimmerMessages = () => {
           className="shrink-0"
         />
       </div>
-      <span className="text-sm text-muted-foreground animate-pulse pt-0.5">
-        {messages[currentMessageIndex]}
+      <span className="text-sm pt-0.5">
+        <span className="text-white font-mono mr-2  text-[12px] inline-block">{timeString}</span>
+        <span className="text-muted-foreground animate-pulse">{messages[currentMessageIndex]}</span>
       </span>
     </div>
   );

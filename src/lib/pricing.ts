@@ -12,9 +12,13 @@ export const MODEL_COSTS: Record<string, number> = {
   "openrouter-seedance-2": 60,
   "openrouter-seedance-2-fast": 48,
   "openrouter-google/gemini-3.1-pro-preview": 80,
+  "openrouter-google/gemini-3.5-flash": 60,
+  "openrouter-google/gemini-3.1-flash-lite": 10,
 };
 
 // Follow-up prompts (when a conversation already exists)
 export const FOLLOW_UP_COSTS: Record<string, number> = {
   "openrouter-google/gemini-3.1-pro-preview": 30,
+  "openrouter-google/gemini-3.5-flash": 20,
+  "openrouter-google/gemini-3.1-flash-lite": 5,
 };

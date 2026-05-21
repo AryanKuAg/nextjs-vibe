@@ -16,6 +16,8 @@ import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+  { id: "openrouter-google/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+  { id: "openrouter-google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -305,11 +307,11 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             {/* Model Selector Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer whitespace-nowrap"
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
-                <span className="whitespace-nowrap">{SELECTED_MODEL_DATA.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                <span className="truncate max-w-[100px] sm:max-w-[120px]">{SELECTED_MODEL_DATA.label}</span>
+                <i className="ri-arrow-down-s-line mt-0.5 text-white flex-shrink-0" />
               </div>
 
               {modelDropdownOpen && (

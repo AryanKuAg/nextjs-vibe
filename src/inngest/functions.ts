@@ -39,6 +39,7 @@ interface AgentState {
 export const codeAgentFunction = inngest.createFunction(
   {
     id: "code-agent",
+    timeouts: { finish: "15m" },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
 
@@ -1230,7 +1231,7 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 );
 
 export const veoGenerateFunction = inngest.createFunction(
-  { id: "veo-generate", retries: 0 },
+  { id: "veo-generate", retries: 0, timeouts: { finish: "15m" } },
   { event: "veo/generate" },
   async ({ event, step }) => {
     const { projectId, prompt, model, userId } = event.data;

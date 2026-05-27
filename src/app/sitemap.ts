@@ -1,47 +1,48 @@
 import { MetadataRoute } from "next";
+import { getAllPosts } from "@/lib/blog";
 
 const BASE_URL = "https://framerate.space";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
+  
+  // Blog posts
+  const posts = getAllPosts();
+  const blogRoutes = posts.map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.date),
+  }));
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: BASE_URL,
       lastModified,
-      changeFrequency: "daily",
-      priority: 1,
+    },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified,
     },
     {
       url: `${BASE_URL}/pricing`,
       lastModified,
-      changeFrequency: "weekly",
-      priority: 0.8,
     },
     {
       url: `${BASE_URL}/terms`,
       lastModified,
-      changeFrequency: "monthly",
-      priority: 0.4,
     },
     {
       url: `${BASE_URL}/privacy`,
       lastModified,
-      changeFrequency: "monthly",
-      priority: 0.4,
     },
     {
       url: `${BASE_URL}/cookies`,
       lastModified,
-      changeFrequency: "monthly",
-      priority: 0.3,
     },
     {
       url: `${BASE_URL}/compliance`,
       lastModified,
-      changeFrequency: "monthly",
-      priority: 0.3,
     },
+    ...blogRoutes,
   ];
 
   return staticRoutes;

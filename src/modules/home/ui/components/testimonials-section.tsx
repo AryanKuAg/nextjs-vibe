@@ -54,10 +54,10 @@ export const TestimonialsSection = () => {
     <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
       <div className="flex flex-col items-center mb-10">
         <h2 className="text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500] mb-4">
-          Builders who shipped with presets
+          Trusted by builders shipping real work
         </h2>
         <p className="text-center font-mono text-[#8A8A88] text-sm">
-          Real people, real launches - shared with their consent.
+          See what founders, creators, and teams are saying after shipping with us.
         </p>
       </div>
 
@@ -65,15 +65,15 @@ export const TestimonialsSection = () => {
         {testimonials.map((testimonial, idx) => (
           <div
             key={idx}
-            className="flex flex-col bg-[#282828] rounded-[16px] p-6 font-inconsolata border border-transparent hover:border-white/5 transition-colors"
+            className="flex flex-col bg-[#282828] rounded-[16px] p-6 font-inconsolata border border-transparent  transition-colors"
           >
-            <div className="text-[#8A8A88] text-4xl mb-2 font-serif leading-none opacity-50 font-bold">
+            <div className="text-[#8A8A88] text-4xl mb-2 font-space-grotesk leading-none opacity-50 font-bold">
               “
             </div>
-            <p className="text-[#CCCCCC] text-[14px] flex-1 mb-8 leading-relaxed">
+            <p className="text-white text-[14px] flex-1 mb-8 leading-relaxed">
               {testimonial.text}
             </p>
-            <div className="flex items-center justify-between text-xs mt-auto text-[#8A8A88]">
+            <div className="flex items-center justify-between text-sm mt-auto text-[#8A8A88] border-t border-[#333333] pt-4">
               <span className="text-white">{testimonial.name}</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm">{testimonial.flag}</span>

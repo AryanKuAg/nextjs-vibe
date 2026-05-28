@@ -78,7 +78,7 @@ const Page = () => {
         </div>
       </section>
 
-      <TestimonialsSection />
+
 
       {/* Real Sites Section */}
       <section id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
@@ -180,7 +180,7 @@ const Page = () => {
           </FeatureCard>
         </div>
       </section>
-
+      <TestimonialsSection />
       {/* Pricing Section */}
       {/* <section className="py-20 px-6 max-w-7xl mx-auto w-full">
         <PricingSection title="Pricing" />

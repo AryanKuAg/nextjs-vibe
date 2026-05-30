@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
+import { Hint } from "@/components/hint";
 
 import { MODEL_COSTS } from "@/lib/pricing";
 
@@ -312,13 +313,15 @@ export const ProjectForm = () => {
                 className="hidden"
                 onChange={handleFileInputChange}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-[#2c2c2c] hover:bg-white/5 text-white transition-colors"
-              >
-                <i className="ri-add-line text-base" />
-              </button>
+              <Hint text="Add photo" side="top" >
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-[#2c2c2c] hover:bg-white/5 text-white transition-colors"
+                >
+                  <i className="ri-add-line text-base" />
+                </button>
+              </Hint>
               <div className="relative" ref={dropdownRef}>
                 <div
                   className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#2c2c2c] text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
@@ -355,22 +358,32 @@ export const ProjectForm = () => {
                   <i className="ri-sparkling-fill text-white text-sm" />
                   <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
                 </div>
-                <button
-                  type="submit"
-                  disabled={isButtonDisabled}
-                  className={cn(
-                    "flex items-center justify-center size-8 rounded-full transition-all duration-150",
-                    isButtonDisabled
-                      ? "bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
-                      : "bg-white text-[#1C1C1C]"
-                  )}
-                >
-                  {isPending ? (
-                    <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                  ) : (
-                    <i className="ri-arrow-up-line text-[16px] rotate-90" />
-                  )}
-                </button>
+                {isButtonDisabled ? (
+                  <button
+                    type="submit"
+                    disabled
+                    className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
+                  >
+                    {isPending ? (
+                      <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
+                    ) : (
+                      <i className="ri-arrow-up-line text-[16px] rotate-90" />
+                    )}
+                  </button>
+                ) : (
+                  <Hint text="Generate" side="top">
+                    <button
+                      type="submit"
+                      className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white text-[#1C1C1C]"
+                    >
+                      {isPending ? (
+                        <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
+                      ) : (
+                        <i className="ri-arrow-up-line text-[16px] rotate-90" />
+                      )}
+                    </button>
+                  </Hint>
+                )}
               </div>
             </div>
           </div>

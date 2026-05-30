@@ -13,6 +13,7 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
+import { Hint } from "@/components/hint";
 
 const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
@@ -294,16 +295,17 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
           <div className="flex items-center gap-x-1">
             {/* + Image attach button — before model name */}
-            <button
-              type="button"
-              onClick={() => imageInputRef.current?.click()}
-              disabled={isPending}
-              className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50 text-base leading-none"
-              title="Attach image"
-            >
-              +
-            </button>
-
+            <Hint text="Add photo" side="top" align="start">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isPending}
+                className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50 text-base leading-none"
+                title="Attach image"
+              >
+                <i className="ri-add-line text-lg" />
+              </button>
+            </Hint>
             {/* Model Selector Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <div
@@ -338,19 +340,20 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
 
             {/* Enhance prompt */}
-            <button
-              type="button"
-              onClick={handleEnhancePrompt}
-              disabled={isEnhancing}
-              className="h-8 px-2 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
-              title="Magic Wand - Enhance Prompt"
-            >
-              {isEnhancing ? (
-                <i className="ri-loader-4-line animate-spin text-[15px]" />
-              ) : (
-                <i className="ri-magic-line text-[15px]" />
-              )}
-            </button>
+            <Hint text="Generate prompt" side="top" >
+              <button
+                type="button"
+                onClick={handleEnhancePrompt}
+                disabled={isEnhancing}
+                className="h-8 px-2 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                {isEnhancing ? (
+                  <i className="ri-loader-4-line animate-spin text-[15px]" />
+                ) : (
+                  <i className="ri-magic-line text-[15px]" />
+                )}
+              </button>
+            </Hint>
 
             <div className="flex gap-2 ml-auto">
               <div className="flex items-center gap-1 text-white">
@@ -368,18 +371,31 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>
-              ) : (
+              ) : isButtonDisabled ? (
                 <button
                   type="submit"
-                  disabled={isButtonDisabled}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] disabled:bg-[#666666] disabled:text-[#444] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                  disabled
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] disabled:bg-[#666666] disabled:text-[#444] transition-all shadow-sm"
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />
                   ) : (
-                    <i className="ri-arrow-up-line" />
+                    <i className="ri-arrow-right-line" />
                   )}
                 </button>
+              ) : (
+                <Hint text="Generate" side="top">
+                  <button
+                    type="submit"
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                  >
+                    {isPending ? (
+                      <i className="ri-loader-4-line animate-spin inline-block" />
+                    ) : (
+                      <i className="ri-arrow-right-line" />
+                    )}
+                  </button>
+                </Hint>
               )}
             </div>
           </div>

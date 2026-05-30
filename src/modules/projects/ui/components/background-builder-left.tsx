@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
 import { MODEL_COSTS } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/hint";
 import { toast } from "sonner";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { cn } from "@/lib/utils";
@@ -519,14 +520,15 @@ export const BackgroundBuilderLeft = ({
                       e.target.value = "";
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white  transition-colors"
-                    title="Upload image"
-                  >
-                    <i className="ri-add-line text-lg" />
-                  </button>
+                  <Hint text="Add photo" side="top" align="start">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white  transition-colors"
+                    >
+                      <i className="ri-add-line text-lg" />
+                    </button>
+                  </Hint>
                 </>
               )}
               <div className="relative" ref={dropdownRef}>
@@ -560,19 +562,20 @@ export const BackgroundBuilderLeft = ({
               </div>
 
               {isVideo && (
-                <button
-                  type="button"
-                  onClick={handleEnhancePrompt}
-                  disabled={isEnhancing}
-                  className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
-                  title="Magic Wand - Enhance Prompt"
-                >
-                  {isEnhancing ? (
-                    <i className="ri-loader-4-line animate-spin text-[15px]" />
-                  ) : (
-                    <i className="ri-magic-line text-[15px]" />
-                  )}
-                </button>
+                <Hint text="Generate prompt" side="top">
+                  <button
+                    type="button"
+                    onClick={handleEnhancePrompt}
+                    disabled={isEnhancing}
+                    className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                  >
+                    {isEnhancing ? (
+                      <i className="ri-loader-4-line animate-spin text-[15px]" />
+                    ) : (
+                      <i className="ri-magic-line text-[15px]" />
+                    )}
+                  </button>
+                </Hint>
               )}
 
               <div className="flex gap-2 ml-auto">
@@ -580,18 +583,29 @@ export const BackgroundBuilderLeft = ({
                   <i className="ri-sparkling-2-fill text-white text-sm" />
                   <span className="text-sm font-medium">{AVAILABLE_MODEL?.credits}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSubmit()}
-                  disabled={shouldShowSpinner || (!prompt.trim())}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
-                >
-                  {shouldShowSpinner ? (
-                    <i className="ri-loader-4-line animate-spin inline-block text-[#1C1C1C]" />
-                  ) : (
-                    <i className="ri-arrow-right-line text-[#1C1C1C]" />
-                  )}
-                </button>
+                {shouldShowSpinner || !prompt.trim() ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white disabled:bg-[#666666] transition-all shadow-sm"
+                  >
+                    {shouldShowSpinner ? (
+                      <i className="ri-loader-4-line animate-spin inline-block text-[#1C1C1C]" />
+                    ) : (
+                      <i className="ri-arrow-right-line text-[#1C1C1C]" />
+                    )}
+                  </button>
+                ) : (
+                  <Hint text="Generate" side="top">
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit()}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-white hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
+                    >
+                      <i className="ri-arrow-right-line text-[#1C1C1C]" />
+                    </button>
+                  </Hint>
+                )}
               </div>
             </div>
           </div>

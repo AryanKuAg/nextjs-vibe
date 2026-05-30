@@ -48,7 +48,7 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
       const updateIntervalMs = 500;
       // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
       let baseFraction = type === "video" ? 0.015 : 0.05;
-      
+
       if (modelId === "replicate-kling-v2.5-turbo-pro") {
         baseFraction = 0.003; // Kling takes ~3 mins, so slow it down significantly
       }
@@ -326,19 +326,19 @@ export const BackgroundBuilderRight = ({
         )}
         <div className={cn(
           "bg-[#282828] rounded-[16px] transition-colors max-w-[640px] mx-auto w-full overflow-hidden",
-          blocks.length > 1 && (isActive ? "border border-white" : "border border-transparent")
+          blocks.length > 1 && (isActive ? "border border-white" : "border border-transparent hover:bg-[#2c2c2c]")
         )}>
           <div className="flex items-center justify-between p-3 border-b border-[#333333]">
             <h3 className="text-white text-sm font-inconsolata">{title}</h3>
             <div className="flex items-center gap-4">
-              <span className="text-[#666] text-xs font-mono">{duration}</span>
+              <span className="text-[#737373] text-sm font-mono">{duration}</span>
               {showRemove && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onRemoveBlock(index);
                   }}
-                  className="text-[#666] hover:text-red-400 transition-colors"
+                  className="text-[#666] hover:text-white transition-colors"
                   title="Remove video box"
                 >
                   <i className="ri-close-line text-lg" />

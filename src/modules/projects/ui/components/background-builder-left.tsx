@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { useTRPC } from "@/trpc/client";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { TemplatesModal } from "@/components/templates-modal";
 
 import { VideoBlock } from "./background-builder-right";
 
@@ -23,6 +24,7 @@ interface Props {
   onTabChange: (tab: BlockTab) => void;
   onProceed: () => void;
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
+  onApplyTemplate?: (blocks: VideoBlock[]) => void;
   projectId: string;
   blocks: VideoBlock[];
   isExtracting?: boolean;
@@ -87,12 +89,14 @@ export const BackgroundBuilderLeft = ({
   onTabChange,
   onProceed,
   updateBlock,
+  onApplyTemplate,
   projectId,
   blocks,
   isExtracting
 }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -629,12 +633,29 @@ export const BackgroundBuilderLeft = ({
           <Button
             variant="ghost"
             className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
+            onClick={() => setIsTemplatesModalOpen(true)}
+          >
+            Templates
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
             onClick={() => window.location.href = "/"}
           >
             Back to home
           </Button>
         </div>
       </div>
+
+      <TemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        onSelect={(t) => {
+          if (onApplyTemplate) {
+            onApplyTemplate(t.blocks);
+          }
+        }}
+      />
     </>
   );
 };

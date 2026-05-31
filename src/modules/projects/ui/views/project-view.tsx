@@ -151,6 +151,12 @@ export const ProjectView = ({ projectId }: Props) => {
     }
   };
 
+  const handleApplyTemplate = (templateBlocks: VideoBlock[]) => {
+    setBlocks(templateBlocks);
+    setActiveBlockIndex(0);
+    setActiveBlockTab("START");
+  };
+
   const updateBlock = (index: number, updates: Partial<VideoBlock>) => {
     setBlocks(prev => {
       const newBlocks = [...prev];
@@ -692,6 +698,7 @@ export const ProjectView = ({ projectId }: Props) => {
               onProceed={handleProceed}
               isExtracting={isExtracting}
               updateBlock={updateBlock}
+              onApplyTemplate={handleApplyTemplate}
             />
           )}
 

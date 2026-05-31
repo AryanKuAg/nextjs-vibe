@@ -41,7 +41,7 @@ export const TemplatesModal = ({ isOpen, onClose, onSelect }: TemplatesModalProp
                 onClick={() => setSelectedTemplate(template)}
                 className={cn(
                   "relative aspect-video rounded-[16px] overflow-hidden cursor-pointer group border transition-all",
-                  selectedTemplate?.id === template.id ? "border-white border-2" : "border-transparent hover:border-[#333] hover:opacity-60"
+                  selectedTemplate?.id === template.id ? "border-white border" : "border-transparent hover:border-[#333] hover:opacity-60"
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -56,5 +56,26 @@ export const TEMPLATES: Template[] = [
         videoPrompt: "",
       }
     ]
+  },
+  {
+    id: "template-2",
+    name: "Cave",
+    coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/cave_1.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/cave_1.jpg",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/cave_1.jpg"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/cave_2.jpg",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/cave_2.jpg"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/cave_video_1.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/cave_video_1.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      }
+    ]
   }
 ];

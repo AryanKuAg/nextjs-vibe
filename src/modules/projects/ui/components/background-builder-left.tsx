@@ -74,13 +74,14 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
-  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
-  { id: "replicate-prunaai/p-video", label: "Pruna", emoji: "", type: "VIDEO" },
-  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
-  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO" },
-  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO" },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0", emoji: "", type: "VIDEO", time: "~3 min" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO", time: "~2 min" },
+  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO", time: "~20 sec" },
+  // { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO", time: "~10 sec" },
+
+  // { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO", time: "~1 min" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
@@ -394,6 +395,18 @@ export const BackgroundBuilderLeft = ({
     }
   };
 
+
+
+  function adjustedPadding(modelId: string) {
+    if (modelId === "replicate-nb-2") return "pb-2";
+    if (modelId === "replicate-kling-v2.5-turbo-pro") return "pb-2";
+    if (modelId === "replicate-prunaai/p-video") return "pt-2";
+    if (modelId === "openrouter-seedance-2") return "py-2";
+    if (modelId === "bytedance/seedream-4.5") return "pt-2";
+    return ""
+
+  }
+
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
@@ -546,19 +559,21 @@ export const BackgroundBuilderLeft = ({
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#212121] border border-[#2c2c2c] rounded-[16px] min-w-[240px] shadow-3xl flex flex-col overflow-hidden">
                     {availableModels.map((model) => (
                       <button
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5",
-                          selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                        )}
+                        className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
                       >
-                        <span className="whitespace-nowrap">{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
+                        <div className="flex flex-col">
+                          <span className="text-sm  tracking-tight text-white leading-5">{model.label}</span>
+                          <span className="text-xs leading-[18px]  text-[#737373]">
+                            {model.time} · {model.credits} credits
+                          </span>
+                        </div>
+                        {selectedModel === model.id && <i className="ri-check-line text-[20px] text-white" />}
                       </button>
                     ))}
                   </div>

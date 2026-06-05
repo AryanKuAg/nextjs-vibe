@@ -77,5 +77,102 @@ export const TEMPLATES: Template[] = [
         videoPrompt: "",
       }
     ]
-  }
+  },
+  {
+    id: "template-3",
+    name: "Mars",
+    coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/mars_image_1.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/mars_image_1.jpg",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/mars_image_1.jpg"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/mars_image_2.png",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/mars_image_2.png"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/mars_video_1.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/mars_video_1.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      }
+    ]
+  },
+  {
+    id: "template-4",
+    name: "Beach",
+    coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_image_1.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_image_1.jpg",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_image_1.jpg"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_image_2.png",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_image_2.png"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_video_1.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_video_1.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      },
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_image_2.png",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_image_2.png"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_image_3.png",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_image_3.png"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/beach_video_2.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/beach_video_2.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      }
+    ]
+  },
+  {
+    id: "template-5",
+    name: "Green Train",
+    coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/green_train_image_1.jpeg",
+    blocks: [
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/green_train_image_1.jpeg",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/green_train_image_1.jpeg"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/green_train_image_2.png",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/green_train_image_2.png"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/green_train_video_1.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/green_train_video_1.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      }
+    ]
+  }, {
+    id: "template-6",
+    name: "Forest",
+    coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/forest_image_1.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/forest_image_1.jpg",
+        startFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/forest_image_1.jpg"],
+        endFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/forest_image_2.jpg",
+        endFrameHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/forest_image_2.jpg"],
+        videoUrl: "https://storage.googleapis.com/sites.framerate.space/templates/forest_video_1.mp4",
+        videoHistory: ["https://storage.googleapis.com/sites.framerate.space/templates/forest_video_1.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+      }
+    ]
+  },
 ];

@@ -91,11 +91,11 @@ export const codeAgentFunction = inngest.createFunction(
     }
 
     const getModel = (modelName: string) => {
-      // Fallback if OpenRouter models are passed
+      // Using Cerebras for free testing as requested
       return openai({
-        model: modelName.replace("openrouter-", ""),
-        apiKey: process.env.OPENROUTER_API_KEY!,
-        baseUrl: "https://openrouter.ai/api/v1",
+        model: "gpt-oss-120b", // User-requested model
+        apiKey: process.env.CEREBRAS_API_KEY!,
+        baseUrl: "https://api.cerebras.ai/v1",
       });
     };
 

@@ -12,4 +12,8 @@
  * client-side React instance for both the provider (QueryClientProvider in
  * TRPCReactProvider) and the consumer (HydrationBoundary).
  */
-export { HydrationBoundary } from "@tanstack/react-query";
+import { HydrationBoundary as RQHydrationBoundary, type HydrationBoundaryProps } from "@tanstack/react-query";
+
+export function HydrationBoundary(props: HydrationBoundaryProps) {
+  return <RQHydrationBoundary {...props} />;
+}

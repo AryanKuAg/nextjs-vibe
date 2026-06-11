@@ -79,6 +79,7 @@ export const ProjectView = ({ projectId }: Props) => {
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("START");
   // Prevent the DB restore effect from running more than once
   const hasRestoredFromDBRef = useRef(false);
+  const hasInitializedStageRef = useRef(false);
   // True once the client-side localStorage restore has completed.
   // The save effect is gated on this so it can't overwrite localStorage
   // before the restore runs.
@@ -98,6 +99,9 @@ export const ProjectView = ({ projectId }: Props) => {
             startPrompt: item?.startPrompt,
             endPrompt: item?.endPrompt,
             videoPrompt: item?.videoPrompt,
+            startFrameUrl: item?.startFrameUrl || null,
+            endFrameUrl: item?.endFrameUrl || null,
+            videoUrl: item?.videoUrl || null,
           })));
         }
       }
@@ -213,6 +217,12 @@ export const ProjectView = ({ projectId }: Props) => {
       return;
     }
 
+    if (mode === "video") {
+      toast.success("Ready to build site with video background!");
+      setActiveStageTab("SITE");
+      return;
+    }
+
     // Collect the currently active video URL per block (in order)
     const activeVideoUrls = blocks
       .map(b => b.videoUrl)
@@ -250,17 +260,18 @@ export const ProjectView = ({ projectId }: Props) => {
 
   // Sync initial render from project
   useEffect(() => {
-    if (project) {
+    if (project && !hasInitializedStageRef.current) {
       if (project.currentStage === "SITE") {
         setActiveStageTab("SITE");
       } else {
         setActiveStageTab("BACKGROUND");
       }
-      
-      const frameCount = (project as { frameCount?: number | null })?.frameCount;
-      if (frameCount && extractedFrameCount === undefined) {
-        setExtractedFrameCount(frameCount);
-      }
+      hasInitializedStageRef.current = true;
+    }
+    
+    const frameCount = (project as { frameCount?: number | null })?.frameCount;
+    if (frameCount && extractedFrameCount === undefined) {
+      setExtractedFrameCount(frameCount);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.currentStage, (project as { frameCount?: number | null })?.frameCount]);
@@ -476,7 +487,10 @@ export const ProjectView = ({ projectId }: Props) => {
     const dataToSave = blocks.map(b => ({
       startPrompt: b.startPrompt,
       endPrompt: b.endPrompt,
-      videoPrompt: b.videoPrompt
+      videoPrompt: b.videoPrompt,
+      startFrameUrl: b.startFrameUrl,
+      endFrameUrl: b.endFrameUrl,
+      videoUrl: b.videoUrl
     }));
 
     // Save locally immediately

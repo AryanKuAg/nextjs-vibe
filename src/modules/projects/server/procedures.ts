@@ -264,57 +264,7 @@ export const projectsRouter = createTRPCRouter({
       const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
       await checkCredits(cost);
 
-      // Check if a template is matched and has rawHtml for instant generation
-      let rawHtmlBypass = false;
-      let finalDeploymentUrl = null;
-      if (input.templateId) {
-        const { TEMPLATES } = await import("@/lib/templates");
-        const template = TEMPLATES.find(t => t.id === input.templateId);
-        if (template && template.rawHtml) {
-          rawHtmlBypass = true;
-          let htmlContent = template.rawHtml;
-          
-          if (input.mode === "interactive" && input.videoUrl) {
-            htmlContent = htmlContent.replace(/\{\{FRAMES_ZIP_URL\}\}/g, input.videoUrl);
-          } else if (input.mode === "video") {
-            // Find the video URL. If blocks are passed, use it, else fallback to something safe.
-            // In a real scenario, videoUrl from input will be the extracted zip. 
-            // We need to look up the project's actual video URLs.
-            const projectVideos = Array.isArray(existingProject.videoUrls) ? existingProject.videoUrls : [];
-            const lastVideo = projectVideos[projectVideos.length - 1];
-            const actualVideoUrl = typeof lastVideo === "string" ? lastVideo : (lastVideo as any)?.url || "";
-            htmlContent = htmlContent.replace(/\{\{VIDEO_URL\}\}/g, actualVideoUrl);
-          }
 
-          // Upload raw HTML to GCS
-          const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-          const { Storage } = await import("@google-cloud/storage");
-          const storage = new Storage(
-            process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-              ? {
-                  projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                  credentials: {
-                    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-                  },
-                }
-              : {
-                  projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                }
-          );
-          
-          const bucket = storage.bucket(bucketName);
-          const fileName = `sites/${input.projectId}/index_${Date.now()}.html`;
-          const file = bucket.file(fileName);
-          
-          await file.save(htmlContent, {
-            metadata: { contentType: "text/html" },
-          });
-
-          const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
-          finalDeploymentUrl = `${cdnUrl}/${fileName}`;
-        }
-      }
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -326,39 +276,18 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
-      if (rawHtmlBypass && finalDeploymentUrl) {
-        // Create an ASSISTANT message immediately with the fragment
-        await prisma.message.create({
-          data: {
-            projectId: existingProject.id,
-            content: "Site generated instantly via template.",
-            role: "ASSISTANT",
-            type: "RESULT",
-            stage: "SITE",
-            fragment: {
-              create: {
-                title: "Template Site",
-                deploymentUrl: finalDeploymentUrl,
-                sandboxUrl: finalDeploymentUrl,
-                files: {},
-              }
-            }
-          }
-        });
-      } else {
-        await inngest.send({
-          name: "code-agent/run",
-          data: {
-            value: input.value,
-            projectId: input.projectId,
-            videoUrl: input.videoUrl ?? undefined,
-            frameCount: input.frameCount,
-            model: input.model,
-            userId: ctx.auth.userId,
-            imageDataUrl: input.imageDataUrl,
-          },
-        });
-      }
+      await inngest.send({
+        name: "code-agent/run",
+        data: {
+          value: input.value,
+          projectId: input.projectId,
+          videoUrl: input.videoUrl ?? undefined,
+          frameCount: input.frameCount,
+          model: input.model,
+          userId: ctx.auth.userId,
+          imageDataUrl: input.imageDataUrl,
+        },
+      });
 
       await prisma.project.update({
         where: { id: input.projectId },

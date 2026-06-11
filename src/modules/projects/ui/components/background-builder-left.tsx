@@ -28,6 +28,7 @@ interface Props {
   projectId: string;
   blocks: VideoBlock[];
   isExtracting?: boolean;
+  mode: "video" | "interactive";
 }
 
 const openImagesDB = (): Promise<IDBDatabase> => {
@@ -93,7 +94,8 @@ export const BackgroundBuilderLeft = ({
   onApplyTemplate,
   projectId,
   blocks,
-  isExtracting
+  isExtracting,
+  mode
 }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -670,6 +672,7 @@ export const BackgroundBuilderLeft = ({
             onApplyTemplate(t.blocks);
           }
         }}
+        mode={mode}
       />
     </>
   );

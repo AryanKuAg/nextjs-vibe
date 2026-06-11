@@ -62,6 +62,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
+  const [mode, setMode] = useState<"video" | "interactive">("interactive");
 
   const emptyBlock: VideoBlock = {
     startFrameUrl: null, startFrameHistory: [],
@@ -100,6 +101,11 @@ export const ProjectView = ({ projectId }: Props) => {
           })));
         }
       }
+      
+      const savedMode = localStorage.getItem(`vibe-mode-${projectId}`);
+      if (savedMode === "video" || savedMode === "interactive") {
+        setMode(savedMode);
+      }
     } catch (e) {
       console.error("[blocks] Failed to restore from localStorage:", e);
     }
@@ -108,6 +114,15 @@ export const ProjectView = ({ projectId }: Props) => {
     setHasRestored(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount (client-only)
+
+  const handleModeChange = (newMode: "video" | "interactive") => {
+    setMode(newMode);
+    localStorage.setItem(`vibe-mode-${projectId}`, newMode);
+    if (newMode === "video" && blocks.length > 1) {
+      setBlocks(prev => prev.slice(0, 1));
+      if (activeBlockIndex > 0) handleSetActiveBlockIndex(0);
+    }
+  };
 
   const handleAddBlock = () => {
     if (blocks.length < 4) {
@@ -699,6 +714,7 @@ export const ProjectView = ({ projectId }: Props) => {
               isExtracting={isExtracting}
               updateBlock={updateBlock}
               onApplyTemplate={handleApplyTemplate}
+              mode={mode}
             />
           )}
 
@@ -713,6 +729,8 @@ export const ProjectView = ({ projectId }: Props) => {
                   extractedZipUrl={extractedZipUrl}
                   extractedFrameCount={extractedFrameCount}
                   onBack={() => setActiveStageTab("BACKGROUND")}
+                  mode={mode}
+                  blocks={blocks}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -803,6 +821,8 @@ export const ProjectView = ({ projectId }: Props) => {
                   onAddBlock={handleAddBlock}
                   onRemoveBlock={handleRemoveBlock}
                   updateBlock={updateBlock}
+                  mode={mode}
+                  setMode={handleModeChange}
                 />
               ) : (
                 <>

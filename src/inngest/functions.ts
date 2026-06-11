@@ -1,14 +1,17 @@
 import { z } from "zod";
-import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT, ARCHITECT_PROMPT } from "@/prompt";
+import { templateManifests } from "@/registry/components";
+import fs from "fs";
+import path from "path";
+import matter from "gray-matter";
 
 import { inngest } from "./client";
 import { NonRetriableError } from "inngest";
 import { SANDBOX_TIMEOUT } from "./types";
-import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
+import { parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
 import { Storage } from "@google-cloud/storage";
 
@@ -96,29 +99,6 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
-    const sandboxId = await step.run("get-sandbox-id", async () => {
-      let sandbox;
-      if (project?.sandboxId) {
-        try {
-          sandbox = await Sandbox.connect(project.sandboxId);
-        } catch {
-          console.log("Existing sandbox expired, creating new one.");
-        }
-      }
-
-      if (!sandbox) {
-        sandbox = await Sandbox.create("vibe-reactjs-test");
-        await sandbox.setTimeout(SANDBOX_TIMEOUT);
-
-        await prisma.project.update({
-          where: { id: event.data.projectId },
-          data: { sandboxId: sandbox.sandboxId }
-        });
-      }
-
-      return sandbox.sandboxId;
-    });
-
     const latestFragment = await step.run("get-latest-fragment", async () => {
       const messageWithFragment = await prisma.message.findFirst({
         where: {
@@ -196,103 +176,6 @@ export const codeAgentFunction = inngest.createFunction(
       return files;
     });
 
-    await step.run("hydrate-sandbox", async () => {
-      const filesObj = initialFiles;
-      const hasFiles = Object.keys(filesObj).length > 0;
-
-      if (!hasFiles) {
-        console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
-        return null;
-      }
-
-      const PROTECTED_FILES = [
-        "src/components/CanvasScroll.tsx",
-        "src/components/Preloader.tsx",
-        "src/store/useStore.ts",
-        "src/constants/frames.ts",
-        "src/components/headers/DotNav.tsx",
-        "src/components/headers/FullWidthNav.tsx",
-        "src/components/headers/PillNav.tsx",
-      ];
-
-      // Helper function to write a file absolute to /home/user and ensure directory exists
-      const writeSandboxFile = async (sandbox: Sandbox, filePath: string, content: string) => {
-        const absolutePath = filePath.startsWith('/') ? filePath : `/home/user/${filePath}`;
-        const dirParts = filePath.split('/');
-        if (dirParts.length > 1 && !filePath.startsWith('/')) {
-          const dir = dirParts.slice(0, -1).join('/');
-          await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
-        }
-        await sandbox.files.write(absolutePath, content);
-      };
-
-      // If the returned sandboxId exactly matches the one previously saved in the DB, 
-      // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
-      if (sandboxId === project?.sandboxId) {
-        console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
-
-        try {
-          const sandbox = await getSandbox(sandboxId);
-          const fs = await import("fs");
-          const path = await import("path");
-          
-          // Ensure all protected template files are present and correct in the hot sandbox
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              const content = fs.readFileSync(templatePath, "utf-8");
-              await writeSandboxFile(sandbox, file, content);
-              console.log(`DEBUG: Force-wrote template file ${file} to hot sandbox`);
-            }
-          }
-
-          // We MUST still update the frames.ts file in case the user extracted new frames
-          // between prompts, otherwise the hot sandbox will retain the old frame count.
-          if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
-            await writeSandboxFile(sandbox, "src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
-            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
-          }
-        } catch (e) {
-          console.error("Failed to ensure template files in hot sandbox", e);
-        }
-
-        return null;
-      }
-
-      const sandbox = await getSandbox(sandboxId);
-      let written = 0;
-      
-      // Ensure directory structure and write all files
-      for (const [filePath, content] of Object.entries(filesObj)) {
-        if (typeof content === "string") {
-          try {
-            await writeSandboxFile(sandbox, filePath, content);
-            written++;
-          } catch (e) {
-            console.error(`Failed to hydrate file ${filePath}`, e);
-          }
-        }
-      }
-
-      // Also force-write the templates just to be safe on fresh sandbox
-      try {
-        const fs = await import("fs");
-        const path = await import("path");
-        for (const file of PROTECTED_FILES) {
-          const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-          if (fs.existsSync(templatePath)) {
-            const content = fs.readFileSync(templatePath, "utf-8");
-            await writeSandboxFile(sandbox, file, content);
-            console.log(`DEBUG: Force-wrote template file ${file} to new sandbox`);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to ensure template files on new sandbox hydration", e);
-      }
-
-      console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
-    });
-
     const previousMessages = await step.run("get-previous-messages", async () => {
       const formattedMessages: Message[] = [];
 
@@ -343,51 +226,23 @@ export const codeAgentFunction = inngest.createFunction(
     const runId = event.id ? event.id.slice(0, 8) : Math.random().toString(36).substring(2, 10);
 
     // Factory to generate tools with safe, deterministic, auto-incrementing step IDs
-    // Factory to generate tools with safe, deterministic, auto-incrementing step IDs
     const getToolsForAgent = (prefix: string) => {
-      let terminalCount = 0;
       let readFilesCount = 0;
-      let createFilesCount = 0; // <-- Add this counter
+      let createFilesCount = 0;
 
       return [
         createTool({
-          name: "terminal",
-          // ... keep existing terminal description/params ...
-          parameters: z.object({
-            command: z.string(),
-          }),
-          handler: async ({ command }, { step }) => {
-            terminalCount++;
-            return await step?.run(`terminal-${prefix}-call-${terminalCount}`, async () => {
-              const buffers = { stdout: "", stderr: "" };
-              try {
-                const sandbox = await getSandbox(sandboxId);
-                const result = await sandbox.commands.run(`yes 2>/dev/null | (${command})`, {
-                  timeoutMs: 0,
-                  onStdout: (data: string) => { buffers.stdout += data; },
-                  onStderr: (data: string) => { buffers.stderr += data; },
-                });
-                return result.stdout || "(done, no output)";
-              } catch (e) {
-                return `Command failed: ${e}\nstdout: ${buffers.stdout}\nstderr: ${buffers.stderr}`;
-              }
-            });
-          },
-        }),
-        createTool({
           name: "createOrUpdateFiles",
-          description: "Create or update files in the sandbox",
+          description: "Create or update files in the project",
           parameters: z.object({
             files: z.array(z.object({ path: z.string(), content: z.string() })),
           }),
           handler: async ({ files }, { network, step }: Tool.Options<AgentState>) => {
             createFilesCount++;
 
-            // 1. Do the heavy API work INSIDE the step
             const updatedFiles = await step?.run(`createFiles-${prefix}-call-${createFilesCount}`, async () => {
               try {
                 const updated: Record<string, string> = {};
-                const sandbox = await getSandbox(sandboxId);
 
                 const PROTECTED_FILES = [
                   "src/components/CanvasScroll.tsx",
@@ -427,15 +282,6 @@ export const codeAgentFunction = inngest.createFunction(
                     }
                   }
 
-                  // Ensure parent directory exists before writing to prevent missing directory errors
-                  const dirParts = file.path.split('/');
-                  if (dirParts.length > 1) {
-                    const dir = dirParts.slice(0, -1).join('/');
-                    await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
-                  }
-
-                  await sandbox.files.write(`/home/user/${file.path}`, file.content);
-                  await sandbox.commands.run(`touch "/home/user/${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
                 return { updated };
@@ -449,7 +295,6 @@ export const codeAgentFunction = inngest.createFunction(
               return updatedFiles.error || "File write failed";
             }
 
-            // 2. Safely mutate the state OUTSIDE the step
             if (updatedFiles && 'updated' in updatedFiles && network) {
               network.state.data.files = {
                 ...(network.state.data.files || {}),
@@ -461,20 +306,18 @@ export const codeAgentFunction = inngest.createFunction(
         }),
         createTool({
           name: "readFiles",
-          // ... keep existing readFiles code ...
-          description: "Read files from the sandbox",
+          description: "Read files from the project",
           parameters: z.object({
             files: z.array(z.string()),
           }),
-          handler: async ({ files }, { step }) => {
+          handler: async ({ files }, { network, step }) => {
             readFilesCount++;
             return await step?.run(`readFiles-${prefix}-call-${readFilesCount}`, async () => {
               try {
-                const sandbox = await getSandbox(sandboxId);
                 const contents = [];
-                 for (const file of files) {
-                  const absolutePath = file.startsWith('/') ? file : `/home/user/${file}`;
-                  const content = await sandbox.files.read(absolutePath);
+                for (const file of files) {
+                  // Read from the agent's current state instead of sandbox
+                  const content = network?.state.data.files[file] || "File not found";
                   contents.push({ path: file, content });
                 }
                 return JSON.stringify(contents);
@@ -578,9 +421,115 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
       currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
     }
 
-    // --- 1. INITIAL GENERATION (The Creator) ---
+    // --- 1. ARCHITECT ROUTING (The Planner) ---
+    console.log('DEBUG: Running Architect agent...');
+    
+    // Parse frontmatter of all registered templates
+    const registryManifest = [];
+    const templateDataMap: Record<string, { dir: string, content: string }> = {};
 
-    // --- 1. INITIAL GENERATION (The Creator) ---
+    for (const templateDir of templateManifests) {
+      try {
+        const absoluteDir = path.join(process.cwd(), templateDir);
+        const readmePath = path.join(absoluteDir, "README.md");
+        if (fs.existsSync(readmePath)) {
+          const rawReadme = fs.readFileSync(readmePath, "utf-8");
+          const parsed = matter(rawReadme);
+          const id = parsed.data.id;
+          const description = parsed.data.description;
+          if (id && description) {
+            registryManifest.push({ id, description });
+            templateDataMap[id] = { dir: absoluteDir, content: parsed.content };
+          }
+        }
+      } catch (err) {
+        console.error(`DEBUG: Failed to parse template at ${templateDir}:`, err);
+      }
+    }
+
+    let architectPromptText = `User Prompt: ${event.data.value}\n\nRegistry Manifest: ${JSON.stringify(registryManifest, null, 2)}`;
+    if (event.data.videoUrl) {
+      architectPromptText += `\n\nCRITICAL SYSTEM REQUIREMENT: A videoUrl is present (${event.data.videoUrl}). You MUST include a video background handling component.`;
+    }
+
+    const architectAgent = createAgent({
+      name: `architect-agent-run-${runId}`,
+      description: "A component routing architect",
+      system: ARCHITECT_PROMPT,
+      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+    });
+
+    const architectResult = await architectAgent.run(architectPromptText);
+    const architectOutput = parseAgentOutput(architectResult.output) || "[]";
+    console.log('DEBUG: Architect Output:', architectOutput);
+    
+    let injectedComponentsSpec = "";
+    
+    try {
+      // Find JSON array in the response (in case the AI wraps it in markdown)
+      const match = architectOutput.match(/\\[[\\s\\S]*\\]/);
+      const jsonStr = match ? match[0] : architectOutput;
+      const selectedIds = JSON.parse(jsonStr);
+
+      if (Array.isArray(selectedIds) && selectedIds.length > 0) {
+        let componentDocs = "";
+        
+        for (const id of selectedIds) {
+          const template = templateDataMap[id];
+          if (template) {
+            // 1. Recursive file injection
+            const getAllFilesRecursive = (dirPath: string, arrayOfFiles: {path: string, content: string}[] = []) => {
+              const files = fs.readdirSync(dirPath);
+              files.forEach((file) => {
+                const fullPath = path.join(dirPath, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                  arrayOfFiles = getAllFilesRecursive(fullPath, arrayOfFiles);
+                } else if (file !== "README.md") { // Skip injecting README.md into the sandbox
+                  arrayOfFiles.push({
+                    path: fullPath,
+                    content: fs.readFileSync(fullPath, "utf-8")
+                  });
+                }
+              });
+              return arrayOfFiles;
+            };
+
+            const filesToInject = getAllFilesRecursive(template.dir);
+            for (const file of filesToInject) {
+              // Calculate relative path inside the template directory
+              const relativePath = path.relative(template.dir, file.path);
+              // Inject to src/components/[id]/[relativePath]
+              const sandboxPath = `src/components/${id}/${relativePath}`;
+              state.data.files[sandboxPath] = file.content;
+            }
+            
+            // 2. Add the README instructions to the Builder prompt
+            componentDocs += `${template.content}\n\n---\n\n`;
+          }
+        }
+
+        if (componentDocs) {
+          injectedComponentsSpec = `
+[SYSTEM PROMPT INJECTION: PRE-BUILT COMPONENTS]
+You are an expert frontend developer. To accelerate development, I have pre-injected the following custom components into your workspace (they already exist in your file system). 
+**You MUST use them if they fit the user's request.** Do not try to recreate this functionality from scratch.
+
+${componentDocs}
+
+**Task:** Read the user's request. Write \`src/App.tsx\` and any other necessary files to fulfill it. If the pre-injected components are relevant to the user's request, use them as documented above to save time. If the user is asking for something completely different, ignore the components and build it from scratch exactly as requested.
+`;
+        }
+      }
+    } catch (err) {
+      console.error("DEBUG: Failed to process Architect response:", err);
+    }
+
+    // Replace the placeholder in the main prompt
+    currentPrompt = currentPrompt.replace("[SYSTEM PROMPT INJECTION PLACEHOLDER]", injectedComponentsSpec);
+
+
+
+    // --- 2. INITIAL GENERATION (The Creator) ---
     // Run the main massive agent exactly once to build the features
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialNetwork = createNetwork<AgentState>({
@@ -609,355 +558,15 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
       finalSummary = "Task completed.";
     }
 
-    // --- 2. THE SELF-HEALING LOOP (The Fixer) ---
-    let isBuildSuccessful = false;
-    const maxRetries = 5;
-    let attempt = 1;
-
-    while (!isBuildSuccessful && attempt <= maxRetries) {
-      await checkCancellation(event.data.projectId);
-      // Step A: Check the build
-      const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
-        try {
-          const sandbox = await getSandbox(sandboxId);
-          await sandbox.commands.run("rm -rf dist");
-
-          // Ensure all protected template files are present and correct in the sandbox
-          const PROTECTED_FILES = [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ];
-          
-          const fs = await import("fs");
-          const path = await import("path");
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              try {
-                const content = fs.readFileSync(templatePath, "utf-8");
-                const dir = path.dirname(file);
-                await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
-                await sandbox.files.write(`/home/user/${file}`, content);
-                console.log(`DEBUG: Force-wrote template file ${file} to sandbox`);
-              } catch (e) {
-                console.error(`Failed to force-write template file ${file}`, e);
-              }
-            }
-          }
-
-          if (videoUrl) {
-            console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-            if (zipResult.exitCode !== 0) {
-              console.error("ZIP FETCH ERR:", zipResult.stderr);
-              throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
-            }
-          }
-
-          console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
-          const checkStructureScript = `
-const fs = require('fs');
-if (fs.existsSync('src/App.tsx')) {
-  const c = fs.readFileSync('src/App.tsx', 'utf8');
-  const hasCanvas = c.includes('<CanvasScroll');
-  const hasPreloader = c.includes('<Preloader');
-  const canvasCommented = c.match(/\\{\\/\\*\\s*<CanvasScroll/);
-  const preloaderCommented = c.match(/\\{\\/\\*\\s*<Preloader/);
-  
-  if (!hasCanvas || !hasPreloader || canvasCommented || preloaderCommented) {
-    console.error('CRITICAL ERROR: App.tsx is missing <CanvasScroll /> or <Preloader />, or they are commented out. They MUST be present and active.');
-    process.exit(1);
-  }
-}
-`;
-          await sandbox.files.write("/app/check-structure.js", checkStructureScript);
-          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
-          if (structCheck.exitCode !== 0) {
-            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
-          }
-
-          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
-          try {
-            await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr) {
-            const err = tsErr as { stdout?: string, stderr?: string };
-            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
-          }
-
-          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
-          try {
-            // Safeguard: Convert absolute frame paths (/frame-) into relative paths (./frame-) 
-            // We use a robust Node script to avoid turning existing './frame-' into '.../frame-'
-            const fixPathsScript = `
-const fs = require('fs');
-const path = require('path');
-function fixPaths(dir) {
-  if (!fs.existsSync(dir)) return;
-  for (const f of fs.readdirSync(dir)) {
-    const p = path.join(dir, f);
-    if (fs.statSync(p).isDirectory()) fixPaths(p);
-    else if (p.endsWith('.tsx') || p.endsWith('.js') || p.endsWith('.html') || p.endsWith('.css')) {
-      let content = fs.readFileSync(p, 'utf8');
-      let changed = false;
-
-      // Fix App.tsx dummy declarations
-      if (f === 'App.tsx') {
-        let originalContent = content;
-        
-        // Remove dummy definitions
-        const dummyPatterns = [
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*null;?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*null;?/g,
-          /function\s+Preloader\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /function\s+CanvasScroll\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /\/\/ Dummy components to satisfy imports/g,
-          /\/\/ Dummy components?/g,
-        ];
-        for (const pattern of dummyPatterns) {
-          content = content.replace(pattern, '');
-        }
-
-        // Fix default to named imports
-        content = content.replace(/import\s+Preloader\s+from\s+["']([^"']+)["']/g, 'import { Preloader } from "$1"');
-        content = content.replace(/import\s+CanvasScroll\s+from\s+["']([^"']+)["']/g, 'import { CanvasScroll } from "$1"');
-        content = content.replace(/import\s+Navbar\s+from\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
-        content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
-
-        // Fix alias paths
-        content = content.replace(/@\/components\/Preloader/g, './components/Preloader');
-        content = content.replace(/@\/components\/CanvasScroll/g, './components/CanvasScroll');
-        content = content.replace(/@\/store\/useStore/g, './store/useStore');
-        content = content.replace(/@\/components\/Navbar/g, './components/Navbar');
-
-        // Ensure imports exist
-        const requiredImports = [
-          { name: 'Preloader', path: './components/Preloader' },
-          { name: 'CanvasScroll', path: './components/CanvasScroll' },
-          { name: 'useStore', path: './store/useStore' }
-        ];
-
-        for (const req of requiredImports) {
-          if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {
-            content = 'import { ' + req.name + ' } from "' + req.path + '";\\n' + content;
-          }
-        }
-        
-        if (content !== originalContent) {
-          changed = true;
-        }
-      }
-
-      // Fix missing Lucide brand icons
-      const brandIcons = ['Github', 'Twitter', 'Linkedin', 'Facebook', 'Instagram', 'Youtube'];
-      let importedBrands = [];
-      const importRegex = /import\\s+\\{([^}]+)\\}\\s+from\\s+["']lucide-react["']/g;
-      let match;
-      let newContent = content;
-      while ((match = importRegex.exec(content)) !== null) {
-        const fullImportStatement = match[0];
-        const importedItemsStr = match[1];
-        const items = importedItemsStr.split(',').map(item => item.trim());
-        const remainingItems = [];
-        let statementChanged = false;
-        
-        for (const item of items) {
-          const name = item.split(/\\s+as\\s+/)[0].trim();
-          if (brandIcons.includes(name)) {
-            importedBrands.push(item);
-            statementChanged = true;
-          } else {
-            remainingItems.push(item);
-          }
-        }
-        
-        if (statementChanged) {
-          let replacement = '';
-          if (remainingItems.length > 0) {
-            replacement = \`import { \${remainingItems.join(', ')} } from "lucide-react"\`;
-          }
-          newContent = newContent.replace(fullImportStatement, replacement);
-        }
-      }
-      
-      if (importedBrands.length > 0) {
-        let svgDeclarations = '\\n// Inject missing brand icons from older Lucide versions\\n';
-        for (const item of importedBrands) {
-          const parts = item.split(/\\s+as\\s+/);
-          const originalName = parts[0].trim();
-          const localName = parts[1] ? parts[1].trim() : originalName;
-          let svgPath = '';
-          if (originalName === 'Github') {
-            svgPath = '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" />';
-          } else if (originalName === 'Twitter') {
-            svgPath = '<path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />';
-          } else if (originalName === 'Linkedin') {
-            svgPath = '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" />';
-          } else if (originalName === 'Facebook') {
-            svgPath = '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />';
-          } else if (originalName === 'Instagram') {
-            svgPath = '<rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />';
-          } else if (originalName === 'Youtube') {
-            svgPath = '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />';
-          }
-          svgDeclarations += \`const \${localName} = (props) => (
-  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    \${svgPath}
-  </svg>
-);\\n\`;
-        }
-        newContent = newContent + svgDeclarations;
-        content = newContent;
-        changed = true;
-      }
-
-      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/assets\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/assets\\/frame-/g, '$1./frame-');
-        changed = true;
-      }
-      // Strip assets/ prefix if import.meta.url was used
-      if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\/frame-/g, 'frame-');
-        changed = true;
-      }
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/frame-/g, '$1./frame-');
-        changed = true;
-      }
-      if (changed) fs.writeFileSync(p, content);
-    }
-  }
-}
-fixPaths(process.argv[2]);
-`;
-            await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
-
-            // Run pre-build to fix source files
-            await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
-
-            await sandbox.commands.run("npm run build --silent -- --base=./");
-
-            // Run post-build to fix bundled output files
-            await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
-          } catch (buildErr) {
-            const err = buildErr as { stdout?: string, stderr?: string };
-            const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
-          }
-
-          return { success: true, error: "" };
-        } catch (infraErr) {
-          const err = infraErr as Error;
-          return { success: false, error: `Sandbox Execution Error: ${err.message || String(err)}` };
-        }
-      });
-
-      // Step B: Evaluate the check
-      if (buildCheck.success) {
-        console.log("DEBUG: Build passed successfully!");
-        isBuildSuccessful = true;
-        break; // Exit the loop!
-      }
-
-      // Step C: The Fixer Agent takes over
-      // Step C: The Fixer Agent takes over
-      console.log(`DEBUG: Build failed. Spinning up Fixer Agent (Attempt ${attempt})...`);
-
-      // CREATE A CLEAN STATE FOR THE FIXER
-      // We pass the files so it can edit them, but we do NOT pass the messages history.
-      const fixerState = createState<AgentState>({
-        summary: "",
-        files: state.data.files,
-      });
-
-      // Create a dedicated mini-agent just for this fix attempt
-      const fixerAgent = createAgent<AgentState>({
-        name: `fixer-agent-run-${runId}-attempt-${attempt}`,
-        description: "An expert debugging agent",
-        system: FIXER_PROMPT,
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
-        tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
-        lifecycle: {
-          onResponse: async ({ result, network }) => {
-            const lastAssistantMessageText = lastAssistantTextMessageContent(result);
-            if (lastAssistantMessageText && network) {
-              if (lastAssistantMessageText.includes("<task_summary>")) {
-                network.state.data.summary = lastAssistantMessageText;
-              }
-            }
-            return result;
-          },
-        },
-      });
-
-      const fixerNetwork = createNetwork<AgentState>({
-        name: `fixer-network-run-${runId}-attempt-${attempt}`,
-        agents: [fixerAgent],
-        maxIter: 3,
-        defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
-        router: async ({ network }) => {
-          await checkCancellation(event.data.projectId);
-          if (network.state.data.summary) return;
-          return fixerAgent;
-        },
-        defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
-      });
-
-      // --- SMART CONTEXT INJECTION FOR THE FIXER ---
-      let brokenFilesContext = "";
-      const hasStateFiles = Object.keys(fixerState.data.files).length > 0;
-      if (hasStateFiles) {
-        brokenFilesContext += `\n\n=== BROKEN FILES CONTENT ===\n`;
-        let injectedCount = 0;
-
-        for (const [path, content] of Object.entries(fixerState.data.files)) {
-          if (buildCheck.error.includes(path)) {
-            brokenFilesContext += `--- ${path} ---\n\`\`\`tsx\n${content}\n\`\`\`\n\n`;
-            injectedCount++;
-          }
-        }
-        brokenFilesContext += `=== END BROKEN FILES CONTENT ===\n\n`;
-
-        if (injectedCount === 0) {
-          brokenFilesContext = "\n*(Note: Could not auto-extract broken file contents. Use your `readFiles` tool to investigate the error above.)*\n";
-        }
-      }
-
-      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
-The build failed with these exact errors:
-
-${buildCheck.error}
-${brokenFilesContext}
-
-Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
-
-      // <--- USE THE CLEAN STATE HERE AS WELL
-      const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });
-
-      // Update our master state with whatever the fixer changed
-      state.data.files = fixResult.state.data.files;
-      finalFiles = state.data.files;
-
-      attempt++;
-    }
     const fragmentTitleGenerator = createAgent({
-      name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
+      name: `fragment-title-generator-run-${runId}`,
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
       model: getModel(event.data.model || "gemini-3.1-pro-preview"),
     });
 
     const responseGenerator = createAgent({
-      name: `response-generator-run-${runId}`, // Ensure name is unique per run!
+      name: `response-generator-run-${runId}`,
       description: "A response generator",
       system: RESPONSE_PROMPT,
       model: getModel(event.data.model || "gemini-3.1-pro-preview"),
@@ -965,234 +574,6 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
     const { output: responseOutput } = await responseGenerator.run(finalSummary);
-
-    console.log('hola', isBuildSuccessful);
-    // ... continues to deploymentUrl ...
-
-    const deploymentUrl = await step.run("deploy-to-gcp", async () => {
-      if (!isBuildSuccessful) {
-        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting GCP deployment.");
-        return null;
-      }
-
-      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for GCS deployment...");
-      const sandbox = await getSandbox(sandboxId);
-
-      // Step 1: Write the extraction script as a file to the sandbox (avoids all quote/escape mangling)
-      const extractionScript = [
-        "const fs = require('fs');",
-        "const path = require('path');",
-        "function getFiles(dir, fileList) {",
-        "  fileList = fileList || {};",
-        "  if (!fs.existsSync(dir)) return fileList;",
-        "  var items = fs.readdirSync(dir);",
-        "  for (var i = 0; i < items.length; i++) {",
-        "    var p = path.join(dir, items[i]);",
-        "    if (fs.statSync(p).isDirectory()) {",
-        "      getFiles(p, fileList);",
-        "    } else {",
-        "      var name = items[i].toLowerCase();",
-        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
-        "      if (!isFrame) {",
-        "        var key = p.split(path.sep).join('/').replace('dist/', '');",
-        "        fileList[key] = fs.readFileSync(p).toString('base64');",
-        "      }",
-        "    }",
-        "  }",
-        "  return fileList;",
-        "}",
-        "process.stdout.write(JSON.stringify(getFiles('dist')));",
-      ].join("\n");
-
-      // Write it to the sandbox filesystem then execute — no shell quoting issues
-      await sandbox.files.write("/app/extract-dist.js", extractionScript);
-      const cmdResult = await sandbox.commands.run("node /app/extract-dist.js", { timeoutMs: 60000 });
-
-      if (cmdResult.exitCode !== 0) {
-        console.error("Failed to extract dist folder. stderr:", cmdResult.stderr);
-        console.error("stdout:", cmdResult.stdout);
-        throw new Error(`Failed to read dist folder: ${cmdResult.stderr || "unknown error"}`);
-      }
-
-      const files = JSON.parse(cmdResult.stdout);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const storage = new Storage(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-          }
-          : {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          }
-      );
-
-      const bucket = storage.bucket(bucketName);
-      const sitePrefix = `sites/${event.data.projectId}/`;
-
-      // Step 2: Upload text/code assets to GCS in batches
-      console.log(`DEBUG: Pushing ${Object.keys(files).length} text assets to GCS...`);
-      const entries = Object.entries(files);
-      const chunkSize = 25;
-
-      for (let i = 0; i < entries.length; i += chunkSize) {
-        const chunk = entries.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
-          const buffer = Buffer.from(base64Content as string, 'base64');
-          let contentType = "application/octet-stream";
-          const lowerPath = relativePath.toLowerCase();
-          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
-          else if (lowerPath.endsWith(".css")) contentType = "text/css";
-          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (lowerPath.endsWith(".json")) contentType = "application/json";
-          else if (lowerPath.endsWith(".png")) contentType = "image/png";
-          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
-          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
-          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
-          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
-          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
-          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
-          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
-          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
-          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
-        }));
-      }
-
-      // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
-      // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
-      if (videoUrl) {
-        console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
-        const JSZip = (await import("jszip")).default;
-        const zipResponse = await fetch(videoUrl);
-        if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
-        const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
-        const zip = await JSZip.loadAsync(zipBuffer);
-
-        const frameEntries = Object.entries(zip.files).filter(([name, f]) => !f.dir && name.endsWith(".jpg"));
-        const frameChunkSize = 12; // Reduced to 5 to prevent socket hang up with high-quality larger frames
-        for (let i = 0; i < frameEntries.length; i += frameChunkSize) {
-          const chunk = frameEntries.slice(i, i + frameChunkSize);
-          await Promise.all(chunk.map(async ([name, zipEntry]) => {
-            const frameBuffer = await zipEntry.async("nodebuffer");
-            const meta = { metadata: { contentType: "image/jpeg" }, resumable: false };
-            // Upload to root site dir (for AI code using ./frame-N.jpg relative to the page)
-            // AND to assets/ subdir (for AI code using import.meta.url inside the JS bundle)
-            // This guarantees frames load correctly regardless of how the AI resolves paths.
-            await Promise.all([
-              bucket.file(`${sitePrefix}${name}`).save(frameBuffer, meta),
-              bucket.file(`${sitePrefix}assets/${name}`).save(frameBuffer, meta),
-            ]);
-          }));
-        }
-        console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
-      }
-
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      const finalUrl = `${cdnBase}/${sitePrefix}index.html`;
-      console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
-      return finalUrl;
-    });
-
-    const sandboxUrl = await step.run("get-sandbox-url", async () => {
-      const sandbox = await getSandbox(sandboxId);
-
-      // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
-      await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
-
-      if (videoUrl) {
-        console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
-        if (devZipResult.exitCode !== 0) {
-          throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
-        }
-      }
-
-      // 2. Start the Vite server in the background
-      await sandbox.commands.run("npm run dev -- --host 0.0.0.0 --port 3000", { background: true });
-
-      // 3. Robustly poll locally until the server is awake and accepting traffic
-      // This eliminates the race condition where the UI renders the URL before Vite has bound the port.
-      await sandbox.commands.run(`
-        for i in {1..20}; do
-          if curl -s http://localhost:3000 >/dev/null; then
-            exit 0
-          fi
-          sleep 0.5
-        done
-        exit 1
-      `);
-
-      const host = sandbox.getHost(3000);
-      return `https://${host}`;
-    });
-
-    const completeFiles = await step.run("get-all-sandbox-files", async () => {
-      try {
-        const sandbox = await getSandbox(sandboxId);
-        // Scrape the sandbox using a strict Whitelist approach.
-        // We only want 'src/', 'public/', and specific configuration files. 
-        // This prevents capturing massive hidden folders like '~/.npm'.
-        const cmdResult = await sandbox.commands.run(`node -e "
-          const fs = require('fs');
-          const path = require('path');
-          
-          function getFiles(dir, fileList = {}) {
-            if (!fs.existsSync(dir)) return fileList;
-            const files = fs.readdirSync(dir);
-            for (const file of files) {
-              const filePath = path.join(dir, file);
-              if (fs.statSync(filePath).isDirectory()) {
-                getFiles(filePath, fileList);
-              } else {
-                const ext = path.extname(filePath).toLowerCase();
-                const normalizedPath = filePath.split(path.sep).join('/');
-                if (normalizedPath.startsWith('public/assets/frame-') && ext === '.jpg') {
-                  continue; // Hide these routing duplicates from the UI
-                }
-                if (['.jpg', '.webp'].includes(ext)) {
-                   fileList[normalizedPath] = 'BINARY_ASSET_OMITTED_FROM_SYNC';
-                } else if (!['.png', '.jpeg', '.gif', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {
-                   fileList[normalizedPath] = fs.readFileSync(filePath, 'utf8');
-                }
-              }
-            }
-            return fileList;
-          }
-          
-          const result = {};
-          
-          // 1. Recursively get UI directories
-          Object.assign(result, getFiles('src'));
-          Object.assign(result, getFiles('public'));
-          
-          // 2. Explicitly grab root configuration files
-          const rootFiles = [
-            'index.html', 'vite.config.ts', 'tailwind.config.js', 'postcss.config.js', 
-            'package.json', 'components.json', 'eslint.config.js', 'tsconfig.app.json', 
-            'tsconfig.json', 'tsconfig.node.json'
-          ];
-          
-          for (const file of rootFiles) {
-            if (fs.existsSync(file)) {
-              result[file] = fs.readFileSync(file, 'utf8');
-            }
-          }
-          
-          console.log(JSON.stringify(result));
-        "`);
-
-        const parsedFiles = JSON.parse(cmdResult.stdout.trim());
-        return parsedFiles;
-      } catch (e) {
-        console.error('DEBUG: Failed to extract full file tree from sandbox:', e);
-        return null;
-      }
-    });
 
     await step.run("save-result", async () => {
       return await prisma.message.create({
@@ -1203,10 +584,10 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
           type: "RESULT",
           fragment: {
             create: {
-              sandboxUrl: sandboxUrl,
-              deploymentUrl: deploymentUrl,
+              sandboxUrl: "",
+              deploymentUrl: null,
               title: parseAgentOutput(fragmentTitleOutput) || "Project Updated",
-              files: completeFiles || finalFiles || {},
+              files: finalFiles || {},
             },
           },
         },
@@ -1220,9 +601,9 @@ Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <ta
     });
 
     return {
-      url: deploymentUrl || sandboxUrl,
-      deploymentUrl: deploymentUrl,
-      sandboxUrl: sandboxUrl,
+      url: "",
+      deploymentUrl: null,
+      sandboxUrl: "",
       title: parseAgentOutput(fragmentTitleOutput) || "Project",
       files: finalFiles,
       summary: finalSummary,

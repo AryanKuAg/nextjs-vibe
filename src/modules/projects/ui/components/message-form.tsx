@@ -16,9 +16,7 @@ import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 import { Hint } from "@/components/hint";
 
 const MODELS = [
-  { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
-  { id: "openrouter-google/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-  { id: "openrouter-google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+  { id: "minimax/minimax-m3", label: "Minimax M3" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -29,6 +27,8 @@ interface Props {
   extractedZipUrl?: string | null;
   extractedFrameCount?: number;
   isGenerating?: boolean;
+  mode?: "video" | "interactive";
+  blocks?: any[];
 };
 
 const formSchema = z.object({
@@ -70,14 +70,14 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, mode, blocks }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("openrouter-google/gemini-3.1-pro-preview");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("minimax/minimax-m3");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -204,6 +204,31 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (stage === "SITE") {
+      // Validate media based on mode
+      if (mode === "video") {
+        const hasVideos = blocks?.some((b: any) => b.videoUrl);
+        if (!hasVideos) {
+          toast.error("Please generate a video before building the site.");
+          return;
+        }
+      } else if (mode === "interactive") {
+        if (!extractedZipUrl || !extractedFrameCount) {
+          toast.error("Please generate videos and extract frames before building the site.");
+          return;
+        }
+      }
+
+      // Infer templateId if the videoUrl matches a predefined template
+      let templateId: string | undefined;
+      const firstVideoUrl = blocks?.[0]?.videoUrl;
+      if (firstVideoUrl) {
+        const { TEMPLATES } = await import("@/lib/templates");
+        const matchedTemplate = TEMPLATES.find(t => t.blocks?.[0]?.videoUrl === firstVideoUrl);
+        if (matchedTemplate) {
+          templateId = matchedTemplate.id;
+        }
+      }
+
       try {
         await buildSite.mutateAsync({
           value: values.value,
@@ -213,6 +238,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           model: selectedModel,
           isFollowUp,
           imageDataUrl: uploadedDataUrl ?? undefined,
+          templateId,
+          mode,
         });
       } catch {
         // Error is handled in the mutation's onError callback
@@ -306,38 +333,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                 <i className="ri-add-line text-lg" />
               </button>
             </Hint>
-            {/* Model Selector Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={() => setModelDropdownOpen((o) => !o)}
-              >
-                <span className="truncate max-w-[100px] sm:max-w-[120px]">{SELECTED_MODEL_DATA.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white flex-shrink-0" />
-              </div>
-
-              {modelDropdownOpen && (
-                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
-                  {MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        setModelDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                        }`}
-                    >
-                      <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
-                        <span className="whitespace-nowrap">{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Enhance prompt */}
             <Hint text="Generate prompt" side="top" >

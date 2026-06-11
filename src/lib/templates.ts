@@ -5,6 +5,7 @@ export interface Template {
   name: string;
   coverUrl: string;
   blocks: VideoBlock[];
+  rawHtml?: string;
 }
 
 export const TEMPLATES: Template[] = [
@@ -12,6 +13,24 @@ export const TEMPLATES: Template[] = [
     id: "template-1",
     name: "Airplane",
     coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/airplane_1.png",
+    rawHtml: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-black text-white overflow-hidden">
+    <video src="{{VIDEO_URL}}" autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover z-0 opacity-60"></video>
+    <div class="relative z-10 flex flex-col items-center justify-center h-screen px-4 text-center">
+        <h1 class="text-5xl md:text-7xl font-extrabold tracking-tighter mb-6">Explore the Skies</h1>
+        <p class="text-lg md:text-xl text-gray-300 max-w-2xl mb-10">Discover new horizons with our premium travel packages. Your journey begins here.</p>
+        <button class="bg-white text-black px-8 py-4 rounded-full font-semibold hover:scale-105 transition-transform">Book Now</button>
+    </div>
+</body>
+</html>`,
     blocks: [
       {
         startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/airplane_1.png",
@@ -180,6 +199,31 @@ export const TEMPLATES: Template[] = [
     id: "hero-template-1",
     name: "Human",
     coverUrl: "https://storage.googleapis.com/sites.framerate.space/templates/hero_human_image_1.png",
+    rawHtml: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-black text-white">
+    <div class="fixed inset-0 z-0 flex items-center justify-center opacity-50">
+        <p class="text-gray-500">Interactive Scroll Background placeholder<br/>ZIP: {{FRAMES_ZIP_URL}}</p>
+    </div>
+    <div class="relative z-10 space-y-[100vh] py-[50vh] px-8 text-center">
+        <section>
+            <h1 class="text-6xl font-bold mb-4">Section 1</h1>
+            <p class="text-xl">Scroll down to see the sequence animate.</p>
+        </section>
+        <section>
+            <h1 class="text-6xl font-bold mb-4">Section 2</h1>
+            <p class="text-xl">The background frames change as you scroll.</p>
+        </section>
+    </div>
+</body>
+</html>`,
     blocks: [
       {
         startFrameUrl: "https://storage.googleapis.com/sites.framerate.space/templates/hero_human_image_1.png",

@@ -10,9 +10,10 @@ interface TemplatesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (template: Template) => void;
+  mode: "video" | "interactive";
 }
 
-export const TemplatesModal = ({ isOpen, onClose, onSelect }: TemplatesModalProps) => {
+export const TemplatesModal = ({ isOpen, onClose, onSelect, mode }: TemplatesModalProps) => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   const handleUseTemplate = () => {
@@ -21,6 +22,10 @@ export const TemplatesModal = ({ isOpen, onClose, onSelect }: TemplatesModalProp
       onClose();
     }
   };
+
+  const filteredTemplates = TEMPLATES.filter(t => 
+    mode === "video" ? t.id.startsWith("hero-template-") : t.id.startsWith("template-")
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -35,7 +40,7 @@ export const TemplatesModal = ({ isOpen, onClose, onSelect }: TemplatesModalProp
 
         <div className="p-4 flex-1 overflow-y-auto">
           <div className="grid grid-cols-3 gap-4">
-            {TEMPLATES.map((template) => (
+            {filteredTemplates.map((template) => (
               <div
                 key={template.id}
                 onClick={() => setSelectedTemplate(template)}

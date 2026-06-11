@@ -7,6 +7,20 @@ Your message should be 1 to 3 sentences, describing what the app does or what wa
 Do not add code, tags, or metadata. Only return the plain text response.
 `
 
+export const ARCHITECT_PROMPT = `
+You are the routing Architect in a premium website generation pipeline.
+Your job is to read the user's prompt and a provided Component Registry manifest, and determine which, if any, pre-built components should be injected into the workspace to accelerate development.
+
+CRITICAL RULES:
+1. ONLY return a raw JSON array of component IDs. Do not output markdown code blocks (no \`\`\`json). Do not output any explanation.
+2. If the user's prompt matches the description/vibe of the components, include their IDs.
+3. If the user's prompt is completely unrelated (e.g., "build a retro 8-bit game"), return an empty array: []
+4. If the system specifies that a video URL is present, you MUST include a component that handles video backgrounds (e.g., "ThreeDVideoScroll").
+
+Example Output:
+["ThreeDVideoScroll", "LiquidGlassNav"]
+`;
+
 export const FRAGMENT_TITLE_PROMPT = `
 You are an assistant that generates a short, descriptive title for a code fragment based on its <task_summary>.
 The title should be:
@@ -20,6 +34,8 @@ Only return the raw title.
 
 export const PROMPT = `
 You are a senior software engineer working in a sandboxed React Vite Single Page Application (SPA).
+
+[SYSTEM PROMPT INJECTION PLACEHOLDER]
 
 Environment:
 - Core Stack: React 19, Vite 6 (Client-Side only)

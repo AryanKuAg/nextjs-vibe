@@ -15,6 +15,8 @@ interface Props {
   projectId: string;
   activeFragment: Fragment | null;
   setActiveFragment: (fragment: Fragment | null) => void;
+  mode?: "video" | "interactive";
+  blocks?: any[];
 };
 
 export const MessagesContainer = ({
@@ -25,6 +27,8 @@ export const MessagesContainer = ({
   extractedZipUrl,
   extractedFrameCount,
   onBack,
+  mode,
+  blocks,
 }: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, extractedFrameCount?: number, onBack?: () => void }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -154,6 +158,8 @@ export const MessagesContainer = ({
           extractedZipUrl={extractedZipUrl} 
           extractedFrameCount={extractedFrameCount} 
           isGenerating={isLastMessageUser && !isStuck}
+          mode={mode}
+          blocks={blocks}
         />
         {onBack && (
           <button

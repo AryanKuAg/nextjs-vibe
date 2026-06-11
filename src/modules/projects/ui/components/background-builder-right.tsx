@@ -30,6 +30,8 @@ interface Props {
   onAddBlock: () => void;
   onRemoveBlock: (index: number) => void;
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
+  mode: "video" | "interactive";
+  setMode: (mode: "video" | "interactive") => void;
 }
 
 import { useState, useRef, useEffect } from "react";
@@ -193,7 +195,9 @@ export const BackgroundBuilderRight = ({
   setActiveBlockIndex,
   onAddBlock,
   onRemoveBlock,
-  updateBlock
+  updateBlock,
+  mode,
+  setMode
 }: Props) => {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [hoveredVideoIndex, setHoveredVideoIndex] = useState<number | null>(null);
@@ -510,13 +514,36 @@ export const BackgroundBuilderRight = ({
     <div className="flex-1 h-full flex flex-col bg-background overflow-y-auto custom-scrollbar relative p-8">
 
       {/* Top Toggle */}
-
+      <div className="flex justify-center mb-8">
+        <div className="bg-[#1c1c1c] p-1 rounded-[12px] flex items-center border border-[#2c2c2c]">
+          <button
+            onClick={() => setMode("video")}
+            className={cn(
+              "flex flex-col items-center justify-center px-6 py-2 rounded-[8px] transition-all",
+              mode === "video" ? "bg-[#2c2c2c] text-white" : "text-[#737373] hover:text-white"
+            )}
+          >
+            <span className="text-sm font-inconsolata">Video</span>
+            <span className="text-[10px] uppercase tracking-wider font-mono opacity-60 mt-0.5">Hero background</span>
+          </button>
+          <button
+            onClick={() => setMode("interactive")}
+            className={cn(
+              "flex flex-col items-center justify-center px-6 py-2 rounded-[8px] transition-all",
+              mode === "interactive" ? "bg-[#2c2c2c] text-white" : "text-[#737373] hover:text-white"
+            )}
+          >
+            <span className="text-sm font-inconsolata">Interactive</span>
+            <span className="text-[10px] uppercase tracking-wider font-mono opacity-60 mt-0.5">3D scroll animation</span>
+          </button>
+        </div>
+      </div>
 
       {/* Blocks Container */}
       <div className="flex flex-col pb-20 w-full max-w-4xl mx-auto px-4">
         {blocks.map((block, idx) => renderBlock(block, idx))}
 
-        {blocks.length < 4 && (
+        {mode === "interactive" && blocks.length < 4 && (
           <button
             onClick={onAddBlock}
             disabled={!blocks[blocks.length - 1]?.videoUrl}

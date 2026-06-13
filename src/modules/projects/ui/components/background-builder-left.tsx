@@ -25,6 +25,7 @@ interface Props {
   onProceed: () => void;
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
   onApplyTemplate?: (blocks: VideoBlock[]) => void;
+  onSkip?: () => void;
   projectId: string;
   blocks: VideoBlock[];
   isExtracting?: boolean;
@@ -95,7 +96,8 @@ export const BackgroundBuilderLeft = ({
   projectId,
   blocks,
   isExtracting,
-  mode
+  mode,
+  onSkip
 }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -657,9 +659,9 @@ export const BackgroundBuilderLeft = ({
           <Button
             variant="ghost"
             className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
-            onClick={() => window.location.href = "/"}
+            onClick={() => onSkip?.()}
           >
-            Back to home
+            Skip
           </Button>
         </div>
       </div>

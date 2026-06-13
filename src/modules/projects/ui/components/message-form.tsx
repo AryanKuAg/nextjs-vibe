@@ -233,7 +233,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
         await buildSite.mutateAsync({
           value: values.value,
           projectId,
-          videoUrl: extractedZipUrl || undefined,
+          videoUrl: mode === "video" ? blocks?.[0]?.videoUrl : (extractedZipUrl || undefined),
           frameCount: extractedFrameCount,
           model: selectedModel,
           isFollowUp,

@@ -286,6 +286,8 @@ export const projectsRouter = createTRPCRouter({
           model: input.model,
           userId: ctx.auth.userId,
           imageDataUrl: input.imageDataUrl,
+          mode: input.mode,
+          templateId: input.templateId,
         },
       });
 

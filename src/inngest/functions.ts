@@ -2,11 +2,12 @@ import { z } from "zod";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT, ARCHITECT_PROMPT } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT, ARCHITECT_PROMPT, INTERACTIVE_ARCH_PROMPT, VIDEO_ARCH_PROMPT } from "@/prompt";
 import { templateManifests } from "@/registry/components";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import * as ts from "typescript";
 
 import { inngest } from "./client";
 import { NonRetriableError } from "inngest";
@@ -91,11 +92,11 @@ export const codeAgentFunction = inngest.createFunction(
     }
 
     const getModel = (modelName: string) => {
-      // Using Cerebras for free testing as requested
+      // Using OpenRouter for free testing as requested
       return openai({
-        model: "gpt-oss-120b", // User-requested model
-        apiKey: process.env.CEREBRAS_API_KEY!,
-        baseUrl: "https://api.cerebras.ai/v1",
+        model: "openai/gpt-oss-120b:free", // User-requested model
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        baseUrl: "https://openrouter.ai/api/v1",
       });
     };
 
@@ -135,6 +136,7 @@ export const codeAgentFunction = inngest.createFunction(
           for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
             if (entry.isDirectory()) {
+              if (entry.name === 'registry' && dir === templatesDir) continue;
               readDirRecursive(fullPath);
             } else {
               const relativePath = path.relative(templatesDir, fullPath);
@@ -143,6 +145,25 @@ export const codeAgentFunction = inngest.createFunction(
           }
         };
         readDirRecursive(templatesDir);
+
+        // Inject the base index.html so the AI can read and modify it (e.g. for branding/title)
+        files["index.html"] = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vite + React + TS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { margin: 0; padding: 0; background: #0b0b0f; color: #fff; }
+      #root { opacity: 0; animation: fadeIn 0.5s ease-in forwards 0.3s; }
+      @keyframes fadeIn { to { opacity: 1; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`;
       } else {
         // Enforce golden templates on follow-ups to keep them synced and prevent dummy components
         const PROTECTED_FILES = [
@@ -212,15 +233,7 @@ export const codeAgentFunction = inngest.createFunction(
       return (latestMessage?.fragment?.files as Record<string, string>) || null;
     });
 
-    const state = createState<AgentState>(
-      {
-        summary: "",
-        files: previousFiles || (initialFiles as Record<string, string>),
-      },
-      {
-        messages: previousMessages,
-      },
-    );
+    let baseFiles = previousFiles || (initialFiles as Record<string, string>);
 
 
     const runId = event.id ? event.id.slice(0, 8) : Math.random().toString(36).substring(2, 10);
@@ -269,7 +282,7 @@ export const codeAgentFunction = inngest.createFunction(
                   }
 
                   // Strict enforcement for App.tsx integrity
-                  if (file.path === "src/App.tsx") {
+                  if (file.path === "src/App.tsx" && event.data.mode !== "video") {
                     const c = file.content;
                     if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
@@ -279,6 +292,29 @@ export const codeAgentFunction = inngest.createFunction(
                     }
                     if (/\{\/\*\s*<Preloader/i.test(c) || /\/\/\s*import.*Preloader/i.test(c)) {
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
+                    }
+                  }
+
+                  // Auto-fix mechanism: Parse React files for syntax errors
+                  if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') || file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+                    const result = ts.transpileModule(file.content, {
+                      compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ESNext },
+                      reportDiagnostics: true
+                    });
+
+                    if (result.diagnostics && result.diagnostics.length > 0) {
+                      const errors = result.diagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
+                      if (errors.length > 0) {
+                        const errorMessages = errors.map(d => {
+                          if (d.file && d.start !== undefined) {
+                            const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+                            return `Line ${line + 1}, Col ${character + 1}: ${ts.flattenDiagnosticMessageText(d.messageText, '\\n')}`;
+                          }
+                          return ts.flattenDiagnosticMessageText(d.messageText, '\\n');
+                        }).join('\\n');
+
+                        throw new Error(`SYNTAX ERROR in ${file.path}:\n${errorMessages}\n\nCRITICAL FIX REQUIRED: You MUST fix this syntax error before proceeding! (Hint: Check for unescaped '<' or '>' characters in your JSX text, you must use &lt; or wrap them in curly braces like {"<10"}).`);
+                      }
                     }
                   }
 
@@ -332,10 +368,19 @@ export const codeAgentFunction = inngest.createFunction(
 
     // Factory function: creates an agent with unique name and step IDs per attempt.
     const createCodeAgentForAttempt = (attemptIndex: number, iterIndex: number = 0) => {
+      let systemPrompt = PROMPT;
+
+      const videoUrl = event.data.videoUrl;
+      if (event.data.mode === "interactive" || (!event.data.mode && event.data.frameCount)) {
+        systemPrompt += "\n\n" + INTERACTIVE_ARCH_PROMPT;
+      } else if (event.data.mode === "video" || (!event.data.mode && videoUrl)) {
+        systemPrompt += "\n\n" + VIDEO_ARCH_PROMPT(videoUrl);
+      }
+
       return createAgent<AgentState>({
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
-        system: PROMPT,
+        system: systemPrompt,
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
         model: getModel(event.data.model || "gemini-3.1-pro-preview"),
@@ -356,7 +401,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
-    let finalFiles = state.data.files;
+    let finalFiles = baseFiles;
 
     // --- CONTEXT INJECTION FOR ITERATIONS ---
     const hasExistingFiles = Object.keys(initialFiles).length > 0;
@@ -375,45 +420,10 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
-    if (videoUrl) {
-      currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
-The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
-You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
-
-Specifically, you ALREADY HAVE:
-1. \`src/components/CanvasScroll.tsx\` - Handles the high-performance background frame rendering.
-2. \`src/components/Preloader.tsx\` - A full-screen aura loading state.
-3. \`src/components/Navbar.tsx\` - A default pill-shaped navigation bar.
-4. \`src/components/headers/\` - A directory containing alternative header templates (\`DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`).
-5. \`src/store/useStore.ts\` - Global state management for frames.
-6. \`src/App.tsx\` - The layout wrapper that combines these components.
-
-YOUR ONLY JOB:
-1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
-2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
-3. CHOOSE A HEADER: You can modify \`src/components/Navbar.tsx\` to match the site's brand, OR you can completely replace it by importing one of the templates from \`src/components/headers/\` into \`src/App.tsx\` (e.g. use \`DotNav\` or \`FullWidthNav\` instead if it fits the vibe better!). You have full creative freedom over the navigation design.
-4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
-5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
-6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
-7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
-8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
-9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
-11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
-13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
-14. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
-    - \`src/components/CanvasScroll.tsx\`
-    - \`src/components/Preloader.tsx\`
-    - \`src/store/useStore.ts\`
-    - \`src/constants/frames.ts\`
-    - \`src/components/headers/DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`
-    DO NOT attempt to modify these files. DO NOT recreate them.
-
-When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
-=== END TEMPLATE ARCHITECTURE INSTRUCTION ===
-
-` + currentPrompt;
+    if (event.data.mode === "video" || (!event.data.mode && event.data.videoUrl)) {
+      currentPrompt = `[MODE: VIDEO BACKGROUND] You MUST use the HeroBgVideo component from the registry to render the background video. Do NOT implement your own video tag or background logic. Read the \`src/templates/registry/HeroBgVideo/README.md\` file for usage instructions.\n\n` + currentPrompt;
+    } else if (event.data.mode === "interactive" || (!event.data.mode && event.data.frameCount)) {
+      currentPrompt = `[MODE: INTERACTIVE 3D SCROLL] You MUST use the ThreeDVideoScroll component from the registry to render the scrolling frames background. Do NOT implement your own preloader or canvas scroll logic. Read the \`src/templates/registry/ThreeDVideoScroll/README.md\` file for usage instructions. Format the image URL appropriately (e.g. padding numbers).\n\n` + currentPrompt;
     }
 
     // Inject image reference into the prompt when a user attaches an image
@@ -423,7 +433,7 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
 
     // --- 1. ARCHITECT ROUTING (The Planner) ---
     console.log('DEBUG: Running Architect agent...');
-    
+
     // Parse frontmatter of all registered templates
     const registryManifest = [];
     const templateDataMap: Record<string, { dir: string, content: string }> = {};
@@ -447,62 +457,77 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
       }
     }
 
-    let architectPromptText = `User Prompt: ${event.data.value}\n\nRegistry Manifest: ${JSON.stringify(registryManifest, null, 2)}`;
-    if (event.data.videoUrl) {
-      architectPromptText += `\n\nCRITICAL SYSTEM REQUIREMENT: A videoUrl is present (${event.data.videoUrl}). You MUST include a video background handling component.`;
+    let selectedIds: string[] = [];
+
+    if (event.data.templateId) {
+      console.log(`DEBUG: Bypassing Architect, using explicitly requested template: ${event.data.templateId}`);
+      selectedIds = [event.data.templateId];
+    } else {
+      let architectPromptText = `User Prompt: ${event.data.value}\n\nRegistry Manifest: ${JSON.stringify(registryManifest, null, 2)}`;
+      if (event.data.videoUrl) {
+        architectPromptText += `\n\nCRITICAL SYSTEM REQUIREMENT: A videoUrl is present (${event.data.videoUrl}). You MUST include a video background handling component.`;
+      }
+
+      const architectAgent = createAgent({
+        name: `architect-agent-run-${runId}`,
+        description: "A component routing architect",
+        system: ARCHITECT_PROMPT,
+        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      });
+
+      const architectResult = await architectAgent.run(architectPromptText);
+      const architectOutput = parseAgentOutput(architectResult.output) || "[]";
+      console.log('DEBUG: Architect Output:', architectOutput);
+
+      try {
+        const match = architectOutput.match(/\[[\s\S]*\]/);
+        const jsonStr = match ? match[0] : architectOutput;
+        selectedIds = JSON.parse(jsonStr);
+      } catch (err) {
+        console.error("DEBUG: Failed to parse Architect response:", err);
+      }
     }
 
-    const architectAgent = createAgent({
-      name: `architect-agent-run-${runId}`,
-      description: "A component routing architect",
-      system: ARCHITECT_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
-    });
+    // Safety fallback: if videoUrl or frameCount is present, ALWAYS ensure the core 
+    // infrastructure component is selected, in case the Architect agent omitted it.
+    if (event.data.videoUrl && !selectedIds.includes("HeroBgVideo")) {
+      selectedIds.push("HeroBgVideo");
+    }
+    if (event.data.frameCount && !selectedIds.includes("ThreeDVideoScroll")) {
+      selectedIds.push("ThreeDVideoScroll");
+    }
 
-    const architectResult = await architectAgent.run(architectPromptText);
-    const architectOutput = parseAgentOutput(architectResult.output) || "[]";
-    console.log('DEBUG: Architect Output:', architectOutput);
-    
     let injectedComponentsSpec = "";
-    
-    try {
-      // Find JSON array in the response (in case the AI wraps it in markdown)
-      const match = architectOutput.match(/\\[[\\s\\S]*\\]/);
-      const jsonStr = match ? match[0] : architectOutput;
-      const selectedIds = JSON.parse(jsonStr);
 
+    try {
       if (Array.isArray(selectedIds) && selectedIds.length > 0) {
         let componentDocs = "";
-        
+
         for (const id of selectedIds) {
           const template = templateDataMap[id];
           if (template) {
-            // 1. Recursive file injection
-            const getAllFilesRecursive = (dirPath: string, arrayOfFiles: {path: string, content: string}[] = []) => {
-              const files = fs.readdirSync(dirPath);
-              files.forEach((file) => {
-                const fullPath = path.join(dirPath, file);
-                if (fs.statSync(fullPath).isDirectory()) {
-                  arrayOfFiles = getAllFilesRecursive(fullPath, arrayOfFiles);
-                } else if (file !== "README.md") { // Skip injecting README.md into the sandbox
-                  arrayOfFiles.push({
-                    path: fullPath,
-                    content: fs.readFileSync(fullPath, "utf-8")
-                  });
+            // Dynamically inject the selected template's files into the agent's initial state
+            const injectedFiles: Record<string, string> = {};
+            const readTemplateFiles = (dir: string) => {
+              if (!fs.existsSync(dir)) return;
+              const entries = fs.readdirSync(dir, { withFileTypes: true });
+              for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                  readTemplateFiles(fullPath);
+                } else {
+                  const relativePath = path.relative(path.join(process.cwd(), "src", "templates"), fullPath);
+                  injectedFiles[`src/${relativePath}`] = fs.readFileSync(fullPath, "utf-8");
                 }
-              });
-              return arrayOfFiles;
+              }
+            };
+            readTemplateFiles(template.dir);
+
+            baseFiles = {
+              ...baseFiles,
+              ...injectedFiles
             };
 
-            const filesToInject = getAllFilesRecursive(template.dir);
-            for (const file of filesToInject) {
-              // Calculate relative path inside the template directory
-              const relativePath = path.relative(template.dir, file.path);
-              // Inject to src/components/[id]/[relativePath]
-              const sandboxPath = `src/components/${id}/${relativePath}`;
-              state.data.files[sandboxPath] = file.content;
-            }
-            
             // 2. Add the README instructions to the Builder prompt
             componentDocs += `${template.content}\n\n---\n\n`;
           }
@@ -531,6 +556,16 @@ ${componentDocs}
 
     // --- 2. INITIAL GENERATION (The Creator) ---
     // Run the main massive agent exactly once to build the features
+    const state = createState<AgentState>(
+      {
+        summary: "",
+        files: baseFiles,
+      },
+      {
+        messages: previousMessages,
+      },
+    );
+
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,

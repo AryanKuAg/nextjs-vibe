@@ -1,4 +1,4 @@
 export const templateManifests = [
   "src/templates/registry/ThreeDVideoScroll",
-  "src/templates/registry/LiquidGlassNav"
+  "src/templates/registry/HeroBgVideo"
 ];

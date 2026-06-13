@@ -62,7 +62,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
-  const [mode, setMode] = useState<"video" | "interactive">("interactive");
+  const [mode, setMode] = useState<"video" | "interactive">("video");
 
   const emptyBlock: VideoBlock = {
     startFrameUrl: null, startFrameHistory: [],
@@ -725,6 +725,7 @@ export const ProjectView = ({ projectId }: Props) => {
               activeBlockTab={activeBlockTab}
               onTabChange={setActiveBlockTab}
               onProceed={handleProceed}
+              onSkip={() => setActiveStageTab("SITE")}
               isExtracting={isExtracting}
               updateBlock={updateBlock}
               onApplyTemplate={handleApplyTemplate}
@@ -840,7 +841,7 @@ export const ProjectView = ({ projectId }: Props) => {
                 />
               ) : (
                 <>
-                  <TabsContent value="preview" className="h-full m-0">
+                  <TabsContent value="preview" forceMount className={`h-full m-0 ${tabState !== "preview" ? "hidden" : ""}`}>
                     {activeFragment ? (
                       <FragmentWeb key={`${activeFragment.id}-${fragmentKey}`} data={activeFragment} />
                     ) : (
@@ -852,7 +853,7 @@ export const ProjectView = ({ projectId }: Props) => {
                       </div>
                     )}
                   </TabsContent>
-                  <TabsContent value="code" className="h-full m-0">
+                  <TabsContent value="code" forceMount className={`h-full m-0 ${tabState !== "code" ? "hidden" : ""}`}>
                     {!!activeFragment?.files && (
                       <FileExplorer
                         files={activeFragment.files as { [path: string]: string }}

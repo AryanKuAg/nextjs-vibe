@@ -25,6 +25,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { StageIndicator } from "../components/stage-indicator";
 import { BackgroundBuilderLeft } from "../components/background-builder-left";
 import { BackgroundBuilderRight, VideoBlock, BlockTab } from "../components/background-builder-right";
+import { extractLastFrame } from "@/lib/video-utils";
 
 // Removed frame extraction since end frames are mandatory
 
@@ -74,6 +75,41 @@ export const ProjectView = ({ projectId }: Props) => {
   // This runs before any effect, so there is no race condition.
   const [blocks, setBlocks] = useState<VideoBlock[]>([emptyBlock]);
 
+  const extractedFramesCacheRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    blocks.forEach(async (block) => {
+      if (block.videoUrl && !block.endFrameUrl && !extractedFramesCacheRef.current[block.videoUrl]) {
+        try {
+          extractedFramesCacheRef.current[block.videoUrl] = "pending";
+          const frameUrl = await extractLastFrame(block.videoUrl);
+          extractedFramesCacheRef.current[block.videoUrl] = frameUrl;
+          
+          setBlocks(prev => {
+            const newBlocks = [...prev];
+            for (let j = 1; j < newBlocks.length; j++) {
+              const rawInherited = newBlocks[j - 1].videoUrl ? (newBlocks[j - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[j - 1].videoUrl!] || null) : null;
+              const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
+              if (newBlocks[j].startFrameUrl !== inheritedUrl) {
+                newBlocks[j] = { ...newBlocks[j], startFrameUrl: inheritedUrl };
+                if (inheritedUrl) {
+                  const history = newBlocks[j].startFrameHistory || [];
+                  if (!history.includes(inheritedUrl)) {
+                    newBlocks[j].startFrameHistory = [...history, inheritedUrl];
+                  }
+                }
+              }
+            }
+            return newBlocks;
+          });
+        } catch (e) {
+          console.error("Failed to extract frame for", block.videoUrl, e);
+          extractedFramesCacheRef.current[block.videoUrl] = ""; 
+        }
+      }
+    });
+  }, [blocks]);
+
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("START");
   // Prevent the DB restore effect from running more than once
@@ -113,7 +149,8 @@ export const ProjectView = ({ projectId }: Props) => {
     if (blocks.length < 4) {
       setBlocks(prev => {
         const lastBlock = prev[prev.length - 1];
-        const inheritedUrl = lastBlock.videoUrl ? (lastBlock.endFrameUrl || null) : null;
+        const rawInherited = lastBlock.videoUrl ? (lastBlock.endFrameUrl || extractedFramesCacheRef.current[lastBlock.videoUrl] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
         const newBlock = {
           ...emptyBlock,
           startFrameUrl: inheritedUrl,
@@ -164,7 +201,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Cascade inherited start frames for all subsequent blocks
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+        const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
           if (inheritedUrl) {
@@ -350,7 +388,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Inherit start frame from the previous block's end frame if missing
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+        const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
 
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i].startFrameUrl = inheritedUrl;
@@ -428,7 +467,8 @@ export const ProjectView = ({ projectId }: Props) => {
       if (changed) {
         // Cascade start frame from previous block's end frame if missing
         for (let i = 1; i < newBlocks.length; i++) {
-          const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+          const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+          const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
 
           if (newBlocks[i].startFrameUrl !== inheritedUrl) {
             newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
@@ -696,6 +736,7 @@ export const ProjectView = ({ projectId }: Props) => {
               activeBlockTab={activeBlockTab}
               onTabChange={setActiveBlockTab}
               onProceed={handleProceed}
+              onSkip={() => setActiveStageTab("SITE")}
               isExtracting={isExtracting}
               updateBlock={updateBlock}
               onApplyTemplate={handleApplyTemplate}

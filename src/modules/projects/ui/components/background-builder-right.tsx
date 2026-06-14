@@ -252,6 +252,15 @@ export const BackgroundBuilderRight = ({
 
   const handleDownload = async (url: string, filename: string) => {
     try {
+      if (url.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
       const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -391,7 +400,7 @@ export const BackgroundBuilderRight = ({
               {/* End Frame */}
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-white text-sm font-inconsolata">End frame</span>
+                  <span className="text-white text-sm font-inconsolata">End frame (Optional)</span>
                   {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
                 </div>
                 <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">

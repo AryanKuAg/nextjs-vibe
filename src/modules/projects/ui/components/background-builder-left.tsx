@@ -23,6 +23,7 @@ interface Props {
   activeBlockTab: BlockTab;
   onTabChange: (tab: BlockTab) => void;
   onProceed: () => void;
+  onSkip?: () => void;
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
   onApplyTemplate?: (blocks: VideoBlock[]) => void;
   projectId: string;
@@ -89,6 +90,7 @@ export const BackgroundBuilderLeft = ({
   activeBlockTab,
   onTabChange,
   onProceed,
+  onSkip,
   updateBlock,
   onApplyTemplate,
   projectId,
@@ -304,12 +306,6 @@ export const BackgroundBuilderLeft = ({
 
     try {
       if (isVideo) {
-        if (!currentBlock.endFrameUrl) {
-          toast.error("Please generate an end frame first.");
-          setIsGenerating(false);
-          return;
-        }
-
         toast.info("Video generation started...");
         updateBlock(activeBlockIndex, { isGeneratingVideo: true, generatingVideoModel: effectiveModel });
 
@@ -655,9 +651,9 @@ export const BackgroundBuilderLeft = ({
           <Button
             variant="ghost"
             className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
-            onClick={() => window.location.href = "/"}
+            onClick={onSkip}
           >
-            Back to home
+            Skip
           </Button>
         </div>
       </div>

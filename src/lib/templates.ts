@@ -765,4 +765,4 @@ export const TEMPLATES: Template[] = [
     ]
   },
 
-];
+].filter(t => !t.id.startsWith('hero-'));

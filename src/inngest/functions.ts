@@ -253,7 +253,7 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           const fs = await import("fs");
           const path = await import("path");
-          
+
           // Ensure all protected template files are present and correct in the hot sandbox
           for (const file of PROTECTED_FILES) {
             const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
@@ -279,7 +279,7 @@ export const codeAgentFunction = inngest.createFunction(
 
       const sandbox = await getSandbox(sandboxId);
       let written = 0;
-      
+
       // Ensure directory structure and write all files
       for (const [filePath, content] of Object.entries(filesObj)) {
         if (typeof content === "string") {
@@ -370,7 +370,7 @@ export const codeAgentFunction = inngest.createFunction(
       return [
         createTool({
           name: "terminal",
-          // ... keep existing terminal description/params ...
+          description: "Execute a terminal command in the sandbox",
           parameters: z.object({
             command: z.string(),
           }),
@@ -490,7 +490,7 @@ export const codeAgentFunction = inngest.createFunction(
               try {
                 const sandbox = await getSandbox(sandboxId);
                 const contents = [];
-                 for (const file of files) {
+                for (const file of files) {
                   const absolutePath = file.startsWith('/') ? file : `/home/user/${file}`;
                   const content = await sandbox.files.read(absolutePath);
                   contents.push({ path: file, content });
@@ -621,7 +621,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -658,14 +658,19 @@ Create unique, stunning designs. Do NOT just make a plain white page.
             "src/components/headers/FullWidthNav.tsx",
             "src/components/headers/PillNav.tsx",
           ] : [];
-          
+
           const fs = await import("fs");
           const path = await import("path");
           for (const file of PROTECTED_FILES) {
             const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
             if (fs.existsSync(templatePath)) {
               try {
-                const content = fs.readFileSync(templatePath, "utf-8");
+                let content = fs.readFileSync(templatePath, "utf-8");
+                if (file === "src/constants/frames.ts") {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const frameCount = event.data.frameCount || (project as any)?.frameCount || 450;
+                  content = content.replace(/TOTAL_FRAMES = \\d+;/, `TOTAL_FRAMES = ${frameCount};`);
+                }
                 const dir = path.dirname(file);
                 await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
                 await sandbox.files.write(`/home/user/${file}`, content);
@@ -758,10 +763,10 @@ function fixPaths(dir) {
         content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
 
         // Fix alias paths
-        content = content.replace(/@\/components\/Preloader/g, './components/Preloader');
-        content = content.replace(/@\/components\/CanvasScroll/g, './components/CanvasScroll');
-        content = content.replace(/@\/store\/useStore/g, './store/useStore');
-        content = content.replace(/@\/components\/Navbar/g, './components/Navbar');
+        content = content.replace(/@\\/components\\/Preloader/g, './components/Preloader');
+        content = content.replace(/@\\/components\\/CanvasScroll/g, './components/CanvasScroll');
+        content = content.replace(/@\\/store\\/useStore/g, './store/useStore');
+        content = content.replace(/@\\/components\\/Navbar/g, './components/Navbar');
 
         // Ensure imports exist
         const requiredImports = [
@@ -935,7 +940,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---

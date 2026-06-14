@@ -277,7 +277,7 @@ export const ProjectView = ({ projectId }: Props) => {
       if (project.currentStage === "SITE") {
         setActiveStageTab("SITE");
       } else {
-        setActiveStageTab("BACKGROUND");
+        setActiveStageTab(prev => prev === "SITE" ? "SITE" : "BACKGROUND");
       }
       
       const frameCount = (project as { frameCount?: number | null })?.frameCount;

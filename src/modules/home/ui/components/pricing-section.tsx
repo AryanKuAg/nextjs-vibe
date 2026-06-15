@@ -5,6 +5,7 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 export interface PricingCardProps {
   title: string;
@@ -52,37 +53,47 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
   };
 
   return (
-    <div className={cn("relative flex flex-col bg-[#282828] rounded-[16px] p-4 font-onest", isPopular && "border border-white", className)}>
+    <div className={cn("relative flex flex-col  bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-[500] p-6 font-onest", isPopular && "border-2 border-white", className)}>
       {isPopular && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono">
+        <Image
+          src="/pricing_gradient.png"
+          alt="Pricing glow"
+          fill
+          className="object-contain object-bottom rounded-[24px] z-0 pointer-events-none"
+        />
+      )}
+      {isPopular && (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono z-20">
           MOST POPULAR
         </div>
       )}
-      <h3 className="text-2xl text-white mb-0">{title}</h3>
-      <p className="text-sm text-neutral-400 mb-4">{desc}</p>
-      <div className="flex items-end gap-2 mb-4">
-        <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
-        <span className="text-sm text-neutral-400 mb-1.5 leading-[1]">Billed monthly</span>
-      </div>
-      <button
-        onClick={handleCheckout}
-        disabled={loading}
-        className={cn(
-          "w-full h-[36px] rounded-lg text-sm font-[500] mb-4 disabled:opacity-50 transition-all",
-          isPopular
-            ? "bg-white hover:bg-white/90 text-black"
-            : "bg-[#333333] hover:bg-[#444444] text-white"
-        )}
-      >
-        {loading ? "Redirecting..." : `Get started`}
-      </button>
-      <div className="flex flex-col gap-1">
-        {features.map((f, i) => (
-          <div key={i} className="flex items-start gap-2 text-sm text-white leading-[20px]">
-            <i className="ri-check-line text-white text-sm" />
-            <span className="">{f}</span>
-          </div>
-        ))}
+      <div className="relative z-10 flex flex-col h-full">
+        <h3 className="text-2xl text-white mb-0">{title}</h3>
+        <p className="text-sm text-neutral-400 mb-5">{desc}</p>
+        <div className="flex items-end gap-2 mb-5">
+          <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
+          <span className="text-sm text-neutral-400 mb-1.5 leading-[1]">Billed monthly</span>
+        </div>
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          className={cn(
+            "w-full h-[52px] rounded-[12px] text-sm font-[500] mb-5 disabled:opacity-50 transition-all",
+            isPopular
+              ? "bg-white hover:bg-white/90 text-black"
+              : "bg-[#333333] hover:bg-[#444444] text-white"
+          )}
+        >
+          {loading ? "Redirecting..." : `Get started`}
+        </button>
+        <div className="flex flex-col gap-2">
+          {features.map((f, i) => (
+            <div key={i} className="flex items-start gap-2 text-sm text-white leading-[20px]">
+              <i className="ri-check-line text-white text-sm" />
+              <span className="">{f}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -96,9 +107,11 @@ export const PLANS: PricingCardProps[] = [
     features: [
       "500 credits / month",
       "40 images and 20 videos",
-      "Seedream 4.5 & Pruna Video",
+      "Nano Banana 2 & Veo 3.1",
       "2 website",
-      "Export websites",
+      "Template gallery",
+      "Full site export",
+      "No coding required",
       "Standard generation"
     ],
   },
@@ -111,8 +124,10 @@ export const PLANS: PricingCardProps[] = [
       "2,000 credits / month",
       "160 images and 80 videos",
       "Nano Banana 2 & Seedance 2.0",
-      "10 websites",
-      "Export websites",
+      "10 website",
+      "Template gallery",
+      "Full site export",
+      "No coding required",
       "Priority generation"
     ],
   },
@@ -124,8 +139,10 @@ export const PLANS: PricingCardProps[] = [
       "3,500 credits / month",
       "240 images and 160 videos",
       "Nano Banana 2 & Seedance 2.0",
-      "40 websites",
-      "Export websites",
+      "40 website",
+      "Template gallery",
+      "Full site export",
+      "No coding required",
       "Priority generation"
     ],
   },
@@ -133,9 +150,10 @@ export const PLANS: PricingCardProps[] = [
 
 interface PricingSectionProps {
   title?: string;
+  desc?: string;
 }
 
-export const PricingSection = ({ title }: PricingSectionProps) => {
+export const PricingSection = ({ title, desc }: PricingSectionProps) => {
   const pathname = usePathname();
   const isProjectPage = pathname?.startsWith("/projects/");
 
@@ -145,12 +163,18 @@ export const PricingSection = ({ title }: PricingSectionProps) => {
     "Pro": "For creators building AI projects",
   };
 
+
   return (
     <div>
       {title && (
-        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white mb-10">
+        <h2 className="text-3xl md:text-5xl text-white font-[500] leading-[1] mb-4 font-stack-sans-notch">
           {title}
         </h2>
+      )}
+      {desc && (
+        <p className="text-sm text-[#737373] mb-20">
+          {desc}
+        </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-4">
         {PLANS.map((plan) => (

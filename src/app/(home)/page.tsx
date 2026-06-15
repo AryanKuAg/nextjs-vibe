@@ -1,6 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import { motion } from "framer-motion";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
@@ -39,14 +46,19 @@ const HeroVideo = () => {
   // return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
 
   return (
-    <div className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105">
+    <motion.div 
+      className="absolute inset-0 z-0 bg-[#0e0e0e]"
+      initial={{ opacity: 0, scale: 1.05 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/Hero%20BG%20IMG.png"
         alt="Hero Background"
         className="w-full h-full object-cover opacity-80"
       />
-    </div>
+    </motion.div>
   );
 };
 
@@ -114,8 +126,117 @@ const FeatureCard = ({ step, title, description, children }: FeatureCardProps) =
       <p className="text-[14px] text-[#737373] pl-4 pt-0.5 pb-4 font-[500]">{description}</p>
     </div>
   </div>
-)
+);
 
+const BrowseTemplatesButton = () => {
+  const { signIn, isLoaded } = useSignIn();
+  const [isPending, setIsPending] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
+
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded || isPending) return;
+    setIsPending(true);
+    try {
+      // @ts-ignore
+      window.google?.accounts.id.cancel();
+    } catch {}
+    await signIn.authenticateWithRedirect({
+      strategy: "oauth_google",
+      redirectUrl: "/sso-callback",
+      redirectUrlComplete: "/",
+    });
+  };
+
+  const handleStartBuilding = async () => {
+    await createProject.mutateAsync({ value: "" });
+  };
+
+  const isActionPending = isPending || createProject.isPending;
+
+  const btnClass = "px-6 py-3.5 rounded-[12px] border border-[#2c2c2c] hover:bg-white/4 transition-colors text-white text-sm font-[500] font-onest flex items-center justify-center disabled:opacity-50";
+
+  if (!mounted) {
+    return (
+      <button disabled className={btnClass}>
+        Browse all templates
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <SignedOut>
+        <button onClick={handleGoogleSignIn} disabled={isActionPending} className={btnClass}>
+          {isActionPending ? "Loading..." : "Browse all templates"}
+        </button>
+      </SignedOut>
+      <SignedIn>
+        <button onClick={handleStartBuilding} disabled={isActionPending} className={btnClass}>
+          {isActionPending ? "Loading..." : "Browse all templates"}
+        </button>
+      </SignedIn>
+    </>
+  );
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    filter: "blur(0px)",
+    transition: { 
+      duration: 1.5,
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
+    } 
+  }
+};
+
+const heroItemVariants = {
+  hidden: { opacity: 0, y: 15, filter: "blur(4px)" },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    filter: "blur(0px)",
+    transition: { 
+      duration: 1.2, 
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number] 
+    } 
+  }
+};
+
+const FadeInSection = ({ children, className, id }: { children: React.ReactNode, className?: string, id?: string }) => (
+  <motion.section
+    id={id}
+    className={className}
+    initial="hidden"
+    whileInView="visible"
+    viewport={{ once: true, amount: 0.3 }}
+    variants={{
+      visible: { transition: { staggerChildren: 0.2, delayChildren: 0.1 } },
+      hidden: {}
+    }}
+  >
+    {children}
+  </motion.section>
+);
 
 const Page = () => {
   return (
@@ -133,172 +254,222 @@ const Page = () => {
         /> */}
 
 
-        <div className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center">
-          <h1 className="text-4xl md:text-6xl text-white font-stack-sans-notch text-center leading-[1] drop-shadow-2xl font-[700] mb-4">
+        <motion.div 
+          className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } },
+            hidden: {}
+          }}
+        >
+          <motion.h1 variants={heroItemVariants} className="text-4xl md:text-6xl text-white font-stack-sans-notch text-center leading-[1] drop-shadow-2xl font-[700] mb-4">
             Ship 3D websites<br />in minutes with AI
-          </h1>
-          <p className="font-[500] font-onest text-white mb-8 md:mb-[40px] text-sm text-center">Just describe your vision and watch it turn into a live, interactive experience in few minutes.</p>
-          <ProjectForm />
-        </div>
+          </motion.h1>
+          <motion.p variants={heroItemVariants} className="font-[500] font-onest text-white mb-8 md:mb-[40px] text-sm text-center">
+            Just describe your vision and watch it turn into a live, interactive experience in few minutes.
+          </motion.p>
+          <motion.div variants={heroItemVariants} className="w-full flex justify-center">
+            <ProjectForm />
+          </motion.div>
+        </motion.div>
       </section>
 
 
       {/* Features Section */}
-      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How it works?</h2>
-          <p className="text-center font-onest text-[#737373] text-sm font-[500]">From prompt to cinematic website in just three simple steps.</p>
+          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How it works?</motion.h2>
+          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">From prompt to cinematic website in just three simple steps.</motion.p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FeatureCard
-            step="01"
-            title="Generate background"
-            description="Prompt and create a custom scene with AI."
-          >
-            <Image
-              src="/generate_background.png"
-              alt="Generate background"
-              fill
-              className="object-cover rounded-[16px]"
-            />
-          </FeatureCard>
+          <motion.div variants={itemVariants}>
+            <FeatureCard
+              step="01"
+              title="Generate background"
+              description="Prompt and create a custom scene with AI."
+            >
+              <Image
+                src="/generate_background.png"
+                alt="Generate background"
+                fill
+                className="object-cover rounded-[16px]"
+              />
+            </FeatureCard>
+          </motion.div>
 
-          <FeatureCard
-            step="02"
-            title="Animate the scene"
-            description="Turn your image into a smooth cinematic video."
-          >
-            <Image
-              src="/animate_the_scene.png"
-              alt="Animate the scene"
-              fill
-              className="object-cover rounded-[16px]"
-            />
-          </FeatureCard>
+          <motion.div variants={itemVariants}>
+            <FeatureCard
+              step="02"
+              title="Animate the scene"
+              description="Turn your image into a smooth cinematic video."
+            >
+              <Image
+                src="/animate_the_scene.png"
+                alt="Animate the scene"
+                fill
+                className="object-cover rounded-[16px]"
+              />
+            </FeatureCard>
+          </motion.div>
 
-          <FeatureCard
-            step="03"
-            title="Build your website"
-            description="Convert video into a scroll driven 3D experience."
-          >
-            <Image
-              src="/build_your_website.png"
-              alt="Build your website"
-              fill
-              className="object-cover rounded-[16px]"
-            />
-          </FeatureCard>
+          <motion.div variants={itemVariants}>
+            <FeatureCard
+              step="03"
+              title="Build your website"
+              description="Convert video into a scroll driven 3D experience."
+            >
+              <Image
+                src="/build_your_website.png"
+                alt="Build your website"
+                fill
+                className="object-cover rounded-[16px]"
+              />
+            </FeatureCard>
+          </motion.div>
         </div>
-      </section>
+      </FadeInSection>
 
       {/* Benefits Section */}
-      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping, not configuring</h2>
-          <p className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</p>
+          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping, not configuring</motion.h2>
+          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</motion.p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <BenefitCard
-            iconClass="ri-mouse-line"
-            title="Cinematic Scroll"
-            description="Every frame, every layer — locked at 60fps. Smooth by default."
-          />
-          <BenefitCard
-            iconClass="ri-play-fill"
-            title="Seamless Video Flow"
-            description="Chain multiple videos into one unbroken visual story across your entire page."
-          />
-          <BenefitCard
-            iconClass="ri-cpu-line"
-            title="Built by the Best Models"
-            description="Claude, Gemini, GPT — the most powerful AI available, all in one builder."
-          />
-          <BenefitCard
-            iconClass="ri-chat-2-line"
-            title="Iterative chat editing"
-            description="Describe any change in chat. Framerate updates your site in real time."
-          />
-          <BenefitCard
-            iconClass="ri-layout-grid-line"
-            title="Industry presets gallery"
-            description="Start from a template built for your world — not a blank, generic canvas."
-          />
-          <BenefitCard
-            iconClass="ri-file-code-line"
-            title="Full site export"
-            description="Download clean, production-ready code. Host anywhere. No lock-in, ever."
-          />
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-mouse-line"
+              title="Cinematic Scroll"
+              description="Every frame, every layer — locked at 60fps. Smooth by default."
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-play-fill"
+              title="Seamless Video Flow"
+              description="Chain multiple videos into one unbroken visual story across your entire page."
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-cpu-line"
+              title="Built by the Best Models"
+              description="Claude, Gemini, GPT — the most powerful AI available, all in one builder."
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-chat-2-line"
+              title="Iterative chat editing"
+              description="Describe any change in chat. Framerate updates your site in real time."
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-layout-grid-line"
+              title="Industry presets gallery"
+              description="Start from a template built for your world — not a blank, generic canvas."
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <BenefitCard
+              iconClass="ri-file-code-line"
+              title="Full site export"
+              description="Download clean, production-ready code. Host anywhere. No lock-in, ever."
+            />
+          </motion.div>
         </div>
-      </section>
+      </FadeInSection>
+
+      {/* Real Sites Section */}
+      <FadeInSection id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col items-center mb-10">
+          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you'll wish were yours</motion.h2>
+          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene we made for you.</motion.p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Aurelia Air"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/plane_template.png"
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Elysia"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/forest_template.png"
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Mythica"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/cloud_template.png"
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Verdant Journeys"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/train_template.png"
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Aether"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.png"
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <SitePreviewCard
+              title="Solara Retreats"
+              href="/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/hotel_template.png"
+            />
+          </motion.div>
+        </div>
+
+        <motion.div variants={itemVariants} className="mt-10 flex justify-center font-onest">
+          <BrowseTemplatesButton />
+        </motion.div>
+      </FadeInSection>
 
       <TestimonialsSection />
 
-      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
-
+      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
         <PricingSection title="Simple, transparent pricing" desc="Flexible plans built for hobbyists, creators, and teams." />
-      </section>
+      </FadeInSection>
 
-      <ComparisonSection />
-
-
-      {/* Real Sites Section */}
-      <section id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col items-center mb-10">
-          <h2 className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you'll wish were yours</h2>
-          <p className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene we made for you.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SitePreviewCard
-            title="Aurelia Air"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/plane_template.png"
-          />
-
-          <SitePreviewCard
-            title="Elysia"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/forest_template.png"
-          />
-
-          <SitePreviewCard
-            title="Mythica"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/cloud_template.png"
-          />
-          <SitePreviewCard
-            title="Verdant Journeys"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/train_template.png"
-          />
-          <SitePreviewCard
-            title="Aether"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.png"
-          />
-          <SitePreviewCard
-            title="Solara Retreats"
-            href="/"
-            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/hotel_template.png"
-          />
-        </div>
-      </section>
-
-
+      <FadeInSection>
+        <motion.div variants={itemVariants}>
+          <ComparisonSection />
+        </motion.div>
+      </FadeInSection>
 
       {/* Pricing Section */}
       {/* <section className="py-20 px-6 max-w-7xl mx-auto w-full">
         <PricingSection title="Pricing" />
       </section> */}
 
-      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-2xl mx-auto w-full">
-        <FAQSection />
-      </section>
+      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-2xl mx-auto w-full">
+        <motion.div variants={itemVariants}>
+          <FAQSection />
+        </motion.div>
+      </FadeInSection>
 
       {/* Final CTA Section */}
-      <FinalCTASection />
+      <FadeInSection className="px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <motion.div variants={itemVariants}>
+          <FinalCTASection />
+        </motion.div>
+      </FadeInSection>
 
       <Footer />
     </div>

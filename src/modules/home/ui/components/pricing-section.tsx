@@ -6,6 +6,20 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { motion } from "framer-motion";
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    filter: "blur(0px)",
+    transition: { 
+      duration: 1.5,
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
+    } 
+  }
+};
 
 export interface PricingCardProps {
   title: string;
@@ -59,7 +73,7 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
           src="/pricing_gradient.png"
           alt="Pricing glow"
           fill
-          className="object-contain object-bottom rounded-[24px] z-0 pointer-events-none"
+          className="object-contain object-bottom rounded-[24px] z-0 pointer-events-none saturate-200 contrast-[100%]"
         />
       )}
       {isPopular && (
@@ -68,8 +82,8 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
         </div>
       )}
       <div className="relative z-10 flex flex-col h-full">
-        <h3 className="text-2xl text-white mb-0">{title}</h3>
-        <p className="text-sm text-neutral-400 mb-5">{desc}</p>
+        <h3 className="text-2xl text-white mb-0 text-start">{title}</h3>
+        <p className="text-sm text-neutral-400 mb-5 text-start">{desc}</p>
         <div className="flex items-end gap-2 mb-5">
           <span className="text-[40px] font-[500] text-white leading-[1]">${price}</span>
           <span className="text-sm text-neutral-400 mb-1.5 leading-[1]">Billed monthly</span>
@@ -178,11 +192,12 @@ export const PricingSection = ({ title, desc }: PricingSectionProps) => {
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-4">
         {PLANS.map((plan) => (
-          <PricingCard
-            key={plan.title}
-            {...plan}
-            desc={isProjectPage ? projectDescs[plan.title] : plan.desc}
-          />
+          <motion.div key={plan.title} variants={itemVariants}>
+            <PricingCard
+              {...plan}
+              desc={isProjectPage ? projectDescs[plan.title] : plan.desc}
+            />
+          </motion.div>
         ))}
       </div>
     </div>

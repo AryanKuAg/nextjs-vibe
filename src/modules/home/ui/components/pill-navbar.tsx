@@ -158,10 +158,10 @@ const UserAvatarButton = ({ mobile = false }: { mobile?: boolean }) => {
             alt={initial}
             width={52}
             height={52}
-            className="w-[52px] h-[52px] rounded-[16px] object-cover"
+            className="w-[52px] h-[52px] rounded-[12px] object-cover"
           />
         ) : (
-          <div className="w-[52px] h-[52px] rounded-[16px] bg-pink-500 flex items-center justify-center text-white text-[15px] font-bold">
+          <div className="w-[52px] h-[52px] rounded-[12px] bg-pink-500 flex items-center justify-center text-white text-[15px] font-bold">
             {initial}
           </div>
         )}

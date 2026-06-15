@@ -58,15 +58,25 @@ interface FeatureCardProps {
   children: React.ReactNode;
 }
 
+const BenefitCard = ({ iconClass, title, description }: { iconClass: string; title: string; description: string }) => (
+  <div className="flex flex-col p-6 bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-onest">
+    <i className={`${iconClass} text-white mb-6 text-xl`} />
+    <div className="flex flex-col">
+      <h3 className="text-[16px] text-white font-[500]">{title}</h3>
+      <p className="text-[14px] text-[#737373] pt-1.5 font-[500] leading-[1.4]">{description}</p>
+    </div>
+  </div>
+);
+
 const FeatureCard = ({ step, title, description, children }: FeatureCardProps) => (
-  <div className="flex flex-col gap-2 group p-2 bg-[#282828] rounded-[16px] font-onest">
-    <div className="relative aspect-[5/2] bg-[#282828]  overflow-hidden p-3">
+  <div className="flex flex-col gap-2 group p-2 bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-onest">
+    <div className="relative aspect-[5/2]   overflow-hidden p-3">
       {children}
     </div>
     <div className="flex flex-col">
-      <div className="text-sm text-[#CCCCCC] pl-2 pb-1">{step}</div>
-      <h3 className="text-[16px] text-white font-[500] pl-2">{title}</h3>
-      <p className="text-[14px] text-[#CCCCCC] pl-2">{description}</p>
+      <div className="text-sm text-[#737373] pl-4 pt-2 font-[500]">{step}</div>
+      <h3 className="text-[16px] text-white font-[500] pl-4 pt-2">{title}</h3>
+      <p className="text-[14px] text-[#737373] pl-4 pt-0.5 pb-4 font-[500]">{description}</p>
     </div>
   </div>
 )
@@ -97,6 +107,98 @@ const Page = () => {
         </div>
       </section>
 
+
+      {/* Features Section */}
+      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col items-center mb-10">
+          <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How it works?</h2>
+          <p className="text-center font-onest text-[#737373] text-sm font-[500]">From prompt to cinematic website in just three simple steps.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FeatureCard
+            step="01"
+            title="Generate background"
+            description="Prompt and create a custom scene with AI."
+          >
+            <Image
+              src="/generate_background.png"
+              alt="Generate background"
+              fill
+              className="object-cover rounded-[16px]"
+            />
+          </FeatureCard>
+
+          <FeatureCard
+            step="02"
+            title="Animate the scene"
+            description="Turn your image into a smooth cinematic video."
+          >
+            <Image
+              src="/animate_the_scene.png"
+              alt="Animate the scene"
+              fill
+              className="object-cover rounded-[16px]"
+            />
+          </FeatureCard>
+
+          <FeatureCard
+            step="03"
+            title="Build your website"
+            description="Convert video into a scroll driven 3D experience."
+          >
+            <Image
+              src="/build_your_website.png"
+              alt="Build your website"
+              fill
+              className="object-cover rounded-[16px]"
+            />
+          </FeatureCard>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col items-center mb-10">
+          <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping, not configuring</h2>
+          <p className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <BenefitCard
+            iconClass="ri-mouse-line"
+            title="Cinematic Scroll"
+            description="Every frame, every layer — locked at 60fps. Smooth by default."
+          />
+          <BenefitCard
+            iconClass="ri-play-fill"
+            title="Seamless Video Flow"
+            description="Chain multiple videos into one unbroken visual story across your entire page."
+          />
+          <BenefitCard
+            iconClass="ri-cpu-line"
+            title="Built by the Best Models"
+            description="Claude, Gemini, GPT — the most powerful AI available, all in one builder."
+          />
+          <BenefitCard
+            iconClass="ri-chat-2-line"
+            title="Iterative chat editing"
+            description="Describe any change in chat. Framerate updates your site in real time."
+          />
+          <BenefitCard
+            iconClass="ri-layout-grid-line"
+            title="Industry presets gallery"
+            description="Start from a template built for your world — not a blank, generic canvas."
+          />
+          <BenefitCard
+            iconClass="ri-file-code-line"
+            title="Full site export"
+            description="Download clean, production-ready code. Host anywhere. No lock-in, ever."
+          />
+        </div>
+      </section>
+
+      <TestimonialsSection />
 
 
       {/* Real Sites Section */}
@@ -151,55 +253,8 @@ const Page = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col items-center mb-10">
-          <h2 className="mb-4 text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500]">How it works?</h2>
-          <p className="text-center font-mono text-[#8A8A88] text-sm">From prompt to cinematic website in just three simple steps.</p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FeatureCard
-            step="01"
-            title="Generate background"
-            description="Prompt and create a custom scene with AI."
-          >
-            <Image
-              src="/generate_background.png"
-              alt="Generate background"
-              fill
-              className="object-cover rounded-[8px]"
-            />
-          </FeatureCard>
 
-          <FeatureCard
-            step="02"
-            title="Animate the scene"
-            description="Turn your image into a smooth cinematic video."
-          >
-            <Image
-              src="/animate_the_scene.png"
-              alt="Animate the scene"
-              fill
-              className="object-cover rounded-[8px]"
-            />
-          </FeatureCard>
-
-          <FeatureCard
-            step="03"
-            title="Build your website"
-            description="Convert video into a scroll driven 3D experience."
-          >
-            <Image
-              src="/build_your_website.png"
-              alt="Build your website"
-              fill
-              className="object-cover rounded-[8px]"
-            />
-          </FeatureCard>
-        </div>
-      </section>
-      <TestimonialsSection />
       {/* Pricing Section */}
       {/* <section className="py-20 px-6 max-w-7xl mx-auto w-full">
         <PricingSection title="Pricing" />

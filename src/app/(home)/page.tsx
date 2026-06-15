@@ -52,6 +52,40 @@ const HeroVideo = () => {
 
 
 
+interface SitePreviewCardProps {
+  title: string;
+  href: string;
+  imgSrc: string;
+}
+
+const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group block rounded-[24px] font-onest overflow-hidden relative"
+  >
+    <div className="relative aspect-[1280/720] w-full bg-transparent">
+      <Image src={imgSrc} alt={title} fill className="object-cover  transition-transform duration-500 group-hover:scale-105" />
+
+      {/* Top Gradient for text readability */}
+      <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+
+      {/* Top Left Title */}
+      <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+        <span className="text-white font-[500] text-sm md:text-[15px]">{title}</span>
+      </div>
+
+      {/* Top Right Preview Pill */}
+      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+        <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-[15px] px-6 py-2.5 rounded-[16px] flex items-center justify-center font-[500] hover:bg-black/60 transition-colors">
+          Preview
+        </div>
+      </div>
+    </div>
+  </a>
+);
+
 interface FeatureCardProps {
   step: string;
   title: string;
@@ -212,52 +246,43 @@ const Page = () => {
       {/* Real Sites Section */}
       <section id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <h2 className="text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500] mb-4">Real sites. Generated.</h2>
-          <p className="text-center font-mono text-[#8A8A88] text-sm">Turn ideas into polished, interactive websites in minutes, not weeks.</p>
+          <h2 className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you'll wish were yours</h2>
+          <p className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene we made for you.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <a
-            href="https://storage.googleapis.com/sites.framerate.space/sites/cb0b14d4-2546-49aa-9999-90dbbc0c83cc/index.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group block rounded-[16px] font-onest overflow-hidden relative"
-          >
-            <div className="relative aspect-[2880/1800] w-full bg-transparent">
-              <Image src="/giftmas.png" alt="Giftmas" fill className="object-cover scale-[1.01]" />
-              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
-                Preview
-              </div>
-            </div>
-          </a>
+          <SitePreviewCard
+            title="Aurelia Air"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/plane_template.png"
+          />
 
-          <a
-            href="https://f1-master-framerate.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group block rounded-[16px] font-onest overflow-hidden relative"
-          >
-            <div className="relative aspect-[2880/1800] w-full bg-transparent">
-              <Image src="/f1-master.png" alt="F1 Master" fill className="object-cover scale-[1.01]" />
-              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
-                Preview
-              </div>
-            </div>
-          </a>
+          <SitePreviewCard
+            title="Elysia"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/forest_template.png"
+          />
 
-          <a
-            href="https://aviator-fr.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group block rounded-[16px] font-onest overflow-hidden relative"
-          >
-            <div className="relative aspect-[2880/1800] w-full bg-transparent">
-              <Image src="/aviator.png" alt="Aviator" fill className="object-cover scale-[1.01]" />
-              <div className="absolute inset-x-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity py-2 rounded-[10px] border text-white border-white text-[15px] flex items-center justify-center bg-white/8 backdrop-blur-sm z-10 h-[32px] hover:bg-white/16">
-                Preview
-              </div>
-            </div>
-          </a>
+          <SitePreviewCard
+            title="Mythica"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/cloud_template.png"
+          />
+          <SitePreviewCard
+            title="Verdant Journeys"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/train_template.png"
+          />
+          <SitePreviewCard
+            title="Aether"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.png"
+          />
+          <SitePreviewCard
+            title="Solara Retreats"
+            href="/"
+            imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/hotel_template.png"
+          />
         </div>
       </section>
 

@@ -43,7 +43,7 @@ const stats = [
 
 export const ComparisonSection = () => {
   return (
-    <section className="py-[60px] md:py-24 px-4 sm:px-6 max-w-[640px] mx-auto w-full font-inconsolata">
+    <section className="py-[60px] md:py-24 px-4 sm:px-6 max-w-[640px] mx-auto w-full font-onest">
       {/* Header */}
       <div className="flex flex-col items-center text-center mb-12">
         <p className="text-xs tracking-[0.18em] uppercase text-[#8A8A88] mb-4">

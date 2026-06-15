@@ -43,14 +43,14 @@ export const CustomOutOfCreditsModal = ({ isOpen, onClose }: CustomOutOfCreditsM
             <span className="text-white font-[500] text-[20px] font-space-grotesk tracking-tight">framerate</span>
           </Link>
 
-          <h2 className="text-3xl md:text-[40px] text-white font-inconsolata mb-4 tracking-tight font-[500]">Upgrade to keep creating</h2>
-          <p className="text-neutral-400 text-sm leading-sm font-inconsolata mx-auto">
+          <h2 className="text-3xl md:text-[40px] text-white font-onest mb-4 tracking-tight font-[500]">Upgrade to keep creating</h2>
+          <p className="text-neutral-400 text-sm leading-sm font-onest mx-auto">
             You&apos;ve used all your free credits. Choose a plan to continue building 3D websites.
           </p>
         </div>
 
         {/* Pricing Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-inconsolata">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-onest">
           {PLANS.map((plan) => (
             <PricingCard
               key={plan.title}

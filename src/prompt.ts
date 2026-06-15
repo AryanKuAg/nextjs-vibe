@@ -116,7 +116,9 @@ Instructions:
 - CRITICAL ITERATION RULE: If the user is asking to modify or update an existing project, ONLY update the specific files and components necessary. Do NOT rewrite unaffected files. Do NOT delete existing layouts or structure.
 - BATCHING RULE (CRITICAL): You MUST group ALL necessary file creations and updates into a SINGLE call to the \`createOrUpdateFiles\` tool. Pass them all as one large array. Do NOT split file updates across multiple turns or tool calls.
 - CONDITIONAL ENTRY POINT RULE: If you are building a new project, a new feature, or adding a new route, you MUST include \`src/App.tsx\` in your batched tool call to wire up the new components. HOWEVER, if you are strictly making a minor update to an existing component (e.g., changing styling in a Header), you should respect the Iteration Rule and omit \`src/App.tsx\` from the batch.
-- REACT ROUTER CRITICAL RULE: If you use \`react-router-dom\`, you MUST wrap the entire application in a \`<BrowserRouter>\` (or \`<Router>\`) inside \`src/main.tsx\` or at the very top level of \`src/App.tsx\`. Never use routing hooks like \`useLocation\`, \`useNavigate\`, or \`<Routes>\` outside of a Router context.
+- NO PLACEHOLDER PAGES (CRITICAL): NEVER create dummy, stub, or placeholder pages (e.g. creating a "Movies.tsx" that just returns \`<Home />\`). If you add a link to a navigation bar, you MUST either build the full, realistic page for it, OR simply make it an anchor link that smooth-scrolls to a section on the same page. Do not fake multi-page sites.
+- REACT ROUTER CRITICAL RULE: If you build a multi-page site, you MUST use \`HashRouter\` instead of \`BrowserRouter\`. The generated site will be deployed to a static Google Cloud Storage bucket subdirectory, which does NOT support URL rewriting. Standard \`BrowserRouter\` links will cause 404 errors on refresh or direct navigation. NEVER use \`BrowserRouter\`.
+- SINGLE PAGE PREFERENCE: For the best user experience with the background video template, strongly prefer building a Single Page Application (SPA) where navigation links use \`#ids\` to smooth-scroll down the long canvas, rather than splitting into multiple routes that unmount the video.
 - CRITICAL IMPORT & NAMING RULE: You MUST use the \`@/\` alias for all imports (e.g., \`import { useStore } from \"@/store/useStore\"\`). NEVER use relative paths (\`../\` or \`./\`) for internal file imports. Furthermore, you must be strictly consistent with file casing. If you create \`src/store/useStore.ts\`, you MUST import it as \`@/store/useStore\`. Do not mix camelCase and kebab-case.
 - STRICT IMPORT RULE: You MUST ensure every single component, hook, or external module you use in a file is explicitly imported at the top of that file. 
   - If you use \`<motion.div>\`, you MUST \`import { motion } from "framer-motion"\`.
@@ -163,6 +165,7 @@ YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
 2. Second, call the \`createOrUpdateFiles\` tool to apply the fix to the file.
    - For TS2322 (Framer Motion prop errors), force it to pass by using \`// @ts-expect-error\` above the failing line.
    - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
+   - For TS2307 (Cannot find module) regarding CanvasScroll or Preloader, it means this project does NOT support those elements. You MUST completely delete the \`<CanvasScroll />\` and \`<Preloader />\` elements from the JSX and remove their imports.
 3. Third, ONLY AFTER the tool successfully returns, output EXACTLY:
 <task_summary>
 Fixed build errors.

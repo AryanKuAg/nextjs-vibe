@@ -173,7 +173,7 @@ function GenerationOverlay({ isGenerating, type = "image", modelId }: { isGenera
       </div>
       {/* Percentage */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
-        <span className="text-white font-inconsolata text-sm tabular-nums">
+        <span className="text-white font-onest text-sm tabular-nums">
           {Math.round(pct)}%
         </span>
         <div className="w-20 h-[2px] bg-[#333] rounded-full overflow-hidden">
@@ -338,7 +338,7 @@ export const BackgroundBuilderRight = ({
           blocks.length > 1 && (isActive ? "border border-white" : "border border-transparent hover:bg-[#2c2c2c]")
         )}>
           <div className="flex items-center justify-between p-3 border-b border-[#333333]">
-            <h3 className="text-white text-sm font-inconsolata">{title}</h3>
+            <h3 className="text-white text-sm font-onest">{title}</h3>
             <div className="flex items-center gap-4">
               <span className="text-[#737373] text-sm font-mono">{duration}</span>
               {showRemove && (
@@ -361,7 +361,7 @@ export const BackgroundBuilderRight = ({
               {/* Start Frame */}
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-white text-sm font-inconsolata">Start frame</span>
+                  <span className="text-white text-sm font-onest">Start frame</span>
                   {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
                 </div>
                 <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
@@ -388,7 +388,7 @@ export const BackgroundBuilderRight = ({
                       </div>
                     </div>
                   ) : !block.isGeneratingStart ? (
-                    <span className="text-[#ccc] text-sm font-inconsolata">
+                    <span className="text-[#ccc] text-sm font-onest">
                       {index > 0 ? (
                         `Last frame of video ${index} will appear here`
                       ) : "Prompt to generate"}
@@ -400,7 +400,7 @@ export const BackgroundBuilderRight = ({
               {/* End Frame */}
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-white text-sm font-inconsolata">End frame (Optional)</span>
+                  <span className="text-white text-sm font-onest">End frame (Optional)</span>
                   {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
                 </div>
                 <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
@@ -427,7 +427,7 @@ export const BackgroundBuilderRight = ({
                       </div>
                     </div>
                   ) : !block.isGeneratingEnd ? (
-                    <span className="text-[#ccc] text-sm font-inconsolata">Prompt to generate</span>
+                    <span className="text-[#ccc] text-sm font-onest">Prompt to generate</span>
                   ) : null}
                 </div>
               </div>
@@ -436,7 +436,7 @@ export const BackgroundBuilderRight = ({
             {/* Video */}
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
-                <span className="text-white text-sm font-inconsolata">Video</span>
+                <span className="text-white text-sm font-onest">Video</span>
                 {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
               </div>
               <div
@@ -505,7 +505,7 @@ export const BackgroundBuilderRight = ({
                     </div>
                   </>
                 ) : (
-                  <span className="text-[#ccc] text-sm font-inconsolata">Preview your generated video here</span>
+                  <span className="text-[#ccc] text-sm font-onest">Preview your generated video here</span>
                 )}
               </div>
             </div>
@@ -530,7 +530,7 @@ export const BackgroundBuilderRight = ({
             onClick={onAddBlock}
             disabled={!blocks[blocks.length - 1]?.videoUrl}
             className={cn(
-              "w-full rounded-[8px] border border-[#2c2c2c] bg-transparent text-white text-sm font-inconsolata transition-colors h-[32px] max-w-[640px] mx-auto",
+              "w-full rounded-[8px] border border-[#2c2c2c] bg-transparent text-white text-sm font-onest transition-colors h-[32px] max-w-[640px] mx-auto",
               !blocks[blocks.length - 1]?.videoUrl
                 ? "opacity-50 cursor-not-allowed"
                 : "hover:bg-[#282828]"

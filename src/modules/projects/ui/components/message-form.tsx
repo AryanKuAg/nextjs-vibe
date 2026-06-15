@@ -327,10 +327,10 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                         setSelectedModel(model.id);
                         setModelDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                         }`}
                     >
-                      <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
+                      <div className="flex w-full items-center font-onest whitespace-nowrap">
                         <span className="whitespace-nowrap">{model.label}</span>
                         {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                       </div>

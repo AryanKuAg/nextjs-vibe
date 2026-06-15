@@ -38,7 +38,7 @@ export const UserControl = ({ showName }: Props) => {
           </AvatarFallback>
         </Avatar>
         {showName && (
-          <span className="text-sm text-white font-inconsolata truncate max-w-[100px] hidden sm:inline-block">
+          <span className="text-sm text-white font-onest truncate max-w-[100px] hidden sm:inline-block">
             {user.fullName || user.firstName}
           </span>
         )}
@@ -46,7 +46,7 @@ export const UserControl = ({ showName }: Props) => {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-inconsolata rounded-xl shadow-xl"
+        className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-onest rounded-xl shadow-xl"
       >
         <div className="flex items-center gap-3 p-2 mb-2">
           <Avatar className="h-10 w-10 rounded-md">

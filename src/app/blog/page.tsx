@@ -38,13 +38,13 @@ export default function BlogIndex() {
   };
 
   return (
-    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-inconsolata">
+    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-onest">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <PillNavbar />
-      
+
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-32 pb-20">
         <div className="flex flex-col items-center mb-16">
           <h1 className="text-4xl md:text-5xl font-mono text-center text-white leading-[1] font-[500] mb-4">
@@ -57,17 +57,17 @@ export default function BlogIndex() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => (
-            <Link 
-              key={post.slug} 
+            <Link
+              key={post.slug}
               href={`/blog/${post.slug}`}
               className="group flex flex-col bg-[#282828] rounded-[16px] overflow-hidden hover:ring-1 hover:ring-white/20 transition-all"
             >
               <div className="relative aspect-[16/9] w-full bg-[#1a1a1a] overflow-hidden">
                 {post.coverImage ? (
-                  <Image 
-                    src={post.coverImage} 
-                    alt={post.title} 
-                    fill 
+                  <Image
+                    src={post.coverImage}
+                    alt={post.title}
+                    fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (

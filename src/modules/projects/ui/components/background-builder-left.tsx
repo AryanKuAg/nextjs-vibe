@@ -472,7 +472,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="bg-[#282828] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
           <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b-0 border-[#282825]">
-            <span className="text-white text-sm font-inconsolata">Editing video {activeBlockIndex + 1}</span>
+            <span className="text-white text-sm font-onest">Editing video {activeBlockIndex + 1}</span>
             <span className="text-white/30 text-xs font-mono">
               {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
             </span>
@@ -630,7 +630,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="space-y-3 mt-auto">
           <Button
-            className="w-full rounded-[8px] bg-white text-black font-inconsolata text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
+            className="w-full rounded-[8px] bg-white text-black font-onest text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
             disabled={isExtracting || !blocks.every((block) => !!block.videoUrl)}
           >
@@ -643,14 +643,14 @@ export const BackgroundBuilderLeft = ({
           </Button>
           <Button
             variant="ghost"
-            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
+            className="w-full text-white font-onest h-8 border border-[2c2c2c] hover:bg-[#282828]!"
             onClick={() => setIsTemplatesModalOpen(true)}
           >
             Templates
           </Button>
           <Button
             variant="ghost"
-            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
+            className="w-full text-white font-onest h-8 border border-[2c2c2c] hover:bg-[#282828]!"
             onClick={onSkip}
           >
             Skip

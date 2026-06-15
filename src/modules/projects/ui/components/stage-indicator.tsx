@@ -18,7 +18,7 @@ const STAGES = [
 
 export const StageIndicator = ({ activeTab, onStageClick, hasFrames, hasMessages }: Props) => {
   const activeIndex = STAGES.findIndex((s) => s.id === activeTab);
-  
+
   const isUnlocked = (idx: number) => {
     if (idx === 0) return true;
     if (idx === 1) return hasFrames || hasMessages;
@@ -48,7 +48,7 @@ export const StageIndicator = ({ activeTab, onStageClick, hasFrames, hasMessages
               disabled={!unlocked}
             >
               <span className="text-xs mb-[4px] text-[#666666] font-dm-mono">{num}</span>
-              <span className="text-sm text-white leading-tight text-center px-1 font-inconsolata">{text}</span>
+              <span className="text-sm text-white leading-tight text-center px-1 font-onest">{text}</span>
             </button>
 
             {idx < STAGES.length - 1 && (

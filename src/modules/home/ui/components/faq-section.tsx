@@ -36,7 +36,7 @@ export interface FAQItem {
 /* ─── FAQItem ────────────────────────────────────────────────────────── */
 const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onToggle: () => void }) => {
   return (
-    <div className="rounded-[16px] overflow-hidden font-inconsolata">
+    <div className="rounded-[16px] overflow-hidden font-onest">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 text-left text-sm text-white font-[400] bg-[#282828] transition-colors "
@@ -71,7 +71,7 @@ export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questio
   return (
     <>
       <div className="flex flex-col items-center mb-10">
-        <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-4 leading-[40px]">
+        <h2 className="text-[40px] text-white text-center font-onest font-[500] mb-4 leading-[40px]">
           {title}
         </h2>
         <p className="text-center font-mono text-[#8A8A88] text-sm">Got questions? We’ve got answers.</p>

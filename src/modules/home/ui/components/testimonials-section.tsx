@@ -65,7 +65,7 @@ export const TestimonialsSection = () => {
         {testimonials.map((testimonial, idx) => (
           <div
             key={idx}
-            className="flex flex-col bg-[#282828] rounded-[16px] p-6 font-inconsolata border border-transparent  transition-colors"
+            className="flex flex-col bg-[#282828] rounded-[16px] p-6 font-onest border border-transparent  transition-colors"
           >
             <div className="text-[#8A8A88] text-4xl mb-2 font-space-grotesk leading-none opacity-50 font-bold">
               “

@@ -52,7 +52,7 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
   };
 
   return (
-    <div className={cn("relative flex flex-col bg-[#282828] rounded-[16px] p-4 font-inconsolata", isPopular && "border border-white", className)}>
+    <div className={cn("relative flex flex-col bg-[#282828] rounded-[16px] p-4 font-onest", isPopular && "border border-white", className)}>
       {isPopular && (
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono">
           MOST POPULAR

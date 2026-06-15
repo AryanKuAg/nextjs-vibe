@@ -136,6 +136,9 @@
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
   --font-inconsolata: var(--font-inconsolata);
+  --font-onest: var(--font-onest);
+  --font-stack-sans-notch: var(--font-stack-sans-notch);
+
   --font-dm-mono: var(--font-dm-mono);
   --font-space-grotesk: var(--font-space-grotesk);
 
@@ -165,7 +168,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-inconsolata;
+    @apply bg-background text-foreground font-onest;
   }
 }
 

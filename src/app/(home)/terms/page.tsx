@@ -18,7 +18,7 @@ export const metadata = {
 };
 
 const LegalFooter = () => (
-  <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-inconsolata gap-4">
+  <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-onest gap-4">
     <span>2026 © Framerate</span>
 
     <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
@@ -31,7 +31,7 @@ const LegalFooter = () => (
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background font-inconsolata">
+    <div className="min-h-screen bg-background font-onest">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link href="/" className="flex items-center gap-2 mb-11">
           <Image src="/logo.png" alt="Framerate" width={24} height={24} />

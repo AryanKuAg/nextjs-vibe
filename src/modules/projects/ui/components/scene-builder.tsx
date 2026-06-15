@@ -171,7 +171,7 @@ export const SceneBuilder = ({
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
-      <div className="flex flex-col h-full bg-background font-inconsolata">
+      <div className="flex flex-col h-full bg-background font-onest">
         <div className="flex-1" />
 
         <div className="p-4 space-y-3">
@@ -238,7 +238,7 @@ export const SceneBuilder = ({
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
                         <span className="whitespace-nowrap">{model.label}</span>
@@ -270,7 +270,7 @@ export const SceneBuilder = ({
           </div>
 
           <Button
-            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
+            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-onest text-sm h-9 hover:bg-white/5! font-[400]"
             onClick={onNext}
           >
             Skip

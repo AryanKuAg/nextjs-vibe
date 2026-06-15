@@ -75,7 +75,7 @@ export default function ManageAccountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white font-inconsolata flex flex-col font-mono selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-onest flex flex-col font-mono selection:bg-[#F1336E]/30">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
         <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">
@@ -129,7 +129,7 @@ export default function ManageAccountPage() {
               <Button
                 onClick={() => portalMutation.mutate()}
                 disabled={portalMutation.isPending || usage?.plan === "free" || !usage?.plan}
-                className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-inconsolata"
+                className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-onest"
               >
                 {portalMutation.isPending ? "Redirecting..." : "Manage subscription"}
               </Button>
@@ -144,7 +144,7 @@ export default function ManageAccountPage() {
               </div>
               <Button
                 onClick={handleSignOut}
-                className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-inconsolata"
+                className="bg-transparent text-white border border-[#3B3B3B] hover:bg-[#2A2A28] h-9 px-4 rounded-[8px] text-sm font-onest"
               >
                 Sign out
               </Button>
@@ -160,7 +160,7 @@ export default function ManageAccountPage() {
               <Button
                 onClick={handleDeleteAccount}
                 disabled={deleteAccountMutation.isPending}
-                className="bg-transparent text-[#F1336E] border border-[#3B3B3B] hover:bg-[#F1336E]/10 h-9 px-4 rounded-[8px] text-sm font-inconsolata transition-colors disabled:opacity-50"
+                className="bg-transparent text-[#F1336E] border border-[#3B3B3B] hover:bg-[#F1336E]/10 h-9 px-4 rounded-[8px] text-sm font-onest transition-colors disabled:opacity-50"
               >
                 {deleteAccountMutation.isPending ? "Deleting..." : "Delete account"}
               </Button>

@@ -148,18 +148,18 @@ export const MessagesContainer = ({
       </div>
       <div className="relative p-3 pt-1">
         <div className="absolute -top-6 left-0 right-0 h-6 pointer-events-none" />
-        <MessageForm 
-          projectId={projectId} 
-          stage={stage} 
-          extractedZipUrl={extractedZipUrl} 
-          extractedFrameCount={extractedFrameCount} 
+        <MessageForm
+          projectId={projectId}
+          stage={stage}
+          extractedZipUrl={extractedZipUrl}
+          extractedFrameCount={extractedFrameCount}
           isGenerating={isLastMessageUser && !isStuck}
         />
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-inconsolata text-sm hover:bg-[#282828]! font-[400] h-[32px]"
+            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-onest text-sm hover:bg-[#282828]! font-[400] h-[32px]"
           >
             Back
           </button>

@@ -575,9 +575,10 @@ YOUR ONLY JOB:
 9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
 10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
 11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
-13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
-14. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
+12. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
+13. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
+14. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
+15. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
     - \`src/components/CanvasScroll.tsx\`
     - \`src/components/Preloader.tsx\`
     - \`src/store/useStore.ts\`
@@ -669,7 +670,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
                 if (file === "src/constants/frames.ts") {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const frameCount = event.data.frameCount || (project as any)?.frameCount || 450;
-                  content = content.replace(/TOTAL_FRAMES = \\d+;/, `TOTAL_FRAMES = ${frameCount};`);
+                  content = content.replace(/TOTAL_FRAMES = \d+;/, `TOTAL_FRAMES = ${frameCount};`);
                 }
                 const dir = path.dirname(file);
                 await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
@@ -769,11 +770,11 @@ function fixPaths(dir) {
         content = content.replace(/@\\/components\\/Navbar/g, './components/Navbar');
 
         // Ensure imports exist
-        const requiredImports = [
+        const requiredImports = ${videoUrl ? `[
           { name: 'Preloader', path: './components/Preloader' },
           { name: 'CanvasScroll', path: './components/CanvasScroll' },
           { name: 'useStore', path: './store/useStore' }
-        ];
+        ]` : `[]`};
 
         for (const req of requiredImports) {
           if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {

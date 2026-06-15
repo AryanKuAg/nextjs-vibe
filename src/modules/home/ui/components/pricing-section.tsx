@@ -63,7 +63,7 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
         />
       )}
       {isPopular && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono z-20">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black px-3 py-1 rounded-full text-[12px] font-mono z-10">
           MOST POPULAR
         </div>
       )}

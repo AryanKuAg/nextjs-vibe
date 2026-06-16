@@ -40,10 +40,10 @@ export const StageIndicator = ({ activeTab, onStageClick, hasFrames, hasMessages
               className={cn(
                 "flex-1 flex flex-col items-center justify-center h-[64px] rounded-[16px] border-[1px] transition-all font-mono",
                 isActive
-                  ? "border-white bg-[#282828] text-white"
+                  ? "border-white bg-[#212121] text-white"
                   : unlocked
-                    ? "border-transparent bg-[#282828] text-white/50 hover:text-white/80 hover:bg-[#282828] cursor-pointer"
-                    : "border-transparent bg-[#282828] text-white/30 cursor-not-allowed"
+                    ? "border-transparent bg-[#212121] text-white/50 hover:text-white/80 hover:bg-[#212121] cursor-pointer"
+                    : "border-transparent bg-[#212121] text-white/30 cursor-not-allowed"
               )}
               disabled={!unlocked}
             >

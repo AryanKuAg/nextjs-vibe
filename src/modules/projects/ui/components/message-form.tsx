@@ -251,7 +251,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#282828] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
+          className={`bg-[#212121] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
             }`}
         >
           {/* Image preview — same style as video-builder */}
@@ -296,21 +296,21 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
           <div className="flex items-center gap-x-1">
             {/* + Image attach button — before model name */}
-            <Hint text="Add photo" side="top" align="start">
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={isPending}
-                className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50 text-base leading-none"
-                title="Attach image"
-              >
-                <i className="ri-add-line text-lg" />
-              </button>
-            </Hint>
+            {/* <Hint text="Add photo" side="top" align="start"> */}
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isPending}
+              className="h-8 w-8 flex items-center justify-center rounded-full text-white hover:bg-white/4 transition-colors disabled:opacity-50 text-base leading-none"
+              title="Attach image"
+            >
+              <i className="ri-add-line text-lg" />
+            </button>
+            {/* </Hint> */}
             {/* Model Selector Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full text-sm text-white hover:bg-white/4 transition-colors cursor-pointer"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
                 <span className="truncate max-w-[100px] sm:max-w-[120px]">{SELECTED_MODEL_DATA.label}</span>
@@ -341,7 +341,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
 
             {/* Enhance prompt */}
-            <Hint text="Generate prompt" side="top" >
+            {/* <Hint text="Generate prompt" side="top" >
               <button
                 type="button"
                 onClick={handleEnhancePrompt}
@@ -354,7 +354,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   <i className="ri-magic-line text-[15px]" />
                 )}
               </button>
-            </Hint>
+            </Hint> */}
 
             <div className="flex gap-2 ml-auto">
               <div className="flex items-center gap-1 text-white">
@@ -368,7 +368,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent text-[#fefefe] transition-all shadow-sm active:scale-95 border border-[#333333]"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/12 hover:bg-white/24 text-[#fefefe] transition-all shadow-sm active:scale-95"
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>

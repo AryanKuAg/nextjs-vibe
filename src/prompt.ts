@@ -166,6 +166,7 @@ YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
    - For TS2322 (Framer Motion prop errors), force it to pass by using \`// @ts-expect-error\` above the failing line.
    - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
    - For TS2307 (Cannot find module) regarding CanvasScroll or Preloader, it means this project does NOT support those elements. You MUST completely delete the \`<CanvasScroll />\` and \`<Preloader />\` elements from the JSX and remove their imports.
+   - For TS2554 (Expected 1 arguments, but got 0) on \`useRef\` hooks, add \`(null)\` as the initial value (e.g. \`useRef<number>(null)\`).
 3. Third, ONLY AFTER the tool successfully returns, output EXACTLY:
 <task_summary>
 Fixed build errors.

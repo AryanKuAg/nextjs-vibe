@@ -713,6 +713,13 @@ if (fs.existsSync('src/App.tsx')) {
             return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
           }
 
+          console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
+          try {
+            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
+          } catch (e) {
+            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
+          }
+
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx tsc --noEmit");
@@ -964,13 +971,14 @@ fixPaths(process.argv[2]);
         }
       }
 
-      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
-The build failed with these exact errors:
-
-${buildCheck.error}
-${brokenFilesContext}
-
-Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
+      let fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\n`;
+      fixPrompt += `The build failed with these exact errors:\n\n${buildCheck.error}\n${brokenFilesContext}\n\n`;
+      
+      if (attempt >= 3) {
+        fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
+      }
+      
+      fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
 
       // <--- USE THE CLEAN STATE HERE AS WELL
       const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });

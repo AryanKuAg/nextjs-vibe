@@ -72,7 +72,7 @@ export const projectsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        value: z.string().max(10000, { message: "Value is too long" }),
+        value: z.string().max(100000, { message: "Value is too long" }),
       }),
     )
     .mutation(async ({ input, ctx }) => {

@@ -91,6 +91,8 @@ Instructions:
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.
+   - GOOGLE FONTS CRITICAL RULE: If the user or template specifies a custom font (e.g., 'Kanit', 'Inter', 'Playfair Display'), you MUST import it at the very top of \`src/index.css\` using an \`@import url(...);\` statement from Google Fonts. If you do not import it, the font will not load. Example: \`@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800;900&display=swap');\`
+
 
 4. ENTRY POINT & APP.TSX OVERRIDE (CRITICAL):
    - You MUST completely overwrite the default Vite boilerplate in \`src/App.tsx\`. Do NOT leave the default Vite logos, counter, or default styling.

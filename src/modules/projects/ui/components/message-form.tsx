@@ -30,12 +30,13 @@ interface Props {
   extractedZipUrl?: string | null;
   extractedFrameCount?: number;
   isGenerating?: boolean;
+  initialPrompt?: string;
 };
 
 const formSchema = z.object({
   value: z.string()
     .min(1, { message: "Value is required" })
-    .max(10000, { message: "Value is too long" }),
+    .max(100000, { message: "Value is too long" }),
 })
 
 const processImageFile = (file: File): Promise<string> =>
@@ -71,7 +72,7 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -106,8 +107,14 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { value: "" },
+    defaultValues: { value: initialPrompt || "" },
   });
+
+  useEffect(() => {
+    if (initialPrompt && !form.getValues().value && !isFollowUp) {
+      form.setValue("value", initialPrompt, { shouldValidate: true });
+    }
+  }, [initialPrompt, form, isFollowUp]);
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
     onSuccess: () => {
@@ -215,6 +222,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           isFollowUp,
           imageDataUrl: uploadedDataUrl ?? undefined,
         });
+        form.setValue("value", "");
+        setUploadedDataUrl(null);
       } catch {
         // Error is handled in the mutation's onError callback
       }
@@ -226,6 +235,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           stage,
           model: selectedModel,
         });
+        form.setValue("value", "");
+        setUploadedDataUrl(null);
       } catch {
         // Error is handled in the mutation's onError callback
       }
@@ -233,7 +244,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   };
 
   const isPending = createMessage.isPending || buildSite.isPending;
-  const isButtonDisabled = isPending || (!form.formState.isValid && !isGenerating);
+  const promptValue = form.watch("value");
+  const isButtonDisabled = isPending || (!promptValue?.trim() && !isGenerating);
 
   return (
     <>

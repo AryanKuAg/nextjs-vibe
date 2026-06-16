@@ -49,7 +49,7 @@ const formSchema = z.object({
   value: z
     .string()
     .min(1, { message: "Value is required" })
-    .max(10000, { message: "Value is too long" }),
+    .max(100000, { message: "Value is too long" }),
 });
 
 export const ProjectForm = () => {

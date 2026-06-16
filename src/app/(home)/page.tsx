@@ -203,7 +203,7 @@ const itemVariants = {
     y: 0, 
     filter: "blur(0px)",
     transition: { 
-      duration: 1.5,
+      duration: 0.9,
       ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
     } 
   }
@@ -230,7 +230,7 @@ const FadeInSection = ({ children, className, id }: { children: React.ReactNode,
     whileInView="visible"
     viewport={{ once: true, amount: 0.3 }}
     variants={{
-      visible: { transition: { staggerChildren: 0.2, delayChildren: 0.1 } },
+      visible: { transition: { staggerChildren: 0.12, delayChildren: 0.06 } },
       hidden: {}
     }}
   >
@@ -332,7 +332,7 @@ const Page = () => {
       </FadeInSection>
 
       {/* Benefits Section */}
-      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+      <FadeInSection id="features" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
           <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping, not configuring</motion.h2>
           <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</motion.p>

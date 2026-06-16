@@ -9,6 +9,7 @@ export interface VideoBlock {
   startPrompt?: string;
   endPrompt?: string;
   videoPrompt?: string;
+  builderPrompt?: string;
   startFrameUrl: string | null;
   startFrameHistory?: string[];
   endFrameUrl: string | null;

@@ -632,7 +632,7 @@ export const BackgroundBuilderLeft = ({
           <Button
             className="w-full rounded-[8px] bg-white text-black font-onest text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
-            disabled={isExtracting || !blocks.every((block) => !!block.videoUrl)}
+            disabled={isExtracting || (!blocks.every((block) => !!block.videoUrl) && !blocks.some(block => !!block.builderPrompt))}
           >
             {isExtracting ? (
               <>

@@ -111,7 +111,7 @@ export default async function BlogPost({ params }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-inconsolata">
+    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-onest">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -120,14 +120,14 @@ export default async function BlogPost({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      
+
       <PillNavbar />
-      
+
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 pt-32 pb-20">
         <Link href="/blog" className="inline-flex items-center text-[#8A8A88] hover:text-white mb-10 transition-colors font-mono text-sm">
           &larr; Back to Blog
         </Link>
-        
+
         <article>
           <header className="mb-12">
             <h1 className="text-3xl md:text-5xl font-[500] text-white leading-tight mb-6">
@@ -146,18 +146,18 @@ export default async function BlogPost({ params }: Props) {
 
           {post.coverImage && (
             <div className="relative aspect-[21/9] w-full bg-[#282828] rounded-[16px] overflow-hidden mb-12 border border-white/5">
-              <Image 
-                src={post.coverImage} 
-                alt={post.title} 
-                fill 
+              <Image
+                src={post.coverImage}
+                alt={post.title}
+                fill
                 className="object-cover"
                 priority
               />
             </div>
           )}
 
-          <div 
-            className="prose prose-invert prose-lg max-w-none prose-headings:font-inconsolata prose-p:font-inconsolata prose-a:text-primary hover:prose-a:text-primary/80 prose-img:rounded-xl"
+          <div
+            className="prose prose-invert prose-lg max-w-none prose-headings:font-onest prose-p:font-onest prose-a:text-primary hover:prose-a:text-primary/80 prose-img:rounded-xl"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
         </article>

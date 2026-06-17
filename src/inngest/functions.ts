@@ -163,21 +163,39 @@ export const codeAgentFunction = inngest.createFunction(
           }
         };
         readDirRecursive(templatesDir);
+
+        if (!videoUrl) {
+          const PROTECTED_FILES = [
+            "src/components/CanvasScroll.tsx",
+            "src/components/Preloader.tsx",
+            "src/store/useStore.ts",
+            "src/constants/frames.ts",
+            "src/components/headers/DotNav.tsx",
+            "src/components/headers/FullWidthNav.tsx",
+            "src/components/headers/PillNav.tsx",
+          ];
+          for (const file of PROTECTED_FILES) {
+            delete files[file];
+          }
+          files["src/App.tsx"] = `export default function App() {\n  return (\n    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-8">\n      <h1 className="text-4xl font-bold mb-4">Hello World</h1>\n      <p className="text-lg text-muted-foreground">Start building your application here.</p>\n    </div>\n  );\n}\n`;
+        }
       } else {
         // Enforce golden templates on follow-ups to keep them synced and prevent dummy components
-        const PROTECTED_FILES = [
-          "src/components/CanvasScroll.tsx",
-          "src/components/Preloader.tsx",
-          "src/store/useStore.ts",
-          "src/constants/frames.ts",
-          "src/components/headers/DotNav.tsx",
-          "src/components/headers/FullWidthNav.tsx",
-          "src/components/headers/PillNav.tsx",
-        ];
-        for (const file of PROTECTED_FILES) {
-          const templatePath = path.join(templatesDir, file.replace("src/", ""));
-          if (fs.existsSync(templatePath)) {
-            files[file] = fs.readFileSync(templatePath, "utf-8");
+        if (videoUrl) {
+          const PROTECTED_FILES = [
+            "src/components/CanvasScroll.tsx",
+            "src/components/Preloader.tsx",
+            "src/store/useStore.ts",
+            "src/constants/frames.ts",
+            "src/components/headers/DotNav.tsx",
+            "src/components/headers/FullWidthNav.tsx",
+            "src/components/headers/PillNav.tsx",
+          ];
+          for (const file of PROTECTED_FILES) {
+            const templatePath = path.join(templatesDir, file.replace("src/", ""));
+            if (fs.existsSync(templatePath)) {
+              files[file] = fs.readFileSync(templatePath, "utf-8");
+            }
           }
         }
       }
@@ -205,7 +223,7 @@ export const codeAgentFunction = inngest.createFunction(
         return null;
       }
 
-      const PROTECTED_FILES = [
+      const PROTECTED_FILES = videoUrl ? [
         "src/components/CanvasScroll.tsx",
         "src/components/Preloader.tsx",
         "src/store/useStore.ts",
@@ -213,7 +231,7 @@ export const codeAgentFunction = inngest.createFunction(
         "src/components/headers/DotNav.tsx",
         "src/components/headers/FullWidthNav.tsx",
         "src/components/headers/PillNav.tsx",
-      ];
+      ] : [];
 
       // Helper function to write a file absolute to /home/user and ensure directory exists
       const writeSandboxFile = async (sandbox: Sandbox, filePath: string, content: string) => {
@@ -235,7 +253,7 @@ export const codeAgentFunction = inngest.createFunction(
           const sandbox = await getSandbox(sandboxId);
           const fs = await import("fs");
           const path = await import("path");
-          
+
           // Ensure all protected template files are present and correct in the hot sandbox
           for (const file of PROTECTED_FILES) {
             const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
@@ -261,15 +279,15 @@ export const codeAgentFunction = inngest.createFunction(
 
       const sandbox = await getSandbox(sandboxId);
       let written = 0;
-      
+
       // Ensure directory structure and write all files
       for (const [filePath, content] of Object.entries(filesObj)) {
         if (typeof content === "string") {
           try {
             await writeSandboxFile(sandbox, filePath, content);
             written++;
-          } catch (e) {
-            console.error(`Failed to hydrate file ${filePath}`, e);
+          } catch {
+            // Just ignore and continue.
           }
         }
       }
@@ -352,7 +370,7 @@ export const codeAgentFunction = inngest.createFunction(
       return [
         createTool({
           name: "terminal",
-          // ... keep existing terminal description/params ...
+          description: "Execute a terminal command in the sandbox",
           parameters: z.object({
             command: z.string(),
           }),
@@ -389,7 +407,7 @@ export const codeAgentFunction = inngest.createFunction(
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
 
-                const PROTECTED_FILES = [
+                const PROTECTED_FILES = videoUrl ? [
                   "src/components/CanvasScroll.tsx",
                   "src/components/Preloader.tsx",
                   "src/store/useStore.ts",
@@ -397,7 +415,7 @@ export const codeAgentFunction = inngest.createFunction(
                   "src/components/headers/DotNav.tsx",
                   "src/components/headers/FullWidthNav.tsx",
                   "src/components/headers/PillNav.tsx",
-                ];
+                ] : [];
 
                 for (const file of files) {
                   if (!file || !file.path || typeof file.path !== "string" || file.path.trim() === "") {
@@ -414,7 +432,7 @@ export const codeAgentFunction = inngest.createFunction(
                   }
 
                   // Strict enforcement for App.tsx integrity
-                  if (file.path === "src/App.tsx") {
+                  if (videoUrl && file.path === "src/App.tsx") {
                     const c = file.content;
                     if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
@@ -472,7 +490,7 @@ export const codeAgentFunction = inngest.createFunction(
               try {
                 const sandbox = await getSandbox(sandboxId);
                 const contents = [];
-                 for (const file of files) {
+                for (const file of files) {
                   const absolutePath = file.startsWith('/') ? file : `/home/user/${file}`;
                   const content = await sandbox.files.read(absolutePath);
                   contents.push({ path: file, content });
@@ -548,7 +566,7 @@ Specifically, you ALREADY HAVE:
 YOUR ONLY JOB:
 1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
 2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
-3. CHOOSE A HEADER: You can modify \`src/components/Navbar.tsx\` to match the site's brand, OR you can completely replace it by importing one of the templates from \`src/components/headers/\` into \`src/App.tsx\` (e.g. use \`DotNav\` or \`FullWidthNav\` instead if it fits the vibe better!). You have full creative freedom over the navigation design.
+3. CREATE HIGHLY UNIQUE DESIGNS: You are highly encouraged to invent entirely NEW layouts, typography choices, color palettes, and unconventional structures. DO NOT default to the provided pill-shaped Navbar. You MUST redesign the navigation or use one of the alternative headers to match the specific vibe of the user's prompt. DO NOT build the exact same centered-text hero section every time. Introduce grids, side-panels, bento boxes, etc.
 4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
 5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
 6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
@@ -557,9 +575,10 @@ YOUR ONLY JOB:
 9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
 10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
 11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **RICH CONTENT (CRITICAL)**: Generate highly detailed, copy-rich sections with variant content. Do not output just a minimal title and subtitle. You MUST generate at least 500 words of realistic content. Add features, bullet points, grids, statistics, testimonials, detailed pricing tiers, and dense paragraph text so the layout feels like a complete, premium, scrollable website. Do not build minimal sites!
-13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color will hide the animation and result in failure!
-14. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
+12. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
+13. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
+14. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
+15. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
     - \`src/components/CanvasScroll.tsx\`
     - \`src/components/Preloader.tsx\`
     - \`src/store/useStore.ts\`
@@ -569,6 +588,14 @@ YOUR ONLY JOB:
 
 When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
 === END TEMPLATE ARCHITECTURE INSTRUCTION ===
+
+` + currentPrompt;
+    } else {
+      currentPrompt = `=== STANDARD WEBSITE ARCHITECTURE ===
+Build a standard, high-quality React application based on the user's prompt. 
+You have full creative freedom. There is no background video, so you can use any colors, backgrounds, or layouts you want.
+Create unique, stunning designs. Do NOT just make a plain white page.
+=== END STANDARD WEBSITE ARCHITECTURE ===
 
 ` + currentPrompt;
     }
@@ -595,7 +622,7 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -623,7 +650,7 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
           await sandbox.commands.run("rm -rf dist");
 
           // Ensure all protected template files are present and correct in the sandbox
-          const PROTECTED_FILES = [
+          const PROTECTED_FILES = videoUrl ? [
             "src/components/CanvasScroll.tsx",
             "src/components/Preloader.tsx",
             "src/store/useStore.ts",
@@ -631,15 +658,20 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
             "src/components/headers/DotNav.tsx",
             "src/components/headers/FullWidthNav.tsx",
             "src/components/headers/PillNav.tsx",
-          ];
-          
+          ] : [];
+
           const fs = await import("fs");
           const path = await import("path");
           for (const file of PROTECTED_FILES) {
             const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
             if (fs.existsSync(templatePath)) {
               try {
-                const content = fs.readFileSync(templatePath, "utf-8");
+                let content = fs.readFileSync(templatePath, "utf-8");
+                if (file === "src/constants/frames.ts") {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const frameCount = event.data.frameCount || (project as any)?.frameCount || 450;
+                  content = content.replace(/TOTAL_FRAMES = \d+;/, `TOTAL_FRAMES = ${frameCount};`);
+                }
                 const dir = path.dirname(file);
                 await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
                 await sandbox.files.write(`/home/user/${file}`, content);
@@ -660,7 +692,7 @@ When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<C
           }
 
           console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
-          const checkStructureScript = `
+          const checkStructureScript = videoUrl ? `
 const fs = require('fs');
 if (fs.existsSync('src/App.tsx')) {
   const c = fs.readFileSync('src/App.tsx', 'utf8');
@@ -674,11 +706,18 @@ if (fs.existsSync('src/App.tsx')) {
     process.exit(1);
   }
 }
-`;
+` : `console.log("No structure check for non-video projects.");`;
           await sandbox.files.write("/app/check-structure.js", checkStructureScript);
           const structCheck = await sandbox.commands.run("node /app/check-structure.js");
           if (structCheck.exitCode !== 0) {
             return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+          }
+
+          console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
+          try {
+            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
+          } catch {
+            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
           }
 
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
@@ -732,17 +771,17 @@ function fixPaths(dir) {
         content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
 
         // Fix alias paths
-        content = content.replace(/@\/components\/Preloader/g, './components/Preloader');
-        content = content.replace(/@\/components\/CanvasScroll/g, './components/CanvasScroll');
-        content = content.replace(/@\/store\/useStore/g, './store/useStore');
-        content = content.replace(/@\/components\/Navbar/g, './components/Navbar');
+        content = content.replace(/@\\/components\\/Preloader/g, './components/Preloader');
+        content = content.replace(/@\\/components\\/CanvasScroll/g, './components/CanvasScroll');
+        content = content.replace(/@\\/store\\/useStore/g, './store/useStore');
+        content = content.replace(/@\\/components\\/Navbar/g, './components/Navbar');
 
         // Ensure imports exist
-        const requiredImports = [
+        const requiredImports = ${videoUrl ? `[
           { name: 'Preloader', path: './components/Preloader' },
           { name: 'CanvasScroll', path: './components/CanvasScroll' },
           { name: 'useStore', path: './store/useStore' }
-        ];
+        ]` : `[]`};
 
         for (const req of requiredImports) {
           if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {
@@ -909,7 +948,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -932,13 +971,14 @@ fixPaths(process.argv[2]);
         }
       }
 
-      const fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨
-The build failed with these exact errors:
-
-${buildCheck.error}
-${brokenFilesContext}
-
-Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
+      let fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\n`;
+      fixPrompt += `The build failed with these exact errors:\n\n${buildCheck.error}\n${brokenFilesContext}\n\n`;
+      
+      if (attempt >= 3) {
+        fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
+      }
+      
+      fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
 
       // <--- USE THE CLEAN STATE HERE AS WELL
       const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });

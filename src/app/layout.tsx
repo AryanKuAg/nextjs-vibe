@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { ClerkProvider, SignedOut } from "@clerk/nextjs";
-import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk, Onest } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 
 import { GoogleOneTap } from "@/components/google-one-tap";
@@ -22,6 +23,17 @@ const geistMono = Geist_Mono({
 
 const inconsolata = Inconsolata({
   variable: "--font-inconsolata",
+  subsets: ["latin"],
+});
+
+const stackSansNotch = localFont({
+  src: "../fonts/StackSansNotch-VF.woff2",
+  variable: "--font-stack-sans-notch",
+  display: "swap",
+});
+
+const onest = Onest({
+  variable: "--font-onest",
   subsets: ["latin"],
 });
 
@@ -84,7 +96,7 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
           <body
             suppressHydrationWarning
-            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
+            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${onest.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
           >
             <Script
               strategy="afterInteractive"

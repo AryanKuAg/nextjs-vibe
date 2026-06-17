@@ -18,6 +18,10 @@ const faqs_list = [
     a: "You can create 3D websites, interactive pages, and immersive visuals for products, portfolios, events, or brand experiences.",
   },
   {
+    q: "Do I own my website?",
+    a: "Yes, you own 100% of the intellectual property rights to the websites you create. You can export the code and host it wherever you&apos;d like.",
+  },
+  {
     q: "How do credits work, and what do they cover?",
     a: "If you run out of credits, you won't be able to create more until your credits refresh on your next billing date. You can also upgrade to a higher plan if you need more credits sooner.",
   },
@@ -36,21 +40,20 @@ export interface FAQItem {
 /* ─── FAQItem ────────────────────────────────────────────────────────── */
 const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onToggle: () => void }) => {
   return (
-    <div className="rounded-[16px] overflow-hidden font-inconsolata">
+    <div className="rounded-[24px] overflow-hidden font-onest bg-gradient-to-b from-[#282828] to-[#282828]/40">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 text-left text-sm text-white font-[400] bg-[#282828] transition-colors "
+        className="w-full flex items-center justify-between px-6 py-5 text-left text-[16px] text-white font-[500] bg-transparent transition-colors"
       >
-        <span className="text-sm leading-[20px]">{q}</span>
-        <i className={`ri-arrow-down-s-line text-white transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <span className="leading-[24px]">{q}</span>
+        <i className={`ri-arrow-down-s-line text-white text-xl transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
       <div
-        className="overflow-hidden"
+        className="overflow-hidden transition-all duration-300"
         style={{ maxHeight: isOpen ? "500px" : "0px", opacity: isOpen ? 1 : 0 }}
       >
-        <div className="bg-[#282828]">
-          <div className="mx-4 border-t border-white/10" />
-          <div className="px-4 py-3 text-sm text-neutral-400 leading-[20px]">
+        <div className="bg-transparent">
+          <div className="px-6 pb-6 text-[14px] text-[#737373] font-[500] leading-[1.6]">
             {a}
           </div>
         </div>
@@ -71,10 +74,12 @@ export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questio
   return (
     <>
       <div className="flex flex-col items-center mb-10">
-        <h2 className="text-[40px] text-white text-center font-inconsolata font-[500] mb-4 leading-[40px]">
+        <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">
           {title}
         </h2>
-        <p className="text-center font-mono text-[#8A8A88] text-sm">Got questions? We’ve got answers.</p>
+        <p className="text-center font-onest text-[#737373] text-sm font-[500]">
+          Got questions? We&apos;ve got answers.
+        </p>
       </div>
       <div className="flex flex-col gap-3">
         {faqs.map((faq, i) => (

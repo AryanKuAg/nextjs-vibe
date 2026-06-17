@@ -11,9 +11,9 @@ try {
   ) {
     const noopStorage = {
       getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-      clear: () => {},
+      setItem: () => { },
+      removeItem: () => { },
+      clear: () => { },
       key: () => null,
       length: 0,
     };
@@ -52,7 +52,19 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev",
+      },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/proxy-r2/:path*",
+        destination: "https://assets.framerate.space/:path*",
+      },
+    ];
   },
 };
 

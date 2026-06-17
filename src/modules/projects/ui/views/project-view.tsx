@@ -25,6 +25,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { StageIndicator } from "../components/stage-indicator";
 import { BackgroundBuilderLeft } from "../components/background-builder-left";
 import { BackgroundBuilderRight, VideoBlock, BlockTab } from "../components/background-builder-right";
+import { extractLastFrame } from "@/lib/video-utils";
 
 // Removed frame extraction since end frames are mandatory
 
@@ -63,6 +64,15 @@ export const ProjectView = ({ projectId }: Props) => {
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("builderAutoSubmit") === "true") {
+        setActiveStageTab("SITE");
+      }
+    }
+  }, []);
+
   const emptyBlock: VideoBlock = {
     startFrameUrl: null, startFrameHistory: [],
     endFrameUrl: null, endFrameHistory: [],
@@ -73,6 +83,41 @@ export const ProjectView = ({ projectId }: Props) => {
   // Read block count from localStorage SYNCHRONOUSLY in the initializer.
   // This runs before any effect, so there is no race condition.
   const [blocks, setBlocks] = useState<VideoBlock[]>([emptyBlock]);
+
+  const extractedFramesCacheRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    blocks.forEach(async (block) => {
+      if (block.videoUrl && !block.endFrameUrl && !extractedFramesCacheRef.current[block.videoUrl]) {
+        try {
+          extractedFramesCacheRef.current[block.videoUrl] = "pending";
+          const frameUrl = await extractLastFrame(block.videoUrl);
+          extractedFramesCacheRef.current[block.videoUrl] = frameUrl;
+
+          setBlocks(prev => {
+            const newBlocks = [...prev];
+            for (let j = 1; j < newBlocks.length; j++) {
+              const rawInherited = newBlocks[j - 1].videoUrl ? (newBlocks[j - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[j - 1].videoUrl!] || null) : null;
+              const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
+              if (newBlocks[j].startFrameUrl !== inheritedUrl) {
+                newBlocks[j] = { ...newBlocks[j], startFrameUrl: inheritedUrl };
+                if (inheritedUrl) {
+                  const history = newBlocks[j].startFrameHistory || [];
+                  if (!history.includes(inheritedUrl)) {
+                    newBlocks[j].startFrameHistory = [...history, inheritedUrl];
+                  }
+                }
+              }
+            }
+            return newBlocks;
+          });
+        } catch (e) {
+          console.error("Failed to extract frame for", block.videoUrl, e);
+          extractedFramesCacheRef.current[block.videoUrl] = "";
+        }
+      }
+    });
+  }, [blocks]);
 
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("START");
@@ -92,11 +137,14 @@ export const ProjectView = ({ projectId }: Props) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 1) {
-          setBlocks(parsed.map((item: Record<string, string | undefined>) => ({
+          setBlocks(parsed.map((item: Partial<VideoBlock>) => ({
             ...emptyBlock,
-            startPrompt: item?.startPrompt,
-            endPrompt: item?.endPrompt,
-            videoPrompt: item?.videoPrompt,
+            ...item,
+            startUploadedImage: null,
+            endUploadedImage: null,
+            isGeneratingStart: false,
+            isGeneratingEnd: false,
+            isGeneratingVideo: false,
           })));
         }
       }
@@ -113,7 +161,8 @@ export const ProjectView = ({ projectId }: Props) => {
     if (blocks.length < 4) {
       setBlocks(prev => {
         const lastBlock = prev[prev.length - 1];
-        const inheritedUrl = lastBlock.videoUrl ? (lastBlock.endFrameUrl || null) : null;
+        const rawInherited = lastBlock.videoUrl ? (lastBlock.endFrameUrl || extractedFramesCacheRef.current[lastBlock.videoUrl] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
         const newBlock = {
           ...emptyBlock,
           startFrameUrl: inheritedUrl,
@@ -151,6 +200,12 @@ export const ProjectView = ({ projectId }: Props) => {
     }
   };
 
+  const handleApplyTemplate = (templateBlocks: VideoBlock[]) => {
+    setBlocks(templateBlocks);
+    setActiveBlockIndex(0);
+    setActiveBlockTab("START");
+  };
+
   const updateBlock = (index: number, updates: Partial<VideoBlock>) => {
     setBlocks(prev => {
       const newBlocks = [...prev];
@@ -158,7 +213,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Cascade inherited start frames for all subsequent blocks
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+        const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
           if (inheritedUrl) {
@@ -182,6 +238,13 @@ export const ProjectView = ({ projectId }: Props) => {
   const [isExtracting, setIsExtracting] = useState(false);
 
   const handleProceed = async () => {
+    // Check if it's a pseudo template by checking for builderPrompt
+    const builderPrompt = blocks[0]?.builderPrompt;
+    if (builderPrompt) {
+      setActiveStageTab("SITE");
+      return;
+    }
+
     // Check if any videos have been generated yet
     const hasVideos = blocks.some(b => b.videoUrl);
 
@@ -233,9 +296,9 @@ export const ProjectView = ({ projectId }: Props) => {
       if (project.currentStage === "SITE") {
         setActiveStageTab("SITE");
       } else {
-        setActiveStageTab("BACKGROUND");
+        setActiveStageTab(prev => prev === "SITE" ? "SITE" : "BACKGROUND");
       }
-      
+
       const frameCount = (project as { frameCount?: number | null })?.frameCount;
       if (frameCount && extractedFrameCount === undefined) {
         setExtractedFrameCount(frameCount);
@@ -344,7 +407,8 @@ export const ProjectView = ({ projectId }: Props) => {
 
       // Inherit start frame from the previous block's end frame if missing
       for (let i = 1; i < newBlocks.length; i++) {
-        const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+        const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+        const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
 
         if (newBlocks[i].startFrameUrl !== inheritedUrl) {
           newBlocks[i].startFrameUrl = inheritedUrl;
@@ -422,7 +486,8 @@ export const ProjectView = ({ projectId }: Props) => {
       if (changed) {
         // Cascade start frame from previous block's end frame if missing
         for (let i = 1; i < newBlocks.length; i++) {
-          const inheritedUrl = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || null) : null;
+          const rawInherited = newBlocks[i - 1].videoUrl ? (newBlocks[i - 1].endFrameUrl || extractedFramesCacheRef.current[newBlocks[i - 1].videoUrl!] || null) : null;
+          const inheritedUrl = rawInherited === "pending" ? null : rawInherited;
 
           if (newBlocks[i].startFrameUrl !== inheritedUrl) {
             newBlocks[i] = { ...newBlocks[i], startFrameUrl: inheritedUrl };
@@ -452,14 +517,23 @@ export const ProjectView = ({ projectId }: Props) => {
   useEffect(() => {
     if (!hasRestored || !project?.id || blocks.length === 0) return;
 
-    const dataToSave = blocks.map(b => ({
+    const dbDataToSave = blocks.map(b => ({
       startPrompt: b.startPrompt,
       endPrompt: b.endPrompt,
       videoPrompt: b.videoPrompt
     }));
 
+    const localDataToSave = blocks.map(b => ({
+      ...b,
+      startUploadedImage: null,
+      endUploadedImage: null,
+      isGeneratingStart: false,
+      isGeneratingEnd: false,
+      isGeneratingVideo: false,
+    }));
+
     // Save locally immediately
-    localStorage.setItem(`vibe-blocks-${project.id}`, JSON.stringify(dataToSave));
+    localStorage.setItem(`vibe-blocks-${project.id}`, JSON.stringify(localDataToSave));
 
     // Debounce saving to DB
     if (saveTimeoutRef.current) {
@@ -469,7 +543,7 @@ export const ProjectView = ({ projectId }: Props) => {
     const { mutationFn } = trpc.projects.updatePrompts.mutationOptions();
     saveTimeoutRef.current = setTimeout(() => {
       if (mutationFn) {
-        mutationFn({ projectId: project.id, prompts: dataToSave })
+        mutationFn({ projectId: project.id, prompts: dbDataToSave })
           .catch(err => console.error("Failed to save prompts to DB:", err));
       }
     }, 1500);
@@ -601,10 +675,10 @@ export const ProjectView = ({ projectId }: Props) => {
           let fetchUrl = resolvedZipUrl;
           // Ensure we hit storage.googleapis.com directly if the CDN doesn't forward CORS headers
           if (!fetchUrl.includes("storage.googleapis.com")) {
-             const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space';
-             const pathParts = new URL(resolvedZipUrl).pathname.split('/').filter(Boolean);
-             const pathKey = pathParts.slice(pathParts.indexOf('frames')).join('/');
-             fetchUrl = `https://storage.googleapis.com/${bucketName}/${pathKey}`;
+            const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space';
+            const pathParts = new URL(resolvedZipUrl).pathname.split('/').filter(Boolean);
+            const pathKey = pathParts.slice(pathParts.indexOf('frames')).join('/');
+            fetchUrl = `https://storage.googleapis.com/${bucketName}/${pathKey}`;
           }
 
           const res = await fetch(fetchUrl);
@@ -690,8 +764,10 @@ export const ProjectView = ({ projectId }: Props) => {
               activeBlockTab={activeBlockTab}
               onTabChange={setActiveBlockTab}
               onProceed={handleProceed}
+              onSkip={() => setActiveStageTab("SITE")}
               isExtracting={isExtracting}
               updateBlock={updateBlock}
+              onApplyTemplate={handleApplyTemplate}
             />
           )}
 
@@ -706,13 +782,14 @@ export const ProjectView = ({ projectId }: Props) => {
                   extractedZipUrl={extractedZipUrl}
                   extractedFrameCount={extractedFrameCount}
                   onBack={() => setActiveStageTab("BACKGROUND")}
+                  initialPrompt={blocks[0]?.builderPrompt}
                 />
               </Suspense>
             </ErrorBoundary>
           )}
         </ResizablePanel>
 
-        <ResizableHandle className="hover:bg-white transition-colors" />
+        <ResizableHandle className="bg-[#282825] " />
 
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
@@ -725,7 +802,7 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2.5  gap-x-2 bg-background h-[56px] shrink-0 border-b">
+            <div className="w-full flex items-center p-2.5 gap-x-2 bg-background h-[56px] shrink-0 border-b border-[#282825]">
               {activeStageTab === "SITE" && (
                 <>
                   <TabsList className="h-8 p-0.5 rounded-[8px] bg-[#272725]">

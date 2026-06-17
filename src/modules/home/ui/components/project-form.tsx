@@ -17,39 +17,11 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { Hint } from "@/components/hint";
 
-import { MODEL_COSTS } from "@/lib/pricing";
-
-const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "" },
-].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
-
-const SUGGESTED_PROMPTS = [
-  {
-    label: "Frosted village",
-    prompt: "Miniature snowy Christmas village at blue hour, cozy glowing cottages covered in snow, massive illuminated Christmas tree in the center, warm golden lights everywhere, dreamy cinematic atmosphere, soft depth of field, tilt shift look, ultra detailed, magical winter wonderland, realistic 3D render."
-  },
-  {
-    label: "Aurora dreamscape",
-    prompt: "Dreamlike arctic night landscape, glowing aurora borealis in deep blue sky, snowy hills with tall dark pine trees, reflective frozen lake in foreground, magical bioluminescent flower field with pink, purple, blue and orange glowing plants, tiny floating fireflies, cinematic lighting, ultra detailed, fantasy atmosphere, soft mist, vibrant glow, wide shot, surreal nature, 3D render style, highly immersive."
-  },
-  {
-    label: "Floating monoliths",
-    prompt: "Massive floating stone structures above a misty landscape, surreal cinematic environment, glowing ambient light, dreamy atmosphere, soft fog, reflective water, minimal fantasy world, ultra detailed, immersive 3D render style."
-  },
-  {
-    label: "Ember valley",
-    prompt: "Dark fantasy valley filled with glowing orange flora, volcanic atmosphere, floating embers, cinematic lighting, reflective river, towering silhouettes, surreal immersive world, ultra detailed 3D render style."
-  }
-];
-
-type ModelId = typeof MODELS[number]["id"];
-
 const formSchema = z.object({
   value: z
     .string()
     .min(1, { message: "Value is required" })
-    .max(10000, { message: "Value is too long" }),
+    .max(100000, { message: "Value is too long" }),
 });
 
 export const ProjectForm = () => {
@@ -59,25 +31,12 @@ export const ProjectForm = () => {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   // Clean up object URLs
   useEffect(() => {
@@ -156,7 +115,7 @@ export const ProjectForm = () => {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        const url = `/projects/${data.id}${variables.value ? "?autoSubmit=true" : ""}`;
+        const url = `/projects/${data.id}${variables.value ? "?builderAutoSubmit=true" : ""}`;
         router.push(url);
       },
       onError: (error) => {
@@ -184,8 +143,9 @@ export const ProjectForm = () => {
       return;
     }
 
-    // Persist the selected model so the dashboard uses it for auto-submit
-    sessionStorage.setItem("pending_model", selectedModel);
+    // Persist the default model so the dashboard uses it
+    sessionStorage.setItem("pending_model", "openrouter-google/gemini-3.1-pro-preview");
+    sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
@@ -216,14 +176,6 @@ export const ProjectForm = () => {
     }
   };
 
-  const onSelect = (value: string) => {
-    form.setValue("value", value, {
-      shouldDirty: true,
-      shouldValidate: true,
-      shouldTouch: true,
-    });
-  };
-
   const isPending = createProject.isPending;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
 
@@ -237,7 +189,7 @@ export const ProjectForm = () => {
         >
           <div className="flex flex-col items-center gap-2 text-white">
             <i className="ri-download-line text-white text-3xl mb-3" />
-            <p className="text-lg font-inconsolata font-medium">Drop your image</p>
+            <p className="text-lg font-onest font-medium">Drop your image</p>
           </div>
         </div>
       )}
@@ -246,8 +198,8 @@ export const ProjectForm = () => {
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className={cn(
-            "relative rounded-2xl overflow-hidden transition-all min-h-[148px]",
-            "bg-background w-full md:w-[720px]!",
+            "relative rounded-3xl overflow-hidden transition-all min-h-[148px]",
+            "bg-[#212121]/80 w-full md:w-[720px]!",
             isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
@@ -265,7 +217,7 @@ export const ProjectForm = () => {
                 <button
                   type="button"
                   onClick={removeImage}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-[#333] border border-white/10 text-white/70 hover:text-white text-[10px]"
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full border border-white/10 text-white/70 hover:text-white text-[10px]"
                 >
                   <i className="ri-close-line" />
                 </button>
@@ -286,13 +238,13 @@ export const ProjectForm = () => {
                 minRows={3}
                 maxRows={10}
                 className={cn(
-                  "w-full resize-none border-none outline-none bg-transparent",
+                  "w-full resize-none border-none outline-none",
                   "px-4 pt-4 ",
-                  "text-[15px] font-inconsolata leading-relaxed text-white",
-                  "placeholder:text-neutral-400 placeholder:whitespace-nowrap placeholder:text-[14px] ",
-                  "transition-colors"
+                  "text-sm font-onest leading-relaxed text-white font-[500]",
+                  "placeholder:text-white/40 placeholder:whitespace-nowrap placeholder:text-[14px] ",
+                  "transition-colors bg-transparent placeholder:mt-1   placeholder:font-[500]"
                 )}
-                placeholder="Describe your background..."
+                placeholder="Describe your website..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -304,7 +256,7 @@ export const ProjectForm = () => {
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center justify-between px-4 pb-4 font-inconsolata pt-3">
+          <div className="flex items-center justify-between px-4 pb-4 font-onest pt-3">
             <div className="flex gap-x-1 items-center flex-1">
               <input
                 ref={fileInputRef}
@@ -317,12 +269,12 @@ export const ProjectForm = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent border border-[#2c2c2c] hover:bg-white/5 text-white transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent hover:bg-white/4 text-white transition-colors"
                 >
                   <i className="ri-add-line text-base" />
                 </button>
               </Hint>
-              <div className="relative" ref={dropdownRef}>
+              {/* <div className="relative" ref={dropdownRef}>
                 <div
                   className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#2c2c2c] text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
                   onClick={() => setModelDropdownOpen((o) => !o)}
@@ -339,7 +291,7 @@ export const ProjectForm = () => {
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"}`}
                       >
                         <span>{model.emoji}</span>
                         <span>{model.label}</span>
@@ -348,21 +300,21 @@ export const ProjectForm = () => {
                     ))}
                   </div>
                 )}
-              </div>
+              </div> */}
             </div>
 
             <div className="flex items-center gap-2">
 
               <div className="flex gap-2 ml-auto">
-                <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
+                {/* <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
                   <i className="ri-sparkling-fill text-white text-sm" />
                   <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
-                </div>
+                </div> */}
                 {isButtonDisabled ? (
                   <button
                     type="submit"
                     disabled
-                    className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-[#333333] text-[#1C1C1C] cursor-not-allowed"
+                    className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white/40 text-[#1C1C1C] cursor-not-allowed"
                   >
                     {isPending ? (
                       <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
@@ -390,7 +342,7 @@ export const ProjectForm = () => {
         </form>
 
         {/* ── Template chips ── */}
-        <div className="hidden md:flex flex-wrap justify-center gap-2 font-inconsolata">
+        {/* <div className="hidden md:flex flex-wrap justify-center gap-2 font-onest">
           {SUGGESTED_PROMPTS.map((item) => (
             <button
               key={item.label}
@@ -405,7 +357,7 @@ export const ProjectForm = () => {
               {item.label}
             </button>
           ))}
-        </div>
+        </div> */}
       </section>
 
       <CustomSignInModal

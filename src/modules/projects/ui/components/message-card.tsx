@@ -1,4 +1,5 @@
 import "remixicon/fonts/remixicon.css";
+import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -10,11 +11,49 @@ interface UserMessageProps {
 }
 
 const UserMessage = ({ content }: UserMessageProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      if (contentRef.current.scrollHeight > 148) {
+        setIsOverflowing(true);
+      }
+    }
+  }, [content]);
+
   return (
     <div className="flex justify-end pb-4 pr-2 pl-10">
-      <Card className="rounded-lg bg-[#272725] py-3 px-4 shadow-none border-none max-w-[80%] break-words text-sm">
-        {content}
-      </Card>
+      <div className="flex flex-col max-w-[80%] w-fit">
+        <Card className="rounded-[16px] bg-[#212121] p-4 shadow-none border-none break-words text-[15px] leading-relaxed text-white/90 relative overflow-hidden">
+          <div
+            ref={contentRef}
+            className={cn(
+              "transition-all duration-300 relative whitespace-pre-wrap",
+              !isExpanded && isOverflowing ? "max-h-[148px] overflow-hidden" : ""
+            )}
+          >
+            {content}
+          </div>
+
+          {!isExpanded && isOverflowing && (
+            // <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#171717] to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-[148px] bg-gradient-to-t from-[#171717] to-transparent pointer-events-none" />
+          )}
+        </Card>
+
+        {isOverflowing && (
+          <div className="px-2 flex items-center self-start h-[28px] rounded-[8px] hover:bg-[#212121] mt-1 transition-colors duration-300 ease-out">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-white text-[12px] transition-colors"
+            >
+              {isExpanded ? "Show less" : "Show more"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

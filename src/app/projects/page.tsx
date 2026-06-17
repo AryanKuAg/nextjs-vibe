@@ -143,7 +143,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white font-inconsolata flex flex-col font-mono selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-onest flex flex-col font-mono selection:bg-[#F1336E]/30">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
         <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">

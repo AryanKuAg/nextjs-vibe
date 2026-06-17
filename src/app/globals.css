@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #212121;
+  --background: #171717;
   --foreground: oklch(0.3438 0.0269 95.7226);
   --card: oklch(0.9818 0.0054 95.0986);
   --card-foreground: oklch(0.1908 0.0020 106.5859);
@@ -52,7 +52,7 @@
 }
 
 .dark {
-  --background: #212121;
+  --background: #171717;
   --foreground: oklch(0.8074 0.0142 93.0137);
   --card: oklch(0.2679 0.0036 106.6427);
   --card-foreground: oklch(0.9818 0.0054 95.0986);
@@ -136,6 +136,9 @@
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
   --font-inconsolata: var(--font-inconsolata);
+  --font-onest: var(--font-onest);
+  --font-stack-sans-notch: var(--font-stack-sans-notch);
+
   --font-dm-mono: var(--font-dm-mono);
   --font-space-grotesk: var(--font-space-grotesk);
 
@@ -165,7 +168,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-inconsolata;
+    @apply bg-background text-foreground font-onest;
   }
 }
 

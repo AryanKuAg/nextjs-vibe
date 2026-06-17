@@ -8,7 +8,7 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { MODEL_COSTS } from "@/lib/pricing";
 
 const MODEL_IDS = [
-  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro" },
+  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0" },
   { id: "replicate-prunaai/p-video", label: "Pruna" },
   { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
   { id: "openrouter-seedance-2", label: "Seedance 2.0" },
@@ -34,7 +34,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-kling-v2.5-turbo-pro");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("kwaivgi/kling-v3-video");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -216,10 +216,10 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
-                        <div className="flex w-full items-center font-inconsolata whitespace-nowrap">
+                        <div className="flex w-full items-center font-onest whitespace-nowrap">
                           <span className="whitespace-nowrap">{model.label}</span>
                           {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                         </div>
@@ -250,7 +250,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
           </div>
 
           <Button
-            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-inconsolata text-sm h-9 hover:bg-white/5! font-[400]"
+            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-onest text-sm h-9 hover:bg-white/5! font-[400]"
             onClick={onBack}
           >
             Back

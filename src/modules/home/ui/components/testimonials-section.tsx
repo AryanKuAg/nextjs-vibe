@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "framer-motion";
+
 const testimonials = [
   {
     name: "Livia Vaccaro",
@@ -49,40 +53,64 @@ const testimonials = [
   },
 ];
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    filter: "blur(0px)",
+    transition: { 
+      duration: 1.5,
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
+    } 
+  }
+};
+
 export const TestimonialsSection = () => {
   return (
     <section className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-      <div className="flex flex-col items-center mb-10">
-        <h2 className="text-3xl md:text-[40px] font-mono text-center text-white leading-[40px] font-[500] mb-4">
-          Trusted by builders shipping real work
-        </h2>
-        <p className="text-center font-mono text-[#8A8A88] text-sm">
-          See what founders, creators, and teams are saying after shipping with us.
-        </p>
-      </div>
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.3 }}
+        variants={{
+          visible: { transition: { staggerChildren: 0.2, delayChildren: 0.1 } },
+          hidden: {}
+        }}
+      >
+        <div className="flex flex-col items-center mb-10">
+          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">
+            Trusted by builders shipping real work
+          </motion.h2>
+          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">
+            See what founders, creators, and teams are saying after shipping with us.
+          </motion.p>
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {testimonials.map((testimonial, idx) => (
-          <div
-            key={idx}
-            className="flex flex-col bg-[#282828] rounded-[16px] p-6 font-inconsolata border border-transparent  transition-colors"
-          >
-            <div className="text-[#8A8A88] text-4xl mb-2 font-space-grotesk leading-none opacity-50 font-bold">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {testimonials.map((testimonial, idx) => (
+            <motion.div
+              variants={itemVariants}
+              key={idx}
+              className="flex flex-col bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] p-6 font-onest"
+            >
+            <div className="text-[#737373] text-3xl mb-4 font-space-grotesk leading-none font-bold">
               “
             </div>
-            <p className="text-white text-[14px] flex-1 mb-8 leading-relaxed">
+            <p className="text-white text-[14px] font-[500] flex-1 mb-10 leading-[1.6]">
               {testimonial.text}
             </p>
-            <div className="flex items-center justify-between text-sm mt-auto text-[#8A8A88] border-t border-[#333333] pt-4">
-              <span className="text-white">{testimonial.name}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{testimonial.flag}</span>
+            <div className="flex items-center justify-between mt-10">
+              <span className="text-white text-[14px] font-[500]">{testimonial.name}</span>
+              <div className="flex items-center gap-1.5 text-[#737373] text-[14px] font-[500]">
+                <span>{testimonial.flag}</span>
                 <span>{testimonial.country}</span>
               </div>
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+        </div>
+      </motion.div>
     </section>
   );
 };

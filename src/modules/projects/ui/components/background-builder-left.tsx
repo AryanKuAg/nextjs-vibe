@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { useTRPC } from "@/trpc/client";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { TemplatesModal } from "@/components/templates-modal";
 
 import { VideoBlock } from "./background-builder-right";
 
@@ -22,7 +23,9 @@ interface Props {
   activeBlockTab: BlockTab;
   onTabChange: (tab: BlockTab) => void;
   onProceed: () => void;
+  onSkip?: () => void;
   updateBlock: (index: number, updates: Partial<VideoBlock>) => void;
+  onApplyTemplate?: (blocks: VideoBlock[]) => void;
   projectId: string;
   blocks: VideoBlock[];
   isExtracting?: boolean;
@@ -72,13 +75,14 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE" },
-  { id: "replicate-kling-v2.5-turbo-pro", label: "Kling 2.5 Turbo Pro", emoji: "", type: "VIDEO" },
-  { id: "replicate-prunaai/p-video", label: "Pruna", emoji: "", type: "VIDEO" },
-  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO" },
-  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO" },
-  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO" },
+  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0", emoji: "", type: "VIDEO", time: "~3 min" },
+  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO", time: "~2 min" },
+  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO", time: "~20 sec" },
+  // { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO", time: "~10 sec" },
+
+  // { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO", time: "~1 min" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
@@ -86,13 +90,16 @@ export const BackgroundBuilderLeft = ({
   activeBlockTab,
   onTabChange,
   onProceed,
+  onSkip,
   updateBlock,
+  onApplyTemplate,
   projectId,
   blocks,
   isExtracting
 }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -105,7 +112,6 @@ export const BackgroundBuilderLeft = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const currentBlock = blocks[activeBlockIndex] || {};
 
@@ -152,34 +158,6 @@ export const BackgroundBuilderLeft = ({
       updateBlock(activeBlockIndex, { startPrompt: newPrompt });
     } else {
       updateBlock(activeBlockIndex, { endPrompt: newPrompt });
-    }
-  };
-
-  const handleEnhancePrompt = async () => {
-    setIsEnhancing(true);
-    try {
-      const res = await fetch("/api/enhance-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          type: "video",
-          startFrameUrl: currentBlock.startFrameUrl,
-          endFrameUrl: currentBlock.endFrameUrl
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.prompt) {
-        handlePromptChange(data.prompt);
-        toast.success("Prompt enhanced successfully!");
-      } else {
-        toast.error("Failed to enhance prompt: " + (data.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while enhancing prompt");
-    } finally {
-      setIsEnhancing(false);
     }
   };
 
@@ -299,12 +277,6 @@ export const BackgroundBuilderLeft = ({
 
     try {
       if (isVideo) {
-        if (!currentBlock.endFrameUrl) {
-          toast.error("Please generate an end frame first.");
-          setIsGenerating(false);
-          return;
-        }
-
         toast.info("Video generation started...");
         updateBlock(activeBlockIndex, { isGeneratingVideo: true, generatingVideoModel: effectiveModel });
 
@@ -390,6 +362,18 @@ export const BackgroundBuilderLeft = ({
     }
   };
 
+
+
+  function adjustedPadding(modelId: string) {
+    if (modelId === "replicate-nb-2") return "pb-2";
+    if (modelId === "replicate-kling-v2.5-turbo-pro") return "pb-2";
+    if (modelId === "replicate-prunaai/p-video") return "pt-2";
+    if (modelId === "openrouter-seedance-2") return "py-2";
+    if (modelId === "bytedance/seedream-4.5") return "pt-2";
+    return ""
+
+  }
+
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
@@ -426,8 +410,8 @@ export const BackgroundBuilderLeft = ({
               className={cn(
                 "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
                 activeBlockTab === "START"
-                  ? "bg-[#282828] text-white border-[#282828]"
-                  : "text-white border-[#2C2C2C] hover:bg-[#282828]"
+                  ? "bg-[#212121] text-white border-[#212121]"
+                  : "text-white border-[#212121] hover:bg-[#212121]"
               )}
             >
               Start frame
@@ -438,8 +422,8 @@ export const BackgroundBuilderLeft = ({
             className={cn(
               "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
               activeBlockTab === "END"
-                ? "bg-[#282828] text-white border-[#282828]"
-                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
+                ? "bg-[#212121] text-white border-[#212121]"
+                : "text-white border-[#212121] hover:bg-[#212121]"
             )}
           >
             End frame
@@ -449,18 +433,18 @@ export const BackgroundBuilderLeft = ({
             className={cn(
               "flex-1 text-center py-2 text-sm rounded-[8px] transition-all h-[32px] border flex items-center justify-center",
               activeBlockTab === "VIDEO"
-                ? "bg-[#282828] text-white border-[#282828]"
-                : "text-white border-[#2C2C2C] hover:bg-[#282828]"
+                ? "bg-[#212121] text-white border-[#212121]"
+                : "text-white border-[#212121] hover:bg-[#212121]"
             )}
           >
             Video
           </button>
         </div>
 
-        <div className="bg-[#282828] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
+        <div className="bg-[#212121] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
           <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b-0 border-[#282825]">
-            <span className="text-white text-sm font-inconsolata">Editing video {activeBlockIndex + 1}</span>
-            <span className="text-white/30 text-xs font-mono">
+            <span className="text-white text-sm font-onest">Editing video {activeBlockIndex + 1}</span>
+            <span className="text-white/30 text-sm">
               {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
             </span>
           </div>
@@ -473,7 +457,7 @@ export const BackgroundBuilderLeft = ({
                 <img src={URL.createObjectURL(uploadedImage)} alt="Uploaded" className="h-16 w-16 object-cover rounded-[6px]" />
                 <button
                   onClick={() => setUploadedImage(null)}
-                  className="absolute -top-2 -right-2 bg-background text-white rounded-full w-5 h-5 flex items-center justify-center border border-[#3b3b3b] hover:bg-[#3b3b3b] transition-colors"
+                  className="absolute -top-2 -right-2 bg-background text-white rounded-full w-5 h-5 flex items-center justify-center border border-[#2c2c2c] hover:bg-[#3b3b3b] transition-colors"
                 >
                   <i className="ri-close-line text-xs" />
                 </button>
@@ -520,63 +504,65 @@ export const BackgroundBuilderLeft = ({
                       e.target.value = "";
                     }}
                   />
-                  <Hint text="Add photo" side="top" align="start">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white  transition-colors"
-                    >
-                      <i className="ri-add-line text-lg" />
-                    </button>
-                  </Hint>
+                  {/* <Hint text="Add photo" side="top" align="start"> */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 w-8 flex items-center justify-center rounded-full text-white hover:bg-white/4  transition-colors"
+                  >
+                    <i className="ri-add-line text-base" />
+                  </button>
+                  {/* </Hint> */}
                 </>
               )}
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#333333] text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-white/4 text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
                   <span className="whitespace-nowrap">{AVAILABLE_MODEL?.label}</span>
-                  <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                  <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[240px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#212121] border border-[#2c2c2c] rounded-[16px] min-w-[240px] shadow-3xl flex flex-col overflow-hidden">
                     {availableModels.map((model) => (
                       <button
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 text-sm font-inconsolata transition-colors hover:bg-white/5",
-                          selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                        )}
+                        className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
                       >
-                        <span className="whitespace-nowrap">{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
+                        <div className="flex flex-col">
+                          <span className="text-sm  tracking-tight text-white leading-5 mb-0.5">{model.label}</span>
+                          <span className="text-xs leading-[18px]  text-[#737373]">
+                            {model.time} · {model.credits} credits
+                          </span>
+                        </div>
+                        {selectedModel === model.id && <i className="ri-check-line text-[20px] text-white" />}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {isVideo && (
+              {/* {isVideo && (
                 <Hint text="Generate prompt" side="top">
-                  <button
-                    type="button"
-                    onClick={handleEnhancePrompt}
-                    disabled={isEnhancing}
-                    className="h-8 px-2 flex items-center justify-center rounded-full border-[0.5px] border-[#3B3B3B] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
-                  >
-                    {isEnhancing ? (
-                      <i className="ri-loader-4-line animate-spin text-[15px]" />
-                    ) : (
-                      <i className="ri-magic-line text-[15px]" />
-                    )}
-                  </button>
-                </Hint>
-              )}
+                <button
+                  type="button"
+                  onClick={handleEnhancePrompt}
+                  disabled={isEnhancing}
+                  className="h-8 px-2 flex items-center justify-center rounded-full text-white hover:bg-white/4 transition-colors disabled:opacity-50"
+                >
+                  {isEnhancing ? (
+                    <i className="ri-loader-4-line animate-spin text-base" />
+                  ) : (
+                    <i className="ri-magic-line text-base" />
+                  )}
+                </button>
+                 </Hint>
+              )} */}
 
               <div className="flex gap-2 ml-auto">
                 <div className="flex items-center gap-1 text-white">
@@ -615,9 +601,9 @@ export const BackgroundBuilderLeft = ({
 
         <div className="space-y-3 mt-auto">
           <Button
-            className="w-full rounded-[8px] bg-white text-black font-inconsolata text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
+            className="w-full rounded-[8px] bg-white text-black font-onest text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
-            disabled={isExtracting || !blocks.every((block) => !!block.videoUrl)}
+            disabled={isExtracting || (!blocks.every((block) => !!block.videoUrl) && !blocks.some(block => !!block.builderPrompt))}
           >
             {isExtracting ? (
               <>
@@ -626,15 +612,34 @@ export const BackgroundBuilderLeft = ({
               </>
             ) : "Proceed"}
           </Button>
-          <Button
-            variant="ghost"
-            className="w-full text-white font-inconsolata h-8 border border-[2c2c2c] hover:bg-[#282828]!"
-            onClick={() => window.location.href = "/"}
-          >
-            Back to home
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              onClick={onSkip}
+            >
+              Skip
+            </Button>
+            <Button
+              variant="ghost"
+              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              onClick={() => setIsTemplatesModalOpen(true)}
+            >
+              Templates
+            </Button>
+          </div>
         </div>
       </div>
+
+      <TemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        onSelect={(t) => {
+          if (onApplyTemplate) {
+            onApplyTemplate(t.blocks);
+          }
+        }}
+      />
     </>
   );
 };

@@ -52,26 +52,26 @@ export const Footer = () => {
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
-      <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-inconsolata">
+      <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-onest font-[500]">
         {/* Rounded card container */}
-        <div className="bg-[#282828] rounded-[16px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8">
+        <div className="rounded-[24px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8  bg-gradient-to-b from-[#282828] to-[#282828]/40">
           {/* Main grid row */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 md:gap-12 mb-6 md:mb-10">
             {/* Left: Logo + description */}
             <div className="max-w-[414px]">
-              <div className="flex items-center gap-2.5 mb-[10px]">
-                <Image src="/logo.png" alt="framerate" width={20} height={20} />
-                <span className="text-white font-[500] text-[16px]" style={{ fontFamily: 'var(--font-space-grotesk)' }}>framerate</span>
+              <div className="flex items-center gap-2.5 mb-[12px]">
+                <Image src="/logo.png" alt="framerate" width={32} height={32} />
+                <span className="text-white font-[700] text-[20px]" style={{ fontFamily: 'var(--font-stack-sans-notch)' }}>Framerate</span>
               </div>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-neutral-400 ">
                 The fastest way to go from a text prompt to a live,<br className="hidden md:block" /> production-ready 3D website.
               </p>
             </div>
 
             {/* Right: Nav columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16">
               <div>
-                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Product</h4>
+                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide leading-[2.85] uppercase font-[500]">Product</h4>
                 <div className="flex flex-col gap-2 items-start">
                   <button
                     onClick={handleDashboardClick}
@@ -86,7 +86,7 @@ export const Footer = () => {
               </div>
 
               <div>
-                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Links</h4>
+                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase leading-[2.85] font-[500]">Links</h4>
                 <div className="flex flex-col gap-2 items-start">
                   <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Blog</Link>
                   <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Changelog</Link>
@@ -95,7 +95,7 @@ export const Footer = () => {
               </div>
 
               <div>
-                <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Legal</h4>
+                <h4 className="text-sm leading-[2.85] text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Legal</h4>
                 <div className="flex flex-col gap-2">
                   <Link href="/terms" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Terms of service</Link>
                   <Link href="/privacy" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Privacy policy</Link>
@@ -106,7 +106,7 @@ export const Footer = () => {
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-6 border-t border-[#41413F33] flex flex-col sm:flex-row items-start md:items-center justify-between gap-4">
+          <div className="pt-10 border-t border-[#41413F33] flex flex-col sm:flex-row items-start md:items-center justify-between gap-4">
             <span className="text-sm text-white!">© 2026 Framerate. All rights reserved.</span>
             <div className="flex items-center gap-1.5 group">
               <Link

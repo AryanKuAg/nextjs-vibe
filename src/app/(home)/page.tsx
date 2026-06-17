@@ -46,7 +46,7 @@ const HeroVideo = () => {
   // return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
 
   return (
-    <motion.div 
+    <motion.div
       className="absolute inset-0 z-0 bg-[#0e0e0e]"
       initial={{ opacity: 0, scale: 1.05 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -156,7 +156,7 @@ const BrowseTemplatesButton = () => {
     try {
       // @ts-ignore
       window.google?.accounts.id.cancel();
-    } catch {}
+    } catch { }
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -198,27 +198,27 @@ const BrowseTemplatesButton = () => {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     filter: "blur(0px)",
-    transition: { 
+    transition: {
       duration: 0.9,
       ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
-    } 
+    }
   }
 };
 
 const heroItemVariants = {
   hidden: { opacity: 0, y: 15, filter: "blur(4px)" },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     filter: "blur(0px)",
-    transition: { 
-      duration: 1.2, 
-      ease: [0.16, 1, 0.3, 1] as [number, number, number, number] 
-    } 
+    transition: {
+      duration: 1.2,
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
+    }
   }
 };
 
@@ -254,7 +254,7 @@ const Page = () => {
         /> */}
 
 
-        <motion.div 
+        <motion.div
           className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center"
           initial="hidden"
           animate="visible"
@@ -394,44 +394,44 @@ const Page = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <motion.div variants={itemVariants}>
             <SitePreviewCard
-              title="Aurelia Air"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/plane_template.png"
+              title="Vaultone"
+              href="https://vaultoneframerate.netlify.app"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
-              title="Elysia"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/forest_template.png"
+              title="Orbis"
+              href="https://orbisframerate.netlify.app"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/template.jpg"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
-              title="Mythica"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/cloud_template.png"
+              title="Theo"
+              href="https://theoframerate.netlify.app/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Theo/Template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
-              title="Verdant Journeys"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/train_template.png"
+              title="Strata"
+              href="https://strataframerate.netlify.app/"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stone/template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Aether"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.png"
+              href="https://spacexmarsmission.netlify.app"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.jpg"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
-              title="Solara Retreats"
-              href="/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/hotel_template.png"
+              title="Obisidian"
+              href="https://obisidianframerate.netlify.app"
+              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/template.png"
             />
           </motion.div>
         </div>
@@ -443,7 +443,7 @@ const Page = () => {
 
       <TestimonialsSection />
 
-      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
+      <FadeInSection id="pricing" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
         <PricingSection title="Simple, transparent pricing" desc="Flexible plans built for hobbyists, creators, and teams." />
       </FadeInSection>
 

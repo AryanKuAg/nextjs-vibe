@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -10,14 +10,14 @@ import { motion } from "framer-motion";
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     filter: "blur(0px)",
-    transition: { 
+    transition: {
       duration: 1.5,
       ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
-    } 
+    }
   }
 };
 
@@ -33,11 +33,25 @@ export interface PricingCardProps {
 export const PricingCard = ({ title, desc, price, features, className, isPopular }: PricingCardProps) => {
   const [loading, setLoading] = useState(false);
   const { isSignedIn } = useAuth();
-  const clerk = useClerk();
+  const { signIn, isLoaded } = useSignIn();
 
   const handleCheckout = async () => {
     if (!isSignedIn) {
-      clerk.openSignIn();
+      if (!isLoaded) return;
+      setLoading(true);
+
+      try {
+        // @ts-ignore
+        window.google?.accounts.id.cancel();
+      } catch {
+        // Ignore
+      }
+
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: `${window.location.pathname}#pricing`,
+      });
       return;
     }
 
@@ -92,13 +106,25 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
           onClick={handleCheckout}
           disabled={loading}
           className={cn(
-            "w-full h-[52px] rounded-[12px] text-sm font-[500] mb-5 disabled:opacity-50 transition-all",
+            "w-full h-[52px] rounded-[12px] text-sm font-[500] flex items-center justify-center gap-2 mb-5 disabled:opacity-70 transition-all",
             isPopular
               ? "bg-white hover:bg-white/90 text-black"
               : "bg-[#333333] hover:bg-[#444444] text-white"
           )}
         >
-          {loading ? "Redirecting..." : `Get started`}
+          {loading ? (
+            <>
+              <svg className={cn("animate-spin h-4 w-4 shrink-0", isPopular ? "text-black" : "text-white")} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Redirecting...
+            </>
+          ) : (
+            <>
+              Get started
+            </>
+          )}
         </button>
         <div className="flex flex-col gap-2">
           {features.map((f, i) => (

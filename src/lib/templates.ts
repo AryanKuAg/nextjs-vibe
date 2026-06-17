@@ -1943,5 +1943,1262 @@ Responsive behavior:
 Make everything fully mobile responsive. Use a single 'App.tsx' component with 'useState' for the menu toggle. No routing needed.`
       }
     ]
+  },
+
+
+
+
+
+
+  {
+    id: "pesudo-template-9",
+    name: "Airplane",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a premium luxury travel landing page hero section with the following specifications:
+
+Video Background:  
+Use this exact CloudFront video URL: [https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4)
+
+Video should autoplay, be muted, loop continuously, and include playsInline attribute.
+
+Video covers entire viewport (100vh) using object-cover.
+
+Navigation Bar:
+
+Brand name **"Aurelia"** on the left (text-2xl, font-semibold, text-gray-900)
+
+Desktop menu items (hidden on mobile, visible md:flex):
+
+* Destinations  
+* Experiences  
+* Collection  
+* Journal  
+* Contact
+
+Navigation links in gray-900 with hover:text-gray-700 transition.
+
+Mobile hamburger menu button using Lucide React icons (Menu/X).
+
+Mobile menu appears as dropdown with white/95 opacity background, backdrop blur, rounded corners, shadow.
+
+Max width 7xl, centered with px-8 py-6.
+
+Hero Content (centered, \-mt-80 to pull up):
+
+Small uppercase label:
+
+**"CURATED EXPERIENCES"**
+
+(text-sm, font-semibold, gray-600, tracking-wider, mb-4)
+
+Large two-line heading with overlapping effect:
+
+Line 1:
+
+**"Rare."**
+
+(text-6xl md:text-7xl lg:text-8xl, font-normal, text-gray-500, leading-none, tracking-tighter)
+
+Line 2:
+
+**"Unforgettable."**
+
+(same size, color: \#202A36, negative margin-top: \-12px for overlap)
+
+Subtitle:
+
+**"Extraordinary journeys crafted for those who expect more."**
+
+(text-lg md:text-xl, gray-600, mb-6, max-w-2xl)
+
+Two call-to-action buttons (gap-4, centered):
+
+**"Explore"** button:
+
+px-4 py-2, rounded-full, bg-gray-300, text-gray-800, font-medium, hover:bg-gray-400
+
+**"Plan Journey"** button:
+
+px-4 py-2, rounded-full, white text, bg-color \#202A36, hover color \#1a2229 with smooth transitions.
+
+Typography:
+
+Use Inter font (import from Google Fonts: 400, 500, 600, 700 weights)
+
+Apply to entire body via CSS.
+
+Technical Setup:
+
+React with TypeScript
+
+Tailwind CSS for styling
+
+Lucide React for icons
+
+useState hook for mobile menu toggle
+
+Full screen height container (h-screen)
+
+Responsive breakpoints: mobile-first, md, lg
+
+All transitions use transition-colors class.
+
+Layout Structure:
+
+Outer container: min-h-screen, bg-gray-50
+
+Hero section: relative, h-screen, overflow-hidden
+
+Content wrapper: relative, h-full, flex flex-col
+
+Main content area: flex-1, flex items-center justify-center
+
+Make it clean, modern, and premium-looking with smooth interactions.`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-10",
+    name: "Green Earth",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a full-screen hero landing page for **"Atelier"** — an AI-powered creative concept and visual world-building platform. The design uses a liquid glass morphism aesthetic over a looping video background.
+
+Background
+
+Full-screen autoplaying, looping, muted video background:
+
+[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4)
+
+Video covers entire viewport with object-cover, sits at z-0. All content floats above at z-10.
+
+Fonts
+
+Display/Body: Poppins (Google Fonts) — used for headings and body text
+
+Serif accent: Source Serif 4 (Google Fonts) — used only for italic/emphasis text inside headings (e.g., \`<em>\`, \`<i>\`, \`.italic\` inside h1-h3)
+
+Headings use font-weight: 500
+
+Color Palette
+
+Strict grayscale only — all CSS variables are 0 0% X% HSL values
+
+Text is text-white, text-white/80, text-white/60, text-white/50 for hierarchy
+
+No colored accents whatsoever
+
+Liquid Glass CSS (two tiers)
+
+Define under @layer components:
+
+.liquid-glass (light)
+
+background: rgba(255,255,255,0.01);
+
+background-blend-mode: luminosity;
+
+backdrop-filter: blur(4px);
+
+border: none;
+
+box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+
+position: relative;
+
+overflow: hidden;
+
+::before pseudo-element: gradient border using linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%, transparent 40%, transparent 60%, rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%) with padding: 1.4px, masked via \-webkit-mask-composite: xor; mask-composite: exclude;
+
+.liquid-glass-strong (heavy, for CTA/panels)
+
+Same structure but backdrop-filter: blur(50px), box-shadow: 4px 4px 4px rgba(0,0,0,0.05), inset 0 1px 1px rgba(255,255,255,0.15), and ::before uses 0.5/0.2 alpha instead of 0.45/0.15.
+
+Layout — Two-Panel Split
+
+Flex row, min-h-screen.
+
+Left panel w-\[52%\], right panel w-\[48%\] (hidden on mobile lg:flex).
+
+Left Panel
+
+Has a liquid-glass-strong overlay (absolute inset-4 lg:inset-6 rounded-3xl)
+
+Nav:
+
+Logo image (/logo.png, 32×32) \+
+
+"atelier"
+
+text (semibold, 2xl, tracking-tighter, white) on left.
+
+"Menu" button with Menu icon on right, liquid-glass pill.
+
+Hero center (flex-1, centered):
+
+Logo image again (80×80)
+
+h1:
+
+"Crafting the  
+future of  
+visual imagination"
+
+text-6xl lg:text-7xl, tracking-\[-0.05em\], white.
+
+The italic part uses font-serif text-white/80
+
+CTA button:
+
+"Start Creating"
+
+with Download icon in a w-7 h-7 rounded-full bg-white/15 circle.
+
+Button is liquid-glass-strong, rounded-full, hover:scale-105 active:scale-95
+
+Three pills:
+
+"Concept Design"
+
+"Visual Worlds"
+
+"Creative AI"
+
+liquid-glass, rounded-full, text-xs text-white/80
+
+Bottom quote:
+
+Label:
+
+"CREATIVE PHILOSOPHY"
+
+(text-xs tracking-widest uppercase text-white/50)
+
+Quote:
+
+"Every masterpiece begins as a possibility."
+
+mixed font-display/font-serif italic spans
+
+Author:
+
+"ELIAS MONROE"
+
+with horizontal lines on each side
+
+Right Panel (desktop only)
+
+Top bar:
+
+Social icons (Twitter, LinkedIn, Instagram) in a liquid-glass pill with ArrowRight.
+
+Account button with Sparkles icon button, both liquid-glass.
+
+Community card:
+
+Small liquid-glass card (w-56)
+
+Title:
+
+"Join the collective"
+
+Description:
+
+"Connect with creators shaping the next generation of digital experiences."
+
+Bottom feature section (mt-auto):
+
+Outer liquid-glass container with rounded-\[2.5rem\]
+
+Two side-by-side cards:
+
+Card 1:
+
+"Inspiration Engine"
+
+(Wand2 icon)
+
+Card 2:
+
+"Creative Library"
+
+(BookOpen icon)
+
+each liquid-glass rounded-3xl
+
+Bottom card:
+
+Image thumbnail:
+
+from @/assets/hero-flowers.png (96×64)
+
+Title:
+
+"Advanced World Building"
+
+Description:
+
+"Generate immersive concepts, environments, and visual narratives in seconds."
+
+"+" button
+
+All liquid-glass.
+
+Icons
+
+All from lucide-react:
+
+Sparkles
+
+Download
+
+Wand2
+
+BookOpen
+
+ArrowRight
+
+Twitter
+
+Linkedin
+
+Instagram
+
+Menu
+
+Key Details
+
+All interactive elements:
+
+hover:scale-105 transition-transform
+
+Social icon links:
+
+text-white hover:text-white/80 transition-colors
+
+Icon containers:
+
+w-8 h-8 rounded-full bg-white/10 flex items-center justify-center
+
+No border classes anywhere — glass effect handles all borders via ::before
+
+border-radius token:
+
+\--radius: 1rem
+
+Keep all layout, spacing, CSS, video, typography settings, components, icons, effects, and technical implementation exactly the same. Only replace the text content above.
+
+`
+      }
+    ]
+  }, {
+    id: "pesudo-template-11",
+    name: "Dream",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a React \+ Vite \+ TypeScript \+ Tailwind CSS landing page for a creative studio called **"Nova"**. The page has 3 sections: Hero, About, and Features. Use framer-motion for animations and lucide-react for icons. The design is dark, moody, and cinematic with a warm cream color palette.
+
+FONTS
+
+Load two Google Fonts in index.html:
+
+Almarai (weights: 300, 400, 700, 800\) \-- used as the global default font
+
+Instrument Serif (italic only) \-- used for italic accent text in the About section
+
+In index.css, set the global font family:
+
+\* {  
+  font-family: 'Almarai', \-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;  
+}
+
+In tailwind.config.js, extend:
+
+colors.primary: \#DEDBC8 (warm cream, used for all primary text and accents)
+
+fontFamily.serif: \['"Instrument Serif"', 'serif'\]
+
+COLOR SYSTEM
+
+Background: black (\#000000) globally, \#101010 for the About card, \#212121 for Features cards
+
+Primary text color: \#E1E0CC (applied via inline style, slightly different from Tailwind primary)
+
+Tailwind primary: \#DEDBC8 (used for utility classes like text-primary, text-primary/70)
+
+Gray text: text-gray-400, text-gray-500
+
+Navbar link color: rgba(225, 224, 204, 0.8) with hover: \#E1E0CC
+
+CUSTOM CSS UTILITIES (index.css)
+
+Two SVG noise texture utilities:
+
+.noise-overlay: fractal noise (baseFrequency: 0.85, numOctaves: 3\) used as overlay on hero video
+
+.bg-noise: fractal noise (baseFrequency: 0.9, numOctaves: 4\) used as subtle background in Features section
+
+Both use inline SVG data URIs with feTurbulence filter.
+
+SECTION 1: HERO
+
+Full viewport height (h-screen). The entire section has p-4 md padding creating an inset effect. Inside is a container with rounded-2xl md:rounded-\[2rem\] and overflow-hidden.
+
+Background video:
+
+URL:  
+[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4)
+
+autoPlay loop muted playsInline, object-cover, fills entire container
+
+Noise overlay on top: .noise-overlay with opacity-\[0.7\] mix-blend-overlay pointer-events-none
+
+Gradient overlay: bg-gradient-to-b from-black/30 via-transparent to-black/60
+
+Navbar:
+
+Absolutely positioned at top center
+
+Black background pill that hangs from top edge: bg-black rounded-b-2xl md px-4 py-2 md
+
+5 nav items:
+
+"Manifesto"
+
+"Studio"
+
+"Archive"
+
+"Services"
+
+"Contact"
+
+Text size: text-\[10px\] sm md
+
+Gap between items: gap-3 sm md lg
+
+Link color: rgba(225, 224, 204, 0.8), hover: \#E1E0CC (inline styles)
+
+Hero Content (bottom-aligned):
+
+Absolutely positioned at bottom: absolute bottom-0 left-0 right-0
+
+12-column grid: left 8 columns for heading, right 4 columns for text \+ button
+
+Giant heading:
+
+"Nova"
+
+using WordsPullUp component
+
+Responsive sizes: text-\[26vw\] sm:text-\[24vw\] md:text-\[22vw\] lg:text-\[20vw\] xl:text-\[19vw\] 2xl:text-\[20vw\]
+
+font-medium leading-\[0.85\] tracking-\[-0.07em\]
+
+Color: \#E1E0CC
+
+Has a superscript asterisk (\*) on the final "a" of "Nova":
+
+positioned with absolute top-\[0.65em\] \-right-\[0.3em\] text-\[0.31em\]
+
+Pull-up animation: each word slides up from y:20 with staggered delay of 0.08s, triggered by useInView
+
+Description paragraph (right column):
+
+"Nova is a global collective of designers, filmmakers, strategists, and builders creating memorable brands, immersive experiences, and modern digital culture."
+
+text-primary/70 text-xs sm md, line-height: 1.2
+
+Framer motion: fade up from y:20, delay 0.5s, custom ease \[0.16, 1, 0.3, 1\]
+
+CTA Button:
+
+"Enter the studio"
+
+Pill shape: bg-primary rounded-full
+
+Black text, font-medium, text-sm sm
+
+Right side has a black circle (bg-black rounded-full w-9 h-9 sm sm) containing a white/cream ArrowRight icon
+
+Hover: gap increases (hover), circle scales up (group-hover)
+
+Framer motion: fade up from y:20, delay 0.7s, same custom ease
+
+SECTION 2: ABOUT
+
+bg-black, padded section with centered content
+
+Inner card: bg-\[\#101010\], centered text, max-w-6xl
+
+Top:
+
+small label
+
+"Creative Direction"
+
+in text-primary, text-\[10px\] sm
+
+Main heading uses WordsPullUpMultiStyle component with 3 segments:
+
+"I am Elena Hart,"
+
+font-normal (Almarai)
+
+"a multidisciplinary creative director."
+
+italic font-serif (Instrument Serif italic)
+
+"I craft identities, films, and experiences that leave a lasting emotional imprint."
+
+font-normal
+
+Container:
+
+text-3xl sm md lg xl
+
+max-w-3xl mx-auto
+
+leading-\[0.95\] sm:leading-\[0.9\]
+
+Each word animates in with pull-up effect (y:20 to y:0), staggered at 0.08s delay
+
+Body paragraph below with scroll-linked character opacity animation:
+
+Text:
+
+"For over a decade, I have collaborated with independent studios, luxury brands, and cultural institutions across London, Copenhagen, and Tokyo. Together we have created work recognized internationally for its originality and craft."
+
+text-\[\#DEDBC8\], text-xs sm md
+
+Each character is individually wrapped in an AnimatedLetter component
+
+Uses useScroll with target offset \['start 0.8', 'end 0.2'\]
+
+Each character's opacity transitions from 0.2 to 1 based on scroll position, creating a progressive text reveal effect
+
+Character staggering:
+
+charProgress \= index / totalChars
+
+range \[charProgress \- 0.1, charProgress \+ 0.05\]
+
+SECTION 3: FEATURES
+
+min-h-screen bg-black, with subtle .bg-noise overlay at opacity-\[0.15\]
+
+Header text uses WordsPullUpMultiStyle:
+
+Line 1:
+
+"Creative systems for ambitious brands."
+
+in cream
+
+Line 2:
+
+"Built for clarity. Crafted for impact."
+
+in text-gray-500
+
+Both:
+
+text-xl sm md lg font-normal
+
+4-column card grid (lg:h-\[480px\], gap-3 sm md)
+
+Each card has staggered entrance animation:
+
+scale from 0.95 \+ fade in
+
+triggered by useInView (once, margin "-100px")
+
+staggered at 0.15s intervals with ease \[0.22, 1, 0.36, 1\]
+
+Card 1:
+
+Video card
+
+Full video background
+
+URL:  
+[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4)
+
+autoPlay loop muted playsInline object-cover
+
+Bottom text:
+
+"Where ideas become reality."
+
+in \#E1E0CC
+
+Card 2:
+
+"Brand Systems." (01)
+
+bg-\[\#212121\]
+
+small image icon at top
+
+Title with number
+
+4 checklist items:
+
+* Identity frameworks  
+* Design guidelines  
+* Scalable systems  
+* Team collaboration
+
+"Learn more" link with rotated arrow (-45deg)
+
+Card 3:
+
+"Creative Intelligence." (02)
+
+Same layout
+
+3 checklist items:
+
+* Insight generation  
+* Concept development  
+* Workflow automation
+
+Card 4:
+
+"Experience Design." (03)
+
+Same layout
+
+3 checklist items:
+
+* Immersive storytelling  
+* Audience journeys  
+* Cross-platform execution
+
+All feature card checklist items use Check icon from lucide-react in text-primary color, with text-gray-400 description text.
+
+"Learn more" buttons use ArrowRight rotated \-45deg.
+
+SHARED ANIMATION COMPONENTS
+
+WordsPullUp:
+
+Splits text by spaces, each word is a motion.span that slides up (y:20 to 0\) with staggered delay.
+
+Uses useInView (once: true).
+
+Supports showAsterisk prop that adds a superscript \* after the last character of the final word.
+
+WordsPullUpMultiStyle:
+
+Takes an array of {text, className} segments, splits all into individual words preserving per-word className.
+
+Same pull-up animation.
+
+Words are wrapped in inline-flex flex-wrap justify-center.
+
+RESPONSIVE BREAKPOINTS
+
+The page is fully responsive across mobile, tablet, and desktop.
+
+Cards in Features switch from 1-col (mobile) to 2-col (md) to 4-col (lg).
+
+Hero text scales from 26vw down to 19vw.
+
+Navbar items compress with smaller gaps on mobile.
+
+All padding, font sizes, and spacing use Tailwind responsive prefixes (sm/md/lg/xl/2xl).
+
+TECH STACK
+
+Vite \+ React 18 \+ TypeScript
+
+Tailwind CSS 3
+
+framer-motion (for all animations: pull-up text, fade-in, scroll-linked opacity, card entrances)
+
+lucide-react (ArrowRight, Check icons)
+
+Keep every technical specification, layout, animation, spacing, color, video URL, component structure, and implementation detail exactly the same. Only replace the text content above.
+
+`
+      }
+    ]
+  }, {
+    id: "pesudo-template-12",
+    name: "Girl",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Build a single-page hero section with a full-screen looping background video, liquid glass UI elements, and a dark cinematic aesthetic. Use React, TypeScript, Tailwind CSS, and Lucide React icons. Here are the exact specifications:
+
+Background Video:
+
+Full-screen muted autoplaying video covering the entire viewport, positioned absolutely with object-cover
+
+Video source URL:  
+[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4)
+
+The video is shifted down by 17% (translate-y-\[17%\]) so the top portion of the video is cropped \-- the interesting content is in the lower portion of the frame
+
+The video loops seamlessly with a custom JavaScript fade system (no CSS transitions): 500ms requestAnimationFrame-based fade-in on load/loop start, 500ms fade-out when 0.55 seconds remain before the video ends. A fadingOutRef boolean prevents re-triggering the fade-out from repeated timeUpdate events. On ended, opacity is set to 0, then after 100ms the video resets to currentTime \= 0, plays, and fades back in. Each new fade cancels any running animation frame to prevent competing animations. Fades resume from the current opacity rather than snapping.
+
+The outer container is min-h-screen bg-black with overflow-hidden
+
+Font:
+
+Import Google Font "Instrument Serif" (both regular and italic) via CSS
+
+@import url('[https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1\&display=swap](https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap)')
+
+The heading uses fontFamily: "'Instrument Serif', serif" applied via inline style
+
+Liquid Glass CSS (.liquid-glass class):
+
+background: rgba(255, 255, 255, 0.01) with background-blend-mode: luminosity
+
+backdrop-filter: blur(4px) and \-webkit-backdrop-filter: blur(4px)
+
+border: none
+
+box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1)
+
+position: relative; overflow: hidden
+
+A ::before pseudo-element creates the glass border effect:
+
+position: absolute; inset: 0; border-radius: inherit; padding: 1.4px
+
+background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%)
+
+Mask trick for border-only rendering: \-webkit-mask: linear-gradient(\#fff 0 0\) content-box, linear-gradient(\#fff 0 0); \-webkit-mask-composite: xor; mask-composite: exclude
+
+pointer-events: none
+
+Layout (all inside one full-screen flex column):
+
+Navigation bar (relative z-20, padding pl-6 pr-6 py-6):
+
+Inner container: rounded-full px-6 py-3 flex items-center justify-between max-w-5xl mx-auto
+
+Left side:
+
+Logo area with a Globe icon (size 24\) and text
+
+"Atlas"
+
+in white, font-semibold text-lg, with gap-2
+
+Next to the logo (with gap-8): three nav links
+
+"Platform"
+
+"Resources"
+
+"Community"
+
+hidden on mobile, shown on md:
+
+styled text-white/80 hover:text-white transition-colors text-sm font-medium
+
+Right side (gap-4):
+
+"Request Access"
+
+as plain white text button
+
+"Enter"
+
+as a liquid-glass rounded-full px-6 py-2 button
+
+Hero content area (relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center \-translate-y-\[20%\]):
+
+Heading:
+
+"Designed for explorers"
+
+text-5xl md:text-6xl lg:text-7xl
+
+text-white
+
+mb-8
+
+tracking-tight
+
+whitespace-nowrap
+
+with Instrument Serif font
+
+Below the heading, a max-w-xl w-full space-y-4 container:
+
+Email input bar:
+
+liquid-glass rounded-full pl-6 pr-2 py-2 flex items-center gap-3
+
+Inside:
+
+a transparent email input
+
+placeholder:
+
+"Join the waitlist"
+
+text-white
+
+placeholder:text-white/40
+
+text-base
+
+and a white circular submit button
+
+(bg-white rounded-full p-3 text-black)
+
+containing an ArrowRight icon (size 20\)
+
+Subtitle text:
+
+text-white text-sm leading-relaxed px-4
+
+"Receive product updates, early access opportunities, and thoughtful insights from our team. Be the first to know what's coming next."
+
+Manifesto button:
+
+centered
+
+liquid-glass rounded-full px-8 py-3
+
+text-white text-sm font-medium
+
+Text:
+
+"Our Philosophy"
+
+hover:bg-white/5 transition-colors
+
+Social icons footer (relative z-10 flex justify-center gap-4 pb-12):
+
+Three circular icon buttons, each liquid-glass rounded-full p-4 text-white/80 hover:text-white hover:bg-white/5 transition-all
+
+Icons:
+
+Instagram
+
+Twitter
+
+Globe
+
+(all size 20\) from lucide-react
+
+Each has an aria-label
+
+Tech stack:
+
+Vite \+ React 18 \+ TypeScript
+
+Tailwind CSS 3
+
+lucide-react for all icons
+
+Default Tailwind config with no extensions.
+
+Keep all layout, spacing, styling, animations, video behavior, glass effects, component structure, and technical implementation exactly the same. Only replace the text content above.
+
+`
+      }
+    ]
+  }, {
+    id: "pesudo-template-13",
+    name: "Color Disc",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a fullscreen hero section for a cybersecurity platform called "Sentinel" using React, TypeScript, Tailwind CSS, Framer Motion, and Lucide React icons.
+
+Fonts
+- Heading font: 'Helvetica Now Display Bold' loaded from 'https://db.onlinewebfonts.com/c/04e6981992c0e2e7642af2074ebe3901?family=Helvetica+Now+Display+Bold' (add as a '<link>' in 'index.html')
+- Body font: 'Inter' (weights 300-900) loaded from Google Fonts: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap' (imported in CSS)
+
+CSS Variables
+:root {
+  --font-heading: 'Helvetica Now Display Bold', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --color-text: #192837;
+  --color-accent: #7342E2;
+  --color-login-bg: #F2F2EE;
+}
+
+Background Video
+Full-screen background video covering the entire viewport ('absolute inset-0, object-cover'):
+https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4
+
+Attributes: 'autoPlay', 'muted', 'loop', 'playsInline'
+
+Layout Structure
+1. Container: 'relative w-full min-h-screen', font-family from '--font-body', color from '--color-text'
+2. Navbar: max-width 1280px, centered, z-10, 'px-5 sm:px-8 py-4 sm:py-5', flex with items centered and space-between
+3. Hero content: max-width 1280px centered container with 'paddingTop: clamp(40px, 8vw, 72px)', content block capped at 'max-width: 560px'
+
+Logo (SVG)
+Custom SVG logo, 32x32, fill '#192837', geometric angular shape:
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" overflow="visible" viewBox="0 0 256 256">
+  <path d="M 64 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 L 128 64 L 128 64.5 L 161 32 L 192 0 L 256 0 L 256 64 L 192 128 L 128 128 L 128 192 L 96 223 L 63.5 256 L 0 256 L 0 192 Z M 256 192 L 224 223 L 191.5 256 L 128 256 L 128 192 L 192 128 L 256 128 Z" fill="#192837"/>
+</svg>
+
+Navbar Elements
+- Left: Logo
+- Center (desktop only, 'hidden md:flex'): 5 links — ['Platform', 'Solutions', 'Resources', 'Updates', 'Support'], text-sm font-medium, opacity hover effect
+- Right (desktop only):
+  - "Request Access" button — 'background: #7342E2', white text, rounded-full, 'px-5 py-2.5'
+  - "Dashboard" button — 'background: #F2F2EE', dark text, rounded-full, 'px-5 py-2.5'
+- Mobile: Hamburger icon (Menu/X from lucide-react), opens a right-side slide-in sheet
+
+Mobile Menu Sheet (AnimatePresence + Framer Motion)
+- Backdrop: fixed inset-0, 'rgba(25,40,55,0.35)' background with 'blur(4px)' backdrop-filter
+- Sheet: fixed right-0 top-0, width 'min(88vw, 360px)', height '100dvh', background '#CFC8C5', box-shadow '-12px 0 48px rgba(25,40,55,0.18)'
+- Sheet animation: slides from 'x: '100%'' to 'x: 0', ease '[0.22, 1, 0.36, 1]', duration 0.45s
+- Sheet content: Logo + close button header, 1px divider, staggered nav links (delay '0.18 + i * 0.07'), bottom CTA buttons matching desktop style
+
+Hero Heading
+- Font: 'var(--font-heading)'
+- Size: 'clamp(1.65rem, 5vw, 3rem)'
+- Line-height: '1.05'
+- Letter-spacing: '-0.01em'
+- Color: '#192837'
+- Margin-bottom: '24px'
+- Contains inline Lucide icons (Zap, LockKeyhole, Fingerprint) at 24px, color '#192837', vertically aligned middle, positioned 'top: -2px'
+- Text:
+  "Secure Every Identity Across Your Digital World"
+  - Zap icon before "Secure"
+  - LockKeyhole icon between "Identity" and "Across"
+  - Fingerprint icon after "World"
+
+Hero Subtext
+- Font: 'var(--font-body)'
+- Size: 'clamp(0.9rem, 2.5vw, 1.1rem)'
+- Line-height: '1.65'
+- Opacity: '0.8'
+- Max-width: '560px'
+- Text:
+  "From credentials to critical systems, Sentinel protects every access point with enterprise-grade security, seamless authentication, and real-time threat defense."
+
+CTA Button
+- Background: '#7342E2'
+- Color: white
+- Border-radius: '50px'
+- Padding: '17px 24px'
+- Font: 'var(--font-body)', font-weight semibold
+- Size: 'clamp(0.9rem, 2vw, 1rem)'
+- Box-shadow: '0 4px 24px rgba(115,66,226,0.28)'
+- Min-width: '210px'
+- Flex with space-between, gap '32px'
+- Text:
+  "Start Protecting"
+  with ArrowRightCircle icon (20px) on the right
+- Hover: 'scale(1.04)' + 'brightness(1.1)'
+- Tap: 'scale(0.96)'
+
+Animations (Framer Motion)
+fadeUp variant applied to heading (delay 0), subtext (delay 0.15s), and CTA button (delay 0.30s):
+
+hidden: { opacity: 0, y: 28 }
+visible: {
+  opacity: 1,
+  y: 0,
+  transition: {
+    delay: i * 0.15,
+    duration: 0.6,
+    ease: [0.22, 1, 0.36, 1]
   }
-].filter(t => !t.id.startsWith('hero-'));
+}
+
+Dependencies
+- 'react', 'react-dom'
+- 'framer-motion'
+- 'lucide-react' (icons: ArrowRightCircle, Zap, LockKeyhole, Fingerprint, Menu, X)
+- Tailwind CSS
+
+That is every detail needed to reproduce the hero section exactly as built.`
+      }
+    ]
+  }, {
+    id: "pesudo-template-14",
+    name: "Planet Robot",
+    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/first-frame.jpg",
+        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [""],
+        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4",
+        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg2.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg3.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg4.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg5.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg6.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create an NFT landing page called "Orbis.Nft" with 4 sections, using a dark space theme. The page uses video backgrounds served from CloudFront, a liquid glass UI effect, and a specific color/font system. Recreate it exactly as described below.
+
+FONTS (Google Fonts)
+
+Anton \- Used for all headings and navigation text (aliased as font-grotesk in Tailwind)
+
+Condiment \- A cursive script used for accent/overlay text (aliased as font-condiment in Tailwind)
+
+System monospace font (font-mono) \- Used for body/description paragraphs
+
+Load via Google Fonts in index.html:
+
+https://fonts.googleapis.com/css2?family=Anton\&family=Condiment\&display=swap
+
+COLOR SYSTEM (Tailwind config)
+
+Background: \#010828 (deep dark navy blue)
+
+cream: \#EFF4FF (off-white, used for all text)
+
+neon: \#6FFF00 (bright green, used for accent cursive text and underline bars)
+
+LIQUID GLASS CSS EFFECT
+
+Applied via a .liquid-glass class. This is used on the navbar, social icon buttons, NFT cards, and card overlays:
+
+.liquid-glass {  
+  background: rgba(255, 255, 255, 0.01);  
+  background-blend-mode: luminosity;  
+  backdrop-filter: blur(4px);  
+  \-webkit-backdrop-filter: blur(4px);  
+  border: none;  
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);  
+  position: relative;  
+  overflow: hidden;  
+}  
+.liquid-glass::before {  
+  content: '';  
+  position: absolute;  
+  inset: 0;  
+  border-radius: inherit;  
+  padding: 1.4px;  
+  background: linear-gradient(180deg,  
+    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,  
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,  
+    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);  
+  \-webkit-mask: linear-gradient(\#fff 0 0\) content-box, linear-gradient(\#fff 0 0);  
+  \-webkit-mask-composite: xor;  
+  mask-composite: exclude;  
+  pointer-events: none;  
+}
+
+TEXTURE OVERLAY
+
+A full-screen fixed texture overlay sits on top of everything (z-50, pointer-events-none). It uses a /texture.png image with mix-blend-mode: lighten at opacity: 0.6, covering the entire viewport with background-size: cover.
+
+SECTION 1: HERO (Full viewport)
+
+Background: Full-bleed looping muted autoplaying video covering the entire section with object-cover
+
+Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4
+
+Container: max-w-\[1831px\] centered with responsive horizontal padding
+
+Section has rounded-b-\[32px\] bottom corners, clipping the video
+
+Header:
+
+Left: "Orbis.Nft" logo text in Anton, 16px, uppercase
+
+Center: Navigation bar with liquid-glass effect, rounded-\[28px\], px-\[52px\] py-\[24px\]. Contains 5 links: Homepage, Gallery, Buy NFT, FAQ, Contact. Each link is Anton 13px uppercase. Links have hover:text-neon transition. Nav is hidden on mobile (hidden lg:block).
+
+Hero Content:
+
+Large heading in Anton font, responsive sizing: 40px mobile / 60px sm / 75px md / 90px lg. Uppercase. leading-\[1.05\] mobile, leading-\[1\] tablet+. Max width 780px on desktop, offset with lg:ml-32.
+
+Text reads:
+
+Beyond earth  
+and ( its ) familiar boundaries
+
+Overlaid cursive accent text "Nft collection" in Condiment font (24px-48px responsive), positioned absolute to the right side of the heading, slightly rotated (-rotate-1), in neon green (text-neon), with mix-blend-exclusion and opacity-90.
+
+Social Icons (Desktop):
+
+3 square buttons (56x56px) stacked vertically in top-right corner, each with liquid-glass and rounded-\[1rem\]. Icons: Mail, Twitter, Github from lucide-react (20x20px). hover:bg-white/10 transition.
+
+Social Icons (Mobile):
+
+Same 3 buttons but centered horizontally below the heading, shown only below lg breakpoint.
+
+SECTION 2: ABOUT / INTRO (Full viewport)
+
+Background: Full-bleed looping muted autoplaying video with object-cover
+
+Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg2.mp4
+
+Container: Same max-w-\[1831px\] centered, with generous vertical padding (64px-96px responsive)
+
+Top Row (flex row on desktop, column on mobile):
+
+Left: Heading in Anton, responsive 32px-60px, uppercase:
+
+Hello\!  
+I'm orbis
+
+With an overlaid "Orbis" in Condiment cursive, neon green, mix-blend-exclusion, 36px-68px responsive, positioned absolute at bottom-right of heading, slightly rotated.
+
+Right: Short paragraph in monospace 14px-16px, uppercase, cream color, max-width 266px: "A digital object fixed beyond time and place. An exploration of distance, form, and silence in space"
+
+Bottom Row (flex row, space-between):
+
+Two columns (left and right), each containing 2 identical paragraphs. Same monospace text as above but at opacity-10 (nearly invisible, decorative). Right column hidden below lg. On mobile, text uses text-\[\#010828\] (dark) so it's effectively invisible against the video.
+
+SECTION 3: NFT COLLECTION GRID
+
+Background: Solid \#010828 (no video)
+
+Container: Same max-w-\[1831px\] centered
+
+Header Row:
+
+Left: Heading in Anton, 32px-60px responsive, uppercase:
+
+Collection of  
+  \[indented\] Space objects
+
+Where "Space" is in Condiment cursive neon green, and "objects" is in Anton. The second line is indented with ml-12 / ml-24 / ml-32 responsive.
+
+Right: A "SEE ALL CREATORS" button. "SEE" is large (32px-60px), "ALL" and "CREATORS" are stacked smaller (20px-36px) next to it. Below the text is a neon green bar (bg-neon, height 6px-10px responsive, full width of button).
+
+NFT Card Grid:
+
+3-column grid on desktop (lg:grid-cols-3), 2 on tablet, 1 on mobile. Gap 24px.
+
+Each card: liquid-glass container with rounded-\[32px\], padding 18px, hover:bg-white/10 transition.
+
+Inside each card: a square video container (pb-\[100%\] aspect ratio trick) with rounded-\[24px\] overflow hidden.
+
+Video URLs:
+
+https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg3.mp4 (Score: 8.7/10)
+
+https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg4.mp4 (Score: 9/10)
+
+https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg5.mp4 (Score: 8.2/10)
+
+Each card has an overlay bar at the bottom: a liquid-glass bar with rounded-\[20px\], px-5 py-4, showing "RARITY SCORE:" label (11px, cream/70% opacity) and score value (16px). On the right side of the bar is a circular purple gradient button (48x48px, bg-gradient-to-br from-\[\#b724ff\] to-\[\#7c3aed\]) with a right-arrow chevron SVG inside, with shadow-lg shadow-purple-500/50 and hover:scale-110 transition.
+
+SECTION 4: CTA / FINAL SECTION
+
+Background: Full-width video (NOT object-cover, instead w-full h-auto block so it displays at native aspect ratio)
+
+Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg6.mp4
+
+Text Content (positioned absolute over the video):
+
+Right-aligned block, offset with lg:pr-\[20%\] lg:pl-\[15%\]
+
+Small "Go beyond" text in Condiment cursive, neon green, mix-blend-exclusion, positioned absolute at top-left of the heading block. Sizes: 17px-68px responsive.
+
+Heading in Anton, responsive 16px-60px, uppercase:
+
+JOIN US.  
+REVEAL WHAT'S HIDDEN.  
+DEFINE WHAT'S NEXT.  
+FOLLOW THE SIGNAL.
+
+"JOIN US." has extra bottom margin (mb-4 to mb-12 responsive) before the remaining lines.
+
+Social Icons (Bottom-left, absolute positioned):
+
+Positioned at left-\[8%\], bottom-\[12%\] to bottom-\[20%\] with responsive breakpoints.
+
+A vertical liquid-glass container with rounded-\[0.5rem\] to rounded-\[1.25rem\] responsive, containing 3 stacked icon buttons (Mail, Twitter, Github).
+
+Buttons have responsive widths using viewport units and rem values (e.g., w-\[14vw\] sm:w-\[14.375rem\] md:w-\[10.78125rem\] lg:w-\[16.77rem\]) and similar responsive heights.
+
+Buttons are separated by border-b border-white/10 dividers (except the last one).
+
+KEY TECHNICAL DETAILS
+
+Framework: React \+ TypeScript \+ Vite \+ Tailwind CSS
+
+Icons: lucide-react (Mail, Twitter, Github)
+
+No additional packages needed beyond what Vite \+ React \+ Tailwind provides
+
+All videos: autoPlay loop muted playsInline attributes
+
+Responsive: Mobile-first with sm:, md:, lg: breakpoints throughout
+
+Max content width: 1831px across all sections
+
+All text is uppercase except the Condiment cursive accents which are normal-case  
+`
+      }
+    ]
+  },
+].filter(t => !t.id.startsWith('hero-') && !t.id.startsWith('template-'));

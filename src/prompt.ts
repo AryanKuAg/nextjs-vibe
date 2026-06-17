@@ -91,6 +91,8 @@ Instructions:
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.
+   - GOOGLE FONTS CRITICAL RULE: If the user or template specifies a custom font (e.g., 'Kanit', 'Inter', 'Playfair Display'), you MUST import it at the very top of \`src/index.css\` using an \`@import url(...);\` statement from Google Fonts. If you do not import it, the font will not load. Example: \`@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800;900&display=swap');\`
+
 
 4. ENTRY POINT & APP.TSX OVERRIDE (CRITICAL):
    - You MUST completely overwrite the default Vite boilerplate in \`src/App.tsx\`. Do NOT leave the default Vite logos, counter, or default styling.
@@ -166,6 +168,7 @@ YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
    - For TS2322 (Framer Motion prop errors), force it to pass by using \`// @ts-expect-error\` above the failing line.
    - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
    - For TS2307 (Cannot find module) regarding CanvasScroll or Preloader, it means this project does NOT support those elements. You MUST completely delete the \`<CanvasScroll />\` and \`<Preloader />\` elements from the JSX and remove their imports.
+   - For TS2554 (Expected 1 arguments, but got 0) on \`useRef\` hooks, add \`(null)\` as the initial value (e.g. \`useRef<number>(null)\`).
 3. Third, ONLY AFTER the tool successfully returns, output EXACTLY:
 <task_summary>
 Fixed build errors.

@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         }
       ],
-      return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`, 
+      return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`,
       metadata: {
         userId,
         plan
@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
 
     // If session.checkout_url exists, return it
     if (session && session.checkout_url) {
-        return NextResponse.json({ url: session.checkout_url });
+      return NextResponse.json({ url: session.checkout_url });
     }
-    
+
     // Fallback if Dodo returns a different payload
     const fallbackSession = session as unknown as Record<string, unknown>;
     return NextResponse.json({ url: fallbackSession.url || fallbackSession.payment_link });

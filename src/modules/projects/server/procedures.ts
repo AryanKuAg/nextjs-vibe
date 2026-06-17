@@ -72,7 +72,7 @@ export const projectsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        value: z.string().max(10000, { message: "Value is too long" }),
+        value: z.string().max(100000, { message: "Value is too long" }),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -184,15 +184,15 @@ export const projectsRouter = createTRPCRouter({
         const storage = new Storage(
           process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
             ? {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-                credentials: {
-                  client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-                },
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+              credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+              },
+            }
             : {
-                projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              }
+              projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            }
         );
 
         const bucket = storage.bucket(bucketName);

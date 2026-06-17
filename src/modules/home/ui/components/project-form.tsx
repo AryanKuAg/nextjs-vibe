@@ -17,39 +17,11 @@ import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { Hint } from "@/components/hint";
 
-import { MODEL_COSTS } from "@/lib/pricing";
-
-const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "" },
-].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
-
-const SUGGESTED_PROMPTS = [
-  {
-    label: "Frosted village",
-    prompt: "Miniature snowy Christmas village at blue hour, cozy glowing cottages covered in snow, massive illuminated Christmas tree in the center, warm golden lights everywhere, dreamy cinematic atmosphere, soft depth of field, tilt shift look, ultra detailed, magical winter wonderland, realistic 3D render."
-  },
-  {
-    label: "Aurora dreamscape",
-    prompt: "Dreamlike arctic night landscape, glowing aurora borealis in deep blue sky, snowy hills with tall dark pine trees, reflective frozen lake in foreground, magical bioluminescent flower field with pink, purple, blue and orange glowing plants, tiny floating fireflies, cinematic lighting, ultra detailed, fantasy atmosphere, soft mist, vibrant glow, wide shot, surreal nature, 3D render style, highly immersive."
-  },
-  {
-    label: "Floating monoliths",
-    prompt: "Massive floating stone structures above a misty landscape, surreal cinematic environment, glowing ambient light, dreamy atmosphere, soft fog, reflective water, minimal fantasy world, ultra detailed, immersive 3D render style."
-  },
-  {
-    label: "Ember valley",
-    prompt: "Dark fantasy valley filled with glowing orange flora, volcanic atmosphere, floating embers, cinematic lighting, reflective river, towering silhouettes, surreal immersive world, ultra detailed 3D render style."
-  }
-];
-
-type ModelId = typeof MODELS[number]["id"];
-
 const formSchema = z.object({
   value: z
     .string()
     .min(1, { message: "Value is required" })
-    .max(10000, { message: "Value is too long" }),
+    .max(100000, { message: "Value is too long" }),
 });
 
 export const ProjectForm = () => {
@@ -59,25 +31,12 @@ export const ProjectForm = () => {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   // Clean up object URLs
   useEffect(() => {
@@ -156,7 +115,7 @@ export const ProjectForm = () => {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        const url = `/projects/${data.id}${variables.value ? "?autoSubmit=true" : ""}`;
+        const url = `/projects/${data.id}${variables.value ? "?builderAutoSubmit=true" : ""}`;
         router.push(url);
       },
       onError: (error) => {
@@ -184,8 +143,9 @@ export const ProjectForm = () => {
       return;
     }
 
-    // Persist the selected model so the dashboard uses it for auto-submit
-    sessionStorage.setItem("pending_model", selectedModel);
+    // Persist the default model so the dashboard uses it
+    sessionStorage.setItem("pending_model", "openrouter-google/gemini-3.1-pro-preview");
+    sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
@@ -214,14 +174,6 @@ export const ProjectForm = () => {
     } catch {
       // Error is handled in the mutation's onError callback
     }
-  };
-
-  const onSelect = (value: string) => {
-    form.setValue("value", value, {
-      shouldDirty: true,
-      shouldValidate: true,
-      shouldTouch: true,
-    });
   };
 
   const isPending = createProject.isPending;
@@ -290,9 +242,9 @@ export const ProjectForm = () => {
                   "px-4 pt-4 ",
                   "text-sm font-onest leading-relaxed text-white font-[500]",
                   "placeholder:text-white/40 placeholder:whitespace-nowrap placeholder:text-[14px] ",
-                  "transition-colors bg-transparent placeholder:mt-1  mx-2! placeholder:font-[500]"
+                  "transition-colors bg-transparent placeholder:mt-1   placeholder:font-[500]"
                 )}
-                placeholder="Describe your background..."
+                placeholder="Describe your website..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();

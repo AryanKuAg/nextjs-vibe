@@ -64,6 +64,15 @@ export const ProjectView = ({ projectId }: Props) => {
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("builderAutoSubmit") === "true") {
+        setActiveStageTab("SITE");
+      }
+    }
+  }, []);
+
   const emptyBlock: VideoBlock = {
     startFrameUrl: null, startFrameHistory: [],
     endFrameUrl: null, endFrameHistory: [],
@@ -84,7 +93,7 @@ export const ProjectView = ({ projectId }: Props) => {
           extractedFramesCacheRef.current[block.videoUrl] = "pending";
           const frameUrl = await extractLastFrame(block.videoUrl);
           extractedFramesCacheRef.current[block.videoUrl] = frameUrl;
-          
+
           setBlocks(prev => {
             const newBlocks = [...prev];
             for (let j = 1; j < newBlocks.length; j++) {
@@ -104,7 +113,7 @@ export const ProjectView = ({ projectId }: Props) => {
           });
         } catch (e) {
           console.error("Failed to extract frame for", block.videoUrl, e);
-          extractedFramesCacheRef.current[block.videoUrl] = ""; 
+          extractedFramesCacheRef.current[block.videoUrl] = "";
         }
       }
     });
@@ -128,11 +137,14 @@ export const ProjectView = ({ projectId }: Props) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 1) {
-          setBlocks(parsed.map((item: Record<string, string | undefined>) => ({
+          setBlocks(parsed.map((item: Partial<VideoBlock>) => ({
             ...emptyBlock,
-            startPrompt: item?.startPrompt,
-            endPrompt: item?.endPrompt,
-            videoPrompt: item?.videoPrompt,
+            ...item,
+            startUploadedImage: null,
+            endUploadedImage: null,
+            isGeneratingStart: false,
+            isGeneratingEnd: false,
+            isGeneratingVideo: false,
           })));
         }
       }
@@ -226,6 +238,13 @@ export const ProjectView = ({ projectId }: Props) => {
   const [isExtracting, setIsExtracting] = useState(false);
 
   const handleProceed = async () => {
+    // Check if it's a pseudo template by checking for builderPrompt
+    const builderPrompt = blocks[0]?.builderPrompt;
+    if (builderPrompt) {
+      setActiveStageTab("SITE");
+      return;
+    }
+
     // Check if any videos have been generated yet
     const hasVideos = blocks.some(b => b.videoUrl);
 
@@ -279,7 +298,7 @@ export const ProjectView = ({ projectId }: Props) => {
       } else {
         setActiveStageTab(prev => prev === "SITE" ? "SITE" : "BACKGROUND");
       }
-      
+
       const frameCount = (project as { frameCount?: number | null })?.frameCount;
       if (frameCount && extractedFrameCount === undefined) {
         setExtractedFrameCount(frameCount);
@@ -498,14 +517,23 @@ export const ProjectView = ({ projectId }: Props) => {
   useEffect(() => {
     if (!hasRestored || !project?.id || blocks.length === 0) return;
 
-    const dataToSave = blocks.map(b => ({
+    const dbDataToSave = blocks.map(b => ({
       startPrompt: b.startPrompt,
       endPrompt: b.endPrompt,
       videoPrompt: b.videoPrompt
     }));
 
+    const localDataToSave = blocks.map(b => ({
+      ...b,
+      startUploadedImage: null,
+      endUploadedImage: null,
+      isGeneratingStart: false,
+      isGeneratingEnd: false,
+      isGeneratingVideo: false,
+    }));
+
     // Save locally immediately
-    localStorage.setItem(`vibe-blocks-${project.id}`, JSON.stringify(dataToSave));
+    localStorage.setItem(`vibe-blocks-${project.id}`, JSON.stringify(localDataToSave));
 
     // Debounce saving to DB
     if (saveTimeoutRef.current) {
@@ -515,7 +543,7 @@ export const ProjectView = ({ projectId }: Props) => {
     const { mutationFn } = trpc.projects.updatePrompts.mutationOptions();
     saveTimeoutRef.current = setTimeout(() => {
       if (mutationFn) {
-        mutationFn({ projectId: project.id, prompts: dataToSave })
+        mutationFn({ projectId: project.id, prompts: dbDataToSave })
           .catch(err => console.error("Failed to save prompts to DB:", err));
       }
     }, 1500);
@@ -647,10 +675,10 @@ export const ProjectView = ({ projectId }: Props) => {
           let fetchUrl = resolvedZipUrl;
           // Ensure we hit storage.googleapis.com directly if the CDN doesn't forward CORS headers
           if (!fetchUrl.includes("storage.googleapis.com")) {
-             const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space';
-             const pathParts = new URL(resolvedZipUrl).pathname.split('/').filter(Boolean);
-             const pathKey = pathParts.slice(pathParts.indexOf('frames')).join('/');
-             fetchUrl = `https://storage.googleapis.com/${bucketName}/${pathKey}`;
+            const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || 'sites.framerate.space';
+            const pathParts = new URL(resolvedZipUrl).pathname.split('/').filter(Boolean);
+            const pathKey = pathParts.slice(pathParts.indexOf('frames')).join('/');
+            fetchUrl = `https://storage.googleapis.com/${bucketName}/${pathKey}`;
           }
 
           const res = await fetch(fetchUrl);
@@ -754,13 +782,14 @@ export const ProjectView = ({ projectId }: Props) => {
                   extractedZipUrl={extractedZipUrl}
                   extractedFrameCount={extractedFrameCount}
                   onBack={() => setActiveStageTab("BACKGROUND")}
+                  initialPrompt={blocks[0]?.builderPrompt}
                 />
               </Suspense>
             </ErrorBoundary>
           )}
         </ResizablePanel>
 
-        <ResizableHandle className="hover:bg-white transition-colors" />
+        <ResizableHandle className="bg-[#282825] " />
 
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
@@ -773,7 +802,7 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2.5  gap-x-2 bg-background h-[56px] shrink-0 border-b">
+            <div className="w-full flex items-center p-2.5 gap-x-2 bg-background h-[56px] shrink-0 border-b border-[#282825]">
               {activeStageTab === "SITE" && (
                 <>
                   <TabsList className="h-8 p-0.5 rounded-[8px] bg-[#272725]">

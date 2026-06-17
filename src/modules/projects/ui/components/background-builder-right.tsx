@@ -9,6 +9,7 @@ export interface VideoBlock {
   startPrompt?: string;
   endPrompt?: string;
   videoPrompt?: string;
+  builderPrompt?: string;
   startFrameUrl: string | null;
   startFrameHistory?: string[];
   endFrameUrl: string | null;
@@ -334,13 +335,13 @@ export const BackgroundBuilderRight = ({
           </div>
         )}
         <div className={cn(
-          "bg-[#282828] rounded-[16px] transition-colors max-w-[640px] mx-auto w-full overflow-hidden",
+          "bg-[#212121] rounded-[16px] transition-colors max-w-[640px] mx-auto w-full overflow-hidden",
           blocks.length > 1 && (isActive ? "border border-white" : "border border-transparent hover:bg-[#2c2c2c]")
         )}>
-          <div className="flex items-center justify-between p-3 border-b border-[#333333]">
+          <div className="flex items-center justify-between p-3 border-b border-[#2c2c2c]">
             <h3 className="text-white text-sm font-onest">{title}</h3>
             <div className="flex items-center gap-4">
-              <span className="text-[#737373] text-sm font-mono">{duration}</span>
+              <span className="text-[#737373] text-sm">{duration}</span>
               {showRemove && (
                 <button
                   onClick={(e) => {
@@ -364,7 +365,7 @@ export const BackgroundBuilderRight = ({
                   <span className="text-white text-sm font-onest">Start frame</span>
                   {renderHistoryIndicator("START", block.startFrameUrl, block.startFrameHistory, block, index)}
                 </div>
-                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
+                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#2c2c2c] overflow-hidden relative">
                   <GenerationOverlay isGenerating={block.isGeneratingStart} />
                   {!block.isGeneratingStart && block.startFrameUrl ? (
                     <div className="relative w-full h-full group">
@@ -403,7 +404,7 @@ export const BackgroundBuilderRight = ({
                   <span className="text-white text-sm font-onest">End frame (Optional)</span>
                   {renderHistoryIndicator("END", block.endFrameUrl, block.endFrameHistory, block, index)}
                 </div>
-                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#333333] overflow-hidden relative">
+                <div className="aspect-video bg-transparent rounded-[8px] flex items-center justify-center border border-[#2c2c2c] overflow-hidden relative">
                   <GenerationOverlay isGenerating={block.isGeneratingEnd} />
                   {!block.isGeneratingEnd && block.endFrameUrl ? (
                     <div className="relative w-full h-full group">
@@ -440,7 +441,7 @@ export const BackgroundBuilderRight = ({
                 {renderHistoryIndicator("VIDEO", block.videoUrl, block.videoHistory, block, index)}
               </div>
               <div
-                className="aspect-video bg-background rounded-[8px] flex items-center justify-center border border-[#282825] overflow-hidden relative group"
+                className="aspect-video rounded-[8px] flex items-center justify-center border border-[#2c2c2c] overflow-hidden relative group"
                 onMouseEnter={() => {
                   setHoveredVideoIndex(index);
                   if (block.videoUrl) {

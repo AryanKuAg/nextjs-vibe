@@ -1,5 +1,10 @@
 export const extractLastFrame = (videoUrl: string): Promise<string> => {
   return new Promise((resolve, reject) => {
+    // Proxy Cloudflare R2 bucket URLs to bypass CORS restrictions
+    if (videoUrl.includes("assets.framerate.space")) {
+      videoUrl = videoUrl.replace("https://assets.framerate.space", "/proxy-r2");
+    }
+
     const video = document.createElement("video");
     video.crossOrigin = "anonymous";
     video.src = videoUrl;

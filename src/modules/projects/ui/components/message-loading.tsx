@@ -1,56 +1,34 @@
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
+function formatTimer(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
 
 const ShimmerMessages = () => {
-  const messages = [
-    "Thinking...",
-    "Loading...",
-    "Generating...",
-    "Analyzing your request...",
-    "Building your website...",
-    "Crafting components...",
-    "Optimizing layout...",
-    "Adding final touches...",
-    "Almost ready...",
-  ];
-
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
     const startTime = Date.now();
 
-    const messageInterval = setInterval(() => {
-      setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
-    }, 2000);
-
     const timerInterval = setInterval(() => {
       setElapsedMs(Date.now() - startTime);
-    }, 10);
+    }, 1000);
 
     return () => {
-      clearInterval(messageInterval);
       clearInterval(timerInterval);
     };
-  }, [messages.length]);
+  }, []);
 
-  const timeString = `${(elapsedMs / 1000).toFixed(1)}s`;
+  const timeString = formatTimer(Math.floor(elapsedMs / 1000));
 
   return (
-    <div className="flex items-start pl-1 gap-2.5">
-      <div className="flex-shrink-0 mt-0.5">
-        <Image
-          src="/logo.png"
-          alt="Vibe"
-          width={24}
-          height={24}
-          className="shrink-0"
-        />
-      </div>
-      <span className="text-sm pt-0.5">
-        <span className="text-white font-mono mr-2  text-[12px] inline-block">{timeString}</span>
-        <span className="text-muted-foreground animate-pulse">{messages[currentMessageIndex]}</span>
+    <div className="flex items-center gap-3 pl-1 ">
+      <i className="ri-loader-4-line animate-spin text-2xl text-white/80" />
+      <span className="text-white font-onest text-sm tracking-wide">
+        Building <span className="text-white/40 mx-1.5">&middot;</span> {timeString}
       </span>
     </div>
   );

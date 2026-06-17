@@ -25,7 +25,8 @@ export const MessagesContainer = ({
   extractedZipUrl,
   extractedFrameCount,
   onBack,
-}: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, extractedFrameCount?: number, onBack?: () => void }) => {
+  initialPrompt,
+}: Props & { stage?: "SCENE" | "VIDEO" | "SITE", extractedZipUrl?: string | null, extractedFrameCount?: number, onBack?: () => void, initialPrompt?: string }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -154,6 +155,7 @@ export const MessagesContainer = ({
           extractedZipUrl={extractedZipUrl}
           extractedFrameCount={extractedFrameCount}
           isGenerating={isLastMessageUser && !isStuck}
+          initialPrompt={initialPrompt}
         />
         {onBack && (
           <button

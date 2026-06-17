@@ -30,12 +30,13 @@ interface Props {
   extractedZipUrl?: string | null;
   extractedFrameCount?: number;
   isGenerating?: boolean;
+  initialPrompt?: string;
 };
 
 const formSchema = z.object({
   value: z.string()
     .min(1, { message: "Value is required" })
-    .max(10000, { message: "Value is too long" }),
+    .max(100000, { message: "Value is too long" }),
 })
 
 const processImageFile = (file: File): Promise<string> =>
@@ -71,11 +72,10 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("openrouter-google/gemini-3.1-pro-preview");
@@ -106,8 +106,28 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { value: "" },
+    defaultValues: { value: initialPrompt || "" },
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
+      if (pendingPrompt && !form.getValues().value && !isFollowUp) {
+        form.setValue("value", pendingPrompt, { shouldValidate: true });
+        sessionStorage.removeItem("pending_builder_prompt");
+      } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
+        form.setValue("value", initialPrompt, { shouldValidate: true });
+      }
+
+      const pendingImage = sessionStorage.getItem("pending_image_base64");
+      if (pendingImage) {
+        setUploadedDataUrl(pendingImage);
+        sessionStorage.removeItem("pending_image_base64");
+        sessionStorage.removeItem("pending_image_name");
+        sessionStorage.removeItem("pending_image_type");
+      }
+    }
+  }, [initialPrompt, form, isFollowUp]);
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
     onSuccess: () => {
@@ -147,29 +167,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
       }
     },
   }));
-
-  const handleEnhancePrompt = async () => {
-    setIsEnhancing(true);
-    try {
-      const res = await fetch("/api/enhance-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: form.getValues().value, type: "code", projectId, extractedZipUrl })
-      });
-      const data = await res.json();
-      if (res.ok && data.prompt) {
-        form.setValue("value", data.prompt, { shouldValidate: true });
-        toast.success("Prompt enhanced successfully!");
-      } else {
-        toast.error("Failed to enhance prompt: " + (data.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while enhancing prompt");
-    } finally {
-      setIsEnhancing(false);
-    }
-  };
 
   const handleFile = useCallback(async (file: File) => {
     try {
@@ -215,6 +212,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           isFollowUp,
           imageDataUrl: uploadedDataUrl ?? undefined,
         });
+        form.setValue("value", "");
+        setUploadedDataUrl(null);
       } catch {
         // Error is handled in the mutation's onError callback
       }
@@ -226,6 +225,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           stage,
           model: selectedModel,
         });
+        form.setValue("value", "");
+        setUploadedDataUrl(null);
       } catch {
         // Error is handled in the mutation's onError callback
       }
@@ -233,7 +234,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   };
 
   const isPending = createMessage.isPending || buildSite.isPending;
-  const isButtonDisabled = isPending || (!form.formState.isValid && !isGenerating);
+  const promptValue = form.watch("value");
+  const isButtonDisabled = isPending || (!promptValue?.trim() && !isGenerating);
 
   return (
     <>
@@ -251,7 +253,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#282828] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
+          className={`bg-[#212121] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
             }`}
         >
           {/* Image preview — same style as video-builder */}
@@ -296,21 +298,21 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
           <div className="flex items-center gap-x-1">
             {/* + Image attach button — before model name */}
-            <Hint text="Add photo" side="top" align="start">
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={isPending}
-                className="h-8 w-8 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50 text-base leading-none"
-                title="Attach image"
-              >
-                <i className="ri-add-line text-lg" />
-              </button>
-            </Hint>
+            {/* <Hint text="Add photo" side="top" align="start"> */}
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isPending}
+              className="h-8 w-8 flex items-center justify-center rounded-full text-white hover:bg-white/4 transition-colors disabled:opacity-50 text-base leading-none"
+              title="Attach image"
+            >
+              <i className="ri-add-line text-lg" />
+            </button>
+            {/* </Hint> */}
             {/* Model Selector Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border-[0.5px] border-[#3B3B3B] text-sm text-white hover:bg-white/5 transition-colors cursor-pointer"
+                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full text-sm text-white hover:bg-white/4 transition-colors cursor-pointer"
                 onClick={() => setModelDropdownOpen((o) => !o)}
               >
                 <span className="truncate max-w-[100px] sm:max-w-[120px]">{SELECTED_MODEL_DATA.label}</span>
@@ -341,7 +343,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
 
             {/* Enhance prompt */}
-            <Hint text="Generate prompt" side="top" >
+            {/* <Hint text="Generate prompt" side="top" >
               <button
                 type="button"
                 onClick={handleEnhancePrompt}
@@ -354,7 +356,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   <i className="ri-magic-line text-[15px]" />
                 )}
               </button>
-            </Hint>
+            </Hint> */}
 
             <div className="flex gap-2 ml-auto">
               <div className="flex items-center gap-1 text-white">
@@ -368,7 +370,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent text-[#fefefe] transition-all shadow-sm active:scale-95 border border-[#333333]"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/12 hover:bg-white/24 text-[#fefefe] transition-all shadow-sm active:scale-95"
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>

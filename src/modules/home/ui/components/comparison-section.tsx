@@ -35,12 +35,6 @@ const rows = [
   },
 ];
 
-const stats = [
-  { value: "99%", label: "Cheaper" },
-  { value: "100x", label: "Faster" },
-  { value: "0", label: "Zoom calls" },
-];
-
 export const ComparisonSection = () => {
   return (
     <section className="py-[60px] md:py-24 px-4 sm:px-6 max-w-[640px] mx-auto w-full font-onest font-[500]">
@@ -70,7 +64,7 @@ export const ComparisonSection = () => {
         </div>
 
         {/* Rows */}
-        {rows.map((row, i) => (
+        {rows.map((row) => (
           <div
             key={row.label}
             className={`grid grid-cols-[1fr_1fr_1fr] text-sm`}

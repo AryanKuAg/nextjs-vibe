@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
+import { useAuth, useSignIn } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -41,7 +41,6 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
       setLoading(true);
 
       try {
-        // @ts-ignore
         window.google?.accounts.id.cancel();
       } catch {
         // Ignore

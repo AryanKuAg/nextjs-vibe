@@ -112,7 +112,6 @@ export const BackgroundBuilderLeft = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const currentBlock = blocks[activeBlockIndex] || {};
 
@@ -159,34 +158,6 @@ export const BackgroundBuilderLeft = ({
       updateBlock(activeBlockIndex, { startPrompt: newPrompt });
     } else {
       updateBlock(activeBlockIndex, { endPrompt: newPrompt });
-    }
-  };
-
-  const handleEnhancePrompt = async () => {
-    setIsEnhancing(true);
-    try {
-      const res = await fetch("/api/enhance-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          type: "video",
-          startFrameUrl: currentBlock.startFrameUrl,
-          endFrameUrl: currentBlock.endFrameUrl
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.prompt) {
-        handlePromptChange(data.prompt);
-        toast.success("Prompt enhanced successfully!");
-      } else {
-        toast.error("Failed to enhance prompt: " + (data.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while enhancing prompt");
-    } finally {
-      setIsEnhancing(false);
     }
   };
 

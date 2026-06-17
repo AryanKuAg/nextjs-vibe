@@ -18,6 +18,10 @@ const faqs_list = [
     a: "You can create 3D websites, interactive pages, and immersive visuals for products, portfolios, events, or brand experiences.",
   },
   {
+    q: "Do I own my website?",
+    a: "Yes, you own 100% of the intellectual property rights to the websites you create. You can export the code and host it wherever you&apos;d like.",
+  },
+  {
     q: "How do credits work, and what do they cover?",
     a: "If you run out of credits, you won't be able to create more until your credits refresh on your next billing date. You can also upgrade to a higher plan if you need more credits sooner.",
   },
@@ -74,7 +78,7 @@ export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questio
           {title}
         </h2>
         <p className="text-center font-onest text-[#737373] text-sm font-[500]">
-          Got questions? We've got answers.
+          Got questions? We&apos;ve got answers.
         </p>
       </div>
       <div className="flex flex-col gap-3">

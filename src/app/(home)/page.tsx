@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -54,7 +53,7 @@ const HeroVideo = () => {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/Hero%20BG%20IMG.png"
+        src="https://assets.framerate.space/Hero%20BG%20IMG.png"
         alt="Hero Background"
         className="w-full h-full object-cover opacity-80"
       />
@@ -154,7 +153,6 @@ const BrowseTemplatesButton = () => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
     try {
-      // @ts-ignore
       window.google?.accounts.id.cancel();
     } catch { }
     await signIn.authenticateWithRedirect({
@@ -387,7 +385,7 @@ const Page = () => {
       {/* Real Sites Section */}
       <FadeInSection id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you'll wish were yours</motion.h2>
+          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you&apos;ll wish were yours</motion.h2>
           <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene we made for you.</motion.p>
         </div>
 
@@ -396,42 +394,42 @@ const Page = () => {
             <SitePreviewCard
               title="Vaultone"
               href="https://vaultoneframerate.netlify.app"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/template.png"
+              imgSrc="https://assets.framerate.space/templates/stake/template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Orbis"
               href="https://orbisframerate.netlify.app"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/template.jpg"
+              imgSrc="https://assets.framerate.space/templates/planet%20robot/template.jpg"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Theo"
               href="https://theoframerate.netlify.app/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Theo/Template.png"
+              imgSrc="https://assets.framerate.space/templates/Theo/Template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Strata"
               href="https://strataframerate.netlify.app/"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stone/template.png"
+              imgSrc="https://assets.framerate.space/templates/stone/template.png"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Aether"
               href="https://spacexmarsmission.netlify.app"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/mars_template.jpg"
+              imgSrc="https://assets.framerate.space/mars_template.jpg"
             />
           </motion.div>
           <motion.div variants={itemVariants}>
             <SitePreviewCard
               title="Obisidian"
               href="https://obisidianframerate.netlify.app"
-              imgSrc="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/template.png"
+              imgSrc="https://assets.framerate.space/templates/turtle/template.png"
             />
           </motion.div>
         </div>

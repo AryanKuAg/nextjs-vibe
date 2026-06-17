@@ -137,7 +137,7 @@ export const ProjectView = ({ projectId }: Props) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 1) {
-          setBlocks(parsed.map((item: any) => ({
+          setBlocks(parsed.map((item: Partial<VideoBlock>) => ({
             ...emptyBlock,
             ...item,
             startUploadedImage: null,

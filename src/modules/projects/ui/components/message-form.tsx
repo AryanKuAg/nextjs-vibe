@@ -76,7 +76,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("openrouter-google/gemini-3.1-pro-preview");
@@ -168,29 +167,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
       }
     },
   }));
-
-  const handleEnhancePrompt = async () => {
-    setIsEnhancing(true);
-    try {
-      const res = await fetch("/api/enhance-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: form.getValues().value, type: "code", projectId, extractedZipUrl })
-      });
-      const data = await res.json();
-      if (res.ok && data.prompt) {
-        form.setValue("value", data.prompt, { shouldValidate: true });
-        toast.success("Prompt enhanced successfully!");
-      } else {
-        toast.error("Failed to enhance prompt: " + (data.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while enhancing prompt");
-    } finally {
-      setIsEnhancing(false);
-    }
-  };
 
   const handleFile = useCallback(async (file: File) => {
     try {

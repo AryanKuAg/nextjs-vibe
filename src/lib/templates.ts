@@ -767,15 +767,15 @@ export const TEMPLATES: Template[] = [
   {
     id: "pesudo-template-1",
     name: "Blob",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/template.png",
+    coverUrl: "https://assets.framerate.space/templates/Blob/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg-first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg-first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/Blob/bg-first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Blob/bg-first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg2.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/Blob/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/Blob/bg.mp4", "https://assets.framerate.space/templates/Blob/bg2.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -866,7 +866,7 @@ Cleanup on unmount: cancel rAF, remove listeners.
 
 Section 1 — Hero (full viewport, black bg)  
 Background video (120% width/height, top-aligned, centered horizontally — focal point is the top of frame):  
-src: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg.mp4  
+src: https://assets.framerate.space/templates/Blob/bg.mp4  
 class: absolute left-1/2 top-0 \-translate-x-1/2 object-cover object-top z-0  
 style: { width: "120%", height: "120%" }  
 No overlay. z-10 layer holds: Navbar → Hero content (flex-1, centered) → Partners.
@@ -905,7 +905,7 @@ Parent \<p\> is display: flex; flexWrap: wrap; justifyContent: center; rowGap: 0
 
 Section 2 — Capabilities (min-h-screen, black bg)  
 Background video (full-bleed, no 120% scale):  
-src: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Blob/bg2.mp4  
+src: https://assets.framerate.space/templates/Blob/bg2.mp4  
 class: absolute inset-0 w-full h-full object-cover z-0  
 Same FadingVideo treatment. No overlay.
 
@@ -955,11 +955,11 @@ Framer Motion dev warnings about list keys can be suppressed with a console.erro
   {
     id: "pesudo-template-2",
     name: "Theo",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Theo/Template.png",
+    coverUrl: "https://assets.framerate.space/templates/Theo/Template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Theo/bg-first-frame.png",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/Theo/bg-first-frame.png"],
+        startFrameUrl: "https://assets.framerate.space/templates/Theo/bg-first-frame.png",
+        startFrameHistory: ["https://assets.framerate.space/templates/Theo/bg-first-frame.png"],
         endFrameUrl: "",
         endFrameHistory: [""],
         videoUrl: "",
@@ -1085,15 +1085,15 @@ All sections use Tailwind's default breakpoints (sm: 640px, md: 768px, lg: 1024p
   {
     id: "pesudo-template-3",
     name: "Computer",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/template.png",
+    coverUrl: "https://assets.framerate.space/templates/computer/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/bg-first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/bg-first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/computer/bg-first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/computer/bg-first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/computer/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/computer/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1128,7 +1128,7 @@ BACKGROUND VIDEO (mouse-scrub controlled)
 
 * A full-screen \`<video>\` element is \`position: fixed; inset: 0; z-index: 0; object-fit: cover; object-position: 70% center;\`.  
 * Video source URL:  
-  \`https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/computer/bg.mp4\`  
+  \`https://assets.framerate.space/templates/computer/bg.mp4\`  
 * The video is \`muted\`, \`playsInline\`, \`preload="auto"\`. It does NOT autoplay.  
 * The video scrubs forward/backward based on horizontal mouse movement. Use a \`mousemove\` event listener on \`window\`. Track \`prevX\`, compute \`delta = currentX - prevX\`, convert to a time offset:  
   \`(delta / window.innerWidth) * SENSITIVITY * video.duration\`  
@@ -1266,15 +1266,15 @@ Lucide-react is available but not used in this component.`
   {
     id: "pesudo-template-4",
     name: "Flower Landscape",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/template.png",
+    coverUrl: "https://assets.framerate.space/templates/flower%20landscape/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/first_frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/first_frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/flower%20landscape/first_frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/flower%20landscape/first_frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/flower%20landscape/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/flower%20landscape/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1292,7 +1292,7 @@ Layout & Sizing
 * Background video fills the card ('absolute inset-0 w-full h-full object-cover'). The video element has 'autoPlay muted loop playsInline'.
 
 Use this exact URL:
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/flower%20landscape/bg.mp4
+https://assets.framerate.space/templates/flower%20landscape/bg.mp4
 
 * Content layer: 'relative z-10 flex flex-col' with the same min-height ladder as the card and 'lg:h-full', padding 'p-4 sm:p-6 md:p-8', 'gap-6'.
 
@@ -1443,15 +1443,15 @@ Maintain the exact structure, responsiveness, state management, interactions, si
   {
     id: "pesudo-template-5",
     name: "Landscape",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/template.png",
+    coverUrl: "https://assets.framerate.space/templates/landscape/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/bg-first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/bg-first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/landscape/bg-first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/landscape/bg-first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/landscape/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/landscape/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1468,7 +1468,7 @@ Body text (navigation, descriptions): Inter
 Import both fonts in /src/styles/fonts.css
 
 Video Background:
-URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/landscape/bg.mp4
+URL: https://assets.framerate.space/templates/landscape/bg.mp4
 
 Position: top: '300px' with inset: 'auto 0 0 0'
 
@@ -1645,15 +1645,15 @@ All elements should be fully responsive, elegant, editorial, and cinematic, main
   {
     id: "pesudo-template-6",
     name: "Stake",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/template.png",
+    coverUrl: "https://assets.framerate.space/templates/stake/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/stake/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/stake/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/stake/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/stake/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1672,7 +1672,7 @@ Section container
 A <section> with classes: relative h-screen w-full overflow-hidden bg-black.
 
 Background video
-<video> with className="absolute inset-0 w-full h-full object-cover", autoPlay loop muted playsInline, and src="https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stake/bg.mp4".
+<video> with className="absolute inset-0 w-full h-full object-cover", autoPlay loop muted playsInline, and src="https://assets.framerate.space/templates/stake/bg.mp4".
 
 Navbar (absolute, z-20, px-6 md:px-10 pt-6, top-0 left-0 right-0)
 A <nav> with flex items-center justify-between gap-4.
@@ -1758,11 +1758,11 @@ Responsive: mobile hides nav links and diagonal dividers; typography scales via 
   {
     id: "pesudo-template-7",
     name: "Stone",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stone/template.png",
+    coverUrl: "https://assets.framerate.space/templates/stone/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stone/bg-first-frame.webp",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/stone/bg-first-frame.webp"],
+        startFrameUrl: "https://assets.framerate.space/templates/stone/bg-first-frame.webp",
+        startFrameHistory: ["https://assets.framerate.space/templates/stone/bg-first-frame.webp"],
         endFrameUrl: "",
         endFrameHistory: [""],
         videoUrl: "",
@@ -1851,15 +1851,15 @@ Responsiveness
   {
     id: "pesudo-template-8",
     name: "Turtle",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/template.png",
+    coverUrl: "https://assets.framerate.space/templates/turtle/template.png",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/bg-first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/bg-first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/turtle/bg-first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/turtle/bg-first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/turtle/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/turtle/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1870,7 +1870,7 @@ Responsiveness
 
 Background video:
 Use this exact CloudFront URL as a fullscreen '<video>' element with 'autoPlay', 'muted', 'loop', and 'playsInline' attributes, set to 'object-cover' to fill the entire viewport:
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/turtle/bg.mp4
+https://assets.framerate.space/templates/turtle/bg.mp4
 
 Fonts (loaded in index.html):
 1. "FSP DEMO - PODIUM Sharp 4.11" from https://db.onlinewebfonts.com/c/8b75d9dcff6a48c35a46656192adf019?family=FSP+DEMO+-+PODIUM+Sharp+4.11 -- used for the brand name and main heading. Create a '.font-podium' utility class for it and register it in tailwind.config.js as 'fontFamily.podium'.
@@ -1953,15 +1953,15 @@ Make everything fully mobile responsive. Use a single 'App.tsx' component with '
   {
     id: "pesudo-template-9",
     name: "Airplane",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/airplane/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/airplane/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/airplane/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/airplane/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/airplane/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -1971,7 +1971,7 @@ Make everything fully mobile responsive. Use a single 'App.tsx' component with '
         builderPrompt: `Create a premium luxury travel landing page hero section with the following specifications:
 
 Video Background:  
-Use this exact CloudFront video URL: [https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/airplane/bg.mp4)
+Use this exact CloudFront video URL: [https://assets.framerate.space/templates/airplane/bg.mp4)
 
 Video should autoplay, be muted, loop continuously, and include playsInline attribute.
 
@@ -2074,15 +2074,15 @@ Make it clean, modern, and premium-looking with smooth interactions.`
   {
     id: "pesudo-template-10",
     name: "Green Earth",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/green%20earth/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/green%20earth/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/green%20earth/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/green%20earth/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/green%20earth/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -2095,7 +2095,7 @@ Background
 
 Full-screen autoplaying, looping, muted video background:
 
-[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/green%20earth/bg.mp4)
+[https://assets.framerate.space/templates/green%20earth/bg.mp4](https://assets.framerate.space/templates/green%20earth/bg.mp4)
 
 Video covers entire viewport with object-cover, sits at z-0. All content floats above at z-10.
 
@@ -2321,15 +2321,15 @@ Keep all layout, spacing, CSS, video, typography settings, components, icons, ef
   }, {
     id: "pesudo-template-11",
     name: "Dream",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/dream/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/dream/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/dream/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/dream/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/dream/bg.mp4", "https://assets.framerate.space/templates/dream/bg2.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -2387,7 +2387,7 @@ Full viewport height (h-screen). The entire section has p-4 md padding creating 
 Background video:
 
 URL:  
-[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg.mp4)
+[https://assets.framerate.space/templates/dream/bg.mp4](https://assets.framerate.space/templates/dream/bg.mp4)
 
 autoPlay loop muted playsInline, object-cover, fills entire container
 
@@ -2562,7 +2562,7 @@ Video card
 Full video background
 
 URL:  
-[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/dream/bg2.mp4)
+[https://assets.framerate.space/templates/dream/bg2.mp4](https://assets.framerate.space/templates/dream/bg2.mp4)
 
 autoPlay loop muted playsInline object-cover
 
@@ -2667,15 +2667,15 @@ Keep every technical specification, layout, animation, spacing, color, video URL
   }, {
     id: "pesudo-template-12",
     name: "Girl",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/girl/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/girl/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/girl/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/girl/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/girl/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -2689,7 +2689,7 @@ Background Video:
 Full-screen muted autoplaying video covering the entire viewport, positioned absolutely with object-cover
 
 Video source URL:  
-[https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4](https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/girl/bg.mp4)
+[https://assets.framerate.space/templates/girl/bg.mp4](https://assets.framerate.space/templates/girl/bg.mp4)
 
 The video is shifted down by 17% (translate-y-\[17%\]) so the top portion of the video is cropped \-- the interesting content is in the lower portion of the frame
 
@@ -2861,15 +2861,15 @@ Keep all layout, spacing, styling, animations, video behavior, glass effects, co
   }, {
     id: "pesudo-template-13",
     name: "Color Disc",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/color%20disc/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/color%20disc/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/color%20disc/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/color%20disc/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/color%20disc/bg.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -2893,7 +2893,7 @@ CSS Variables
 
 Background Video
 Full-screen background video covering the entire viewport ('absolute inset-0, object-cover'):
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/color%20disc/bg.mp4
+https://assets.framerate.space/templates/color%20disc/bg.mp4
 
 Attributes: 'autoPlay', 'muted', 'loop', 'playsInline'
 
@@ -2987,15 +2987,15 @@ That is every detail needed to reproduce the hero section exactly as built.`
   }, {
     id: "pesudo-template-14",
     name: "Planet Robot",
-    coverUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/template.jpg",
+    coverUrl: "https://assets.framerate.space/templates/planet%20robot/template.jpg",
     blocks: [
       {
-        startFrameUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/first-frame.jpg",
-        startFrameHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/first-frame.jpg"],
+        startFrameUrl: "https://assets.framerate.space/templates/planet%20robot/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/planet%20robot/first-frame.jpg"],
         endFrameUrl: "",
         endFrameHistory: [""],
-        videoUrl: "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4",
-        videoHistory: ["https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg2.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg3.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg4.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg5.mp4", "https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg6.mp4"],
+        videoUrl: "https://assets.framerate.space/templates/planet%20robot/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/planet%20robot/bg.mp4", "https://assets.framerate.space/templates/planet%20robot/bg2.mp4", "https://assets.framerate.space/templates/planet%20robot/bg3.mp4", "https://assets.framerate.space/templates/planet%20robot/bg4.mp4", "https://assets.framerate.space/templates/planet%20robot/bg5.mp4", "https://assets.framerate.space/templates/planet%20robot/bg6.mp4"],
         isGeneratingStart: false,
         isGeneratingEnd: false,
         isGeneratingVideo: false,
@@ -3062,7 +3062,7 @@ SECTION 1: HERO (Full viewport)
 
 Background: Full-bleed looping muted autoplaying video covering the entire section with object-cover
 
-Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg.mp4
+Video URL: https://assets.framerate.space/templates/planet%20robot/bg.mp4
 
 Container: max-w-\[1831px\] centered with responsive horizontal padding
 
@@ -3097,7 +3097,7 @@ SECTION 2: ABOUT / INTRO (Full viewport)
 
 Background: Full-bleed looping muted autoplaying video with object-cover
 
-Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg2.mp4
+Video URL: https://assets.framerate.space/templates/planet%20robot/bg2.mp4
 
 Container: Same max-w-\[1831px\] centered, with generous vertical padding (64px-96px responsive)
 
@@ -3143,11 +3143,11 @@ Inside each card: a square video container (pb-\[100%\] aspect ratio trick) with
 
 Video URLs:
 
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg3.mp4 (Score: 8.7/10)
+https://assets.framerate.space/templates/planet%20robot/bg3.mp4 (Score: 8.7/10)
 
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg4.mp4 (Score: 9/10)
+https://assets.framerate.space/templates/planet%20robot/bg4.mp4 (Score: 9/10)
 
-https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg5.mp4 (Score: 8.2/10)
+https://assets.framerate.space/templates/planet%20robot/bg5.mp4 (Score: 8.2/10)
 
 Each card has an overlay bar at the bottom: a liquid-glass bar with rounded-\[20px\], px-5 py-4, showing "RARITY SCORE:" label (11px, cream/70% opacity) and score value (16px). On the right side of the bar is a circular purple gradient button (48x48px, bg-gradient-to-br from-\[\#b724ff\] to-\[\#7c3aed\]) with a right-arrow chevron SVG inside, with shadow-lg shadow-purple-500/50 and hover:scale-110 transition.
 
@@ -3155,7 +3155,7 @@ SECTION 4: CTA / FINAL SECTION
 
 Background: Full-width video (NOT object-cover, instead w-full h-auto block so it displays at native aspect ratio)
 
-Video URL: https://pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev/templates/planet%20robot/bg6.mp4
+Video URL: https://assets.framerate.space/templates/planet%20robot/bg6.mp4
 
 Text Content (positioned absolute over the video):
 

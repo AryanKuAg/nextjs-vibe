@@ -286,8 +286,8 @@ export const codeAgentFunction = inngest.createFunction(
           try {
             await writeSandboxFile(sandbox, filePath, content);
             written++;
-          } catch (e) {
-            console.error(`Failed to hydrate file ${filePath}`, e);
+          } catch {
+            // Just ignore and continue.
           }
         }
       }
@@ -716,7 +716,7 @@ if (fs.existsSync('src/App.tsx')) {
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
-          } catch (e) {
+          } catch {
             // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
           }
 

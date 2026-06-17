@@ -156,7 +156,7 @@ export const ProjectForm = () => {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        const url = `/projects/${data.id}${variables.value ? "?autoSubmit=true" : ""}`;
+        const url = `/projects/${data.id}${variables.value ? "?builderAutoSubmit=true" : ""}`;
         router.push(url);
       },
       onError: (error) => {
@@ -186,6 +186,7 @@ export const ProjectForm = () => {
 
     // Persist the selected model so the dashboard uses it for auto-submit
     sessionStorage.setItem("pending_model", selectedModel);
+    sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
@@ -290,9 +291,9 @@ export const ProjectForm = () => {
                   "px-4 pt-4 ",
                   "text-sm font-onest leading-relaxed text-white font-[500]",
                   "placeholder:text-white/40 placeholder:whitespace-nowrap placeholder:text-[14px] ",
-                  "transition-colors bg-transparent placeholder:mt-1  mx-2! placeholder:font-[500]"
+                  "transition-colors bg-transparent placeholder:mt-1   placeholder:font-[500]"
                 )}
-                placeholder="Describe your background..."
+                placeholder="Describe your website..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();

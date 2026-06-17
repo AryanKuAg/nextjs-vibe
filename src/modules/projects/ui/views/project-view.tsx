@@ -64,6 +64,15 @@ export const ProjectView = ({ projectId }: Props) => {
   // Local state for UI navigation
   const [activeStageTab, setActiveStageTab] = useState<Stage>("BACKGROUND");
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("builderAutoSubmit") === "true") {
+        setActiveStageTab("SITE");
+      }
+    }
+  }, []);
+
   const emptyBlock: VideoBlock = {
     startFrameUrl: null, startFrameHistory: [],
     endFrameUrl: null, endFrameHistory: [],

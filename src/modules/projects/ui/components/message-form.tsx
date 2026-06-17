@@ -111,8 +111,22 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   });
 
   useEffect(() => {
-    if (initialPrompt && !form.getValues().value && !isFollowUp) {
-      form.setValue("value", initialPrompt, { shouldValidate: true });
+    if (typeof window !== "undefined") {
+      const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
+      if (pendingPrompt && !form.getValues().value && !isFollowUp) {
+        form.setValue("value", pendingPrompt, { shouldValidate: true });
+        sessionStorage.removeItem("pending_builder_prompt");
+      } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
+        form.setValue("value", initialPrompt, { shouldValidate: true });
+      }
+
+      const pendingImage = sessionStorage.getItem("pending_image_base64");
+      if (pendingImage) {
+        setUploadedDataUrl(pendingImage);
+        sessionStorage.removeItem("pending_image_base64");
+        sessionStorage.removeItem("pending_image_name");
+        sessionStorage.removeItem("pending_image_type");
+      }
     }
   }, [initialPrompt, form, isFollowUp]);
 

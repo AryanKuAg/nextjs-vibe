@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "pub-2c7b2ddd2cef4117b3dcb1c04704d106.r2.dev",
+        hostname: "assets.framerate.space",
       },
     ],
   },

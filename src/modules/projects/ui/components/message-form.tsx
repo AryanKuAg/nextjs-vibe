@@ -19,7 +19,7 @@ const MODELS = [
   { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
   { id: "openrouter-google/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
   { id: "openrouter-google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-  { id: "openai/gpt-oss-120b:free", label: "GPT OSS 120B (Free)" },
+  // { id: "openai/gpt-oss-120b:free", label: "GPT OSS 120B (Free)" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];

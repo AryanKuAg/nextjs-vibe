@@ -3201,4 +3201,864 @@ All text is uppercase except the Condiment cursive accents which are normal-case
       }
     ]
   },
+
+
+
+
+
+  {
+    id: "pesudo-template-15",
+    name: "Link Flow",
+    coverUrl: "https://assets.framerate.space/templates/Link%20Flow/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/Link%20Flow/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Link%20Flow/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "https://assets.framerate.space/templates/Link%20Flow/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/Link%20Flow/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Stack
+- Vite + React 18 + TypeScript
+- Tailwind CSS 3.4
+- lucide-react for icons ('LogIn', 'UserPlus', 'Play', 'Sparkles', 'Menu', 'X')
+- No Framer Motion -- all animations are CSS 'transition-*' classes
+
+Fonts (loaded in 'index.html')
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://db.onlinewebfonts.com/c/6e47ef470dd19698c911332a9b4d1cf4?family=Neue+Haas+Grotesk+Text+Pro" rel="stylesheet" />
+<link href="https://db.onlinewebfonts.com/c/dec0d9b4e22ca588dc20e1e2e09a59b5?family=Neue+Haas+Grotesk+Display+Pro+55+Roman" rel="stylesheet" />
+
+Body/root font stack (in 'index.css'):
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: 'Neue Haas Grotesk Display Pro 55 Roman', 'Neue Haas Grotesk Text Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+Video URL (CloudFront)
+https://assets.framerate.space/templates/Link%20Flow/bg.mp4
+
+Color Palette
+Token | Hex
+Dark green (text, buttons) | #1f2a1d
+Medium dark green | #2d3a2a
+Button hover | #2a3827
+Body text green | #4b5b47
+Heading primary | #336443
+Heading accent | #85AB8B
+Bottom-left text | #3d5638
+Bottom-left button bg | #3d5638, hover #2d4228
+
+Architecture
+Two files:
+1. 'BoomerangVideoBg.tsx' -- captures video frames into canvas, then plays them forward/backward in a seamless boomerang loop at 30fps (960px max capture width).
+2. 'App.tsx' -- the full hero section.
+
+'BoomerangVideoBg.tsx' (exact)
+
+import { useEffect, useRef, useState } from 'react';
+
+type Props = {
+  src: string;
+  className?: string;
+};
+
+export default function BoomerangVideoBg({ src, className }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [framesReady, setFramesReady] = useState(false);
+  const framesRef = useRef<HTMLCanvasElement[]>([]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const frames: HTMLCanvasElement[] = [];
+    let capturing = true;
+    let lastTime = -1;
+    const MAX_WIDTH = 960;
+
+    const captureFrame = () => {
+      if (!capturing || video.readyState < 2) return;
+      if (video.currentTime === lastTime) return;
+      lastTime = video.currentTime;
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return;
+
+      const scale = Math.min(1, MAX_WIDTH / vw);
+      const w = Math.round(vw * scale);
+      const h = Math.round(vh * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, w, h);
+      frames.push(canvas);
+    };
+
+    type VFCVideo = HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+    };
+    const vfcVideo = video as VFCVideo;
+    const hasVFC = typeof vfcVideo.requestVideoFrameCallback === 'function';
+
+    let rafId = 0;
+    const rafLoop = () => {
+      captureFrame();
+      if (capturing) rafId = requestAnimationFrame(rafLoop);
+    };
+
+    const vfcLoop = () => {
+      captureFrame();
+      if (capturing && vfcVideo.requestVideoFrameCallback) {
+        vfcVideo.requestVideoFrameCallback(vfcLoop);
+      }
+    };
+
+    const onEnded = () => {
+      capturing = false;
+      if (frames.length > 0) {
+        framesRef.current = frames;
+        setFramesReady(true);
+      }
+    };
+
+    const onLoaded = () => {
+      video.play().catch(() => {});
+      if (hasVFC) {
+        vfcVideo.requestVideoFrameCallback!(vfcLoop);
+      } else {
+        rafId = requestAnimationFrame(rafLoop);
+      }
+    };
+
+    video.addEventListener('loadedmetadata', onLoaded);
+    video.addEventListener('ended', onEnded);
+    if (video.readyState >= 1) onLoaded();
+
+    return () => {
+      capturing = false;
+      cancelAnimationFrame(rafId);
+      video.removeEventListener('loadedmetadata', onLoaded);
+      video.removeEventListener('ended', onEnded);
+    };
+  }, [src]);
+
+  useEffect(() => {
+    if (!framesReady) return;
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const frames = framesRef.current;
+    if (frames.length === 0) return;
+
+    const first = frames[0];
+    canvas.width = first.width;
+    canvas.height = first.height;
+
+    let index = 0;
+    let direction = 1;
+    let last = performance.now();
+    const interval = 1000 / 30;
+    let rafId = 0;
+
+    const render = (now: number) => {
+      if (now - last >= interval) {
+        last = now;
+        ctx.drawImage(frames[index], 0, 0);
+        index += direction;
+        if (index >= frames.length - 1) {
+          index = frames.length - 1;
+          direction = -1;
+        } else if (index <= 0) {
+          index = 0;
+          direction = 1;
+        }
+      }
+      rafId = requestAnimationFrame(render);
+    };
+    rafId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(rafId);
+  }, [framesReady]);
+
+  return (
+    <div className={className ?? 'absolute inset-0 w-full h-full'}>
+      <video
+        ref={videoRef}
+        src={src}
+        className="w-full h-full object-cover"
+        style={{ display: framesReady ? 'none' : 'block' }}
+        muted
+        playsInline
+        preload="auto"
+        crossOrigin="anonymous"
+      />
+      <canvas
+        ref={displayCanvasRef}
+        className="w-full h-full object-cover"
+        style={{ display: framesReady ? 'block' : 'none' }}
+      />
+    </div>
+  );
+}
+
+'App.tsx' (exact)
+
+import { useState, useEffect } from 'react';
+import { LogIn, UserPlus, Play, Sparkles, Menu, X } from 'lucide-react';
+import BoomerangVideoBg from './BoomerangVideoBg';
+
+const BG_VIDEO =
+  'https://assets.framerate.space/templates/Link%20Flow/bg.mp4';
+
+function App() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
+
+  const navLinks = [
+    { href: '#mission', label: 'Purpose' },
+    { href: '#how', label: 'The Process' },
+    { href: '#pricing', label: 'Tariffs' },
+  ];
+
+  return (
+    <section className="relative w-full min-h-screen sm:h-screen overflow-hidden">
+      <BoomerangVideoBg src={BG_VIDEO} className="absolute inset-0 w-full h-full" />
+      <nav className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 sm:py-6">
+        <div className="flex items-center gap-2 text-[#2d3a2a]">
+          <span className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight">
+            LinkFlow<sup className="text-[10px] sm:text-xs font-medium">TM</sup>
+          </span>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-1 bg-white/70 backdrop-blur-md rounded-full pl-6 pr-1 py-1 shadow-sm border border-white/60">
+          {navLinks.map((link, i) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className={'text-sm px-3 py-2 transition-colors \${
+                i === 0 ? 'font-semibold text-[#1f2a1d]' : 'font-medium text-[#4b5b47] hover:text-[#1f2a1d]'
+              }'}
+            >
+              {link.label}
+            </a>
+          ))}
+          <button className="ml-2 bg-[#1f2a1d] hover:bg-[#2a3827] text-white text-sm font-medium px-5 py-2.5 rounded-full transition-colors">
+            Try it Live
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 sm:gap-6 text-[#2d3a2a]">
+          <a href="#signup" className="hidden sm:flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity">
+            <UserPlus className="w-4 h-4" />
+            Sign Me Up!
+          </a>
+          <a href="#login" className="hidden sm:flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity">
+            <LogIn className="w-4 h-4" />
+            Enter
+          </a>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="lg:hidden relative flex items-center justify-center w-10 h-10 rounded-full bg-white/70 backdrop-blur-md border border-white/60 text-[#1f2a1d] transition-all duration-300 hover:bg-white/90"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            <Menu
+              className={'w-5 h-5 absolute transition-all duration-300 \${
+                menuOpen ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+              }'}
+            />
+            <X
+              className={'w-5 h-5 absolute transition-all duration-300 \${
+                menuOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+              }'}
+            />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile menu overlay */}
+      <div
+        className={'lg:hidden fixed inset-0 z-20 transition-opacity duration-300 \${
+          menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }'}
+        onClick={() => setMenuOpen(false)}
+      >
+        <div className="absolute inset-0 bg-[#1f2a1d]/40 backdrop-blur-sm" />
+      </div>
+
+      {/* Mobile menu drawer */}
+      <div
+        className={'lg:hidden fixed top-0 right-0 bottom-0 z-20 w-[85%] max-w-sm bg-white/95 backdrop-blur-xl shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] \${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }'}
+      >
+        <div className="flex flex-col h-full pt-24 px-8 pb-8">
+          <div className="flex flex-col gap-1">
+            {navLinks.map((link, i) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className={'text-2xl font-semibold text-[#1f2a1d] py-4 border-b border-[#1f2a1d]/10 transition-all duration-500 \${
+                  menuOpen ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
+                }'}
+                style={{ transitionDelay: menuOpen ? '\${150 + i * 70}ms' : '0ms' }}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+
+          <div
+            className={'mt-8 flex flex-col gap-4 transition-all duration-500 \${
+              menuOpen ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
+            }'}
+            style={{ transitionDelay: menuOpen ? '400ms' : '0ms' }}
+          >
+            <a href="#signup" className="flex items-center gap-2 text-sm font-medium text-[#2d3a2a] sm:hidden">
+              <UserPlus className="w-4 h-4" />
+              Sign Me Up!
+            </a>
+            <a href="#login" className="flex items-center gap-2 text-sm font-medium text-[#2d3a2a] sm:hidden">
+              <LogIn className="w-4 h-4" />
+              Enter
+            </a>
+            <button className="mt-2 bg-[#1f2a1d] hover:bg-[#2a3827] text-white text-sm font-semibold px-5 py-3 rounded-full transition-colors">
+              Try it Live
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Hero copy */}
+      <div className="relative z-10 flex flex-col items-center text-center pt-24 sm:pt-28 md:pt-32 px-4 sm:px-6">
+        <h1
+          className="font-normal leading-[0.95] text-[#336443] text-[2rem] sm:text-4xl md:text-5xl lg:text-[4.75rem] xl:text-[5.25rem] max-w-5xl"
+          style={{ fontFamily: '"Neue Haas Grotesk Display Pro 55 Roman", "Neue Haas Grotesk Text Pro", "Helvetica Neue", Helvetica, Arial, sans-serif', letterSpacing: '-0.035em' }}
+        >
+          Close the rift{' '}
+          <span className="text-[#85AB8B]">
+            linking
+            <br className="hidden sm:block" /> signals and action
+          </span>
+        </h1>
+        <p className="mt-6 sm:mt-8 text-[#4b5b47] text-sm sm:text-base md:text-lg leading-relaxed max-w-md px-2">
+          Shape scattered signals into meaningful outcomes via AI-driven workflows.
+        </p>
+      </div>
+
+      {/* Bottom-left CTA block */}
+      <div className="absolute left-4 right-4 sm:right-auto sm:left-6 md:left-10 bottom-6 sm:bottom-8 md:bottom-10 z-10 max-w-sm">
+        <div className="flex items-center gap-2 text-[#3d5638] sm:text-white/95 mb-3">
+          <Sparkles className="w-4 h-4" />
+          <span className="text-sm font-semibold sm:font-medium">
+            FluxEngine<sup className="text-[10px]">TM</sup>
+          </span>
+        </div>
+        <p className="text-[#3d5638]/90 sm:text-white/85 text-xs leading-relaxed mb-6 max-w-xs font-medium sm:font-normal">
+          LinkFlow smoothly unites your company systems, streamlining data paths between services without having to write custom scripts.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <button className="bg-[#3d5638] sm:bg-white hover:bg-[#2d4228] sm:hover:bg-white/90 text-white sm:text-[#1f2a1d] text-sm font-semibold px-5 sm:px-6 py-2.5 sm:py-3 rounded-full transition-colors shadow-sm">
+            Try it Live
+          </button>
+          <button className="text-[#3d5638] sm:text-white text-sm font-semibold sm:font-medium hover:opacity-80 transition-opacity">
+            Know More.
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom-right video link */}
+      <div className="hidden sm:flex absolute right-6 md:right-10 bottom-8 md:bottom-10 z-10 items-center gap-2 text-white/90 text-sm">
+        <button className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors">
+          <Play className="w-3 h-3 fill-white text-white ml-0.5" />
+        </button>
+        <span className="font-medium">How we build?</span>
+        <span className="text-white/60">1:35</span>
+      </div>
+    </section>
+  );
+}
+
+export default App;
+
+Animation Details (all CSS, no Framer Motion)
+
+Element | Property | Values
+Hamburger Menu/X icon swap | transition-all duration-300 | Open: Menu gets 'opacity-0 rotate-90 scale-50', X gets 'opacity-100 rotate-0 scale-100'. Closed: reverse.
+Mobile overlay backdrop | transition-opacity duration-300 | Open: 'opacity-100 pointer-events-auto'. Closed: 'opacity-0 pointer-events-none'.
+Mobile drawer slide | transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] | Open: 'translate-x-0'. Closed: 'translate-x-full'.
+Mobile nav links stagger | transition-all duration-500 | Open: 'translate-x-0 opacity-100', delay per item: '150ms + i * 70ms'. Closed: 'translate-x-8 opacity-0', delay '0ms'.
+Mobile CTA group | transition-all duration-500 | Open: 'translate-x-0 opacity-100', delay '400ms'. Closed: 'translate-x-8 opacity-0', delay '0ms'.
+Nav buttons | transition-colors | Default Tailwind duration (150ms).
+Opacity links | transition-opacity | hover:opacity-80.
+
+Key Layout/Spacing Notes
+
+- Root section: 'relative w-full min-h-screen sm:h-screen overflow-hidden'
+- Navbar padding: 'px-4 sm:px-6 md:px-10 py-4 sm:py-6'
+- Desktop pill nav: 'bg-white/70 backdrop-blur-md rounded-full pl-6 pr-1 py-1 shadow-sm border border-white/60'
+- Hero heading: 'pt-24 sm:pt-28 md:pt-32', font sizes 'text-[2rem] sm:text-4xl md:text-5xl lg:text-[4.75rem] xl:text-[5.25rem]', 'leading-[0.95]', 'letterSpacing: '-0.035em''
+- Bottom-left block: 'absolute left-4 right-4 sm:right-auto sm:left-6 md:left-10 bottom-6 sm:bottom-8 md:bottom-10'
+- Bottom-right video: 'absolute right-6 md:right-10 bottom-8 md:bottom-10'
+
+Dependencies (package.json)
+
+{
+  "dependencies": {
+    "lucide-react": "^0.344.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.2"
+  }
+}`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-16",
+    name: "Mindloop",
+    coverUrl: "https://assets.framerate.space/templates/Mindloop/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/Mindloop/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Mindloop/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "https://assets.framerate.space/templates/Mindloop/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/Mindloop/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a full-screen hero section with a background video, navbar, and centered content. Use a dark theme with all white text.\n\nBackground Video:\n\nFull-screen <video> element with autoPlay loop muted playsInline\nPositioned absolute inset-0 w-full h-full object-cover z-0\nSource URL: https://assets.framerate.space/templates/Mindloop/bg.mp4\nFont:\n\nImport Google Font: Instrument Serif (display) and Inter (body)\nAll headings use font-family: 'Instrument Serif', serif\nBody text uses Inter, sans-serif\nNavbar (relative z-10):\n\nFlex row, justify-between, px-8 py-6, max-w-7xl mx-auto\nLeft: Brand name \"Velorah®\" — text-3xl tracking-tight, white, Instrument Serif. The ® is wrapped in <sup className=\"text-xs\">\nCenter: Hidden on mobile (hidden md:flex), links: Home, Studio, About, Journal, Reach Us — text-sm text-white, gap-10, hover:opacity-80 transition-opacity\nRight: \"Begin Journey\" button with liquid-glass effect, rounded-full px-6 py-2.5 text-sm, hover:scale-[1.03]\nHero Content (relative z-10):\n\nFlex column, centered (items-center justify-center text-center), px-6 pt-32 pb-40\nH1: \"Focus in a Distracted World\" — text-5xl sm:text-7xl md:text-8xl, leading-[0.95], tracking-[-2.46px], max-w-7xl, white, Instrument Serif, animate-fade-rise\nParagraph: \"We're designing tools for deep thinkers, bold creators, and quiet rebels. Amid the chaos, we build digital spaces for sharp focus and inspired work.\" — text-base sm:text-lg, max-w-2xl mt-8 leading-relaxed, white, animate-fade-rise-delay\nCTA Button: \"Begin Journey\" — liquid-glass, rounded-full px-14 py-5 text-base, white, mt-12, hover:scale-[1.03], animate-fade-rise-delay-2\nLiquid Glass CSS (.liquid-glass):\n\n.liquid-glass {\n  background: rgba(255, 255, 255, 0.01);\n  background-blend-mode: luminosity;\n  backdrop-filter: blur(4px);\n  -webkit-backdrop-filter: blur(4px);\n  border: none;\n  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);\n  position: relative;\n  overflow: hidden;\n}\n.liquid-glass::before {\n  content: '';\n  position: absolute;\n  inset: 0;\n  border-radius: inherit;\n  padding: 1.4px;\n  background: linear-gradient(180deg,\n    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,\n    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,\n    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);\n  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);\n  -webkit-mask-composite: xor;\n  mask-composite: exclude;\n  pointer-events: none;\n}\nAnimations:\n\n@keyframes fade-rise {\n  from { opacity: 0; transform: translateY(24px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n.animate-fade-rise { animation: fade-rise 0.8s ease-out both; }\n.animate-fade-rise-delay { animation: fade-rise 0.8s ease-out 0.2s both; }\n.animate-fade-rise-delay-2 { animation: fade-rise 0.8s ease-out 0.4s both; }\nPage background: bg-black (hsl(0,0%,0%)), section is min-h-screen overflow-hidden.`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-17",
+    name: "New Era Automotive Hero",
+    coverUrl: "https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Build a full-screen automotive hero section for a car dealership/marketplace website. Use Google Fonts: Inter (400, 500, 600) and Bebas Neue.\n\nBackground:\n\nFull-viewport-height section (min 600px, max 965px) with a dark (#010101) fallback background.\n\nLooping, muted, autoplaying background video covering the entire section using object-cover. Use this video URL: https://assets.framerate.space/templates/New%20Era%20Automotive%20Hero/bg.mp4\n\nAdd a subtle top gradient overlay (260px tall, from black/30 to transparent) and a matching bottom gradient overlay (260px tall, from black/30 to transparent) for text readability.\n\nLarge decorative text:\n\nCentered horizontally, positioned about 15% from the top. Display the words \"NEW ERA\" as very large, bold, all-caps decorative typography spanning about 75% of the width (max 1073px).\n\nFill the text with a vertical linear gradient: white at 83% opacity at the top, fading to white at 12% opacity at the bottom. This text should be behind the content but above the video.\n\nTop navbar (pinned to top, full width, horizontal padding 80px on desktop):\n\nLeft: A small abstract pinwheel/spinner logo icon (28x28, white) next to the brand name \"Logoipsum\" in white, Inter font, ~24px. Hide the brand name on small screens.\n\nCenter: Navigation links — \"Home\", \"Shop\", \"Blog\", \"About Us\", \"Contact Us\" — in Inter, light gray (#EEEFF2), with -0.32px letter-spacing. Hidden on screens below lg breakpoint.\n\nRight: A \"Sign In\" text link in white (#FBFBFD), and a white rounded (8px) \"Cart\" button (48px tall) with a small shopping cart icon (18x18, dark #272835) and \"Cart\" label in Inter medium, dark text (#272835). The button has a subtle box-shadow. Hide \"Sign In\" on small screens.\n\nBottom CTA area (pinned to bottom of the section, same horizontal padding):\n\nLeft side: A paragraph in Inter, white, ~20px/30px line-height, max-width 414px: \"Choose from thousands of certified cars you can trust, transparently priced, because buying a car should feel exciting.\" Next to it, a white rounded (8px) \"Shop Now\" button (48px tall) with an arrow-right icon (18x18, dark), Inter medium text, dark text (#272835), with a light border (#EEEFF2) and subtle shadow. On small screens, stack the paragraph and button vertically.\n\nRight side: A large tagline in Bebas Neue, white, 64px on desktop (48px–60px on smaller screens), line-height 1, max-width 466px: \"Find the perfect car that fits our journey\".\n\nOn large screens, the left and right sides sit in a single row aligned to the bottom. On smaller screens they stack vertically.\n\nMake the entire section fully responsive. Use Tailwind CSS and React.`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-18",
+    name: "Orbit Engineers",
+    coverUrl: "https://assets.framerate.space/templates/Orbit%20Engineers/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/Orbit%20Engineers/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Orbit%20Engineers/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "https://assets.framerate.space/templates/Orbit%20Engineers/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/Orbit%20Engineers/bg.mp4", "https://assets.framerate.space/templates/Orbit%20Engineers/bg2.mp4", "https://assets.framerate.space/templates/Orbit%20Engineers/bg3.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Create a single-page landing page for a fictional space engineering consultancy called \"WE ARE ORBIT ENGINEERS\". The page has 3 full-screen hero sections that the user navigates between using buttons (not scroll). Use React + Tailwind CSS + framer-motion + lucide-react icons (ChevronDown, ArrowRight).\n\nFont & Color System\nFont: Inter (Google Fonts: https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap), set as font-sans in Tailwind config.\nColor scheme (HSL in CSS variables):\n--background: 210 33% 19% (dark blue-gray)\n--foreground: 0 0% 100% (white)\n--primary: 199 89% 60% (cyan accent)\n--accent: 199 89% 60% (same cyan)\nAll text is white (text-foreground). Background is irrelevant since videos cover the full viewport.\n\nBackground Videos\nThree elements are fixed, full-screen, layered behind content at -z-10. Each is autoPlay loop muted playsInline with object-cover. They crossfade using transition-opacity duration-700 — the active section's video is opacity-100, others are opacity-0.\n\nSection 0: https://assets.framerate.space/templates/Orbit%20Engineers/bg.mp4\nSection 1: https://assets.framerate.space/templates/Orbit%20Engineers/bg2.mp4\nSection 2: https://assets.framerate.space/templates/Orbit%20Engineers/bg3.mp4\n\nNavigation Bar (always visible, z-20)\nLeft: Small logo icon (8x8) + bold text stack: WE ARE / ORBIT / ENGINEERS (text-xl, font-bold, tracking-tight, line-height none, stacked with line breaks)\nCenter (hidden on mobile, hidden md:flex): Three links — Industries, Projects, Insights — uppercase, tracking-widest, text-sm, font-medium\nRight: Geographic coordinates in monospace font: 51.50732 N / -0.12765 W (text-xs, tracking-widest, uppercase, font-mono, text-right, stacked with line breaks)\nHorizontal padding: px-10, top padding: pt-8\n\nSection Transitions (framer-motion AnimatePresence mode=\"wait\")\nAll sections use cinematic framer-motion transitions:\n\nSection 0 enter: opacity: 0 → 1, scale: 1.05 → 1, blur: 10px → 0px (duration 0.8s, ease [0.22, 1, 0.36, 1])\nSection 0 exit: opacity → 0, scale → 0.92, blur → 12px, y → -60\nSection 1 & 2 enter: opacity: 0 → 1, y: 80 → 0, scale: 1.08 → 1, blur: 14px → 0px (duration 0.9s)\nSection 1 & 2 exit: opacity → 0, y → -80, scale → 0.95, blur → 10px\n\nSection 0 — Hero Landing\nLayout: Flex column, centered content\nDecorative elements: Two vertical line images positioned absolutely on left and right edges (left-10, right-10), spanning nearly full height (h-[calc(100%-3rem)])\nHeadline: \"Unlock Tactical / Excellence through Space / Engineering\" — text-2xl sm:text-3xl md:text-4xl lg:text-5xl, font-normal, letter-spacing: -3px, centered, max-w-4xl, line breaks\n\nBottom bar: Left side has a \"Scroll to explore\" button with bouncing ChevronDown icon (navigates to section 1). Right side has a small logo icon at 60% opacity.\n\nSection 1 — Mission Statement\nLayout: Responsive — stacked vertically on mobile (flex-col items-center gap-10), horizontal row on desktop (md:flex-row md:items-center md:gap-16 md:justify-between)\nLeft: Large heading \"Spatial Vision / at Your Command\" — text-4xl sm:text-5xl md:text-5xl lg:text-6xl, font-light, letter-spacing: -2px, leading-[0.95]. Animates in from x: -60 with 0.3s delay.\nCenter: CTA button — \"Begin Your Mission\" with ArrowRight icon. White background, dark text (bg-foreground text-background), rounded-full, px-8 py-4, tracking 0.25em, uppercase. Hover scales to 105%. Animates in from y: 30 with 0.4s delay.\nRight: A \"Why We Are\" label (text-xs, tracking 0.3em, uppercase) alongside 4 vertically stacked dots (first filled, rest outline — small 5w images). Animates in from x: 60 with 0.45s delay.\nBottom bar: Three elements — \"Back to top\" button (left, with rotated ChevronDown), centered tagline \"Orbital Solutions is a key strategic / consulting firm in space engineering\" (text-xs, tracking 0.25em, uppercase, animates from y: 30), and \"Next\" button (right, with bouncing ChevronDown).\n\nSection 2 — Service Detail\nLayout: Centered content with decorative vertical lines on left/right (same as section 0 but h-[calc(100%-1rem)])\nContent stack (centered, gap-6):\nSection number \"01\" — text-sm, tracking 0.3em, uppercase, 60% opacity foreground, font-mono. Animates from y: 20, delay 0.3s.\nHeading \"Operational Feasibility / Evaluation\" — text-3xl sm:text-4xl md:text-5xl lg:text-6xl, font-light, letter-spacing: -2px, leading-[1.05]. Animates from y: 40, delay 0.4s.\nDescription paragraph — \"We analyze engineering proposals against / strategic benchmarks to uncover growth paths / and highlight untapped market potential.\" — text-sm, tracking 0.15em, 70% opacity foreground, max-w-md, font-mono, leading-relaxed. Animates from y: 30, delay 0.55s.\nBottom bar: \"Back\" button (left), CTA button \"Reach Out\" with + symbol (center, same style as section 1 CTA), empty spacer div on right (w-20).\n\nKey Design Patterns\nAll navigation between sections uses useState(0) with handleNext (min +1, max 2) and handlePrev (max -1, min 0)\nThe entire page is min-h-screen with overflow-hidden\nAll interactive elements use cursor-pointer\nNavigation text uses tracking-widest uppercase consistently\nHeadlines use negative letter-spacing for a tight, architectural feel\nTechnical/data text uses font-mono\nButtons and links use hover:text-foreground/80 or hover:scale-105 transitions`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-19",
+    name: "Solar Energy Hero",
+    coverUrl: "https://assets.framerate.space/templates/Solar%20Energy%20Hero/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/Solar%20Energy%20Hero/first-frame-one.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Solar%20Energy%20Hero/first-frame-one.jpg", "https://assets.framerate.space/templates/Solar%20Energy%20Hero/first-frame-two.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "",
+        videoHistory: [],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Build a single-page React + TypeScript + Vite hero section for a solar energy brand called "reposit." The page features a fullscreen background image that transitions between a daytime (Morning) photo and a nighttime (Night) photo using a custom pull-down animation. The entire page uses vanilla CSS (no CSS modules) with Tailwind installed but only used minimally (the design is almost entirely custom CSS). Google Font "Outfit" is loaded. The icon library is lucide-react (only the Zap icon is used).
+
+---
+
+TECH STACK AND CONFIG:
+
+- Vite 5.4.2 with @vitejs/plugin-react, React 18.3.1, TypeScript 5.5.3
+- Tailwind CSS 3.4.1 via PostCSS + Autoprefixer
+- lucide-react 0.344.0
+- @supabase/supabase-js 2.57.4 (installed but unused in this page)
+- vite.config.ts: optimizeDeps.exclude includes 'lucide-react'
+- tailwind.config.js: content array is ['./index.html', './src/**/*.{js,ts,jsx,tsx}'], no theme extensions, no plugins
+- postcss.config.js: plugins are tailwindcss and autoprefixer
+
+---
+
+INDEX.HTML (verbatim):
+
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reposit Zero Electricity Bills Page</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+---
+
+IMAGES:
+
+Two images stored locally in /public/images/:
+- '/images/hero-light.webp' — the daytime/morning photo. Source URL: https://assets.framerate.space/templates/Solar%20Energy%20Hero/first-frame-one.jpg
+- '/images/hero-dark.webp' — the nighttime photo. Source URL: https://assets.framerate.space/templates/Solar%20Energy%20Hero/first-frame-two.jpg
+
+Download both at build time so they serve locally (no external fetching at runtime).
+
+---
+
+MAIN.TSX (verbatim):
+
+
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+
+
+---
+
+APP.TSX (verbatim):
+
+Single component, no router, no external state. Uses useState, useEffect, useRef from React. Imports only '{ Zap }' from lucide-react.
+
+Constants:
+- 'LIGHT_IMG = '/images/hero-light.webp''
+- 'DARK_IMG = '/images/hero-dark.webp''
+
+State:
+- 'isDark' (boolean, default 'true') — controls theme
+- 'menuOpen' (boolean, default 'false') — mobile drawer
+
+Refs:
+- 'bgFrontRef' (HTMLDivElement) — the foreground background layer
+- 'bgBackRef' (HTMLDivElement) — the blurred background layer behind it
+- 'animatingRef' (boolean) — prevents double-clicks during transition
+
+Effects:
+1. When 'isDark' changes: add/remove class 'light-theme' on 'document.body'
+2. On mount: set both bgFrontRef and bgBackRef backgroundImage to 'url(\${DARK_IMG})'
+
+Toggle logic ('toggleTheme(toDark: boolean)'):
+1. If already in target state or animating, return early
+2. Set animatingRef true
+3. Set bgBack's backgroundImage to the target image
+4. Add class 'pull-down' to bgFront (triggers the pull-down CSS animation)
+5. After 300ms timeout: set isDark state, set bgFront's backgroundImage to target image
+6. After another 30ms timeout: remove 'pull-down' class, set animatingRef false
+
+JSX structure (exact nesting):
+
+div.hero
+  div.blur-overlay.blur-overlay-top
+  div.blur-overlay.blur-overlay-bottom
+  div.hero-bg-wrapper
+    div[ref=bgBackRef].hero-bg.bg-back
+    div[ref=bgFrontRef].hero-bg.bg-front
+  nav.navbar
+    div.logo-container
+      <Zap className="logo" size={32} strokeWidth={2} />
+      span.brand-name "reposit"
+    div.nav-links (add class "active" when menuOpen)
+      a[href="#"] "How It Works"
+      a[href="#"] "Our Cases"
+      a[href="#"] "About Us"
+      a[href="#"] "Careers"
+      a[href="#"] "Resources"
+      a[href="#"] "Customers"
+      button.cta-button.drawer-cta "Get an Instant Quote"
+    button.cta-button.nav-cta "Get an Instant Quote"
+    div.hamburger (add class "active" when menuOpen, onClick toggles menuOpen)
+      span
+      span
+      span
+  div.hero-content
+    h1.hero-title
+      "$0 Electricity Bills"
+      <br/>
+      span.title-accent "for the next"
+      " 7 years"
+    div.theme-toggle
+      div.toggle-indicator [inline style: transform is 'translateX(calc(100% + 4px))' when isDark, 'translateX(0)' when light]
+      button.toggle-btn (add class "active" when !isDark), onClick => toggleTheme(false)
+        span.label "Morning"
+        span.subtext "$0 for Electricity"
+      button.toggle-btn (add class "active" when isDark), onClick => toggleTheme(true)
+        span.label "Night"
+        span.subtext "$0 for Electricity"
+    p.hero-footer
+      "Forget the energy market, weather conditions and seasons; our Smart Controller guarantees you get no electricity bill for seven years."
+
+
+---
+
+INDEX.CSS (verbatim, every rule):
+
+CSS Custom Properties on :root:
+- '--bg-light: #ffffff'
+- '--bg-dark: #000000'
+- '--text-light: #3E3424'
+- '--text-dark: #E5DEC9'
+- '--active-toggle: #f5f8ea'
+- '--transition-speed: 0.9s'
+- '--pull-easing: cubic-bezier(0.32, 0, 0.67, 0)'
+- '--return-easing: cubic-bezier(0.175, 0.885, 0.32, 1.4)'
+
+Universal reset: '* { margin:0; padding:0; box-sizing:border-box; font-family:'Outfit',sans-serif; }'
+
+body:
+- background-color: var(--bg-dark), color: var(--text-dark), overflow:hidden, transition: background-color 0.5s ease
+
+body.light-theme:
+- background-color: var(--bg-light), color: var(--text-light)
+
+.blur-overlay:
+- position:absolute, left:0, width:100%, height:10vh, z-index:2, pointer-events:none
+- backdrop-filter: blur(25px) saturate(1.5), -webkit-backdrop-filter: blur(25px) saturate(1.5)
+
+.blur-overlay-top:
+- top:0
+- mask-image: linear-gradient(to bottom, black 70%, transparent 100%)
+- -webkit-mask-image: same
+
+.blur-overlay-bottom:
+- bottom:0
+- mask-image: linear-gradient(to top, black 70%, transparent 100%)
+- -webkit-mask-image: same
+
+.hero:
+- position:relative, width:100%, height:100vh, display:flex, flex-direction:column, align-items:center, justify-content:space-between, overflow:hidden
+- background-image: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 100%)
+
+body.light-theme .hero:
+- background-image: radial-gradient(circle at center, rgba(0,0,0,0.02) 0%, transparent 100%)
+
+.hero-bg-wrapper:
+- position:absolute, top:0, left:0, width:100%, height:100%, z-index:1, overflow:hidden
+
+.hero-bg:
+- position:absolute, top:0, left:0, width:100%, height:100%
+- background-size:cover, background-position: center 40%, background-repeat:no-repeat
+- transform: scale(1.1)
+
+.bg-front:
+- z-index:2
+- transition: transform 0.5s var(--return-easing), opacity 0.5s ease
+
+.bg-back:
+- z-index:1, filter: blur(40px), transform: scale(1.2)
+
+.hero-bg::after (pseudo-element overlay):
+- content:'', position:absolute, top:0, left:0, width:100%, height:100%, pointer-events:none
+- background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%), linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.8) 100%)
+
+body.light-theme .hero-bg::after:
+- background: radial-gradient(circle at center, transparent 0%, rgba(255,255,255,0.2) 100%), linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.8) 100%)
+
+.navbar:
+- width:100%, max-width:100%, padding:24px 30px, display:flex, justify-content:space-between, align-items:center, z-index:110
+
+.hamburger:
+- display:none, flex-direction:column, gap:6px, cursor:pointer, z-index:120
+
+.hamburger span:
+- display:block, width:28px, height:2px, background:currentColor, border-radius:2px, transition:0.3s
+
+.hamburger.active span:nth-child(1): transform: translateY(8px) rotate(45deg)
+.hamburger.active span:nth-child(2): opacity:0
+.hamburger.active span:nth-child(3): transform: translateY(-8px) rotate(-45deg)
+
+.logo-container: display:flex, align-items:center, gap:12px
+
+.logo: height:32px, color:#ffffff, transition: color 0.5s ease
+body.light-theme .logo: color:#000000
+
+.brand-name: font-size:24px, font-weight:400, letter-spacing:-0.5px, color:#ffffff, transition: color 0.5s ease
+body.light-theme .brand-name: color:#000000
+
+.nav-links: display:flex, gap:32px
+.nav-links a: color:inherit, text-decoration:none, font-size:14px, font-weight:500, opacity:0.7, transition: opacity 0.3s
+.nav-links a:hover: opacity:1
+
+.cta-button: background:#ffffff, color:#000000, border:none, padding:12px 24px, border-radius:8px, font-weight:600, font-size:14px, cursor:pointer, transition: transform 0.3s, background 0.3s
+.drawer-cta: display:none
+body.light-theme .cta-button: background:#000000, color:#ffffff
+.cta-button:hover: transform: translateY(-2px), box-shadow: 0 10px 20px rgba(0,0,0,0.1)
+
+.hero-content: flex-grow:1, display:flex, flex-direction:column, align-items:center, justify-content:flex-start, text-align:center, padding:30px 20px 0, z-index:5
+
+.hero-title: font-size:56px, font-weight:500, line-height:1.0, max-width:1000px, margin-bottom:40px, letter-spacing:-1px, color:var(--text-dark), opacity:0.95
+
+.title-accent: transition: color 0.5s ease
+body:not(.light-theme) .title-accent: color:#10100F
+body.light-theme .title-accent: color:white
+body.light-theme .hero-title: color:var(--text-light), opacity:0.95
+
+.theme-toggle: background: rgba(210,198,171,0.15), backdrop-filter: blur(20px), border:none, padding:2px 1px, border-radius:8px, display:flex, gap:4px, margin-top:auto, margin-bottom:8px, position:relative
+body.light-theme .theme-toggle: background: rgba(210,198,171,0.25), border:none
+
+.toggle-btn: padding:6px 40px, border-radius:4px, border:none, background:transparent, color:#ffffff, cursor:pointer, z-index:1, transition: color 0.3s, display:flex, flex-direction:column, align-items:center, gap:4px
+.toggle-btn .label: font-weight:500, font-size:18px
+.toggle-btn .subtext: font-size:11px, opacity:0.6
+
+.toggle-indicator: position:absolute, top:2px, left:1px, width:calc(50% - 3px), height:calc(100% - 4px), background:var(--active-toggle), border-radius:4px, transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), z-index:0, box-shadow: 0 4px 12px rgba(0,0,0,0.1)
+body:not(.light-theme) .toggle-indicator: transform: translateX(calc(100% + 4px))
+
+.toggle-btn.active: color:#3E3424 !important
+.toggle-btn.active .subtext: opacity:0.8
+
+.hero-footer: max-width:600px, margin-bottom:60px, margin-top:0, color:var(--text-dark), opacity:1, font-size:16px, font-weight:300, line-height:1.6, z-index:5
+body.light-theme .hero-footer: color:var(--text-light)
+
+.pull-down: transform: translateY(20vh) scale(1.1) !important, opacity:0.8 !important, transition: transform 0.3s var(--pull-easing), opacity 0.3s ease !important
+
+@keyframes fadeIn: from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) }
+.hero-content > *: animation: fadeIn 1s ease forwards
+.hero-title: animation-delay:0.2s
+.theme-toggle: animation-delay:0.4s
+.hero-footer: animation-delay:0.6s
+
+MOBILE BREAKPOINT (@media max-width:768px):
+- .hero-title: font-size:42px, margin-bottom:30px
+- .navbar: padding:16px 20px
+- .hero-bg: background-position: center 40%, transform: scale(1.2)
+- .pull-down: transform: translateY(20vh) scale(1.2) !important
+- .nav-links: display:none, position:fixed, top:0, right:0, width:100%, height:100vh, background:var(--bg-dark), flex-direction:column, justify-content:center, align-items:center, z-index:100, gap:40px, transition: transform 0.4s cubic-bezier(0.77,0,0.175,1), transform:translateX(100%)
+- body.light-theme .nav-links: background:var(--bg-light)
+- .nav-links.active: display:flex, transform:translateX(0)
+- .nav-links a: font-size:24px, font-weight:600
+- .cta-button.nav-cta: display:none
+- .drawer-cta: display:block, width:200px, margin-top:20px, padding:16px
+- .hamburger: display:flex !important
+- .theme-toggle: flex-direction:row, width:calc(100% - 40px), max-width:400px
+- .toggle-btn: padding:12px 20px, flex:1
+
+---
+
+ANIMATION AND TRANSITION SUMMARY:
+
+1. Page load fadeIn: each hero-content child fades in with 'animation: fadeIn 1s ease forwards'. Staggered delays: title 0.2s, toggle 0.4s, footer 0.6s. Keyframes go from opacity:0 + translateY(20px) to opacity:1 + translateY(0).
+
+2. Theme toggle pull-down: When switching themes, the front background div gets class 'pull-down' which applies 'transform: translateY(20vh) scale(1.1)' with 'transition: transform 0.3s cubic-bezier(0.32, 0, 0.67, 0)' and 'opacity: 0.8'. After 300ms, the image source swaps and pull-down is removed. The return uses the bg-front's own transition: 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.4)' (overshoot/bounce easing).
+
+3. Toggle indicator slide: 'transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' — slides left/right between the two buttons with a slight overshoot.
+
+4. Body background color: 'transition: background-color 0.5s ease'
+
+5. Logo and brand name color: 'transition: color 0.5s ease'
+
+6. CTA button hover: 'transform: translateY(-2px)' with 'transition: transform 0.3s'
+
+7. Nav links opacity hover: 'transition: opacity 0.3s'
+
+8. Mobile nav drawer: 'transition: transform 0.4s cubic-bezier(0.77, 0, 0.175, 1)' from translateX(100%) to translateX(0)
+
+9. Hamburger spans: 'transition: 0.3s' for the X animation`
+      }
+    ]
+  },
+  {
+    id: "pesudo-template-20",
+    name: "Web3 EOS Hero",
+    coverUrl: "https://assets.framerate.space/templates/Web3%20EOS%20Hero/template.jpg",
+    blocks: [
+      {
+        startFrameUrl: "https://assets.framerate.space/templates/Web3%20EOS%20Hero/first-frame.jpg",
+        startFrameHistory: ["https://assets.framerate.space/templates/Web3%20EOS%20Hero/first-frame.jpg"],
+        endFrameUrl: "",
+        endFrameHistory: [],
+        videoUrl: "https://assets.framerate.space/templates/Web3%20EOS%20Hero/bg.mp4",
+        videoHistory: ["https://assets.framerate.space/templates/Web3%20EOS%20Hero/bg.mp4"],
+        isGeneratingStart: false,
+        isGeneratingEnd: false,
+        isGeneratingVideo: false,
+        startPrompt: "",
+        endPrompt: "",
+        videoPrompt: "",
+        builderPrompt: `Build a full-screen hero section for a Web3 landing page. Use the font \"General Sans\" (from Fontshare) throughout. The entire section has a pure black (#000000) background with a fullscreen looping background video (muted, autoplay, playsInline) using this URL: https://assets.framerate.space/templates/Web3%20EOS%20Hero/bg.mp4. The video is covered by a 50% black overlay (bg-black/50) for readability. All content sits on top of the video.\n\nNavbar:\n\nHorizontally spread across the top with 120px horizontal padding and 20px vertical padding.\n\nLeft side: a placeholder logo wordmark (use \"LOGOIPSUM\" or similar) in white, 187px wide and 25px tall, followed by 4 nav links spaced 30px apart: \"Get Started\", \"Developers\", \"Features\", \"Resources\". Each nav link is white, 14px, font-medium, with a small white 14px chevron-down arrow icon to the right (14px gap between label and arrow). Nav links are hidden on mobile.\n\nRight side: a \"Join Waitlist\" pill button. This button has a subtle layered construction — a fully rounded pill shape with a thin 0.6px solid white outer border, and inside that, a black-background pill with the text \"Join Waitlist\" in white, 14px, font-medium, centered with 29px horizontal and 11px vertical padding. There's also a subtle white glow/light streak effect along the top edge of the button (a blurred white-to-transparent gradient blob positioned at the top).\n\nHero Content (centered below the navbar):\n\nVertically centered in the remaining viewport space, pushed down with about 280px top padding on desktop (200px on mobile), 102px bottom padding.\n\nAll content is horizontally centered and stacked vertically with 40px gaps.\n\nBadge/pill: A small rounded pill (20px border-radius) with 10% white background and a 1px white/20% border. Inside: a tiny 4px white dot, then text reading \"Early access available from\" in white at 60% opacity, followed by \" May 1, 2026\" in solid white. Font is 13px, font-medium.\n\nHeading: Large text reading \"Web3 at the Speed of Experience\", max-width 613px, 56px on desktop / 36px on mobile, font-medium, line-height 1.28. The text has a gradient fill — a linear-gradient at ~144.5 degrees going from solid white (at ~28%) to fully transparent black (at ~115%), applied as a background-clip text effect so the text itself shows the gradient.\n\nSubtitle: Below the heading with a 24px gap. Text reads: \"Powering seamless experiences and real-time connections, EOS is the base for creators who move with purpose, leveraging resilience, speed, and scale to shape the future.\" — 15px, font-normal, white at 70% opacity, max-width 680px, centered.\n\nCTA Button: A \"Join Waitlist\" pill button similar to the navbar button but with a white background and black text instead. Same layered construction: 0.6px white outer border, white glow streak on top, and inside the white pill the text is 14px font-medium black, with 29px horizontal and 11px vertical padding.\n\nThe entire layout is responsive — nav links collapse on screens below md breakpoint, heading scales down, and padding adjusts.`
+      }
+    ]
+  },
 ].filter(t => !t.id.startsWith('hero-') && !t.id.startsWith('template-'));

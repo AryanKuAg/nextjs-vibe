@@ -13,6 +13,7 @@ const MODEL_IDS = [
   { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
   { id: "openrouter-seedance-2", label: "Seedance 2.0" },
   { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast" },
+  { id: "gcp-veo-3.1-lite", label: "Veo 3.1" },
 ] as const;
 
 type ModelId = typeof MODEL_IDS[number]["id"];

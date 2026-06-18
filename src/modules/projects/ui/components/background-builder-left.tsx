@@ -80,6 +80,7 @@ const MODELS = [
   { id: "kwaivgi/kling-v3-video", label: "Kling 3.0", emoji: "", type: "VIDEO", time: "~3 min" },
   { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO", time: "~2 min" },
   { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO", time: "~20 sec" },
+  { id: "gcp-veo-3.1-lite", label: "Veo 3.1", emoji: "", type: "VIDEO", time: "~2 min" },
   // { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO", time: "~10 sec" },
 
   // { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO", time: "~1 min" },

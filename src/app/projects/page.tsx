@@ -179,13 +179,23 @@ export default function ProjectsPage() {
             </div>
           ) : projects && projects.length > 0 ? (
             <div className="grid grid-cols-2 gap-6">
-              {(projects as { id: string; name: string; sceneImageUrls?: Array<string | { url?: string }> | null }[]).map((project) => {
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {(projects as { id: string; name: string; sceneImageUrls?: Array<string | { url?: string }> | null; prompts?: any[] | null }[]).map((project) => {
                 const thumbnails = Array.isArray(project.sceneImageUrls) ? project.sceneImageUrls : [];
                 let thumbnail: string | null = null;
                 if (thumbnails.length > 0) {
                   const lastItem = thumbnails[thumbnails.length - 1];
                   thumbnail = typeof lastItem === "string" ? lastItem : (lastItem?.url || null);
                 }
+
+                // Fallback to template image if no generated scene images
+                if (!thumbnail && Array.isArray(project.prompts) && project.prompts.length > 0) {
+                  const firstBlock = project.prompts[0];
+                  if (firstBlock?.startFrameUrl) {
+                    thumbnail = firstBlock.startFrameUrl;
+                  }
+                }
+
                 return (
                   <ProjectCard
                     key={project.id}

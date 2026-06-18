@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,47 +18,47 @@ import { ComparisonSection } from "@/modules/home/ui/components/comparison-secti
 
 // Isolated component — bypasses React hydration entirely via useEffect
 const HeroVideo = () => {
-  // const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // useEffect(() => {
-  //   const container = containerRef.current;
-  //   if (!container) return;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-  //   const video = document.createElement("video");
-  //   video.autoplay = true;
-  //   video.loop = true;
-  //   video.muted = true;
-  //   video.playsInline = true;
-  //   video.setAttribute("preload", "auto");
-  //   video.className = "w-full h-full object-cover opacity-80";
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("preload", "auto");
+    video.className = "w-full h-full object-cover ";
 
-  //   const source = document.createElement("source");
-  //   source.src = "/hero_video.mp4";
-  //   source.type = "video/mp4";
-  //   video.appendChild(source);
-  //   container.appendChild(video);
-  //   video.play().catch(() => { });
+    const source = document.createElement("source");
+    source.src = "https://assets.framerate.space/hero_bg_480p.mp4";
+    source.type = "video/mp4";
+    video.appendChild(source);
+    container.appendChild(video);
+    video.play().catch(() => { });
 
-  //   return () => { container.innerHTML = ""; };
-  // }, []);
+    return () => { container.innerHTML = ""; };
+  }, []);
 
-  // return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
+  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
 
-  return (
-    <motion.div
-      className="absolute inset-0 z-0 bg-[#0e0e0e]"
-      initial={{ opacity: 0, scale: 1.05 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="https://assets.framerate.space/Hero%20BG%20IMG.png"
-        alt="Hero Background"
-        className="w-full h-full object-cover opacity-80"
-      />
-    </motion.div>
-  );
+  // return (
+  //   <motion.div
+  //     className="absolute inset-0 z-0 bg-[#0e0e0e]"
+  //     initial={{ opacity: 0, scale: 1.05 }}
+  //     animate={{ opacity: 1, scale: 1 }}
+  //     transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+  //   >
+  //     {/* eslint-disable-next-line @next/next/no-img-element */}
+  //     <img
+  //       src="https://assets.framerate.space/Hero%20BG%20IMG.png"
+  //       alt="Hero Background"
+  //       className="w-full h-full object-cover opacity-80"
+  //     />
+  //   </motion.div>
+  // );
 };
 
 

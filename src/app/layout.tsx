@@ -50,28 +50,28 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Framerate – Build 3D Websites with AI",
-  description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
+  title: "Framerate — Build Scroll-Driven 3D Websites",
+  description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
   metadataBase: new URL("https://framerate.space"),
   openGraph: {
     type: "website",
     url: "https://framerate.space/",
-    title: "Framerate – Build 3D Websites with AI",
-    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
+    title: "Framerate — Build Scroll-Driven 3D Websites",
+    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
     siteName: "Framerate",
     images: [
       {
         url: "/social_preview.png",
         width: 2400,
         height: 1260,
-        alt: "Framerate – Build 3D Websites with AI",
+        alt: "Framerate — Build Scroll-Driven 3D Websites",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Framerate – Build 3D Websites with AI",
-    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with AI in a seamless workflow.",
+    title: "Framerate — Build Scroll-Driven 3D Websites",
+    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
     images: ["/social_preview.png"],
   },
   verification: {

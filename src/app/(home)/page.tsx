@@ -77,7 +77,7 @@ const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
     className="group block rounded-[24px] font-onest overflow-hidden relative"
   >
     <div className="relative aspect-[1280/720] w-full bg-transparent">
-      <Image src={imgSrc} alt={title} fill className="object-cover  transition-transform duration-500 group-hover:scale-105" />
+      <Image src={imgSrc} alt={`${title} - 3D scroll library template`} fill className="object-cover  transition-transform duration-500 group-hover:scale-105" />
 
       {/* Top Gradient for text readability */}
       <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
@@ -262,7 +262,7 @@ const Page = () => {
           }}
         >
           <motion.h1 variants={heroItemVariants} className="text-4xl md:text-6xl text-white font-stack-sans-notch text-center leading-[1] drop-shadow-2xl font-[700] mb-4">
-            Ship 3D websites<br />in minutes with AI
+            Ship 3D websites in minutes<br />with our 3D Scroll Library & AI
           </motion.h1>
           <motion.p variants={heroItemVariants} className="font-[500] font-onest text-white mb-8 md:mb-[40px] text-sm text-center">
             Just describe your vision and watch it turn into a live, interactive experience in few minutes.
@@ -386,7 +386,7 @@ const Page = () => {
       <FadeInSection id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
           <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you&apos;ll wish were yours</motion.h2>
-          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene we made for you.</motion.p>
+          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene built with our 3d scroll library.</motion.p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

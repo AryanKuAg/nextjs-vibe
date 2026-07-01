@@ -46,53 +46,54 @@ export default function BlogIndex() {
       <PillNavbar />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-32 pb-20">
-        <div className="flex flex-col items-center mb-16">
+        <header className="flex flex-col items-center mb-16">
           <h1 className="text-4xl md:text-5xl font-mono text-center text-white leading-[1] font-[500] mb-4">
             Framerate Blog
           </h1>
           <p className="text-center font-mono text-[#8A8A88] text-lg max-w-2xl">
             Insights on AI web design, 3D environments, and the cinematic future of the internet.
           </p>
-        </div>
+        </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => (
-            <Link
-              key={post.slug}
-              href={`/blog/${post.slug}`}
-              className="group flex flex-col bg-[#282828] rounded-[16px] overflow-hidden hover:ring-1 hover:ring-white/20 transition-all"
-            >
-              <div className="relative aspect-[16/9] w-full bg-[#1a1a1a] overflow-hidden">
-                {post.coverImage ? (
-                  <Image
-                    src={post.coverImage}
-                    alt={post.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white/20">
-                    No Image
+            <article key={post.slug} className="group flex flex-col bg-[#282828] rounded-[16px] overflow-hidden hover:ring-1 hover:ring-white/20 transition-all">
+              <Link
+                href={`/blog/${post.slug}`}
+                className="flex flex-col flex-1"
+              >
+                <div className="relative aspect-[16/9] w-full bg-[#1a1a1a] overflow-hidden">
+                  {post.coverImage ? (
+                    <Image
+                      src={post.coverImage}
+                      alt={post.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white/20">
+                      No Image
+                    </div>
+                  )}
+                </div>
+                <div className="p-6 flex flex-col flex-1">
+                  <header className="flex items-center text-xs text-[#8A8A88] mb-3 font-mono">
+                    <span>{new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+                    <span className="mx-2">•</span>
+                    <span>{post.readTime}</span>
+                  </header>
+                  <h2 className="text-xl text-white font-[500] mb-3 group-hover:text-primary transition-colors">
+                    {post.title}
+                  </h2>
+                  <p className="text-sm text-[#CCCCCC] line-clamp-3 mb-4 flex-1">
+                    {post.excerpt}
+                  </p>
+                  <div className="flex items-center text-xs text-white font-mono mt-auto">
+                    Read Article &rarr;
                   </div>
-                )}
-              </div>
-              <div className="p-6 flex flex-col flex-1">
-                <div className="flex items-center text-xs text-[#8A8A88] mb-3 font-mono">
-                  <span>{new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
-                  <span className="mx-2">•</span>
-                  <span>{post.readTime}</span>
                 </div>
-                <h2 className="text-xl text-white font-[500] mb-3 group-hover:text-primary transition-colors">
-                  {post.title}
-                </h2>
-                <p className="text-sm text-[#CCCCCC] line-clamp-3 mb-4 flex-1">
-                  {post.excerpt}
-                </p>
-                <div className="flex items-center text-xs text-white font-mono mt-auto">
-                  Read Article &rarr;
-                </div>
-              </div>
-            </Link>
+              </Link>
+            </article>
           ))}
         </div>
       </main>

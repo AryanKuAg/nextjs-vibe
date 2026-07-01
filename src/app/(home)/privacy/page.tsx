@@ -9,38 +9,61 @@ export const metadata = {
     description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
     url: "https://framerate.space/privacy",
     siteName: "Framerate",
+    images: [
+      {
+        url: "/social_preview.png",
+        width: 2400,
+        height: 1260,
+        alt: "Privacy Policy – Framerate",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Privacy Policy – Framerate",
     description: "Learn how Framerate collects, uses, and protects your personal data when you use our platform.",
+    images: ["/social_preview.png"],
   },
 };
 
 const LegalFooter = () => (
-  <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-onest gap-4">
+  <footer className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-onest gap-4">
     <span>2026 © Framerate</span>
 
-    <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-    <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-    <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
-    <Link href="/compliance" className="hover:text-white transition-colors">Compliance</Link>
-
-  </div>
+    <nav className="flex gap-4">
+      <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+      <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+      <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
+      <Link href="/compliance" className="hover:text-white transition-colors">Compliance</Link>
+    </nav>
+  </footer>
 );
 
 export default function PrivacyPage() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Privacy Policy - Framerate",
+    "url": "https://framerate.space/privacy"
+  };
+
   return (
-    <div className="min-h-screen bg-background font-onest">
+    <main className="min-h-screen bg-background font-onest">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
-        <Link href="/" className="flex items-center gap-2 mb-11">
+        <header className="mb-11">
+          <Link href="/" className="flex items-center gap-2 mb-11">
           <Image src="/logo.png" alt="Framerate" width={24} height={24} />
           <span className="text-white text-lg">Framerate</span>
         </Link>
 
-        <h1 className="text-[40px] font-[500] text-white mb-11">Privacy policy</h1>
-        <p className="text-sm text-[#CCCCCC] mb-12">Last updated: April 16, 2026</p>
+          <h1 className="text-[40px] font-[500] text-white mb-11">Privacy policy</h1>
+          <p className="text-sm text-[#CCCCCC]">Last updated: April 16, 2026</p>
+        </header>
 
         <div className="space-y-10 text-sm text-[#CCCCCC] leading-relaxed">
           <p>
@@ -146,6 +169,6 @@ export default function PrivacyPage() {
 
         <LegalFooter />
       </div>
-    </div>
+    </main>
   );
 }

@@ -237,12 +237,28 @@ const FadeInSection = ({ children, className, id }: { children: React.ReactNode,
 );
 
 const Page = () => {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Framerate",
+    "url": "https://framerate.space",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://framerate.space/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col">
+    <main className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <PillNavbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-[100vh] flex flex-col items-center justify-end pb-6 md:pb-[40px] px-4 overflow-hidden">
+      <header className="relative min-h-[100vh] flex flex-col items-center justify-end pb-6 md:pb-[40px] px-4 overflow-hidden">
         <HeroVideo />
 
         {/* Uniform dark tint overlay */}
@@ -262,7 +278,7 @@ const Page = () => {
           }}
         >
           <motion.h1 variants={heroItemVariants} className="text-4xl md:text-6xl text-white font-stack-sans-notch text-center leading-[1] drop-shadow-2xl font-[700] mb-4">
-            Ship 3D websites in minutes<br />with our 3D Scroll Library & AI
+            Ship 3D websites in minutes with AI
           </motion.h1>
           <motion.p variants={heroItemVariants} className="font-[500] font-onest text-white mb-8 md:mb-[40px] text-sm text-center">
             Just describe your vision and watch it turn into a live, interactive experience in few minutes.
@@ -271,7 +287,7 @@ const Page = () => {
             <ProjectForm />
           </motion.div>
         </motion.div>
-      </section>
+      </header>
 
 
       {/* Features Section */}
@@ -470,7 +486,7 @@ const Page = () => {
       </FadeInSection>
 
       <Footer />
-    </div>
+    </main>
   );
 };
 

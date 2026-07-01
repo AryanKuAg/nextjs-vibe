@@ -8,6 +8,7 @@ import Script from "next/script";
 import { GoogleOneTap } from "@/components/google-one-tap";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
+import { CanonicalUrl } from "@/components/canonical-url";
 
 import "./globals.css";
 
@@ -50,28 +51,28 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Framerate — Build Scroll-Driven 3D Websites",
-  description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
+  title: "Framerate — Create & Export Full 3D Websites with AI",
+  description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
   metadataBase: new URL("https://framerate.space"),
   openGraph: {
     type: "website",
     url: "https://framerate.space/",
-    title: "Framerate — Build Scroll-Driven 3D Websites",
-    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
+    title: "Framerate — Create & Export Full 3D Websites with AI",
+    description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
     siteName: "Framerate",
     images: [
       {
         url: "/social_preview.png",
         width: 2400,
         height: 1260,
-        alt: "Framerate — Build Scroll-Driven 3D Websites",
+        alt: "Framerate — Create & Export Full 3D Websites with AI",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Framerate — Build Scroll-Driven 3D Websites",
-    description: "Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.",
+    title: "Framerate — Create & Export Full 3D Websites with AI",
+    description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
     images: ["/social_preview.png"],
   },
   verification: {
@@ -104,6 +105,7 @@ export default function RootLayout({
             suppressHydrationWarning
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${onest.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
           >
+            <CanonicalUrl />
             <Script
               strategy="lazyOnload"
               src={`https://www.googletagmanager.com/gtag/js?id=G-EDJCD5QD81`}
@@ -140,6 +142,9 @@ export default function RootLayout({
                 `,
               }}
             />
+            <noscript>
+              <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID_HERE&ev=PageView&noscript=1" alt="" />
+            </noscript>
             <ThemeProvider
               attribute="class"
               defaultTheme="system"

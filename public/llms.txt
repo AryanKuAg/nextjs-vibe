@@ -1,0 +1,16 @@
+# Framerate
+
+> The fastest way to go from a text prompt to a live, production-ready 3D website. Turn ideas into stunning 3D websites instantly. Design, animate, and launch with our 3D scroll library and AI in a seamless workflow.
+
+## Core Pages
+
+- [Home](https://framerate.space/) - The main landing page for Framerate, featuring our AI 3D website builder.
+- [Pricing](https://framerate.space/pricing) - Simple, transparent pricing for our AI tools.
+- [Blog](https://framerate.space/blog) - Updates, tutorials, and insights on building 3D websites.
+
+## Legal and Compliance
+
+- [Terms of Service](https://framerate.space/terms) - Read Framerate's terms of service governing your use of our AI-powered 3D website builder.
+- [Privacy Policy](https://framerate.space/privacy) - Learn how Framerate collects, uses, and protects your personal data when you use our platform.
+- [Cookie Policy](https://framerate.space/cookies) - Information on how we use cookies to improve your experience.
+- [Compliance](https://framerate.space/compliance) - Information regarding Framerate's compliance standards.

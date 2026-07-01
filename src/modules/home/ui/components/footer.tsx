@@ -69,7 +69,7 @@ export const Footer = () => {
             </div>
 
             {/* Right: Nav columns */}
-            <div className="grid grid-cols-2 lg:grid-cols-[auto_auto_auto_auto] gap-6 md:gap-8 lg:gap-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[auto_auto_auto_auto] gap-6 md:gap-8 lg:gap-16">
               <div>
                 <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide leading-[2.85] uppercase font-[500]">Product</h4>
                 <div className="flex flex-col gap-2 items-start">
@@ -104,11 +104,9 @@ export const Footer = () => {
               </div>
 
               <div>
-                <h4 className="text-sm leading-[2.85] text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Contact & Social</h4>
+                <h4 className="text-sm leading-[2.85] text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Social</h4>
                 <div className="flex flex-col gap-2">
-                  <span className="text-sm text-white">Delhi, India</span>
-                  <a href="tel:+919560393759" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">+919560393759</a>
-                  <div className="flex gap-4 mt-2">
+                  <div className="flex gap-4">
                     <a href="https://www.facebook.com/framerate.space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Facebook"><i className="ri-facebook-circle-fill text-lg"></i></a>
                     <a href="https://twitter.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="X (Twitter)"><i className="ri-twitter-x-line text-lg"></i></a>
                     <a href="https://www.instagram.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Instagram"><i className="ri-instagram-line text-lg"></i></a>

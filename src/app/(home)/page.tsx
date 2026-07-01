@@ -237,17 +237,41 @@ const FadeInSection = ({ children, className, id }: { children: React.ReactNode,
 );
 
 const Page = () => {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Framerate",
-    "url": "https://framerate.space",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://framerate.space/?q={search_term_string}",
-      "query-input": "required name=search_term_string"
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Framerate",
+      "url": "https://framerate.space",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://framerate.space/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Framerate",
+      "url": "https://framerate.space",
+      "telephone": "+919334801895",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "123 Placeholder St",
+        "addressLocality": "City",
+        "addressRegion": "ST",
+        "postalCode": "12345",
+        "addressCountry": "US"
+      },
+      "sameAs": [
+        "https://facebook.com/placeholder",
+        "https://twitter.com/placeholder",
+        "https://instagram.com/placeholder",
+        "https://linkedin.com/company/placeholder",
+        "https://youtube.com/c/placeholder"
+      ]
     }
-  };
+  ];
 
   return (
     <main className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col">
@@ -293,7 +317,7 @@ const Page = () => {
       {/* Features Section */}
       <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How it works?</motion.h2>
+          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How our 3D website builder works</motion.h2>
           <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">From prompt to cinematic website in just three simple steps.</motion.p>
         </div>
 
@@ -348,7 +372,7 @@ const Page = () => {
       {/* Benefits Section */}
       <FadeInSection id="features" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping, not configuring</motion.h2>
+          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping 3D websites, not configuring</motion.h2>
           <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</motion.p>
         </div>
 
@@ -401,7 +425,7 @@ const Page = () => {
       {/* Real Sites Section */}
       <FadeInSection id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Sites you&apos;ll wish were yours</motion.h2>
+          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Scroll-driven 3D websites you&apos;ll wish were yours</motion.h2>
           <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene built with our 3d scroll library.</motion.p>
         </div>
 

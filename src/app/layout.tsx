@@ -105,12 +105,12 @@ export default function RootLayout({
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${onest.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
           >
             <Script
-              strategy="afterInteractive"
+              strategy="lazyOnload"
               src={`https://www.googletagmanager.com/gtag/js?id=G-EDJCD5QD81`}
             />
             <Script
               id="google-analytics"
-              strategy="afterInteractive"
+              strategy="lazyOnload"
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
@@ -121,7 +121,25 @@ export default function RootLayout({
                 `,
               }}
             />
-            <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+            <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
+            <Script
+              id="fb-pixel"
+              strategy="lazyOnload"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  !function(f,b,e,v,n,t,s)
+                  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+                  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+                  n.queue=[];t=b.createElement(e);t.async=!0;
+                  t.src=v;s=b.getElementsByTagName(e)[0];
+                  s.parentNode.insertBefore(t,s)}(window, document,'script',
+                  'https://connect.facebook.net/en_US/fbevents.js');
+                  fbq('init', 'YOUR_PIXEL_ID_HERE');
+                  fbq('track', 'PageView');
+                `,
+              }}
+            />
             <ThemeProvider
               attribute="class"
               defaultTheme="system"

@@ -56,9 +56,9 @@ export const Footer = () => {
         {/* Rounded card container */}
         <div className="rounded-[24px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8  bg-gradient-to-b from-[#282828] to-[#282828]/40">
           {/* Main grid row */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 md:gap-12 mb-6 md:mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 md:gap-24 mb-6 md:mb-10">
             {/* Left: Logo + description */}
-            <div className="max-w-[414px]">
+            <div className="max-w-lg pr-4">
               <div className="flex items-center gap-2.5 mb-[12px]">
                 <Image src="/logo.png" alt="framerate" width={32} height={32} />
                 <span className="text-white font-[700] text-[20px]" style={{ fontFamily: 'var(--font-stack-sans-notch)' }}>Framerate</span>
@@ -69,7 +69,7 @@ export const Footer = () => {
             </div>
 
             {/* Right: Nav columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-16">
+            <div className="grid grid-cols-2 lg:grid-cols-[auto_auto_auto_auto] gap-6 md:gap-8 lg:gap-16">
               <div>
                 <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide leading-[2.85] uppercase font-[500]">Product</h4>
                 <div className="flex flex-col gap-2 items-start">
@@ -100,6 +100,21 @@ export const Footer = () => {
                   <Link href="/terms" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Terms of service</Link>
                   <Link href="/privacy" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Privacy policy</Link>
                   <Link href="/cookies" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Cookie policy</Link>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm leading-[2.85] text-[#666666] mb-[10px] tracking-wide uppercase font-[500]">Contact & Social</h4>
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm text-white">Delhi, India</span>
+                  <a href="tel:+919560393759" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">+919560393759</a>
+                  <div className="flex gap-4 mt-2">
+                    <a href="https://www.facebook.com/framerate.space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Facebook"><i className="ri-facebook-circle-fill text-lg"></i></a>
+                    <a href="https://twitter.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="X (Twitter)"><i className="ri-twitter-x-line text-lg"></i></a>
+                    <a href="https://www.instagram.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Instagram"><i className="ri-instagram-line text-lg"></i></a>
+                    <a href="https://linkedin.com/company/framerate.space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="LinkedIn"><i className="ri-linkedin-fill text-lg"></i></a>
+                    <a href="https://www.youtube.com/channel/UCfrB9eKkVyu7ZT2Xdj-Amsg" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="YouTube"><i className="ri-youtube-fill text-lg"></i></a>
+                  </div>
                 </div>
               </div>
             </div>

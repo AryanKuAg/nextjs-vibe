@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
@@ -14,6 +14,11 @@ export const Footer = () => {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -120,10 +125,10 @@ export const Footer = () => {
             <span className="text-sm text-white!">© 2026 Framerate. All rights reserved.</span>
             <div className="flex items-center gap-1.5 group">
               <Link
-                href="mailto:teamframerate@gmail.com"
+                href={mounted ? "mailto:teamframerate@gmail.com" : "#"}
                 className="text-sm text-white! hover:opacity-80 transition-opacity"
               >
-                teamframerate@gmail.com
+                {mounted ? "teamframerate@gmail.com" : "Email us"}
               </Link>
               <button
                 onClick={handleCopy}

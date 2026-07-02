@@ -81,16 +81,13 @@ export const Footer = () => {
                     Dashboard
                   </button>
                   <Link href="/pricing" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Pricing</Link>
-                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Affiliate</Link>
                 </div>
               </div>
 
               <div>
                 <h4 className="text-sm text-[#666666] mb-[10px] tracking-wide uppercase leading-[2.85] font-[500]">Links</h4>
                 <div className="flex flex-col gap-2 items-start">
-                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Blog</Link>
-                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Changelog</Link>
-                  <Link href="#" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Help center</Link>
+                  <Link href="/blog" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Blog</Link>
                 </div>
               </div>
 

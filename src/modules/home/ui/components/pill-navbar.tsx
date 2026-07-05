@@ -235,7 +235,7 @@ export const PillNavbar = () => {
 
             {/* Center: Links (Desktop) */}
             <div className="hidden md:flex items-center gap-4 text-white text-sm font-[500]">
-              <Link href="/#features" onClick={(e) => handleScrollTo(e, "features")} className="">Features</Link>
+              <Link href="/blog" className="">Blog</Link>
               <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="">Templates</Link>
               <Link href="/pricing" className="">Pricing</Link>
               <Link href="mailto:teamframerate@gmail.com" className="">Contact</Link>
@@ -287,8 +287,8 @@ export const PillNavbar = () => {
           {isMobileMenuOpen && (
             <div className="md:hidden w-full bg-[#000] rounded-[20px] p-3 flex flex-col font-onest border border-[#2A2A2A] font-[500]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
               <div className="flex flex-col text-[#E0E0E0] text-[15px]">
-                <Link href="/#features" onClick={(e) => handleScrollTo(e, "features")} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
-                  Features
+                <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
+                  Blog
                 </Link>
                 <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Templates

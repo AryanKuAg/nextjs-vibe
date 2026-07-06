@@ -16,7 +16,8 @@ export const MODEL_COSTS: Record<string, number> = {
   "openrouter-google/gemini-3.5-flash": 60,
   "openrouter-google/gemini-3.1-flash-lite": 10,
   "openai/gpt-oss-120b:free": 10,
-  "gcp-veo-3.1-lite": 12
+  "gcp-veo-3.1-lite": 12,
+  "bytedance/seedance-1.5-pro": 10
 };
 
 // Follow-up prompts (when a conversation already exists)

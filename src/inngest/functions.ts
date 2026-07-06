@@ -1289,7 +1289,7 @@ export const veoGenerateFunction = inngest.createFunction(
         let base64VideoData: string | null = null;
         let finalVideoUrl: string | null = null;
 
-        if (model.includes("replicate-")) {
+        if (model.includes("replicate-") || model === "bytedance/seedance-1.5-pro") {
           const Replicate = (await import("replicate")).default;
           const replicate = new Replicate({
             auth: process.env.REPLICATE_API_KEY!,
@@ -1317,6 +1317,19 @@ export const veoGenerateFunction = inngest.createFunction(
             input.prompt_upsampling = false;
             input.disable_safety_filter = true;
 
+            if (event.data.imageUrl) {
+              input.image = event.data.imageUrl;
+            }
+            if (event.data.endImageUrl) {
+              input.last_frame_image = event.data.endImageUrl;
+            }
+          } else if (targetModel === "bytedance/seedance-1.5-pro") {
+            input.fps = 24;
+            input.duration = 4;
+            input.resolution = "720p";
+            input.aspect_ratio = "16:9";
+            input.camera_fixed = false;
+            input.generate_audio = false; // Usually it's better to default to false unless explicitly needed
             if (event.data.imageUrl) {
               input.image = event.data.imageUrl;
             }

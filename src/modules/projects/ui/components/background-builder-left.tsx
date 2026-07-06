@@ -169,7 +169,9 @@ export const BackgroundBuilderLeft = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasAutoSubmitted = useRef(false);
 
-  const AVAILABLE_MODEL = availableModels.find(m => m.id === selectedModel) || availableModels[0];
+  const AVAILABLE_MODEL = isVideo 
+    ? { id: "bytedance/seedance-1.5-pro", label: "Seedance 1.5 Pro", emoji: "", type: "VIDEO", time: "~2 min", credits: 10 }
+    : (availableModels.find(m => m.id === selectedModel) || availableModels[0]);
 
   useEffect(() => {
     setSelectedModel(availableModels[0].id);
@@ -274,7 +276,7 @@ export const BackgroundBuilderLeft = ({
   const handleSubmit = async (modelOverride?: string) => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
-    const effectiveModel = modelOverride || selectedModel;
+    const effectiveModel = isVideo ? "bytedance/seedance-1.5-pro" : (modelOverride || selectedModel);
 
     try {
       if (isVideo) {
@@ -516,37 +518,39 @@ export const BackgroundBuilderLeft = ({
                   {/* </Hint> */}
                 </>
               )}
-              <div className="relative" ref={dropdownRef}>
-                <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-white/4 text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
-                  onClick={() => setModelDropdownOpen((o) => !o)}
-                >
-                  {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
-                  <span className="whitespace-nowrap">{AVAILABLE_MODEL?.label}</span>
-                  <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
-                </div>
-
-                {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#212121] border border-[#2c2c2c] rounded-[16px] min-w-[240px] shadow-3xl flex flex-col overflow-hidden">
-                    {availableModels.map((model) => (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm  tracking-tight text-white leading-5 mb-0.5">{model.label}</span>
-                          <span className="text-xs leading-[18px]  text-[#737373]">
-                            {model.time} · {model.credits} credits
-                          </span>
-                        </div>
-                        {selectedModel === model.id && <i className="ri-check-line text-[20px] text-white" />}
-                      </button>
-                    ))}
+              {!isVideo && (
+                <div className="relative" ref={dropdownRef}>
+                  <div
+                    className="h-8 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-white/4 text-sm text-white transition-colors cursor-pointer whitespace-nowrap"
+                    onClick={() => setModelDropdownOpen((o) => !o)}
+                  >
+                    {AVAILABLE_MODEL?.emoji && <span className="text-sm">{AVAILABLE_MODEL.emoji}</span>}
+                    <span className="whitespace-nowrap">{AVAILABLE_MODEL?.label}</span>
+                    <i className="ri-arrow-down-s-line mt-0.5 text-white text-base" />
                   </div>
-                )}
-              </div>
+
+                  {modelDropdownOpen && (
+                    <div className="absolute bottom-10 left-0 z-50 bg-[#212121] border border-[#2c2c2c] rounded-[16px] min-w-[240px] shadow-3xl flex flex-col overflow-hidden">
+                      {availableModels.map((model) => (
+                        <button
+                          key={model.id}
+                          type="button"
+                          onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                          className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm  tracking-tight text-white leading-5 mb-0.5">{model.label}</span>
+                            <span className="text-xs leading-[18px]  text-[#737373]">
+                              {model.time} · {model.credits} credits
+                            </span>
+                          </div>
+                          {selectedModel === model.id && <i className="ri-check-line text-[20px] text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* {isVideo && (
                 <Hint text="Generate prompt" side="top">

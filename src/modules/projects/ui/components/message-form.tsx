@@ -15,14 +15,10 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 import { Hint } from "@/components/hint";
 
-const MODELS = [
-  { id: "openrouter-google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
-  { id: "openrouter-google/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-  { id: "openrouter-google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-  // { id: "openai/gpt-oss-120b:free", label: "GPT OSS 120B (Free)" },
-] as const;
-
-type ModelId = typeof MODELS[number]["id"];
+type ModelId = 
+  | "openrouter-google/gemini-3.1-pro-preview"
+  | "openrouter-google/gemini-3.5-flash"
+  | "openrouter-google/gemini-3.1-flash-lite";
 
 interface Props {
   projectId: string;
@@ -78,21 +74,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("openrouter-google/gemini-3.1-pro-preview");
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const SELECTED_MODEL_DATA = MODELS.find((m) => m.id === selectedModel) || MODELS[0];
+  const selectedModel: ModelId = "openrouter-google/gemini-3.1-flash-lite";
   const MODEL_CREDITS = MODEL_COSTS[selectedModel] ?? 65;
   const FOLLOW_UP_CREDITS = FOLLOW_UP_COSTS[selectedModel] ?? 10;
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -310,7 +292,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </button>
             {/* </Hint> */}
             {/* Model Selector Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+            {/* <div className="relative" ref={dropdownRef}>
               <div
                 className="h-8 px-2.5 flex items-center gap-1.5 rounded-full text-sm text-white hover:bg-white/4 transition-colors cursor-pointer"
                 onClick={() => setModelDropdownOpen((o) => !o)}
@@ -340,7 +322,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                   ))}
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Enhance prompt */}
             {/* <Hint text="Generate prompt" side="top" >

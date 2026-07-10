@@ -37,6 +37,10 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
+  extracted_zip_url: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
   css_content: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
@@ -133,7 +137,7 @@ const frameExtractionNode = async (state: typeof AgentState.State, config: any) 
   console.log("[Frame Extraction] Extracting frames...");
   const step = config.configurable?.step;
 
-  await step.invoke("extract-frames", {
+  const result = await step.invoke("extract-frames", {
     function: extractFramesFunction,
     data: {
       projectId: state.projectId,
@@ -141,7 +145,7 @@ const frameExtractionNode = async (state: typeof AgentState.State, config: any) 
     }
   });
 
-  return { next_agent: "frame_generation" };
+  return { next_agent: "frame_generation", extracted_zip_url: result.zipUrl };
 };
 
 const frameGenerationNode = async (state: typeof AgentState.State, config: any) => {
@@ -153,7 +157,7 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: any) 
     data: {
       projectId: state.projectId,
       prompt: state.current_prompt,
-      model: "replicate-nb-2",
+      model: "google/nano-banana-2-lite",
       userId: state.userId
     }
   });

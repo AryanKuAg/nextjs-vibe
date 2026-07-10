@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { Storage } from "@google-cloud/storage";
 import Replicate from "replicate";
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
@@ -17,37 +19,37 @@ export const generateFramesFunction = inngest.createFunction(
 
     const cost = MODEL_COSTS[model as string] ?? 10;
 
+    const refinedPrompt = await step.run("refine-prompt", async () => {
+      const routerModel = new ChatOpenAI({
+        modelName: "deepseek/deepseek-v4-flash",
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        configuration: {
+          baseURL: "https://openrouter.ai/api/v1",
+        },
+      });
+
+      const sysMsg = new SystemMessage(
+        "You are an expert image prompt engineer. The user will provide a prompt for building a website. " +
+        "Your job is to extract the visual elements of the request and write a highly descriptive, visually-focused prompt specifically for generating a cinematic scene or hero image. " +
+        "Focus on lighting, subject, style, color palette, and atmosphere. Do NOT include text, UI elements, buttons, or website layouts in the image prompt."
+      );
+
+      const response = await routerModel.invoke([sysMsg, new HumanMessage(prompt)]);
+      return response.content as string;
+    });
+
     const frameUrl = await step.run("generate-image", async () => {
       const replicate = new Replicate({
         auth: process.env.REPLICATE_API_KEY!,
       });
 
-      let replicateModel: `${string}/${string}` = "black-forest-labs/flux-schnell";
-      if (model === "replicate-nb-2") {
-        replicateModel = "google/nano-banana-2";
-      } else if ((model as string).includes("/")) {
-        replicateModel = model as `${string}/${string}`;
-      }
-
       const input: Record<string, unknown> = {
-        prompt,
+        prompt: refinedPrompt,
+        aspect_ratio: "16:9",
+        output_format: "png",
       };
 
-      if (model === "bytedance/seedream-4.5") {
-        input.aspect_ratio = "16:9";
-        input.size = "2K";
-      } else if (model === "replicate-nb-2") {
-        input.aspect_ratio = "16:9";
-        input.output_format = "png";
-        input.resolution = "1K";
-      } else {
-        input.go_fast = true;
-        input.num_outputs = 1;
-        input.aspect_ratio = "16:9";
-        input.output_format = "png";
-      }
-
-      const output = await replicate.run(replicateModel, { input });
+      const output = await replicate.run("google/nano-banana-2-lite", { input });
       const outputItem = Array.isArray(output) ? output[0] : output;
       let imageUrl = "";
 
@@ -99,6 +101,9 @@ export const generateFramesFunction = inngest.createFunction(
           status: "active",
         },
       });
+    });
+
+    await step.run("charge-credits", async () => {
       await consumeCredits(cost, userId);
     });
 

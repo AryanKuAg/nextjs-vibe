@@ -4,6 +4,7 @@
  */
 
 export const MODEL_COSTS: Record<string, number> = {
+  "google/nano-banana-2-lite": 4,
   "replicate-nb-2": 7,
   "bytedance/seedream-4.5": 4,
   "replicate-kling-v2.5-turbo-pro": 35,

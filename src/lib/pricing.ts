@@ -12,9 +12,8 @@ export const MODEL_COSTS: Record<string, number> = {
   "openrouter-seedance-2": 60,
   "openrouter-seedance-2-fast": 48,
   "kwaivgi/kling-v3-video": 34,
-  "openrouter-google/gemini-3.1-pro-preview": 80,
-  "openrouter-google/gemini-3.5-flash": 60,
-  "openrouter-google/gemini-3.1-flash-lite": 10,
+  "deepseek/deepseek-v4-pro": 30,
+  "deepseek/deepseek-v4-flash": 10,
   "openai/gpt-oss-120b:free": 10,
   "gcp-veo-3.1-lite": 12,
   "bytedance/seedance-1.5-pro": 10
@@ -22,8 +21,7 @@ export const MODEL_COSTS: Record<string, number> = {
 
 // Follow-up prompts (when a conversation already exists)
 export const FOLLOW_UP_COSTS: Record<string, number> = {
-  "openrouter-google/gemini-3.1-pro-preview": 30,
-  "openrouter-google/gemini-3.5-flash": 20,
-  "openrouter-google/gemini-3.1-flash-lite": 5,
+  "deepseek/deepseek-v4-pro": 10,
+  "deepseek/deepseek-v4-flash": 5,
   'openai/gpt-oss-120b:free': 5
 };

@@ -15,10 +15,9 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 import { Hint } from "@/components/hint";
 
-type ModelId = 
-  | "openrouter-google/gemini-3.1-pro-preview"
-  | "openrouter-google/gemini-3.5-flash"
-  | "openrouter-google/gemini-3.1-flash-lite";
+type ModelId =
+  | "deepseek/deepseek-v4-flash"
+  | "deepseek/deepseek-v4-pro";
 
 interface Props {
   projectId: string;
@@ -68,13 +67,20 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+const TEMPLATES = [
+  { icon: "ri-macbook-line", label: "Portfolio website" },
+  { icon: "ri-box-3-line", label: "3D product showcase" },
+  { icon: "ri-layout-masonry-line", label: "Creative agency website" },
+];
+
 export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [isAgentActive, setIsAgentActive] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const selectedModel: ModelId = "openrouter-google/gemini-3.1-flash-lite";
+  const selectedModel: ModelId = "deepseek/deepseek-v4-flash";
   const MODEL_CREDITS = MODEL_COSTS[selectedModel] ?? 65;
   const FOLLOW_UP_CREDITS = FOLLOW_UP_COSTS[selectedModel] ?? 10;
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -118,27 +124,12 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
     }
   }));
 
-  const buildSite = useMutation(trpc.projects.buildSite.mutationOptions({
+  const startAutonomousGeneration = useMutation(trpc.projects.startAutonomousGeneration.mutationOptions({
     onSuccess: () => {
       form.reset();
       setUploadedDataUrl(null);
       queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
       queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
-      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-    },
-    onError: (error) => {
-      if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
-        setShowCreditsModal(true);
-      } else {
-        toast.error(error.message, { duration: Infinity });
-      }
-    },
-  }));
-
-  const createMessage = useMutation(trpc.messages.create.mutationOptions({
-    onSuccess: () => {
-      form.reset();
-      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
       queryClient.invalidateQueries(trpc.usage.status.queryOptions());
     },
     onError: (error) => {
@@ -183,44 +174,25 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (stage === "SITE") {
-      try {
-        await buildSite.mutateAsync({
-          value: values.value,
-          projectId,
-          videoUrl: extractedZipUrl || undefined,
-          frameCount: extractedFrameCount,
-          model: selectedModel,
-          isFollowUp,
-          imageDataUrl: uploadedDataUrl ?? undefined,
-        });
-        form.setValue("value", "");
-        setUploadedDataUrl(null);
-      } catch {
-        // Error is handled in the mutation's onError callback
-      }
-    } else {
-      try {
-        await createMessage.mutateAsync({
-          value: values.value,
-          projectId,
-          stage,
-          model: selectedModel,
-        });
-        form.setValue("value", "");
-        setUploadedDataUrl(null);
-      } catch {
-        // Error is handled in the mutation's onError callback
-      }
+    try {
+      await startAutonomousGeneration.mutateAsync({
+        prompt: values.value,
+        projectId,
+        model: selectedModel,
+      });
+      form.setValue("value", "");
+      setUploadedDataUrl(null);
+    } catch {
+      // Error handled in onError
     }
   };
 
-  const isPending = createMessage.isPending || buildSite.isPending;
+  const isPending = startAutonomousGeneration.isPending;
   const promptValue = form.watch("value");
   const isButtonDisabled = isPending || (!promptValue?.trim() && !isGenerating);
 
   return (
-    <>
+    <div className="flex flex-col w-full">
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
       <input
         ref={imageInputRef}
@@ -229,16 +201,31 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
         className="hidden"
         onChange={handleImageSelect}
       />
+
+      {!isFollowUp && (
+        <div className="flex flex-col gap-2 mb-4 px-1">
+          {TEMPLATES.map((t, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => form.setValue("value", t.label, { shouldValidate: true })}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#222] hover:bg-white/5 transition-colors self-start text-sm text-white bg-transparent"
+            >
+              <i className={`${t.icon} text-[#888]`} />
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#212121] border rounded-[16px] p-3 space-y-3 relative transition-all ${isDragOver ? "border-white/30 bg-white/5" : "border-[#2c2c2c]"
-            }`}
+          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""}`}
         >
-          {/* Image preview — same style as video-builder */}
           {uploadedDataUrl && (
             <div className="relative w-fit">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -264,10 +251,10 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
               <TextareaAutosize
                 {...field}
                 disabled={isPending}
-                minRows={2}
+                minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-sm text-white outline-none resize-none min-h-[36px] placeholder:text-[#737373]"
-                placeholder="Prompt to generate website"
+                className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
+                placeholder="Describe your website..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -278,81 +265,33 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             )}
           />
 
-          <div className="flex items-center gap-x-1">
-            {/* + Image attach button — before model name */}
-            {/* <Hint text="Add photo" side="top" align="start"> */}
+          <div className="flex items-center gap-2 mt-2">
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
               disabled={isPending}
-              className="h-8 w-8 flex items-center justify-center rounded-full text-white hover:bg-white/4 transition-colors disabled:opacity-50 text-base leading-none"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
               title="Attach image"
             >
-              <i className="ri-add-line text-lg" />
+              <i className="ri-add-line" />
             </button>
-            {/* </Hint> */}
-            {/* Model Selector Dropdown */}
-            {/* <div className="relative" ref={dropdownRef}>
-              <div
-                className="h-8 px-2.5 flex items-center gap-1.5 rounded-full text-sm text-white hover:bg-white/4 transition-colors cursor-pointer"
-                onClick={() => setModelDropdownOpen((o) => !o)}
-              >
-                <span className="truncate max-w-[100px] sm:max-w-[120px]">{SELECTED_MODEL_DATA.label}</span>
-                <i className="ri-arrow-down-s-line mt-0.5 text-white flex-shrink-0" />
-              </div>
-
-              {modelDropdownOpen && (
-                <div className="absolute bottom-10 left-0 z-50 bg-[#272725] border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[200px] shadow-xl">
-                  {MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        setModelDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
-                        }`}
-                    >
-                      <div className="flex w-full items-center font-onest whitespace-nowrap">
-                        <span className="whitespace-nowrap">{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div> */}
-
-            {/* Enhance prompt */}
-            {/* <Hint text="Generate prompt" side="top" >
-              <button
-                type="button"
-                onClick={handleEnhancePrompt}
-                disabled={isEnhancing}
-                className="h-8 px-2 flex items-center justify-center rounded-full border border-[#333333] text-white hover:bg-white/5 transition-colors disabled:opacity-50"
-              >
-                {isEnhancing ? (
-                  <i className="ri-loader-4-line animate-spin text-[15px]" />
-                ) : (
-                  <i className="ri-magic-line text-[15px]" />
-                )}
-              </button>
-            </Hint> */}
+            <div
+              onClick={() => setIsAgentActive(!isAgentActive)}
+              className={`h-8 px-3 flex items-center rounded-lg border text-sm transition-colors cursor-pointer select-none ${isAgentActive
+                ? "bg-white text-black border-white"
+                : "border-[#333] text-white hover:bg-white/10"
+                }`}
+            >
+              Agent
+            </div>
 
             <div className="flex gap-2 ml-auto">
-              <div className="flex items-center gap-1 text-white">
-                <i className="ri-sparkling-2-fill text-white text-sm" />
-                <span className="text-sm font-medium">
-                  {isFollowUp ? FOLLOW_UP_CREDITS : MODEL_CREDITS}
-                </span>
-              </div>
               {isGenerating ? (
                 <button
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/12 hover:bg-white/24 text-[#fefefe] transition-all shadow-sm active:scale-95"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-white/20 hover:bg-white/30 text-[#fefefe] transition-all"
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>
@@ -360,32 +299,26 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                 <button
                   type="submit"
                   disabled
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] disabled:bg-[#666666] disabled:text-[#444] transition-all shadow-sm"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-[#333] text-[#777] transition-all"
+                >
+                  <i className="ri-arrow-up-line font-bold" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-[#fff] text-[#000] hover:bg-[#ddd] transition-all"
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />
                   ) : (
-                    <i className="ri-arrow-right-line" />
+                    <i className="ri-arrow-up-line font-bold" />
                   )}
                 </button>
-              ) : (
-                <Hint text="Generate" side="top">
-                  <button
-                    type="submit"
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#1C1C1C] hover:bg-[#cccccc] transition-all shadow-sm active:scale-95"
-                  >
-                    {isPending ? (
-                      <i className="ri-loader-4-line animate-spin inline-block" />
-                    ) : (
-                      <i className="ri-arrow-right-line" />
-                    )}
-                  </button>
-                </Hint>
               )}
             </div>
           </div>
         </form>
       </Form>
-    </>
+    </div>
   );
 };

@@ -353,7 +353,7 @@ export const codeAgentFunction = inngest.createFunction(
         files: previousFiles || (initialFiles as Record<string, string>),
       },
       {
-        messages: previousMessages,
+        messages: previousMessages as any,
       },
     );
 
@@ -513,7 +513,7 @@ export const codeAgentFunction = inngest.createFunction(
         system: PROMPT,
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -923,7 +923,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -973,11 +973,11 @@ fixPaths(process.argv[2]);
 
       let fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\n`;
       fixPrompt += `The build failed with these exact errors:\n\n${buildCheck.error}\n${brokenFilesContext}\n\n`;
-      
+
       if (attempt >= 3) {
         fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
       }
-      
+
       fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
 
       // <--- USE THE CLEAN STATE HERE AS WELL
@@ -993,14 +993,14 @@ fixPaths(process.argv[2]);
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
@@ -1254,7 +1254,7 @@ fixPaths(process.argv[2]);
     });
 
     await step.run("charge-credits", async () => {
-      const model = event.data.model || "gemini-3.1-pro-preview";
+      const model = event.data.model || "deepseek/deepseek-v4-flash";
       const cost = MODEL_COSTS[model] || 100;
       await consumeCredits(cost, event.data.userId);
     });
@@ -1505,7 +1505,7 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const source: any = { prompt };
-          
+
           if (event.data.imageUrl) {
             const imgRes = await fetch(event.data.imageUrl);
             if (imgRes.ok) {
@@ -1516,7 +1516,7 @@ export const veoGenerateFunction = inngest.createFunction(
               };
             }
           }
-          
+
           if (event.data.endImageUrl) {
             const endImgRes = await fetch(event.data.endImageUrl);
             if (endImgRes.ok) {
@@ -1541,12 +1541,12 @@ export const veoGenerateFunction = inngest.createFunction(
           });
 
           console.log(`[Video Pipeline] GCP operation created: ${operation.name}, polling...`);
-          
+
           while (!operation.done) {
             await new Promise((resolve) => setTimeout(resolve, 10000));
             if (ai.operations && ai.operations.get) {
               operation = await ai.operations.get({ operation });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } else if (typeof (ai.models as any).getVideosOperation === "function") {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               operation = await (ai.models as any).getVideosOperation({ operation });
@@ -1557,21 +1557,21 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const response = operation.response;
           if (!response || !response.generatedVideos || response.generatedVideos.length === 0) {
-             throw new Error("No videos generated by GCP Veo.");
+            throw new Error("No videos generated by GCP Veo.");
           }
 
           const videoItem = response.generatedVideos[0].video;
           if (!videoItem) throw new Error("GCP Veo did not return a valid video item.");
-          
+
           if (videoItem.videoBytes) {
-             base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
+            base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
           } else if (videoItem.uri) {
-             const videoRes = await fetch(videoItem.uri);
-             if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
-             const arrayBuffer = await videoRes.arrayBuffer();
-             base64VideoData = Buffer.from(arrayBuffer).toString("base64");
+            const videoRes = await fetch(videoItem.uri);
+            if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
+            const arrayBuffer = await videoRes.arrayBuffer();
+            base64VideoData = Buffer.from(arrayBuffer).toString("base64");
           } else {
-             throw new Error("GCP Veo did not return video bytes or uri");
+            throw new Error("GCP Veo did not return video bytes or uri");
           }
         } else {
           throw new Error(`Unsupported model: ${model}`);

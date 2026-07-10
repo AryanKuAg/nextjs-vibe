@@ -144,6 +144,13 @@ export const MessagesContainer = ({
               </div>
             </div>
           )}
+
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center min-h-[300px]">
+              {/* <h2 className="text-xl font-medium text-white mb-2">New website</h2> */}
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
       </div>

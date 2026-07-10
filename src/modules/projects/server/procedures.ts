@@ -104,7 +104,6 @@ export const projectsRouter = createTRPCRouter({
           status: "draft",
           currentStage: "SCENE",
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
-          // Only create the initial message if the user provided a prompt
           ...(input.value.trim()
             ? {
               messages: {
@@ -119,6 +118,18 @@ export const projectsRouter = createTRPCRouter({
             : {}),
         },
       });
+
+      if (input.value.trim()) {
+        await inngest.send({
+          name: "autonomous-agent/run",
+          data: {
+            prompt: input.value,
+            projectId: createdProject.id,
+            userId: ctx.auth.userId,
+            model: "deepseek/deepseek-v4-flash", // Default fallback model
+          },
+        });
+      }
 
       return createdProject;
     }),
@@ -294,16 +305,69 @@ export const projectsRouter = createTRPCRouter({
 
       return createdMessage;
     }),
+  startAutonomousGeneration: protectedProcedure
+    .input(z.object({
+      projectId: z.string().min(1),
+      prompt: z.string(),
+      model: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existingProject = await prisma.project.findUnique({
+        where: { id: input.projectId, userId: ctx.auth.userId },
+      });
+
+      if (!existingProject) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+
+      // Base initialization cost for autonomous mode
+      await checkCredits(10); 
+
+      const createdMessage = await prisma.message.create({
+        data: {
+          projectId: existingProject.id,
+          content: input.prompt,
+          role: "USER",
+          type: "RESULT",
+          stage: "SITE",
+        },
+      });
+
+      await inngest.send({
+        name: "autonomous-agent/run",
+        data: {
+          prompt: input.prompt,
+          projectId: input.projectId,
+          model: input.model,
+          userId: ctx.auth.userId,
+        },
+      });
+
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          currentStage: "SCENE",
+        },
+      });
+
+      return createdMessage;
+    }),
   cancelGeneration: protectedProcedure
     .input(z.object({
       projectId: z.string().uuid(),
     }))
     .mutation(async ({ input }) => {
-      // Stop the Inngest run
-      await inngest.send({
-        name: "code-agent/cancel",
-        data: { projectId: input.projectId }
-      });
+      // Stop the Inngest run for both v1 and v2 autonomous agents
+      await inngest.send([
+        {
+          name: "code-agent/cancel",
+          data: { projectId: input.projectId }
+        },
+        {
+          name: "autonomous-agent/cancel",
+          data: { projectId: input.projectId }
+        }
+      ]);
 
       // Inject a cancellation message to unblock the UI
       await prisma.message.create({

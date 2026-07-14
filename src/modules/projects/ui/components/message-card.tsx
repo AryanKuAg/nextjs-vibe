@@ -88,6 +88,11 @@ const FragmentCard = ({
   );
 };
 
+interface InteractiveContent {
+  text: string;
+  buttons: { label: string; action: string }[];
+}
+
 interface AssistantMessageProps {
   content: string;
   fragment: Fragment | null;
@@ -95,6 +100,9 @@ interface AssistantMessageProps {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  projectId: string;
+  pendingInteractiveAction: string | null;
+  setPendingInteractiveAction: (action: string | null) => void;
 };
 
 const AssistantMessage = ({
@@ -102,7 +110,48 @@ const AssistantMessage = ({
   fragment,
   onFragmentClick,
   type,
+  projectId,
+  pendingInteractiveAction,
+  setPendingInteractiveAction,
 }: AssistantMessageProps) => {
+  let interactiveContent: InteractiveContent | null = null;
+  if (type === "INTERACTIVE") {
+    try {
+      interactiveContent = JSON.parse(content);
+    } catch (e) {
+      console.error("Failed to parse interactive message content", e);
+    }
+  }
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleAction = async (action: string) => {
+    if (["WRITE_PROMPT", "REGENERATE"].includes(action)) {
+      if (pendingInteractiveAction === action) {
+        setPendingInteractiveAction(null);
+      } else {
+        setPendingInteractiveAction(action);
+      }
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await fetch("/api/inngest/user-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, action }),
+      });
+      setSubmitted(true);
+      setPendingInteractiveAction(null);
+    } catch (error) {
+      console.error("Failed to submit action", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className={cn(
       "flex group pl-3 pb-4 gap-2.5 items-start",
@@ -117,9 +166,41 @@ const AssistantMessage = ({
           className="shrink-0"
         />
       </div>
-      <div className="flex flex-col gap-y-4 pt-0.5">
+      <div className="flex flex-col gap-y-4 pt-0.5 w-full">
         <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-          {content || (type === "RESULT" ? "Building..." : "")}
+          {type === "INTERACTIVE" && interactiveContent ? (
+            <div className="flex flex-col gap-3">
+              <div>{interactiveContent.text}</div>
+              {!submitted ? (
+                <div className="flex flex-col gap-3 mt-1">
+                  <div className="flex flex-wrap gap-2">
+                    {interactiveContent.buttons?.map((btn, i) => {
+                      const isSelected = pendingInteractiveAction === btn.action;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleAction(btn.action)}
+                          disabled={isSubmitting}
+                          className={cn(
+                            "px-4 py-2 rounded-full text-[14px] font-medium transition-all duration-200 border",
+                            isSelected
+                              ? "bg-white text-black border-white hover:bg-gray-200" 
+                              : "bg-transparent text-white border-[#333] hover:bg-white/5"
+                          )}
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-white/50 text-xs italic mt-1">Choice submitted.</div>
+              )}
+            </div>
+          ) : (
+            content || (type === "RESULT" ? "Building..." : "")
+          )}
         </div>
         {fragment && type === "RESULT" && (
           <FragmentCard
@@ -140,6 +221,9 @@ interface MessageCardProps {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  projectId: string;
+  pendingInteractiveAction: string | null;
+  setPendingInteractiveAction: (action: string | null) => void;
 };
 
 export const MessageCard = ({
@@ -150,6 +234,9 @@ export const MessageCard = ({
   isActiveFragment,
   onFragmentClick,
   type,
+  projectId,
+  pendingInteractiveAction,
+  setPendingInteractiveAction,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -160,6 +247,9 @@ export const MessageCard = ({
         isActiveFragment={isActiveFragment}
         onFragmentClick={onFragmentClick}
         type={type}
+        projectId={projectId}
+        pendingInteractiveAction={pendingInteractiveAction}
+        setPendingInteractiveAction={setPendingInteractiveAction}
       />
     )
   }

@@ -9,9 +9,17 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
   { id: "generate-frames-agent", timeouts: { finish: "5m" } },
-  { event: "frame-generation/run" },
+  {
+    event: "frame-generation/run",
+    cancelOn: [
+      {
+        event: "autonomous-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
-    const { projectId, prompt, model, userId } = event.data;
+    const { projectId, prompt, model, userId, isDirectPrompt } = event.data;
     
     await step.run("update-stage", async () => {
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "SCENE" } });
@@ -19,7 +27,7 @@ export const generateFramesFunction = inngest.createFunction(
 
     const cost = MODEL_COSTS[model as string] ?? 10;
 
-    const refinedPrompt = await step.run("refine-prompt", async () => {
+    const refinedPrompt = isDirectPrompt ? prompt : await step.run("refine-prompt", async () => {
       const routerModel = new ChatOpenAI({
         modelName: "deepseek/deepseek-v4-flash",
         apiKey: process.env.OPENROUTER_API_KEY!,
@@ -133,7 +141,15 @@ async function getFFmpeg() {
 
 export const extractFramesFunction = inngest.createFunction(
   { id: "extract-frames-agent", timeouts: { finish: "5m" } },
-  { event: "frame-extraction/run" },
+  {
+    event: "frame-extraction/run",
+    cancelOn: [
+      {
+        event: "autonomous-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
     const { projectId, videoUrl } = event.data;
     

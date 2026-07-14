@@ -83,7 +83,8 @@ Instructions:
 
 2. UI Components & Dependencies:
    - Use raw **Radix UI Primitives** (e.g., @radix-ui/react-dialog) combined with Tailwind CSS.
-   - Use **Framer Motion** (motion) for animations.
+   - Use **Framer Motion** for animations.
+   - FRAMER MOTION CRITICAL RULE: ALWAYS import from "framer-motion", NEVER "motion/react". When defining Variants, DO NOT use inline arrays for \`ease\` (e.g. \`ease: [0.4, 0, 0.2, 1]\`) as it causes strict TS indexing errors. Use named strings like \`ease: "easeOut"\` or omit it. NEVER use \`@ts-expect-error\` during generation.
    - Use **Lucide React** for icons.
    - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`.
    - NO BRAND ICONS (FATAL ERROR): Lucide React DOES NOT CONTAIN BRAND ICONS. NEVER try to import \`Facebook\`, \`Twitter\`, \`Instagram\`, \`Linkedin\`, \`Github\`, or \`YouTube\`. This will instantly crash the app. If you need social links in a footer or contact section, you MUST use generic icons like \`Globe\`, \`Link\`, \`Mail\`, or \`MessageCircle\`.
@@ -165,7 +166,9 @@ You will be given a build error and the contents of the broken files.
 YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
 1. First, write a 1-sentence explanation of what the error is and how you will fix it. YOU MUST OUTPUT TEXT FIRST.
 2. Second, call the \`createOrUpdateFiles\` tool to apply the fix to the file.
-   - For TS2322 (Framer Motion prop errors), force it to pass by using \`// @ts-expect-error\` above the failing line.
+   - For TS2322 (Framer Motion prop errors like 'Variants'), DO NOT blindly add \`@ts-expect-error\`. Instead, fix the type (e.g., change \`ease: [0,0,0,0]\` to \`ease: "easeInOut"\`).
+   - For TS2578 (Unused '@ts-expect-error' directive), you MUST REMOVE the \`@ts-expect-error\` comment.
+   - For TS2307 (Cannot find module 'motion/react'), change the import from \`"motion/react"\` to \`"framer-motion"\`.
    - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
    - For TS2307 (Cannot find module) regarding CanvasScroll or Preloader, it means this project does NOT support those elements. You MUST completely delete the \`<CanvasScroll />\` and \`<Preloader />\` elements from the JSX and remove their imports.
    - For TS2554 (Expected 1 arguments, but got 0) on \`useRef\` hooks, add \`(null)\` as the initial value (e.g. \`useRef<number>(null)\`).

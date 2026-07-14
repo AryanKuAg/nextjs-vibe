@@ -26,6 +26,8 @@ interface Props {
   extractedFrameCount?: number;
   isGenerating?: boolean;
   initialPrompt?: string;
+  pendingInteractiveAction?: string | null;
+  setPendingInteractiveAction?: (action: string | null) => void;
 };
 
 const formSchema = z.object({
@@ -73,7 +75,7 @@ const TEMPLATES = [
   { icon: "ri-layout-masonry-line", label: "Creative agency website" },
 ];
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -84,6 +86,15 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   const MODEL_CREDITS = MODEL_COSTS[selectedModel] ?? 65;
   const FOLLOW_UP_CREDITS = FOLLOW_UP_COSTS[selectedModel] ?? 10;
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isInteractiveSubmitting, setIsInteractiveSubmitting] = useState(false);
+
+  // Focus textarea when a pending action is set
+  useEffect(() => {
+    if (pendingInteractiveAction && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [pendingInteractiveAction]);
 
   // Detect follow-up: any existing SITE-stage message means this is a follow-up prompt
   const { data: existingMessages } = useQuery({
@@ -174,11 +185,31 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (pendingInteractiveAction) {
+      setIsInteractiveSubmitting(true);
+      try {
+        await fetch("/api/inngest/user-response", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, action: pendingInteractiveAction, payload: values.value }),
+        });
+        form.setValue("value", "");
+        setPendingInteractiveAction?.(null);
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to send response");
+      } finally {
+        setIsInteractiveSubmitting(false);
+      }
+      return;
+    }
+
     try {
       await startAutonomousGeneration.mutateAsync({
         prompt: values.value,
         projectId,
         model: selectedModel,
+        isAgentMode: isAgentActive,
       });
       form.setValue("value", "");
       setUploadedDataUrl(null);
@@ -224,7 +255,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""}`}
+          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all duration-300 ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction ? "ring-1 ring-[#5b36ff] shadow-[0_0_15px_rgba(91,54,255,0.15)]" : ""}`}
         >
           {uploadedDataUrl && (
             <div className="relative w-fit">
@@ -244,17 +275,21 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
           )}
 
-          <FormField
+            <FormField
             control={form.control}
             name="value"
             render={({ field }) => (
               <TextareaAutosize
                 {...field}
-                disabled={isPending}
+                ref={(e) => {
+                  field.ref(e);
+                  textareaRef.current = e;
+                }}
+                disabled={isPending || isInteractiveSubmitting}
                 minRows={1}
                 maxRows={12}
                 className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
-                placeholder="Describe your website..."
+                placeholder={pendingInteractiveAction ? "Enter your prompt..." : "Describe your website..."}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -286,7 +321,19 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
 
             <div className="flex gap-2 ml-auto">
-              {isGenerating ? (
+              {pendingInteractiveAction ? (
+                <button
+                  type="submit"
+                  disabled={isInteractiveSubmitting || !promptValue?.trim()}
+                  className="px-4 h-8 flex items-center justify-center rounded-[8px] bg-white text-black hover:bg-gray-200 transition-all font-medium text-[13px] disabled:opacity-50"
+                >
+                  {isInteractiveSubmitting ? (
+                    <i className="ri-loader-4-line animate-spin inline-block" />
+                  ) : (
+                    "Send"
+                  )}
+                </button>
+              ) : isGenerating ? (
                 <button
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}

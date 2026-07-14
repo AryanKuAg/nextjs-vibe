@@ -35,6 +35,7 @@ export const MessagesContainer = ({
   // Track when the last user message was sent to detect stuck state
   const lastUserMessageTimestampRef = useRef<number | null>(null);
   const [isStuck, setIsStuck] = useState(false);
+  const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
@@ -125,6 +126,9 @@ export const MessagesContainer = ({
               isActiveFragment={activeFragment?.id === message.fragment?.id}
               onFragmentClick={() => setActiveFragment(message.fragment)}
               type={message.type}
+              projectId={projectId}
+              pendingInteractiveAction={pendingInteractiveAction}
+              setPendingInteractiveAction={setPendingInteractiveAction}
             />
           ))}
           {isLastMessageUser && !isStuck && <MessageLoading />}
@@ -163,6 +167,8 @@ export const MessagesContainer = ({
           extractedFrameCount={extractedFrameCount}
           isGenerating={isLastMessageUser && !isStuck}
           initialPrompt={initialPrompt}
+          pendingInteractiveAction={pendingInteractiveAction}
+          setPendingInteractiveAction={setPendingInteractiveAction}
         />
         {onBack && (
           <button

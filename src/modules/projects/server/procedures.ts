@@ -73,6 +73,7 @@ export const projectsRouter = createTRPCRouter({
     .input(
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
+        isAgentMode: z.boolean().default(false),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -127,6 +128,7 @@ export const projectsRouter = createTRPCRouter({
             projectId: createdProject.id,
             userId: ctx.auth.userId,
             model: "deepseek/deepseek-v4-flash", // Default fallback model
+            isAgentMode: input.isAgentMode,
           },
         });
       }
@@ -258,6 +260,7 @@ export const projectsRouter = createTRPCRouter({
       model: z.string().optional(),
       isFollowUp: z.boolean().optional(),
       imageDataUrl: z.string().optional(),
+      isAgentMode: z.boolean().default(false),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -293,6 +296,7 @@ export const projectsRouter = createTRPCRouter({
           model: input.model,
           userId: ctx.auth.userId,
           imageDataUrl: input.imageDataUrl,
+          isAgentMode: input.isAgentMode,
         },
       });
 
@@ -310,6 +314,7 @@ export const projectsRouter = createTRPCRouter({
       projectId: z.string().min(1),
       prompt: z.string(),
       model: z.string().optional(),
+      isAgentMode: z.boolean().default(false),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -340,6 +345,7 @@ export const projectsRouter = createTRPCRouter({
           projectId: input.projectId,
           model: input.model,
           userId: ctx.auth.userId,
+          isAgentMode: input.isAgentMode,
         },
       });
 

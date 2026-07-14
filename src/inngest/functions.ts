@@ -25,8 +25,9 @@ const checkCancellation = async (projectId: string) => {
     select: { messages: { orderBy: { createdAt: "desc" }, take: 1 } }
   });
   if (pCheck?.messages?.[0]?.content === "Generation was manually stopped.") {
-    throw new NonRetriableError("Generation was manually stopped.");
+    return true;
   }
+  return false;
 };
 
 
@@ -616,8 +617,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
       maxIter: 5,
       defaultState: state,
       router: async ({ network }) => {
-        await checkCancellation(event.data.projectId);
-        await checkCancellation(event.data.projectId);
+        if (await checkCancellation(event.data.projectId)) return;
         // If we have a summary, we are done! Return nothing to stop the loop.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
@@ -627,6 +627,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
 
     console.log('DEBUG: Running initial Creator agent...');
     const result = await initialNetwork.run(currentPrompt, { state });
+    if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
 
     finalSummary = result.state.data.summary || "";
     finalFiles = result.state.data.files;
@@ -642,7 +643,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
     let attempt = 1;
 
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      await checkCancellation(event.data.projectId);
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
       // Step A: Check the build
       const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
@@ -923,7 +924,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+        model: getModel("x-ai/grok-4.5"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -944,7 +945,7 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
-          await checkCancellation(event.data.projectId);
+          if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
           return fixerAgent;
         },
@@ -982,6 +983,7 @@ fixPaths(process.argv[2]);
 
       // <--- USE THE CLEAN STATE HERE AS WELL
       const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
 
       // Update our master state with whatever the fixer changed
       state.data.files = fixResult.state.data.files;
@@ -1272,7 +1274,15 @@ fixPaths(process.argv[2]);
 
 export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0, timeouts: { finish: "15m" } },
-  { event: "veo/generate" },
+  {
+    event: "veo/generate",
+    cancelOn: [
+      {
+        event: "autonomous-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
     const { projectId, prompt, model, userId } = event.data;
     const cost = MODEL_COSTS[model as string] || 25;

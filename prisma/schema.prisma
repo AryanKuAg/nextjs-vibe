@@ -41,6 +41,7 @@ enum MessageRole {
 enum MessageType {
   RESULT
   ERROR
+  INTERACTIVE
 }
 
 model Message {

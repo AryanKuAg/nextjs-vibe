@@ -14,6 +14,7 @@ import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
 import { Hint } from "@/components/hint";
+import { cn } from "@/lib/utils";
 
 type ModelId =
   | "deepseek/deepseek-v4-flash"
@@ -28,6 +29,7 @@ interface Props {
   initialPrompt?: string;
   pendingInteractiveAction?: string | null;
   setPendingInteractiveAction?: (action: string | null) => void;
+  setIsInteractiveSubmitted?: (v: boolean) => void;
 };
 
 const formSchema = z.object({
@@ -75,7 +77,7 @@ const TEMPLATES = [
   { icon: "ri-layout-masonry-line", label: "Creative agency website" },
 ];
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -102,6 +104,9 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
     staleTime: 30_000,
   });
   const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
+  
+  const lastMessage = existingMessages?.[(existingMessages?.length ?? 0) - 1];
+  const isWaitingForInteractive = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "INTERACTIVE";
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -195,6 +200,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
         });
         form.setValue("value", "");
         setPendingInteractiveAction?.(null);
+        setIsInteractiveSubmitted?.(true);
       } catch (error) {
         console.error(error);
         toast.error("Failed to send response");
@@ -220,7 +226,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
 
   const isPending = startAutonomousGeneration.isPending;
   const promptValue = form.watch("value");
-  const isButtonDisabled = isPending || (!promptValue?.trim() && !isGenerating);
+  const isButtonDisabled = isPending || isInteractiveSubmitting || (!promptValue?.trim() && !isGenerating);
 
   return (
     <div className="flex flex-col w-full">
@@ -275,7 +281,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             </div>
           )}
 
-            <FormField
+          <FormField
             control={form.control}
             name="value"
             render={({ field }) => (
@@ -311,34 +317,30 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
               <i className="ri-add-line" />
             </button>
             <div
-              onClick={() => setIsAgentActive(!isAgentActive)}
-              className={`h-8 px-3 flex items-center rounded-lg border text-sm transition-colors cursor-pointer select-none ${isAgentActive
-                ? "bg-white text-black border-white"
-                : "border-[#333] text-white hover:bg-white/10"
-                }`}
+              onClick={() => {
+                if (pendingInteractiveAction || isGenerating || isPending || isWaitingForInteractive) return;
+                setIsAgentActive(!isAgentActive);
+              }}
+              className={cn(
+                "h-8 px-3 flex items-center rounded-lg border text-sm transition-colors select-none",
+                isAgentActive
+                  ? "bg-white text-black border-white"
+                  : "border-[#333] text-white hover:bg-white/10",
+                (pendingInteractiveAction || isGenerating || isPending || isWaitingForInteractive)
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+              )}
             >
               Agent
             </div>
 
             <div className="flex gap-2 ml-auto">
-              {pendingInteractiveAction ? (
-                <button
-                  type="submit"
-                  disabled={isInteractiveSubmitting || !promptValue?.trim()}
-                  className="px-4 h-8 flex items-center justify-center rounded-[8px] bg-white text-black hover:bg-gray-200 transition-all font-medium text-[13px] disabled:opacity-50"
-                >
-                  {isInteractiveSubmitting ? (
-                    <i className="ri-loader-4-line animate-spin inline-block" />
-                  ) : (
-                    "Send"
-                  )}
-                </button>
-              ) : isGenerating ? (
+              {(isGenerating || (isWaitingForInteractive && !pendingInteractiveAction)) ? (
                 <button
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-white/20 hover:bg-white/30 text-[#fefefe] transition-all"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-[#fefefe] transition-all"
                 >
                   <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
                 </button>
@@ -346,14 +348,24 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
                 <button
                   type="submit"
                   disabled
-                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-[#333] text-[#777] transition-all"
+                  className={cn(
+                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    pendingInteractiveAction
+                      ? "bg-[#5b36ff] opacity-50 text-white"
+                      : "bg-[#333] text-[#777]"
+                  )}
                 >
                   <i className="ri-arrow-up-line font-bold" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="w-8 h-8 flex items-center justify-center rounded-[10px] bg-[#fff] text-[#000] hover:bg-[#ddd] transition-all"
+                  className={cn(
+                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    pendingInteractiveAction
+                      ? "bg-[#5b36ff] text-white hover:bg-[#4a2ce6]"
+                      : "bg-white text-black hover:bg-[#ddd]"
+                  )}
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />

@@ -73,6 +73,14 @@ export const AgentState = Annotation.Root({
   isDirectPrompt: Annotation<boolean>({
     reducer: (x, y) => y ?? x,
     default: () => false,
+  }),
+  interactiveMessageId: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  iteration: Annotation<number>({
+    reducer: (x, y) => y ?? x,
+    default: () => 0,
   })
 });
 
@@ -128,7 +136,7 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
     );
 
     // We use a fast, reliable model for routing
-    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const routerModel = getOpenRouterModel("google/gemini-2.5-flash");
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
@@ -141,19 +149,20 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
     return await structuredLlm.invoke([sysMsg, new HumanMessage(prompt)]);
   });
 
-  console.log("[Supervisor] Intial Route:", response.next_agent, "| Media Required:", response.mediaRequired, "| Agent Mode:", state.isAgentMode);
+  const isMediaRequired = response.mediaRequired || /background|hero|scene|cinematic|video|image|photo/i.test(state.current_prompt);
+  console.log("[Supervisor] Intial Route:", response.next_agent, "| Media Required (LLM):", response.mediaRequired, "| Media Required (Final):", isMediaRequired, "| Agent Mode:", state.isAgentMode);
   
   if (response.rejection_reason) {
     console.log("[Supervisor] Rejection reason:", response.rejection_reason);
   }
 
   // HITL Override: If media is required but agent mode is off, pause to ask the user.
-  if (response.mediaRequired && !state.isAgentMode && !state.video_url && !state.start_frame_url) {
+  if (isMediaRequired && !state.isAgentMode && !state.video_url && !state.start_frame_url) {
     response.next_agent = "ask_media_intent";
     console.log("[Supervisor] HITL Override: Routing to ask_media_intent");
   }
 
-  return { next_agent: response.next_agent, rejection_reason: response.rejection_reason ?? null, mediaRequired: response.mediaRequired };
+  return { next_agent: response.next_agent, rejection_reason: response.rejection_reason ?? null, mediaRequired: isMediaRequired };
 };
 
 const askMediaIntentNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -161,8 +170,8 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
   const step = config.configurable?.step;
   const projectId = state.projectId;
 
-  await step.run("ask-media-intent-message", async () => {
-    await prisma.message.create({
+  const message = await step.run("ask-media-intent-message", async () => {
+    return await prisma.message.create({
       data: {
         projectId,
         role: "ASSISTANT",
@@ -186,18 +195,23 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
 
   if (!userResponse) {
     // If it times out, we default to AI creation
-    return { next_agent: "frame_generation" };
+    return { next_agent: "frame_generation", interactiveMessageId: message.id };
   }
 
   const { action, payload } = userResponse.data;
   
+  if (action === "CANCEL") {
+    console.log("[Ask Media Intent] Received CANCEL action, finishing graph.");
+    return { next_agent: "finish", interactiveMessageId: message.id };
+  }
+
   if (action === "WRITE_PROMPT" && payload) {
     // The user wrote a specific prompt for the image, we override the current_prompt
     // and proceed to frame_generation
-    return { next_agent: "frame_generation", current_prompt: payload, isDirectPrompt: true };
+    return { next_agent: "frame_generation", current_prompt: payload, isDirectPrompt: true, interactiveMessageId: message.id };
   }
 
-  return { next_agent: "frame_generation" };
+  return { next_agent: "frame_generation", interactiveMessageId: message.id };
 };
 
 const frameExtractionNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -219,69 +233,115 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
   console.log("[Frame Generation] Generating frames...");
   const step = config.configurable?.step;
   const projectId = state.projectId;
+  const currentIteration = state.iteration || 0;
 
-  const result = await step.invoke("generate-frames", {
-    function: generateFramesFunction,
-    data: {
-      projectId: state.projectId,
-      prompt: state.current_prompt,
-      model: "google/nano-banana-2-lite",
-      userId: state.userId,
-      isAgentMode: state.isAgentMode,
-      isDirectPrompt: state.isDirectPrompt
-    }
-  });
+  let frameUrl = "";
+  if (process.env.NODE_ENV === "development") {
+    await step.sleep(`dev-delay-${currentIteration}`, "4s");
+    frameUrl = "https://assets.framerate.space/Hero%20BG%20IMG.png";
+  } else {
+    const result = await step.invoke(`generate-frames-${currentIteration}`, {
+      function: generateFramesFunction,
+      data: {
+        projectId: state.projectId,
+        prompt: state.current_prompt,
+        model: "google/nano-banana-2-lite",
+        userId: state.userId,
+        isAgentMode: state.isAgentMode,
+        isDirectPrompt: state.isDirectPrompt
+      }
+    });
+    frameUrl = result.frameUrl;
+  }
 
   if (!state.isAgentMode) {
-    await step.run("ask-image-approval-message", async () => {
-      await prisma.message.create({
-        data: {
-          projectId,
-          role: "ASSISTANT",
-          type: "INTERACTIVE",
-          content: JSON.stringify({
-            text: "Here is the generated scene. Are you satisfied, or should we regenerate?",
-            buttons: [
-              { label: "Animate Video", action: "ANIMATE_VIDEO" },
-              { label: "Regenerate", action: "REGENERATE" }
-            ]
-          })
-        }
+    await step.run(`ask-image-approval-message-${currentIteration}`, async () => {
+      const content = JSON.stringify({
+        iteration: currentIteration,
+        text: "Awaiting user input",
+        mediaUrl: frameUrl,
+        buttons: [
+          { label: "Use Image", action: "ANIMATE_VIDEO" },
+          { label: "Prompt Again", action: "WRITE_PROMPT" },
+          { label: "Let AI Recreate", action: "AI_CREATE" }
+        ]
       });
+
+      if (state.interactiveMessageId) {
+        await prisma.message.update({
+          where: { id: state.interactiveMessageId },
+          data: { content }
+        });
+      } else {
+        await prisma.message.create({
+          data: {
+            projectId,
+            role: "ASSISTANT",
+            type: "INTERACTIVE",
+            content
+          }
+        });
+      }
     });
 
-    const userResponse = await step.waitForEvent("wait-image-approval", {
+    const userResponse = await step.waitForEvent(`wait-image-approval-${currentIteration}`, {
       event: "project.user.response",
       timeout: "24h",
       match: "data.projectId"
     });
 
-    if (userResponse && userResponse.data.action === "REGENERATE") {
-      // Loop back to generation
-      return { next_agent: "frame_generation" };
+    if (userResponse) {
+      const { action, payload } = userResponse.data;
+      if (action === "REGENERATE" || action === "AI_CREATE") {
+        return { next_agent: "frame_generation", iteration: currentIteration + 1 };
+      }
+      if (action === "WRITE_PROMPT") {
+        return { 
+          next_agent: "frame_generation", 
+          iteration: currentIteration + 1, 
+          current_prompt: payload || state.current_prompt,
+          isDirectPrompt: true
+        };
+      }
+      if (action === "CANCEL") {
+        console.log("[Frame Generation] Received CANCEL action, finishing graph.");
+        return { next_agent: "finish" };
+      }
+      if (action === "ANIMATE_VIDEO") {
+        return { next_agent: "video_generation", start_frame_url: frameUrl };
+      }
     }
   }
 
-  return { next_agent: "video_generation", start_frame_url: result.frameUrl };
+  // If we get here, it means we timed out or received an unhandled action.
+  // We do NOT automatically proceed to video generation unless ANIMATE_VIDEO was explicitly clicked.
+  console.log("[Frame Generation] Did not receive ANIMATE_VIDEO approval. Finishing graph.");
+  return { next_agent: "finish" };
 };
 
 const videoGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   console.log("[Video Generation] Generating video...");
   const step = config.configurable?.step;
 
-  const result = await step.invoke("generate-video", {
-    function: veoGenerateFunction,
-    data: {
-      projectId: state.projectId,
-      prompt: state.current_prompt,
-      model: "replicate-kling-v2.5-turbo-pro",
-      imageUrl: state.start_frame_url,
-      endImageUrl: state.end_frame_url,
-      userId: state.userId
-    }
-  });
+  let videoUrl = "";
+  if (process.env.NODE_ENV === "development") {
+    videoUrl = "https://assets.framerate.space/hero_bg_480p.mp4";
+  } else {
+    const result = await step.invoke("generate-video", {
+      function: veoGenerateFunction,
+      data: {
+        projectId: state.projectId,
+        prompt: state.current_prompt,
+        model: "replicate-kling-v2.5-turbo-pro",
+        imageUrl: state.start_frame_url,
+        endImageUrl: state.end_frame_url,
+        userId: state.userId
+      }
+    });
+    videoUrl = result.videoUrl;
+  }
 
-  return { next_agent: "code_generation", video_url: result.videoUrl };
+  return { next_agent: "code_generation", video_url: videoUrl };
 };
 
 const codeGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -294,7 +354,7 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       projectId: state.projectId,
       value: state.current_prompt,
       videoUrl: state.video_url,
-      model: "deepseek/deepseek-v4-flash",
+      model: "google/gemini-2.5-flash",
       userId: state.userId
     }
   });
@@ -342,10 +402,16 @@ const workflow = new StateGraph(AgentState)
     reject: "reject",
     finish: END,
   })
-  .addEdge("ask_media_intent", "frame_generation")
-  .addEdge("frame_extraction", "supervisor")
-  .addEdge("frame_generation", "supervisor")
-  .addEdge("video_generation", "supervisor")
+  .addConditionalEdges("ask_media_intent", (state) => state.next_agent, {
+    finish: END,
+    frame_generation: "frame_generation",
+  })
+  .addEdge("frame_extraction", "frame_generation")
+  .addConditionalEdges("frame_generation", (state) => state.next_agent, {
+    frame_generation: "frame_generation",
+    video_generation: "video_generation",
+  })
+  .addEdge("video_generation", "code_generation")
   .addEdge("code_generation", END)
   .addEdge("reject", END);
 

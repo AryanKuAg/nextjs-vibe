@@ -36,6 +36,7 @@ export const MessagesContainer = ({
   const lastUserMessageTimestampRef = useRef<number | null>(null);
   const [isStuck, setIsStuck] = useState(false);
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
+  const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
@@ -46,6 +47,11 @@ export const MessagesContainer = ({
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
+
+  // Reset interactive submitted state when new messages arrive or content changes
+  useEffect(() => {
+    setIsInteractiveSubmitted(false);
+  }, [lastMessage?.id, lastMessage?.content]);
 
   // Track when user message arrived; detect if stuck after timeout
   useEffect(() => {
@@ -116,7 +122,7 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="pt-2 pr-1">
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <MessageCard
               key={message.id}
               content={message.content}
@@ -129,6 +135,8 @@ export const MessagesContainer = ({
               projectId={projectId}
               pendingInteractiveAction={pendingInteractiveAction}
               setPendingInteractiveAction={setPendingInteractiveAction}
+              isLastMessage={index === messages.length - 1}
+              isInteractiveSubmitted={isInteractiveSubmitted}
             />
           ))}
           {isLastMessageUser && !isStuck && <MessageLoading />}
@@ -143,7 +151,7 @@ export const MessagesContainer = ({
                   disabled={injectErrorMessage.isPending}
                   className="self-start px-3 py-1.5 rounded-[6px] bg-[#272725] border border-[#3B3B3B] text-white text-xs hover:bg-white/5 disabled:opacity-50 transition-colors"
                 >
-                  {injectErrorMessage.isPending ? "Resetting..." : "Dismiss & retry"}
+                  {injectErrorMessage.isPending ? "Restarting..." : "Restart Generation"}
                 </button>
               </div>
             </div>
@@ -155,7 +163,7 @@ export const MessagesContainer = ({
             </div>
           )}
 
-          <div ref={bottomRef} />
+          <div ref={bottomRef} className="h-4" />
         </div>
       </div>
       <div className="relative p-3 pt-1">
@@ -169,6 +177,7 @@ export const MessagesContainer = ({
           initialPrompt={initialPrompt}
           pendingInteractiveAction={pendingInteractiveAction}
           setPendingInteractiveAction={setPendingInteractiveAction}
+          setIsInteractiveSubmitted={setIsInteractiveSubmitted}
         />
         {onBack && (
           <button

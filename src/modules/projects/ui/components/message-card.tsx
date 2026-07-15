@@ -4,7 +4,38 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
+import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
+import { ShimmerMessages } from "./message-loading";
+
+const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input" }: { createdAt: Date, text?: string }) => {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    const startMs = new Date(createdAt).getTime();
+    setElapsedMs(Math.max(0, Date.now() - startMs));
+    const timerInterval = setInterval(() => {
+      setElapsedMs(Math.max(0, Date.now() - startMs));
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [createdAt]);
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  const timeString = m > 0 ? `${m}m ${s}s` : `${seconds}s`;
+
+  return (
+    <div className="flex items-center gap-2 mb-0.5">
+      <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+        {text}
+      </span>
+      <span className="text-white/40 text-[13px]">&middot;</span>
+      <span className="text-white/40 text-[13px]">{timeString}</span>
+    </div>
+  );
+};
 
 interface UserMessageProps {
   content: string;
@@ -90,6 +121,7 @@ const FragmentCard = ({
 
 interface InteractiveContent {
   text: string;
+  mediaUrl?: string;
   buttons: { label: string; action: string }[];
 }
 
@@ -103,16 +135,23 @@ interface AssistantMessageProps {
   projectId: string;
   pendingInteractiveAction: string | null;
   setPendingInteractiveAction: (action: string | null) => void;
+  onActionSubmit?: () => void;
+  isLastMessage?: boolean;
+  isInteractiveSubmitted?: boolean;
 };
 
 const AssistantMessage = ({
   content,
   fragment,
+  createdAt,
+  isActiveFragment,
   onFragmentClick,
   type,
   projectId,
   pendingInteractiveAction,
   setPendingInteractiveAction,
+  isLastMessage = false,
+  isInteractiveSubmitted = false,
 }: AssistantMessageProps) => {
   let interactiveContent: InteractiveContent | null = null;
   if (type === "INTERACTIVE") {
@@ -124,7 +163,13 @@ const AssistantMessage = ({
   }
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [localSubmitted, setLocalSubmitted] = useState(false);
+  
+  const submitted = localSubmitted || isInteractiveSubmitted;
+
+  useEffect(() => {
+    setLocalSubmitted(false);
+  }, [content]);
 
   const handleAction = async (action: string) => {
     if (["WRITE_PROMPT", "REGENERATE"].includes(action)) {
@@ -143,7 +188,7 @@ const AssistantMessage = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, action }),
       });
-      setSubmitted(true);
+      setLocalSubmitted(true);
       setPendingInteractiveAction(null);
     } catch (error) {
       console.error("Failed to submit action", error);
@@ -152,26 +197,52 @@ const AssistantMessage = ({
     }
   };
 
+  if (type === "INTERACTIVE" && interactiveContent && !submitted && !isLastMessage) {
+    return null;
+  }
+
   return (
     <div className={cn(
-      "flex group pl-3 pb-4 gap-2.5 items-start",
+      "flex group pb-4 px-3 items-start",
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
-      <div className="flex-shrink-0 mt-0.5">
-        <Image
-          src="/logo.png"
-          alt="Vibe"
-          width={24}
-          height={24}
-          className="shrink-0"
-        />
-      </div>
       <div className="flex flex-col gap-y-4 pt-0.5 w-full">
         <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
           {type === "INTERACTIVE" && interactiveContent ? (
-            <div className="flex flex-col gap-3">
-              <div>{interactiveContent.text}</div>
-              {!submitted ? (
+            (!submitted && isLastMessage) ? (
+              <div className="flex flex-col gap-3">
+                <InteractiveMessageHeader createdAt={createdAt} />
+                {interactiveContent.mediaUrl ? (
+                  <>
+                    {interactiveContent.text !== "Awaiting user input" && (
+                      <div className="text-white/60 text-[13px]">
+                        {interactiveContent.text}
+                      </div>
+                    )}
+                    <div className="w-full max-w-[500px] aspect-video rounded-xl overflow-hidden border border-[#333] bg-[#1a1a1a]">
+                      {interactiveContent.mediaUrl.endsWith(".mp4") ? (
+                        <video 
+                          src={interactiveContent.mediaUrl} 
+                          autoPlay 
+                          loop 
+                          muted 
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img 
+                          src={interactiveContent.mediaUrl} 
+                          alt="Generated scene"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  interactiveContent.text !== "Awaiting user input" && (
+                    <div>{interactiveContent.text}</div>
+                  )
+                )}
                 <div className="flex flex-col gap-3 mt-1">
                   <div className="flex flex-wrap gap-2">
                     {interactiveContent.buttons?.map((btn, i) => {
@@ -182,7 +253,7 @@ const AssistantMessage = ({
                           onClick={() => handleAction(btn.action)}
                           disabled={isSubmitting}
                           className={cn(
-                            "px-4 py-2 rounded-full text-[14px] font-medium transition-all duration-200 border",
+                            "px-2 py-1 rounded-[8px] text-[14px] font-medium transition-all duration-200 border",
                             isSelected
                               ? "bg-white text-black border-white hover:bg-gray-200" 
                               : "bg-transparent text-white border-[#333] hover:bg-white/5"
@@ -194,12 +265,20 @@ const AssistantMessage = ({
                     })}
                   </div>
                 </div>
-              ) : (
-                <div className="text-white/50 text-xs italic mt-1">Choice submitted.</div>
-              )}
-            </div>
+              </div>
+            ) : (
+              isLastMessage ? (
+                <div className="flex flex-col gap-3">
+                  <InteractiveMessageHeader createdAt={createdAt} text="Generating scene" />
+                </div>
+              ) : null
+            )
           ) : (
-            content || (type === "RESULT" ? "Building..." : "")
+            content || (type === "RESULT" ? (
+              <div className="flex flex-col gap-3">
+                <InteractiveMessageHeader createdAt={createdAt} text="Working..." />
+              </div>
+            ) : "")
           )}
         </div>
         {fragment && type === "RESULT" && (
@@ -224,6 +303,9 @@ interface MessageCardProps {
   projectId: string;
   pendingInteractiveAction: string | null;
   setPendingInteractiveAction: (action: string | null) => void;
+  onActionSubmit?: () => void;
+  isLastMessage?: boolean;
+  isInteractiveSubmitted?: boolean;
 };
 
 export const MessageCard = ({
@@ -237,6 +319,8 @@ export const MessageCard = ({
   projectId,
   pendingInteractiveAction,
   setPendingInteractiveAction,
+  isLastMessage = false,
+  isInteractiveSubmitted = false,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -250,6 +334,8 @@ export const MessageCard = ({
         projectId={projectId}
         pendingInteractiveAction={pendingInteractiveAction}
         setPendingInteractiveAction={setPendingInteractiveAction}
+        isLastMessage={isLastMessage}
+        isInteractiveSubmitted={isInteractiveSubmitted}
       />
     )
   }

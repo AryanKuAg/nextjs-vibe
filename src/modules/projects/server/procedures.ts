@@ -372,6 +372,10 @@ export const projectsRouter = createTRPCRouter({
         {
           name: "autonomous-agent/cancel",
           data: { projectId: input.projectId }
+        },
+        {
+          name: "project.user.response",
+          data: { projectId: input.projectId, action: "CANCEL", payload: null }
         }
       ]);
 

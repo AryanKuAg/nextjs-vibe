@@ -178,7 +178,7 @@ export const extractFramesFunction = inngest.createFunction(
       }
 
       const ffmpeg = await getFFmpeg();
-      let videoPath = videoPaths[0];
+      const videoPath = videoPaths[0];
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       let ffprobePath: string = require("ffprobe-static").path;

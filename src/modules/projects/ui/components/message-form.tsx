@@ -12,8 +12,6 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
-import { FOLLOW_UP_COSTS, MODEL_COSTS } from "@/lib/pricing";
-import { Hint } from "@/components/hint";
 import { cn } from "@/lib/utils";
 
 type ModelId =
@@ -76,16 +74,13 @@ const TEMPLATES = [
   { icon: "ri-layout-masonry-line", label: "Creative agency website" },
 ];
 
-export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extractedFrameCount, isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
-  const [isAgentActive, setIsAgentActive] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const selectedModel: ModelId = "deepseek/deepseek-v4-flash";
-  const MODEL_CREDITS = MODEL_COSTS[selectedModel] ?? 65;
-  const FOLLOW_UP_CREDITS = FOLLOW_UP_COSTS[selectedModel] ?? 10;
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isInteractiveSubmitting, setIsInteractiveSubmitting] = useState(false);
@@ -216,7 +211,6 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
         prompt: values.value,
         projectId,
         model: selectedModel,
-        isAgentMode: isAgentActive,
       });
       form.setValue("value", "");
       setUploadedDataUrl(null);

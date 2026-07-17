@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
-import { NonRetriableError } from "inngest";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
@@ -354,7 +353,7 @@ export const codeAgentFunction = inngest.createFunction(
         files: previousFiles || (initialFiles as Record<string, string>),
       },
       {
-        messages: previousMessages as any,
+        messages: previousMessages as Message[],
       },
     );
 
@@ -1329,7 +1328,7 @@ export const veoGenerateFunction = inngest.createFunction(
             auth: process.env.REPLICATE_API_KEY!,
           });
 
-          let targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
+          const targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
 
           const input: Record<string, unknown> = { prompt };
 

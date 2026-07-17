@@ -4,9 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
-import { formatDistanceToNow } from "date-fns";
-import Image from "next/image";
-import { ShimmerMessages } from "./message-loading";
 
 const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true }: { createdAt: Date, text?: string, showTimer?: boolean }) => {
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -152,7 +149,6 @@ const AssistantMessage = ({
   content,
   fragment,
   createdAt,
-  isActiveFragment,
   onFragmentClick,
   type,
   projectId,

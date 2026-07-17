@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
 function formatTimer(seconds: number) {
   if (seconds < 60) return `${seconds}s`;
@@ -22,7 +21,7 @@ export const ShimmerMessages = ({ text = "Working...", showTimer = false }: { te
     return () => {
       clearInterval(timerInterval);
     };
-  }, []);
+  }, [showTimer]);
 
   const timeString = formatTimer(Math.floor(elapsedMs / 1000));
 

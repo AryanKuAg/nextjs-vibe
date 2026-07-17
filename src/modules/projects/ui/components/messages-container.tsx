@@ -38,13 +38,6 @@ export const MessagesContainer = ({
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
   const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
 
-  const startAutonomousGeneration = useMutation(trpc.projects.startAutonomousGeneration.mutationOptions({
-    onSuccess: () => {
-      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
-      queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
-      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-    },
-  }));
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,

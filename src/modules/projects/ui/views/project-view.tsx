@@ -1,6 +1,5 @@
 "use client";
 
-import { toast } from "sonner";
 import Link from "next/link";
 import { Suspense, useState, useTransition, useEffect } from "react";
 import "remixicon/fonts/remixicon.css";

@@ -48,7 +48,7 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
 
       const updateIntervalMs = 500;
       // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
-      let baseFraction = type === "video" ? 0.015 : 0.05;
+      const baseFraction = type === "video" ? 0.015 : 0.05;
 
       intervalRef.current = setInterval(() => {
         setPct((prev) => {

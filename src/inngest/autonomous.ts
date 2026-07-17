@@ -209,7 +209,7 @@ const askWizard3DNode = async (state: typeof AgentState.State, config: RunnableC
   const step = config.configurable?.step;
   const projectId = state.projectId;
 
-  const message = await step.run("ask-wizard-3d-message", async () => {
+  await step.run("ask-wizard-3d-message", async () => {
     return await prisma.message.create({
       data: {
         projectId,
@@ -247,7 +247,7 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
   const step = config.configurable?.step;
   const projectId = state.projectId;
 
-  const message = await step.run("ask-wizard-build-message", async () => {
+  await step.run("ask-wizard-build-message", async () => {
     return await prisma.message.create({
       data: {
         projectId,
@@ -612,7 +612,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "You are an expert design selector. Your job is to select the most appropriate website layout template based on the user's prompt.\n" +
       "You must return the exact ID of the template that best matches the requested vibe, style, or layout.\n\n" +
       "Available Templates:\n" +
-      templates.map((t: any) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
+      templates.map((t: { id: string; description: string }) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
     );
 
     const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
@@ -624,7 +624,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
 
     const result = await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
 
-    const selectedTemplate = templates.find((t: any) => t.id === result.template_id) || templates[0];
+    const selectedTemplate = templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
     return selectedTemplate;
   });
 

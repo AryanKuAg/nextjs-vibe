@@ -48,7 +48,7 @@ export const ProjectView = ({ projectId }: Props) => {
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
   };
-  
+
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
 
@@ -99,13 +99,13 @@ export const ProjectView = ({ projectId }: Props) => {
   if (!project) return null;
 
   return (
-    <div className="h-screen bg-[#0a0a0a] relative">
+    <div className="h-screen bg-bg relative flex">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel
           defaultSize={sidebarDefaultSize}
           minSize={sidebarMinSize}
           maxSize={sidebarMaxSize}
-          className="flex flex-col min-h-0 bg-[#0a0a0a]"
+          className="flex flex-col min-h-0 bg-transparent"
         >
           <ErrorBoundary fallback={<p>Project header error</p>}>
             <Suspense fallback={<p>Loading project...</p>}>
@@ -126,12 +126,12 @@ export const ProjectView = ({ projectId }: Props) => {
           </ErrorBoundary>
         </ResizablePanel>
 
-        <ResizableHandle className="bg-[#282825]" />
+        <ResizableHandle className="w-2 bg-transparent hover:bg-white-4 transition-colors" />
 
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
           minSize={30}
-          className="bg-background relative"
+          className="bg-transparent relative flex flex-col"
         >
           <Tabs
             className="h-full flex flex-col gap-0"
@@ -139,85 +139,93 @@ export const ProjectView = ({ projectId }: Props) => {
             value={tabState}
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
-            <div className="w-full flex items-center p-2.5 gap-x-2 bg-background h-[56px] shrink-0 border-b border-[#282825]">
-              <TabsList className="h-8 p-0.5 rounded-[8px] bg-[#272725]">
-                <TabsTrigger value="preview" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-background">
-                  <i className="ri-eye-line" />
+            <div className="w-full flex items-center py-2 pr-4 gap-x-[5px] h-[52px] shrink-0">
+              <TabsList className="h-7 p-0.5 rounded-[8px] bg-white-4">
+                <TabsTrigger value="preview" className="rounded-[6px] data-[state=active]:border-transparent data-[state=active]:shadow-none data-[state=active]:bg-white-4 text-white-50 data-[state=active]:text-white transition-colors ">
+                  <i className="ri-eye-line px-1" />
                 </TabsTrigger>
-                <TabsTrigger value="code" className="rounded-[8px] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:shadow-none dark:data-[state=active]:bg-background">
-                  <i className="ri-code-line" />
+                <TabsTrigger value="code" className="rounded-[6px] data-[state=active]:border-transparent data-[state=active]:shadow-none data-[state=active]:bg-white-4 text-white-50 data-[state=active]:text-white transition-colors">
+                  <i className="ri-code-line px-1" />
                 </TabsTrigger>
               </TabsList>
-              <Button
-                className="h-8 rounded-[8px] px-2 bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
-                onClick={handleDownloadZip}
-                disabled={!activeFragment?.files || isDownloading}
-              >
-                <i className="ri-download-2-line w-4 h-4 mb-1" />
-                {isDownloading ? "Zipping..." : "Download ZIP"}
-              </Button>
-
-              {displayUrl && (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-[5px]">
+                <Button
+                  className="h-7 w-7 p-0 rounded-[8px] bg-transparent hover:bg-white-4 text-white-85 hover:text-white border border-white-4 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={() => setFragmentKey((prev) => prev + 1)}
+                  disabled={!displayUrl}
+                >
+                  <i className="ri-refresh-line text-base" />
+                </Button>
+                <Button
+                  className="h-7 w-7 p-0 rounded-[8px] bg-transparent hover:bg-white-4 text-white-85 hover:text-white border border-white-4 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={handleCopyUrl}
+                  disabled={!displayUrl}
+                >
+                  {copiedUrl ? <i className="ri-check-line text-base" /> : <i className="ri-file-copy-line text-base" />}
+                </Button>
+                {displayUrl ? (
                   <Button
-                    className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
-                    onClick={() => setFragmentKey((prev) => prev + 1)}
-                  >
-                    <i className="ri-refresh-line" />
-                  </Button>
-                  <Button
-                    className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
+                    className="h-7 w-7 p-0 rounded-[8px] bg-transparent hover:bg-white-4 text-white-85 hover:text-white border border-white-4 transition-colors"
                     asChild
                   >
                     <a href={displayUrl} target="_blank" rel="noopener noreferrer">
-                      <i className="ri-external-link-line" />
+                      <i className="ri-external-link-line text-base" />
                     </a>
                   </Button>
+                ) : (
                   <Button
-                    className="h-8 w-8 p-0 rounded-[8px] bg-background hover:bg-background border-[0.5px] border-[#3B3B3B]"
-                    onClick={handleCopyUrl}
+                    className="h-7 w-7 p-0 rounded-[8px] bg-transparent text-white-85 border border-white-4 transition-colors disabled:opacity-50"
+                    disabled
                   >
-                    {copiedUrl ? <i className="ri-check-line text-white" /> : <i className="ri-file-copy-line" />}
+                    <i className="ri-external-link-line text-base" />
                   </Button>
-                </div>
-              )}
-              
+                )}
+                <Button
+                  className="h-7 w-7 p-0 rounded-[8px] bg-transparent hover:bg-white-4 text-white-85 hover:text-white border border-white-4 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={handleDownloadZip}
+                  disabled={!activeFragment?.files || isDownloading}
+                >
+                  <i className="ri-download-2-line text-base" />
+                </Button>
+              </div>
+
               <div className="ml-auto flex items-center gap-x-1">
-                <div className="bg-[#282828] rounded-full px-3 py-2 text-sm text-white">
+                {/* <div className="bg-grey-bg rounded-full px-3 py-2 text-sm text-white">
                   <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
                   {usage ? `${Number(usage?.remainingCredits).toLocaleString("en-US")} credits` : "Loading credits..."}
                 </div>
                 {usage?.plan === "free" && (
-                  <Button asChild size="sm" className="bg-white text-[#1C1C1C] hover:bg-white">
+                  <Button asChild size="sm" className="bg-white text-black hover:bg-white-85 transition-colors">
                     <Link href="/pricing">
                       Upgrade
                     </Link>
                   </Button>
-                )}
+                )} */}
                 <UserControl />
               </div>
             </div>
 
-            <div className="flex-1 relative overflow-hidden bg-background">
-              <TabsContent value="preview" className="h-full m-0">
-                {activeFragment ? (
-                  <FragmentWeb key={`${activeFragment.id}-${fragmentKey}`} data={activeFragment} />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                    <h2 className="text-sm text-white mb-1">Build site</h2>
-                    <p className="text-sm text-[#737373] leading-relaxed">
-                      Your website preview will appear here
-                    </p>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="code" className="h-full m-0">
-                {!!activeFragment?.files && (
-                  <FileExplorer
-                    files={activeFragment.files as { [path: string]: string }}
-                  />
-                )}
-              </TabsContent>
+            <div className="flex-1 w-full pb-3 pr-3">
+              <div className="h-full w-full flex flex-col bg-bg border border-white-8 rounded-[12px] overflow-hidden relative">
+                <TabsContent value="preview" className="h-full m-0">
+                  {activeFragment ? (
+                    <FragmentWeb key={`${activeFragment.id}-${fragmentKey}`} data={activeFragment} />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <p className="text-sm text-white-50 leading-relaxed">
+                        Your website will preview here
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+                <TabsContent value="code" className="h-full m-0">
+                  {!!activeFragment?.files && (
+                    <FileExplorer
+                      files={activeFragment.files as { [path: string]: string }}
+                    />
+                  )}
+                </TabsContent>
+              </div>
             </div>
           </Tabs>
         </ResizablePanel>

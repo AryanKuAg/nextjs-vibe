@@ -31,7 +31,7 @@ export const UserControl = ({ showName }: Props) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none flex items-center gap-2">
-        <Avatar className="h-[36px] w-[36px] rounded-full transition-opacity hover:opacity-80">
+        <Avatar className="h-[28px] w-[28px] rounded-[8px] transition-opacity hover:opacity-80">
           <AvatarImage src={user.imageUrl} />
           <AvatarFallback className="rounded-full bg-[#F1336E] text-white">
             {user.firstName?.charAt(0) || user.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase()}

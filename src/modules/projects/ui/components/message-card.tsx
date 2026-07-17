@@ -4,7 +4,40 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
-import Image from "next/image";
+
+const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true }: { createdAt: Date, text?: string, showTimer?: boolean }) => {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!showTimer) return;
+    const startMs = new Date(createdAt).getTime();
+    setElapsedMs(Math.max(0, Date.now() - startMs));
+    const timerInterval = setInterval(() => {
+      setElapsedMs(Math.max(0, Date.now() - startMs));
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [createdAt, showTimer]);
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  const timeString = m > 0 ? `${m}m ${s}s` : `${seconds}s`;
+
+  return (
+    <div className="flex items-center gap-2 mb-0.5">
+      <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+        {text}
+      </span>
+      {showTimer && (
+        <>
+          <span className="text-white/40 text-[13px]">&middot;</span>
+          <span className="text-white/40 text-[13px]">{timeString}</span>
+        </>
+      )}
+    </div>
+  );
+};
 
 interface UserMessageProps {
   content: string;
@@ -88,6 +121,12 @@ const FragmentCard = ({
   );
 };
 
+interface InteractiveContent {
+  text: string;
+  mediaUrl?: string;
+  buttons: { label: string; action: string }[];
+}
+
 interface AssistantMessageProps {
   content: string;
   fragment: Fragment | null;
@@ -95,31 +134,188 @@ interface AssistantMessageProps {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  projectId: string;
+  pendingInteractiveAction: string | null;
+  setPendingInteractiveAction: (action: string | null) => void;
+  onActionSubmit?: () => void;
+  isLastMessage?: boolean;
+  isInteractiveSubmitted?: boolean;
+  currentStage?: string;
+  onMockAction?: (action: string) => void;
+  isMockSubmitted?: boolean;
 };
 
 const AssistantMessage = ({
   content,
   fragment,
+  createdAt,
   onFragmentClick,
   type,
+  projectId,
+  pendingInteractiveAction,
+  setPendingInteractiveAction,
+  isLastMessage = false,
+  isInteractiveSubmitted = false,
+  currentStage,
+  onMockAction,
+  isMockSubmitted = false,
 }: AssistantMessageProps) => {
+  let interactiveContent: InteractiveContent | null = null;
+  if (type === "INTERACTIVE") {
+    try {
+      interactiveContent = JSON.parse(content);
+    } catch (e) {
+      console.error("Failed to parse interactive message content", e);
+    }
+  }
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localSubmitted, setLocalSubmitted] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+  const [actionSubmittedAt, setActionSubmittedAt] = useState<Date | null>(null);
+  
+  const submitted = localSubmitted || isInteractiveSubmitted || isMockSubmitted;
+
+  useEffect(() => {
+    setLocalSubmitted(false);
+    setLastAction(null);
+    setActionSubmittedAt(null);
+  }, [content]);
+
+  const handleAction = async (action: string) => {
+    if (onMockAction) {
+      setActionSubmittedAt(new Date());
+      onMockAction(action);
+      setLastAction(action);
+      return;
+    }
+
+    if (["WRITE_PROMPT"].includes(action)) {
+      if (pendingInteractiveAction === action) {
+        setPendingInteractiveAction(null);
+      } else {
+        setPendingInteractiveAction(action);
+      }
+      return;
+    }
+
+    setIsSubmitting(true);
+    setActionSubmittedAt(new Date());
+    try {
+      await fetch("/api/inngest/user-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, action }),
+      });
+      setLastAction(action);
+      setLocalSubmitted(true);
+      setPendingInteractiveAction(null);
+    } catch (error) {
+      console.error("Failed to submit action", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getLoadingText = () => {
+    const isVideo = interactiveContent?.mediaUrl?.endsWith(".mp4");
+    if (lastAction === "EXTRACT_FRAMES" || (isVideo && submitted)) {
+      if (currentStage === "EXTRACTING_FRAMES") return "Extracting frames...";
+      if (currentStage === "BUILDING_SITE") return "Building website...";
+      // Fallback
+      return "Extracting frames...";
+    }
+    if (lastAction === "ANIMATE_VIDEO") return "Generating video...";
+    return isVideo ? "Generating video..." : "Generating scene...";
+  };
+
+  if (type === "INTERACTIVE" && interactiveContent && !submitted && !isLastMessage) {
+    return null;
+  }
+
   return (
     <div className={cn(
-      "flex group pl-3 pb-4 gap-2.5 items-start",
+      "flex group pb-4 px-3 items-start",
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
-      <div className="flex-shrink-0 mt-0.5">
-        <Image
-          src="/logo.png"
-          alt="Vibe"
-          width={24}
-          height={24}
-          className="shrink-0"
-        />
-      </div>
-      <div className="flex flex-col gap-y-4 pt-0.5">
+      <div className="flex flex-col gap-y-4 pt-0.5 w-full">
         <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-          {content || (type === "RESULT" ? "Building..." : "")}
+          {type === "INTERACTIVE" && interactiveContent ? (
+            (!submitted && isLastMessage) ? (
+              <div className="flex flex-col gap-3">
+                <InteractiveMessageHeader createdAt={createdAt} showTimer={false} />
+                {interactiveContent.mediaUrl ? (
+                  <>
+                    {interactiveContent.text !== "Awaiting user input" && (
+                      <div className="text-white/60 text-[13px]">
+                        {interactiveContent.text}
+                      </div>
+                    )}
+                    <div className="w-full max-w-[500px] aspect-video rounded-xl overflow-hidden border border-[#333] bg-[#1a1a1a]">
+                      {interactiveContent.mediaUrl.endsWith(".mp4") ? (
+                        <video 
+                          src={interactiveContent.mediaUrl} 
+                          autoPlay 
+                          loop 
+                          muted 
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img 
+                          src={interactiveContent.mediaUrl} 
+                          alt="Generated scene"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  interactiveContent.text !== "Awaiting user input" && (
+                    <div>{interactiveContent.text}</div>
+                  )
+                )}
+                <div className="flex flex-col gap-3 mt-1">
+                  <div className="flex flex-wrap gap-2">
+                    {interactiveContent.buttons?.map((btn, i) => {
+                      const isSelected = pendingInteractiveAction === btn.action;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleAction(btn.action)}
+                          disabled={isSubmitting}
+                          className={cn(
+                            "px-2 py-1 rounded-[8px] text-[14px] font-medium transition-all duration-200 border",
+                            isSelected
+                              ? "bg-white text-black border-white hover:bg-gray-200" 
+                              : "bg-transparent text-white border-[#333] hover:bg-white/5"
+                          )}
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              isLastMessage ? (
+                <div className="flex flex-col gap-3">
+                  <InteractiveMessageHeader 
+                    createdAt={actionSubmittedAt || createdAt} 
+                    text={getLoadingText()} 
+                    showTimer={getLoadingText() === "Building website..."}
+                  />
+                </div>
+              ) : null
+            )
+          ) : (
+            content || (type === "RESULT" ? (
+              <div className="flex flex-col gap-3">
+                <InteractiveMessageHeader createdAt={createdAt} text="Working..." showTimer={false} />
+              </div>
+            ) : "")
+          )}
         </div>
         {fragment && type === "RESULT" && (
           <FragmentCard
@@ -140,6 +336,15 @@ interface MessageCardProps {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  projectId: string;
+  pendingInteractiveAction: string | null;
+  setPendingInteractiveAction: (action: string | null) => void;
+  onActionSubmit?: () => void;
+  isLastMessage?: boolean;
+  isInteractiveSubmitted?: boolean;
+  currentStage?: string;
+  onMockAction?: (action: string) => void;
+  isMockSubmitted?: boolean;
 };
 
 export const MessageCard = ({
@@ -150,6 +355,14 @@ export const MessageCard = ({
   isActiveFragment,
   onFragmentClick,
   type,
+  projectId,
+  pendingInteractiveAction,
+  setPendingInteractiveAction,
+  isLastMessage = false,
+  isInteractiveSubmitted = false,
+  currentStage,
+  onMockAction,
+  isMockSubmitted,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -160,6 +373,14 @@ export const MessageCard = ({
         isActiveFragment={isActiveFragment}
         onFragmentClick={onFragmentClick}
         type={type}
+        projectId={projectId}
+        pendingInteractiveAction={pendingInteractiveAction}
+        setPendingInteractiveAction={setPendingInteractiveAction}
+        isLastMessage={isLastMessage}
+        isInteractiveSubmitted={isInteractiveSubmitted}
+        currentStage={currentStage}
+        onMockAction={onMockAction}
+        isMockSubmitted={isMockSubmitted}
       />
     )
   }

@@ -21,8 +21,7 @@ interface Props {
 import { MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "" },
+  { id: "google/nano-banana-2-lite", label: "Nano Banana 2", emoji: "" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 type ModelId = typeof MODELS[number]["id"];
@@ -39,7 +38,7 @@ export const SceneBuilder = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("google/nano-banana-2-lite");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

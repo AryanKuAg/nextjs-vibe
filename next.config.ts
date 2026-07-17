@@ -29,6 +29,7 @@ try {
 }
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   output: "standalone", // Required for Docker/Cloud Run deployment
   serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static", "inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   outputFileTracingIncludes: {

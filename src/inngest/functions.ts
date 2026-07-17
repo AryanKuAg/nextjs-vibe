@@ -6,14 +6,13 @@ import { prisma } from "@/lib/db";
 import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
-import { NonRetriableError } from "inngest";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
 import { Storage } from "@google-cloud/storage";
 
 
-import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 
@@ -25,8 +24,9 @@ const checkCancellation = async (projectId: string) => {
     select: { messages: { orderBy: { createdAt: "desc" }, take: 1 } }
   });
   if (pCheck?.messages?.[0]?.content === "Generation was manually stopped.") {
-    throw new NonRetriableError("Generation was manually stopped.");
+    return true;
   }
+  return false;
 };
 
 
@@ -353,7 +353,7 @@ export const codeAgentFunction = inngest.createFunction(
         files: previousFiles || (initialFiles as Record<string, string>),
       },
       {
-        messages: previousMessages,
+        messages: previousMessages as Message[],
       },
     );
 
@@ -393,7 +393,7 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
-          name: "createOrUpdateFiles",
+          name: "editFiles",
           description: "Create or update files in the sandbox",
           parameters: z.object({
             files: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -513,7 +513,7 @@ export const codeAgentFunction = inngest.createFunction(
         system: PROMPT,
         // Using 1.5-pro-002 for the highest reliability in tool-calling.
         // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -547,7 +547,7 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       currentPrompt += `=== END PROJECT STATE ===\n\n`;
-      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
+      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`editFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
     if (videoUrl) {
@@ -616,17 +616,17 @@ Create unique, stunning designs. Do NOT just make a plain white page.
       maxIter: 5,
       defaultState: state,
       router: async ({ network }) => {
-        await checkCancellation(event.data.projectId);
-        await checkCancellation(event.data.projectId);
+        if (await checkCancellation(event.data.projectId)) return;
         // If we have a summary, we are done! Return nothing to stop the loop.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+      defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
     const result = await initialNetwork.run(currentPrompt, { state });
+    if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
 
     finalSummary = result.state.data.summary || "";
     finalFiles = result.state.data.files;
@@ -642,12 +642,16 @@ Create unique, stunning designs. Do NOT just make a plain white page.
     let attempt = 1;
 
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      await checkCancellation(event.data.projectId);
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
       // Step A: Check the build
       const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
-          await sandbox.commands.run("rm -rf dist");
+          try {
+            await sandbox.commands.run("rm -rf dist");
+          } catch (e) {
+            console.error("DEBUG: rm -rf dist failed", e);
+          }
 
           // Ensure all protected template files are present and correct in the sandbox
           const PROTECTED_FILES = videoUrl ? [
@@ -684,10 +688,17 @@ Create unique, stunning designs. Do NOT just make a plain white page.
 
           if (videoUrl) {
             console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-            if (zipResult.exitCode !== 0) {
-              console.error("ZIP FETCH ERR:", zipResult.stderr);
-              throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+            try {
+              const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+              if (zipResult.exitCode !== 0) {
+                console.error("ZIP FETCH ERR:", zipResult.stderr);
+                throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+              }
+            } catch (zipErr) {
+              const err = zipErr as Error;
+              console.error("ZIP FETCH CAUGHT ERR:", err.message);
+              // Instead of crashing the whole verification, maybe just throw a more descriptive error
+              throw new Error(`ZIP Fetch Failed: ${err.message}`);
             }
           }
 
@@ -708,9 +719,16 @@ if (fs.existsSync('src/App.tsx')) {
 }
 ` : `console.log("No structure check for non-video projects.");`;
           await sandbox.files.write("/app/check-structure.js", checkStructureScript);
-          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
-          if (structCheck.exitCode !== 0) {
-            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+          
+          try {
+            const structCheck = await sandbox.commands.run("node /app/check-structure.js");
+            if (structCheck.exitCode !== 0) {
+              return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+            }
+          } catch (structErr) {
+             const err = structErr as { stdout?: string, stderr?: string, message?: string };
+             const structErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
+             return { success: false, error: `Structural Error:\n${structErrorLog || err.message}` };
           }
 
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
@@ -724,9 +742,9 @@ if (fs.existsSync('src/App.tsx')) {
           try {
             await sandbox.commands.run("npx tsc --noEmit");
           } catch (tsErr) {
-            const err = tsErr as { stdout?: string, stderr?: string };
+            const err = tsErr as { stdout?: string, stderr?: string, message?: string };
             const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
+            return { success: false, error: `TypeScript Error:\n${tsErrorLog || err.message}` };
           }
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
@@ -888,9 +906,9 @@ fixPaths(process.argv[2]);
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
           } catch (buildErr) {
-            const err = buildErr as { stdout?: string, stderr?: string };
+            const err = buildErr as { stdout?: string, stderr?: string, message?: string };
             const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
+            return { success: false, error: `Vite Build Error:\n${viteErrorLog || err.message}` };
           }
 
           return { success: true, error: "" };
@@ -923,7 +941,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel("x-ai/grok-4.5"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -944,11 +962,11 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
-          await checkCancellation(event.data.projectId);
+          if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+        defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -973,19 +991,26 @@ fixPaths(process.argv[2]);
 
       let fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\n`;
       fixPrompt += `The build failed with these exact errors:\n\n${buildCheck.error}\n${brokenFilesContext}\n\n`;
-      
+
       if (attempt >= 3) {
         fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
       }
-      
+
       fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
 
       // <--- USE THE CLEAN STATE HERE AS WELL
       const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
 
       // Update our master state with whatever the fixer changed
       state.data.files = fixResult.state.data.files;
       finalFiles = state.data.files;
+
+      await step.run(`charge-credits-fixer-run-${runId}-attempt-${attempt}`, async () => {
+        const model = event.data.model || "deepseek/deepseek-v4-flash";
+        const cost = FOLLOW_UP_COSTS[model] || 5;
+        await consumeCredits(cost, event.data.userId);
+      });
 
       attempt++;
     }
@@ -993,14 +1018,14 @@ fixPaths(process.argv[2]);
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
@@ -1254,7 +1279,7 @@ fixPaths(process.argv[2]);
     });
 
     await step.run("charge-credits", async () => {
-      const model = event.data.model || "gemini-3.1-pro-preview";
+      const model = event.data.model || "deepseek/deepseek-v4-flash";
       const cost = MODEL_COSTS[model] || 100;
       await consumeCredits(cost, event.data.userId);
     });
@@ -1272,7 +1297,15 @@ fixPaths(process.argv[2]);
 
 export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0, timeouts: { finish: "15m" } },
-  { event: "veo/generate" },
+  {
+    event: "veo/generate",
+    cancelOn: [
+      {
+        event: "autonomous-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
     const { projectId, prompt, model, userId } = event.data;
     const cost = MODEL_COSTS[model as string] || 25;
@@ -1289,20 +1322,13 @@ export const veoGenerateFunction = inngest.createFunction(
         let base64VideoData: string | null = null;
         let finalVideoUrl: string | null = null;
 
-        if (model.includes("replicate-") || model === "bytedance/seedance-1.5-pro") {
+        if (model === "bytedance/seedance-1.5-pro") {
           const Replicate = (await import("replicate")).default;
           const replicate = new Replicate({
             auth: process.env.REPLICATE_API_KEY!,
           });
 
-          let targetModel: `${string}/${string}` = "kwaivgi/kling-v2.5-turbo-pro"; // default fallback
-          if (model === "replicate-kling-v2.5-turbo-pro") {
-            targetModel = "kwaivgi/kling-v2.5-turbo-pro";
-          } else if (model === "replicate-prunaai/p-video-draft") {
-            targetModel = "prunaai/p-video";
-          } else if (model.includes("/")) {
-            targetModel = model.replace("replicate-", "") as `${string}/${string}`;
-          }
+          const targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
 
           const input: Record<string, unknown> = { prompt };
 
@@ -1505,7 +1531,7 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const source: any = { prompt };
-          
+
           if (event.data.imageUrl) {
             const imgRes = await fetch(event.data.imageUrl);
             if (imgRes.ok) {
@@ -1516,7 +1542,7 @@ export const veoGenerateFunction = inngest.createFunction(
               };
             }
           }
-          
+
           if (event.data.endImageUrl) {
             const endImgRes = await fetch(event.data.endImageUrl);
             if (endImgRes.ok) {
@@ -1541,12 +1567,12 @@ export const veoGenerateFunction = inngest.createFunction(
           });
 
           console.log(`[Video Pipeline] GCP operation created: ${operation.name}, polling...`);
-          
+
           while (!operation.done) {
             await new Promise((resolve) => setTimeout(resolve, 10000));
             if (ai.operations && ai.operations.get) {
               operation = await ai.operations.get({ operation });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } else if (typeof (ai.models as any).getVideosOperation === "function") {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               operation = await (ai.models as any).getVideosOperation({ operation });
@@ -1557,21 +1583,21 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const response = operation.response;
           if (!response || !response.generatedVideos || response.generatedVideos.length === 0) {
-             throw new Error("No videos generated by GCP Veo.");
+            throw new Error("No videos generated by GCP Veo.");
           }
 
           const videoItem = response.generatedVideos[0].video;
           if (!videoItem) throw new Error("GCP Veo did not return a valid video item.");
-          
+
           if (videoItem.videoBytes) {
-             base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
+            base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
           } else if (videoItem.uri) {
-             const videoRes = await fetch(videoItem.uri);
-             if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
-             const arrayBuffer = await videoRes.arrayBuffer();
-             base64VideoData = Buffer.from(arrayBuffer).toString("base64");
+            const videoRes = await fetch(videoItem.uri);
+            if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
+            const arrayBuffer = await videoRes.arrayBuffer();
+            base64VideoData = Buffer.from(arrayBuffer).toString("base64");
           } else {
-             throw new Error("GCP Veo did not return video bytes or uri");
+            throw new Error("GCP Veo did not return video bytes or uri");
           }
         } else {
           throw new Error(`Unsupported model: ${model}`);

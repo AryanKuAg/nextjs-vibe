@@ -144,8 +144,7 @@ export const ProjectForm = () => {
     }
 
     // Persist the default model so the dashboard uses it
-    sessionStorage.setItem("pending_model", "openrouter-google/gemini-3.1-pro-preview");
-    sessionStorage.setItem("pending_builder_prompt", values.value);
+    sessionStorage.setItem("pending_model", "deepseek/deepseek-v4-flash");
 
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
@@ -203,6 +202,7 @@ export const ProjectForm = () => {
             isFocused && "ring-1 ring-white/20 border-white/20"
           )}
           style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
+          suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
           {imagePreviewUrl && (

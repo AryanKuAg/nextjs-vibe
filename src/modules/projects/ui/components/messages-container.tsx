@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Fragment } from "@prisma/client";
@@ -35,6 +35,9 @@ export const MessagesContainer = ({
   // Track when the last user message was sent to detect stuck state
   const lastUserMessageTimestampRef = useRef<number | null>(null);
   const [isStuck, setIsStuck] = useState(false);
+  const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
+  const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
+
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
@@ -43,8 +46,15 @@ export const MessagesContainer = ({
     refetchInterval: 2000,
   }));
 
+  const { data: projectData } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
+
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
+
+  // Reset interactive submitted state when new messages arrive or content changes
+  useEffect(() => {
+    setIsInteractiveSubmitted(false);
+  }, [lastMessage?.id, lastMessage?.content]);
 
   // Track when user message arrived; detect if stuck after timeout
   useEffect(() => {
@@ -115,7 +125,7 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="pt-2 pr-1">
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <MessageCard
               key={message.id}
               content={message.content}
@@ -125,8 +135,15 @@ export const MessagesContainer = ({
               isActiveFragment={activeFragment?.id === message.fragment?.id}
               onFragmentClick={() => setActiveFragment(message.fragment)}
               type={message.type}
+              projectId={projectId}
+              pendingInteractiveAction={pendingInteractiveAction}
+              setPendingInteractiveAction={setPendingInteractiveAction}
+              isLastMessage={index === messages.length - 1}
+              isInteractiveSubmitted={isInteractiveSubmitted}
+              currentStage={projectData?.currentStage}
             />
           ))}
+
           {isLastMessageUser && !isStuck && <MessageLoading />}
           {isLastMessageUser && isStuck && (
             <div className="px-2 pb-4 flex items-start gap-2.5">
@@ -139,12 +156,19 @@ export const MessagesContainer = ({
                   disabled={injectErrorMessage.isPending}
                   className="self-start px-3 py-1.5 rounded-[6px] bg-[#272725] border border-[#3B3B3B] text-white text-xs hover:bg-white/5 disabled:opacity-50 transition-colors"
                 >
-                  {injectErrorMessage.isPending ? "Resetting..." : "Dismiss & retry"}
+                  {injectErrorMessage.isPending ? "Restarting..." : "Restart Generation"}
                 </button>
               </div>
             </div>
           )}
-          <div ref={bottomRef} />
+
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center min-h-[300px]">
+              {/* <h2 className="text-xl font-medium text-white mb-2">New website</h2> */}
+            </div>
+          )}
+
+          <div ref={bottomRef} className="h-4" />
         </div>
       </div>
       <div className="relative p-3 pt-1">
@@ -156,6 +180,9 @@ export const MessagesContainer = ({
           extractedFrameCount={extractedFrameCount}
           isGenerating={isLastMessageUser && !isStuck}
           initialPrompt={initialPrompt}
+          pendingInteractiveAction={pendingInteractiveAction}
+          setPendingInteractiveAction={setPendingInteractiveAction}
+          setIsInteractiveSubmitted={setIsInteractiveSubmitted}
         />
         {onBack && (
           <button

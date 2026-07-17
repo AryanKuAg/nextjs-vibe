@@ -8,12 +8,7 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { MODEL_COSTS } from "@/lib/pricing";
 
 const MODEL_IDS = [
-  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0" },
-  { id: "replicate-prunaai/p-video", label: "Pruna" },
-  { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft" },
-  { id: "openrouter-seedance-2", label: "Seedance 2.0" },
-  { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast" },
-  { id: "gcp-veo-3.1-lite", label: "Veo 3.1" },
+  { id: "bytedance/seedance-1.5-pro", label: "Seedance 1.5 Pro" },
 ] as const;
 
 type ModelId = typeof MODEL_IDS[number]["id"];
@@ -35,7 +30,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("kwaivgi/kling-v3-video");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("bytedance/seedance-1.5-pro");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

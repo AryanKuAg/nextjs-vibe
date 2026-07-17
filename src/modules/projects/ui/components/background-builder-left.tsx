@@ -75,15 +75,8 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE", time: "~20 sec" },
-  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0", emoji: "", type: "VIDEO", time: "~3 min" },
-  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO", time: "~2 min" },
-  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO", time: "~20 sec" },
-  { id: "gcp-veo-3.1-lite", label: "Veo 3.1", emoji: "", type: "VIDEO", time: "~2 min" },
-  // { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO", time: "~10 sec" },
-
-  // { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO", time: "~1 min" },
+  { id: "google/nano-banana-2-lite", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "bytedance/seedance-1.5-pro", label: "Seedance 1.5 Pro", emoji: "", type: "VIDEO", time: "~2 min" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
@@ -367,15 +360,10 @@ export const BackgroundBuilderLeft = ({
 
 
 
-  function adjustedPadding(modelId: string) {
-    if (modelId === "replicate-nb-2") return "pb-2";
-    if (modelId === "replicate-kling-v2.5-turbo-pro") return "pb-2";
-    if (modelId === "replicate-prunaai/p-video") return "pt-2";
-    if (modelId === "openrouter-seedance-2") return "py-2";
-    if (modelId === "bytedance/seedream-4.5") return "pt-2";
-    return ""
-
-  }
+  const getModelMargin = (modelId: string) => {
+    if (modelId === "google/nano-banana-2-lite") return "pb-2";
+    return "";
+  };
 
   return (
     <>
@@ -536,7 +524,7 @@ export const BackgroundBuilderLeft = ({
                           key={model.id}
                           type="button"
                           onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                          className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
+                          className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", getModelMargin(model.id))}
                         >
                           <div className="flex flex-col">
                             <span className="text-sm  tracking-tight text-white leading-5 mb-0.5">{model.label}</span>

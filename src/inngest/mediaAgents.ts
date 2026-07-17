@@ -157,7 +157,10 @@ export const extractFramesFunction = inngest.createFunction(
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "SCENE" } });
     });
 
-    const zipUrl = await step.run("extract-and-zip", async () => {
+    const result = await step.run("extract-and-zip", async () => {
+      if (!videoUrl) {
+        throw new Error("videoUrl is required for frame extraction but was null/undefined");
+      }
       const videoUrlsToProcess = [videoUrl];
       
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `vibe-frames-${projectId}-`));
@@ -232,9 +235,9 @@ export const extractFramesFunction = inngest.createFunction(
       fs.rmSync(tmpDir, { recursive: true, force: true });
 
       const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      return `${cdnBase}/${fileToUpload}`;
+      return { url: `${cdnBase}/${fileToUpload}`, frameCount: frameFiles.length };
     });
 
-    return { zipUrl };
+    return { zipUrl: result.url, frameCount: result.frameCount };
   }
 );

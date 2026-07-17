@@ -8,10 +8,11 @@ import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import { ShimmerMessages } from "./message-loading";
 
-const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input" }: { createdAt: Date, text?: string }) => {
+const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true }: { createdAt: Date, text?: string, showTimer?: boolean }) => {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
+    if (!showTimer) return;
     const startMs = new Date(createdAt).getTime();
     setElapsedMs(Math.max(0, Date.now() - startMs));
     const timerInterval = setInterval(() => {
@@ -19,7 +20,7 @@ const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input" }: {
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [createdAt]);
+  }, [createdAt, showTimer]);
 
   const seconds = Math.floor(elapsedMs / 1000);
   const m = Math.floor(seconds / 60);
@@ -31,8 +32,12 @@ const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input" }: {
       <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
         {text}
       </span>
-      <span className="text-white/40 text-[13px]">&middot;</span>
-      <span className="text-white/40 text-[13px]">{timeString}</span>
+      {showTimer && (
+        <>
+          <span className="text-white/40 text-[13px]">&middot;</span>
+          <span className="text-white/40 text-[13px]">{timeString}</span>
+        </>
+      )}
     </div>
   );
 };
@@ -138,6 +143,9 @@ interface AssistantMessageProps {
   onActionSubmit?: () => void;
   isLastMessage?: boolean;
   isInteractiveSubmitted?: boolean;
+  currentStage?: string;
+  onMockAction?: (action: string) => void;
+  isMockSubmitted?: boolean;
 };
 
 const AssistantMessage = ({
@@ -152,6 +160,9 @@ const AssistantMessage = ({
   setPendingInteractiveAction,
   isLastMessage = false,
   isInteractiveSubmitted = false,
+  currentStage,
+  onMockAction,
+  isMockSubmitted = false,
 }: AssistantMessageProps) => {
   let interactiveContent: InteractiveContent | null = null;
   if (type === "INTERACTIVE") {
@@ -164,15 +175,26 @@ const AssistantMessage = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localSubmitted, setLocalSubmitted] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+  const [actionSubmittedAt, setActionSubmittedAt] = useState<Date | null>(null);
   
-  const submitted = localSubmitted || isInteractiveSubmitted;
+  const submitted = localSubmitted || isInteractiveSubmitted || isMockSubmitted;
 
   useEffect(() => {
     setLocalSubmitted(false);
+    setLastAction(null);
+    setActionSubmittedAt(null);
   }, [content]);
 
   const handleAction = async (action: string) => {
-    if (["WRITE_PROMPT", "REGENERATE"].includes(action)) {
+    if (onMockAction) {
+      setActionSubmittedAt(new Date());
+      onMockAction(action);
+      setLastAction(action);
+      return;
+    }
+
+    if (["WRITE_PROMPT"].includes(action)) {
       if (pendingInteractiveAction === action) {
         setPendingInteractiveAction(null);
       } else {
@@ -182,12 +204,14 @@ const AssistantMessage = ({
     }
 
     setIsSubmitting(true);
+    setActionSubmittedAt(new Date());
     try {
       await fetch("/api/inngest/user-response", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, action }),
       });
+      setLastAction(action);
       setLocalSubmitted(true);
       setPendingInteractiveAction(null);
     } catch (error) {
@@ -195,6 +219,18 @@ const AssistantMessage = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getLoadingText = () => {
+    const isVideo = interactiveContent?.mediaUrl?.endsWith(".mp4");
+    if (lastAction === "EXTRACT_FRAMES" || (isVideo && submitted)) {
+      if (currentStage === "EXTRACTING_FRAMES") return "Extracting frames...";
+      if (currentStage === "BUILDING_SITE") return "Building website...";
+      // Fallback
+      return "Extracting frames...";
+    }
+    if (lastAction === "ANIMATE_VIDEO") return "Generating video...";
+    return isVideo ? "Generating video..." : "Generating scene...";
   };
 
   if (type === "INTERACTIVE" && interactiveContent && !submitted && !isLastMessage) {
@@ -211,7 +247,7 @@ const AssistantMessage = ({
           {type === "INTERACTIVE" && interactiveContent ? (
             (!submitted && isLastMessage) ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader createdAt={createdAt} />
+                <InteractiveMessageHeader createdAt={createdAt} showTimer={false} />
                 {interactiveContent.mediaUrl ? (
                   <>
                     {interactiveContent.text !== "Awaiting user input" && (
@@ -269,14 +305,18 @@ const AssistantMessage = ({
             ) : (
               isLastMessage ? (
                 <div className="flex flex-col gap-3">
-                  <InteractiveMessageHeader createdAt={createdAt} text="Generating scene" />
+                  <InteractiveMessageHeader 
+                    createdAt={actionSubmittedAt || createdAt} 
+                    text={getLoadingText()} 
+                    showTimer={getLoadingText() === "Building website..."}
+                  />
                 </div>
               ) : null
             )
           ) : (
             content || (type === "RESULT" ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader createdAt={createdAt} text="Working..." />
+                <InteractiveMessageHeader createdAt={createdAt} text="Working..." showTimer={false} />
               </div>
             ) : "")
           )}
@@ -306,6 +346,9 @@ interface MessageCardProps {
   onActionSubmit?: () => void;
   isLastMessage?: boolean;
   isInteractiveSubmitted?: boolean;
+  currentStage?: string;
+  onMockAction?: (action: string) => void;
+  isMockSubmitted?: boolean;
 };
 
 export const MessageCard = ({
@@ -321,6 +364,9 @@ export const MessageCard = ({
   setPendingInteractiveAction,
   isLastMessage = false,
   isInteractiveSubmitted = false,
+  currentStage,
+  onMockAction,
+  isMockSubmitted,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -336,6 +382,9 @@ export const MessageCard = ({
         setPendingInteractiveAction={setPendingInteractiveAction}
         isLastMessage={isLastMessage}
         isInteractiveSubmitted={isInteractiveSubmitted}
+        currentStage={currentStage}
+        onMockAction={onMockAction}
+        isMockSubmitted={isMockSubmitted}
       />
     )
   }

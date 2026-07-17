@@ -7,6 +7,8 @@ import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { generateFramesFunction, extractFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
+import fs from "fs/promises";
+import path from "path";
 
 // 1. Define State
 export const AgentState = Annotation.Root({
@@ -42,6 +44,10 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
+  extracted_frame_count: Annotation<number | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
   css_content: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
@@ -50,7 +56,7 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  next_agent: Annotation<"frame_extraction" | "frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent">({
+  next_agent: Annotation<"frame_extraction" | "frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template">({
     reducer: (x, y) => y ?? x,
     default: () => "finish",
   }),
@@ -75,6 +81,14 @@ export const AgentState = Annotation.Root({
     default: () => false,
   }),
   interactiveMessageId: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  buildPref: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  experiencePref: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
@@ -131,38 +145,149 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
       " 'code_generation' - if the user provides a video URL, or if they just ask to build the website without media generation.\n" +
       " 'finish' - if the task is already complete.\n" +
       " 'reject' - if the request is off-topic, malicious, or not related to website building.\n\n" +
-      "MEDIA REQUIRED:\n" +
-      "Analyze the prompt to determine if the user is asking for a website that requires an AI-generated background video or hero image (e.g., 'scroll-driven hero landing page', 'cinematic background'). If they just want a simple dashboard, form, or UI component, set `mediaRequired` to false."
+      "REQUIRES WIZARD:\n" +
+      "Analyze if the user's prompt is a generic idea (e.g. 'A cyberpunk city') or a highly detailed layout/code-generation prompt (e.g. 'Build a React component with 3 sections...'). " +
+      "If it's generic, set `requiresWizard` to true. If it is highly detailed, specific, includes code snippets, CSS/layout instructions, or includes a media/video URL, you MUST set `requiresWizard` to false."
     );
 
     // We use a fast, reliable model for routing
-    const routerModel = getOpenRouterModel("google/gemini-2.5-flash");
+    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         next_agent: z.enum(["frame_extraction", "frame_generation", "video_generation", "code_generation", "reject", "finish"]),
         rejection_reason: z.string().optional().describe("A short, friendly explanation of why the request was rejected. Only required when next_agent is 'reject'."),
-        mediaRequired: z.boolean().describe("True if the website design requires a background scene/video based on the prompt. False for simple UIs or dashboards."),
+        requiresWizard: z.boolean().describe("True if the prompt is generic and needs the wizard to gather preferences. MUST be false if the prompt is highly detailed, includes a URL, or has specific implementation instructions."),
       })
     );
 
     return await structuredLlm.invoke([sysMsg, new HumanMessage(prompt)]);
   });
 
-  const isMediaRequired = response.mediaRequired || /background|hero|scene|cinematic|video|image|photo/i.test(state.current_prompt);
-  console.log("[Supervisor] Intial Route:", response.next_agent, "| Media Required (LLM):", response.mediaRequired, "| Media Required (Final):", isMediaRequired, "| Agent Mode:", state.isAgentMode);
+  const isMediaRequired = true; // Platform ONLY builds 3D websites, so media is ALWAYS required
+  const hasVideoUrlInPrompt = /https?:\/\/[^\s]+(?:\.mp4|\.webm|\.m3u8|cloudfront\.net)/i.test(state.current_prompt);
   
+  // Override LLM if prompt is highly detailed or contains a video URL
+  let requiresWizard = response.requiresWizard;
+  if (hasVideoUrlInPrompt || state.current_prompt.length > 800) {
+    requiresWizard = false;
+  }
+
+  console.log("[Supervisor] Intial Route:", response.next_agent, "| Media Required (Final):", isMediaRequired, "| Requires Wizard:", requiresWizard);
+
   if (response.rejection_reason) {
     console.log("[Supervisor] Rejection reason:", response.rejection_reason);
   }
 
-  // HITL Override: If media is required but agent mode is off, pause to ask the user.
-  if (isMediaRequired && !state.isAgentMode && !state.video_url && !state.start_frame_url) {
-    response.next_agent = "ask_media_intent";
+  let final_agent = response.next_agent;
+
+  // Force code_generation for highly detailed prompts or prompts with video URLs (unless explicitly asking to extract)
+  if (state.current_prompt.length > 800) {
+    final_agent = "code_generation";
+  } else if (hasVideoUrlInPrompt && final_agent !== "reject") {
+    if (!state.current_prompt.toLowerCase().includes("extract")) {
+      final_agent = "code_generation";
+    }
+  }
+
+  // Path 2 & 3: Wizard Routing
+  if (requiresWizard && !state.experiencePref && !state.buildPref) {
+    final_agent = "ask_wizard_3d";
+    console.log("[Supervisor] Generic prompt detected. Routing to ask_wizard_3d");
+  }
+  // Path 1 (Smart Orchestration) / After Wizard: Check Media Intent
+  else if (isMediaRequired && !state.isAgentMode && !state.video_url && !state.start_frame_url && !hasVideoUrlInPrompt) {
+    final_agent = "ask_media_intent";
     console.log("[Supervisor] HITL Override: Routing to ask_media_intent");
   }
 
-  return { next_agent: response.next_agent, rejection_reason: response.rejection_reason ?? null, mediaRequired: isMediaRequired };
+  return { next_agent: final_agent, rejection_reason: response.rejection_reason ?? null, mediaRequired: isMediaRequired };
+};
+
+const askWizard3DNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Wizard] Pausing for 3D preference...");
+  const step = config.configurable?.step;
+  const projectId = state.projectId;
+
+  const message = await step.run("ask-wizard-3d-message", async () => {
+    return await prisma.message.create({
+      data: {
+        projectId,
+        role: "ASSISTANT",
+        type: "INTERACTIVE",
+        content: JSON.stringify({
+          text: "How would you like to use the 3D experience?",
+          buttons: [
+            { label: "Full page", action: "FULL_PAGE" },
+            { label: "Hero only", action: "HERO_ONLY" }
+          ]
+        })
+      }
+    });
+  });
+
+  const userResponse = await step.waitForEvent("wait-wizard-3d", {
+    event: "project.user.response",
+    timeout: "24h",
+    match: "data.projectId"
+  });
+
+  if (!userResponse) {
+    return { next_agent: "finish" };
+  }
+
+  const { action } = userResponse.data;
+  if (action === "CANCEL") return { next_agent: "finish" };
+
+  return { next_agent: "ask_wizard_build", experiencePref: action };
+};
+
+const askWizardBuildNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Wizard] Pausing for Build preference...");
+  const step = config.configurable?.step;
+  const projectId = state.projectId;
+
+  const message = await step.run("ask-wizard-build-message", async () => {
+    return await prisma.message.create({
+      data: {
+        projectId,
+        role: "ASSISTANT",
+        type: "INTERACTIVE",
+        content: JSON.stringify({
+          text: "How would you like to build your website?",
+          buttons: [
+            { label: "Build it for me", action: "BUILD_FOR_ME" },
+            { label: "I'll guide the visuals", action: "GUIDE_VISUALS" }
+          ]
+        })
+      }
+    });
+  });
+
+  const userResponse = await step.waitForEvent("wait-wizard-build", {
+    event: "project.user.response",
+    timeout: "24h",
+    match: "data.projectId"
+  });
+
+  if (!userResponse) {
+    return { next_agent: "finish" };
+  }
+
+  const { action } = userResponse.data;
+  if (action === "CANCEL") return { next_agent: "finish" };
+
+  // After wizard, check if media is required. Since we only build 3D websites, it is ALWAYS required.
+  const requiresMedia = true;
+  let nextAgent = "code_generation";
+
+  if (requiresMedia && !state.isAgentMode && !state.video_url && !state.start_frame_url) {
+    nextAgent = "ask_media_intent";
+  } else if (requiresMedia) {
+    nextAgent = "frame_generation";
+  }
+
+  return { next_agent: nextAgent, buildPref: action, mediaRequired: requiresMedia };
 };
 
 const askMediaIntentNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -199,7 +324,7 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
   }
 
   const { action, payload } = userResponse.data;
-  
+
   if (action === "CANCEL") {
     console.log("[Ask Media Intent] Received CANCEL action, finishing graph.");
     return { next_agent: "finish", interactiveMessageId: message.id };
@@ -214,9 +339,59 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
   return { next_agent: "frame_generation", interactiveMessageId: message.id };
 };
 
+const askVideoIntentNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Video Intent] Pausing for user input...");
+  const step = config.configurable?.step;
+  const projectId = state.projectId;
+
+  const message = await step.run("ask-video-intent-message", async () => {
+    return await prisma.message.create({
+      data: {
+        projectId,
+        role: "ASSISTANT",
+        type: "INTERACTIVE",
+        content: JSON.stringify({
+          text: "Quick check — for the background video, do you want me to create it, or will you write the prompt?",
+          buttons: [
+            { label: "Write Prompt", action: "WRITE_PROMPT" },
+            { label: "Let AI Create", action: "AI_CREATE" }
+          ]
+        })
+      }
+    });
+  });
+
+  const userResponse = await step.waitForEvent("wait-video-intent", {
+    event: "project.user.response",
+    timeout: "24h",
+    match: "data.projectId"
+  });
+
+  if (!userResponse) {
+    return { next_agent: "video_generation", interactiveMessageId: message.id };
+  }
+
+  const { action, payload } = userResponse.data;
+
+  if (action === "CANCEL") {
+    console.log("[Ask Video Intent] Received CANCEL action, finishing graph.");
+    return { next_agent: "finish", interactiveMessageId: message.id };
+  }
+
+  if (action === "WRITE_PROMPT" && payload) {
+    return { next_agent: "video_generation", current_prompt: payload, isDirectPrompt: true, interactiveMessageId: message.id };
+  }
+
+  return { next_agent: "video_generation", interactiveMessageId: message.id };
+};
+
 const frameExtractionNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   console.log("[Frame Extraction] Extracting frames...");
   const step = config.configurable?.step;
+
+  await step.run("update-stage-extracting", async () => {
+    await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "EXTRACTING_FRAMES" } });
+  });
 
   const result = await step.invoke("extract-frames", {
     function: extractFramesFunction,
@@ -226,7 +401,7 @@ const frameExtractionNode = async (state: typeof AgentState.State, config: Runna
     }
   });
 
-  return { next_agent: "frame_generation", extracted_zip_url: result.zipUrl };
+  return { next_agent: "select_template", extracted_zip_url: result.zipUrl, extracted_frame_count: result.frameCount };
 };
 
 const frameGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -246,6 +421,7 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         projectId: state.projectId,
         prompt: state.current_prompt,
         model: "google/nano-banana-2-lite",
+        startFrameUrl: state.start_frame_url || undefined,
         userId: state.userId,
         isAgentMode: state.isAgentMode,
         isDirectPrompt: state.isDirectPrompt
@@ -296,9 +472,9 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         return { next_agent: "frame_generation", iteration: currentIteration + 1 };
       }
       if (action === "WRITE_PROMPT") {
-        return { 
-          next_agent: "frame_generation", 
-          iteration: currentIteration + 1, 
+        return {
+          next_agent: "frame_generation",
+          iteration: currentIteration + 1,
           current_prompt: payload || state.current_prompt,
           isDirectPrompt: true
         };
@@ -308,6 +484,9 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         return { next_agent: "finish" };
       }
       if (action === "ANIMATE_VIDEO") {
+        if (!state.isAgentMode) {
+          return { next_agent: "ask_video_intent", start_frame_url: frameUrl };
+        }
         return { next_agent: "video_generation", start_frame_url: frameUrl };
       }
     }
@@ -324,37 +503,169 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
   const step = config.configurable?.step;
 
   let videoUrl = "";
+  const projectId = state.projectId;
+  const currentIteration = state.iteration || 0;
+
   if (process.env.NODE_ENV === "development") {
+    await step.sleep(`dev-delay-video-${currentIteration}`, "4s");
     videoUrl = "https://assets.framerate.space/hero_bg_480p.mp4";
   } else {
-    const result = await step.invoke("generate-video", {
+    const result = await step.invoke(`generate-video-${currentIteration}`, {
       function: veoGenerateFunction,
       data: {
         projectId: state.projectId,
         prompt: state.current_prompt,
-        model: "replicate-kling-v2.5-turbo-pro",
-        imageUrl: state.start_frame_url,
-        endImageUrl: state.end_frame_url,
+        model: "bytedance/seedance-1.5-pro",
+        imageUrl: state.start_frame_url || undefined,
+        endImageUrl: state.end_frame_url || undefined,
         userId: state.userId
       }
     });
     videoUrl = result.videoUrl;
   }
 
-  return { next_agent: "code_generation", video_url: videoUrl };
+  if (!state.isAgentMode) {
+    await step.run(`ask-video-approval-message-${currentIteration}`, async () => {
+      const content = JSON.stringify({
+        iteration: currentIteration,
+        text: "Awaiting user input",
+        mediaUrl: videoUrl,
+        buttons: [
+          { label: "Use Video", action: "USE_VIDEO" },
+          { label: "Prompt Again", action: "WRITE_PROMPT" },
+          { label: "Let AI Recreate", action: "AI_CREATE" }
+        ]
+      });
+
+      if (state.interactiveMessageId) {
+        await prisma.message.update({
+          where: { id: state.interactiveMessageId },
+          data: { content }
+        });
+      } else {
+        await prisma.message.create({
+          data: {
+            projectId,
+            role: "ASSISTANT",
+            type: "INTERACTIVE",
+            content
+          }
+        });
+      }
+    });
+
+    const userResponse = await step.waitForEvent(`wait-video-approval-${currentIteration}`, {
+      event: "project.user.response",
+      timeout: "24h",
+      match: "data.projectId"
+    });
+
+    if (userResponse) {
+      const { action, payload } = userResponse.data;
+      if (action === "REGENERATE" || action === "AI_CREATE") {
+        return { next_agent: "video_generation", iteration: currentIteration + 1 };
+      }
+      if (action === "WRITE_PROMPT") {
+        return {
+          next_agent: "video_generation",
+          iteration: currentIteration + 1,
+          current_prompt: payload || state.current_prompt,
+          isDirectPrompt: true
+        };
+      }
+      if (action === "CANCEL") {
+        console.log("[Video Generation] Received CANCEL action, finishing graph.");
+        return { next_agent: "finish" };
+      }
+      if (action === "USE_VIDEO") {
+        if (state.experiencePref === "HERO_ONLY") {
+          return { next_agent: "select_template", video_url: videoUrl };
+        }
+        return { next_agent: "frame_extraction", video_url: videoUrl };
+      }
+    }
+
+    console.log("[Video Generation] Did not receive USE_VIDEO approval. Finishing graph.");
+    return { next_agent: "finish" };
+  }
+
+  if (state.experiencePref === "HERO_ONLY") {
+    return { next_agent: "select_template", video_url: videoUrl };
+  }
+  return { next_agent: "frame_extraction", video_url: videoUrl };
+};
+
+const selectTemplateNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Select Template] Selecting template based on experiencePref...");
+  const step = config.configurable?.step;
+
+  const templateFile = state.experiencePref === "HERO_ONLY"
+    ? "hero_templates.json"
+    : "full_page_templates.json";
+
+  const response = await step.run("select-template-llm", async () => {
+    const templatesPath = path.join(process.cwd(), "src/lib/templates", templateFile);
+    const templatesData = await fs.readFile(templatesPath, "utf-8");
+    const templates = JSON.parse(templatesData);
+
+    const sysMsg = new SystemMessage(
+      "You are an expert design selector. Your job is to select the most appropriate website layout template based on the user's prompt.\n" +
+      "You must return the exact ID of the template that best matches the requested vibe, style, or layout.\n\n" +
+      "Available Templates:\n" +
+      templates.map((t: any) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
+    );
+
+    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const structuredLlm = routerModel.withStructuredOutput(
+      z.object({
+        template_id: z.string().describe("The ID of the chosen template"),
+      })
+    );
+
+    const result = await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+
+    const selectedTemplate = templates.find((t: any) => t.id === result.template_id) || templates[0];
+    return selectedTemplate;
+  });
+
+  let finalPrompt = response.prompt_template;
+  if (state.video_url) {
+    finalPrompt = finalPrompt.replace("{{VIDEO_URL}}", state.video_url);
+  }
+  if (state.extracted_zip_url) {
+    finalPrompt = finalPrompt.replace("{{ZIP_URL}}", state.extracted_zip_url);
+  }
+
+  // Combine user's original instructions with the template prompt to ensure nothing is lost
+  finalPrompt = `${finalPrompt}\n\nAdditional user instructions:\n${state.current_prompt}`;
+
+  return { next_agent: "code_generation", current_prompt: finalPrompt };
 };
 
 const codeGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   console.log("[Code Generation] Building website...");
   const step = config.configurable?.step;
 
+  await step.run("update-stage-building", async () => {
+    await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "BUILDING_SITE" } });
+  });
+
+  let zipUrl = state.extracted_zip_url;
+  if (!zipUrl) {
+    const match = state.current_prompt.match(/https?:\/\/[^\s]+(?:\.zip)/i);
+    if (match) {
+      zipUrl = match[0];
+    }
+  }
+
   await step.invoke("generate-code", {
     function: codeAgentFunction,
     data: {
       projectId: state.projectId,
       value: state.current_prompt,
-      videoUrl: state.video_url,
-      model: "google/gemini-2.5-flash",
+      videoUrl: zipUrl || undefined, // Only pass ZIP URLs, otherwise it incorrectly triggers 3D canvas scroll logic
+      frameCount: state.extracted_frame_count || undefined,
+      model: "deepseek/deepseek-v4-flash",
       userId: state.userId
     }
   });
@@ -386,32 +697,59 @@ const rejectNode = async (state: typeof AgentState.State, config: RunnableConfig
 // 3. Build Graph
 const workflow = new StateGraph(AgentState)
   .addNode("supervisor", supervisorNode)
+  .addNode("ask_wizard_3d", askWizard3DNode)
+  .addNode("ask_wizard_build", askWizardBuildNode)
   .addNode("ask_media_intent", askMediaIntentNode)
+  .addNode("ask_video_intent", askVideoIntentNode)
   .addNode("frame_extraction", frameExtractionNode)
   .addNode("frame_generation", frameGenerationNode)
   .addNode("video_generation", videoGenerationNode)
+  .addNode("select_template", selectTemplateNode)
   .addNode("code_generation", codeGenerationNode)
   .addNode("reject", rejectNode)
   .addEdge(START, "supervisor")
   .addConditionalEdges("supervisor", (state) => state.next_agent, {
-    frame_extraction: "frame_extraction",
+    ask_wizard_3d: "ask_wizard_3d",
     ask_media_intent: "ask_media_intent",
     frame_generation: "frame_generation",
     video_generation: "video_generation",
+    frame_extraction: "frame_extraction",
     code_generation: "code_generation",
     reject: "reject",
+    finish: END,
+  })
+  .addConditionalEdges("ask_wizard_3d", (state) => state.next_agent, {
+    ask_wizard_build: "ask_wizard_build",
+    finish: END,
+  })
+  .addConditionalEdges("ask_wizard_build", (state) => state.next_agent, {
+    ask_media_intent: "ask_media_intent",
+    frame_generation: "frame_generation",
+    code_generation: "code_generation",
     finish: END,
   })
   .addConditionalEdges("ask_media_intent", (state) => state.next_agent, {
     finish: END,
     frame_generation: "frame_generation",
   })
-  .addEdge("frame_extraction", "frame_generation")
+  .addConditionalEdges("ask_video_intent", (state) => state.next_agent, {
+    finish: END,
+    video_generation: "video_generation",
+  })
+  .addEdge("frame_extraction", "select_template")
   .addConditionalEdges("frame_generation", (state) => state.next_agent, {
     frame_generation: "frame_generation",
     video_generation: "video_generation",
+    ask_video_intent: "ask_video_intent",
+    finish: END,
   })
-  .addEdge("video_generation", "code_generation")
+  .addConditionalEdges("video_generation", (state) => state.next_agent, {
+    video_generation: "video_generation",
+    frame_extraction: "frame_extraction",
+    select_template: "select_template",
+    finish: END,
+  })
+  .addEdge("select_template", "code_generation")
   .addEdge("code_generation", END)
   .addEdge("reject", END);
 
@@ -448,13 +786,15 @@ export const autonomousAgentFunction = inngest.createFunction(
     ]
   },
   async ({ event, step }) => {
-    const { projectId, prompt, userId } = event.data;
+    const { projectId, prompt, userId, buildPref, experiencePref } = event.data;
 
     const initialState = {
       projectId,
       userId,
       current_prompt: prompt,
       isAgentMode: event.data.isAgentMode ?? false,
+      buildPref: buildPref ?? null,
+      experiencePref: experiencePref ?? null,
       messages: [new HumanMessage(prompt)],
     };
 

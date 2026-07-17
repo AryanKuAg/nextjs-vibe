@@ -50,10 +50,6 @@ function useGenerationProgress(isGenerating: boolean, type: "image" | "video" = 
       // Fraction of remaining progress to consume per tick to roughly reach 95% at targetSeconds
       let baseFraction = type === "video" ? 0.015 : 0.05;
 
-      if (modelId === "replicate-kling-v2.5-turbo-pro") {
-        baseFraction = 0.003; // Kling takes ~3 mins, so slow it down significantly
-      }
-
       intervalRef.current = setInterval(() => {
         setPct((prev) => {
           const remaining = 99 - prev;

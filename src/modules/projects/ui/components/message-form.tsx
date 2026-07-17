@@ -17,8 +17,7 @@ import { Hint } from "@/components/hint";
 import { cn } from "@/lib/utils";
 
 type ModelId =
-  | "deepseek/deepseek-v4-flash"
-  | "deepseek/deepseek-v4-pro";
+  | "deepseek/deepseek-v4-flash";
 
 interface Props {
   projectId: string;
@@ -210,6 +209,8 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
       return;
     }
 
+
+
     try {
       await startAutonomousGeneration.mutateAsync({
         prompt: values.value,
@@ -316,23 +317,7 @@ export const MessageForm = ({ projectId, stage = "SITE", extractedZipUrl, extrac
             >
               <i className="ri-add-line" />
             </button>
-            <div
-              onClick={() => {
-                if (pendingInteractiveAction || isGenerating || isPending || isWaitingForInteractive) return;
-                setIsAgentActive(!isAgentActive);
-              }}
-              className={cn(
-                "h-8 px-3 flex items-center rounded-lg border text-sm transition-colors select-none",
-                isAgentActive
-                  ? "bg-white text-black border-white"
-                  : "border-[#333] text-white hover:bg-white/10",
-                (pendingInteractiveAction || isGenerating || isPending || isWaitingForInteractive)
-                  ? "opacity-50 cursor-not-allowed"
-                  : "cursor-pointer"
-              )}
-            >
-              Agent
-            </div>
+
 
             <div className="flex gap-2 ml-auto">
               {(isGenerating || (isWaitingForInteractive && !pendingInteractiveAction)) ? (

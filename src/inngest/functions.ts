@@ -13,7 +13,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 import { Storage } from "@google-cloud/storage";
 
 
-import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 
@@ -394,7 +394,7 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
-          name: "createOrUpdateFiles",
+          name: "editFiles",
           description: "Create or update files in the sandbox",
           parameters: z.object({
             files: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -548,7 +548,7 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       currentPrompt += `=== END PROJECT STATE ===\n\n`;
-      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
+      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`editFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
     if (videoUrl) {
@@ -622,7 +622,7 @@ Create unique, stunning designs. Do NOT just make a plain white page.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+      defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -648,7 +648,11 @@ Create unique, stunning designs. Do NOT just make a plain white page.
       const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
-          await sandbox.commands.run("rm -rf dist");
+          try {
+            await sandbox.commands.run("rm -rf dist");
+          } catch (e) {
+            console.error("DEBUG: rm -rf dist failed", e);
+          }
 
           // Ensure all protected template files are present and correct in the sandbox
           const PROTECTED_FILES = videoUrl ? [
@@ -685,10 +689,17 @@ Create unique, stunning designs. Do NOT just make a plain white page.
 
           if (videoUrl) {
             console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-            if (zipResult.exitCode !== 0) {
-              console.error("ZIP FETCH ERR:", zipResult.stderr);
-              throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+            try {
+              const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
+              if (zipResult.exitCode !== 0) {
+                console.error("ZIP FETCH ERR:", zipResult.stderr);
+                throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
+              }
+            } catch (zipErr) {
+              const err = zipErr as Error;
+              console.error("ZIP FETCH CAUGHT ERR:", err.message);
+              // Instead of crashing the whole verification, maybe just throw a more descriptive error
+              throw new Error(`ZIP Fetch Failed: ${err.message}`);
             }
           }
 
@@ -709,9 +720,16 @@ if (fs.existsSync('src/App.tsx')) {
 }
 ` : `console.log("No structure check for non-video projects.");`;
           await sandbox.files.write("/app/check-structure.js", checkStructureScript);
-          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
-          if (structCheck.exitCode !== 0) {
-            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+          
+          try {
+            const structCheck = await sandbox.commands.run("node /app/check-structure.js");
+            if (structCheck.exitCode !== 0) {
+              return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+            }
+          } catch (structErr) {
+             const err = structErr as { stdout?: string, stderr?: string, message?: string };
+             const structErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
+             return { success: false, error: `Structural Error:\n${structErrorLog || err.message}` };
           }
 
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
@@ -725,9 +743,9 @@ if (fs.existsSync('src/App.tsx')) {
           try {
             await sandbox.commands.run("npx tsc --noEmit");
           } catch (tsErr) {
-            const err = tsErr as { stdout?: string, stderr?: string };
+            const err = tsErr as { stdout?: string, stderr?: string, message?: string };
             const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
+            return { success: false, error: `TypeScript Error:\n${tsErrorLog || err.message}` };
           }
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
@@ -889,9 +907,9 @@ fixPaths(process.argv[2]);
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
           } catch (buildErr) {
-            const err = buildErr as { stdout?: string, stderr?: string };
+            const err = buildErr as { stdout?: string, stderr?: string, message?: string };
             const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
+            return { success: false, error: `Vite Build Error:\n${viteErrorLog || err.message}` };
           }
 
           return { success: true, error: "" };
@@ -949,7 +967,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+        defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -988,6 +1006,12 @@ fixPaths(process.argv[2]);
       // Update our master state with whatever the fixer changed
       state.data.files = fixResult.state.data.files;
       finalFiles = state.data.files;
+
+      await step.run(`charge-credits-fixer-run-${runId}-attempt-${attempt}`, async () => {
+        const model = event.data.model || "deepseek/deepseek-v4-flash";
+        const cost = FOLLOW_UP_COSTS[model] || 5;
+        await consumeCredits(cost, event.data.userId);
+      });
 
       attempt++;
     }
@@ -1299,20 +1323,13 @@ export const veoGenerateFunction = inngest.createFunction(
         let base64VideoData: string | null = null;
         let finalVideoUrl: string | null = null;
 
-        if (model.includes("replicate-") || model === "bytedance/seedance-1.5-pro") {
+        if (model === "bytedance/seedance-1.5-pro") {
           const Replicate = (await import("replicate")).default;
           const replicate = new Replicate({
             auth: process.env.REPLICATE_API_KEY!,
           });
 
-          let targetModel: `${string}/${string}` = "kwaivgi/kling-v2.5-turbo-pro"; // default fallback
-          if (model === "replicate-kling-v2.5-turbo-pro") {
-            targetModel = "kwaivgi/kling-v2.5-turbo-pro";
-          } else if (model === "replicate-prunaai/p-video-draft") {
-            targetModel = "prunaai/p-video";
-          } else if (model.includes("/")) {
-            targetModel = model.replace("replicate-", "") as `${string}/${string}`;
-          }
+          let targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
 
           const input: Record<string, unknown> = { prompt };
 

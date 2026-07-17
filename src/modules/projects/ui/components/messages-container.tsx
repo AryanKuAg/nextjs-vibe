@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Fragment } from "@prisma/client";
@@ -38,12 +38,22 @@ export const MessagesContainer = ({
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
   const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
 
+  const startAutonomousGeneration = useMutation(trpc.projects.startAutonomousGeneration.mutationOptions({
+    onSuccess: () => {
+      queryClient.invalidateQueries(trpc.messages.getMany.queryOptions({ projectId, stage }));
+      queryClient.invalidateQueries(trpc.projects.getOne.queryOptions({ id: projectId }));
+      queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+    },
+  }));
+
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
     stage: stage,
   }, {
     refetchInterval: 2000,
   }));
+
+  const { data: projectData } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
@@ -137,8 +147,10 @@ export const MessagesContainer = ({
               setPendingInteractiveAction={setPendingInteractiveAction}
               isLastMessage={index === messages.length - 1}
               isInteractiveSubmitted={isInteractiveSubmitted}
+              currentStage={projectData?.currentStage}
             />
           ))}
+
           {isLastMessageUser && !isStuck && <MessageLoading />}
           {isLastMessageUser && isStuck && (
             <div className="px-2 pb-4 flex items-start gap-2.5">

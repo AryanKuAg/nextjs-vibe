@@ -243,7 +243,7 @@ export const projectsRouter = createTRPCRouter({
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,
-          model: input.model || "replicate-kling-v2.5-turbo-pro",
+          model: input.model || "bytedance/seedance-1.5-pro",
           userId: ctx.auth.userId,
           blockIndex: input.blockIndex,
         },

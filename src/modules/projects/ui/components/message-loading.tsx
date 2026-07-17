@@ -8,10 +8,11 @@ function formatTimer(seconds: number) {
   return `${m}m ${s}s`;
 }
 
-export const ShimmerMessages = ({ text = "Working..." }: { text?: string }) => {
+export const ShimmerMessages = ({ text = "Working...", showTimer = false }: { text?: string, showTimer?: boolean }) => {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
+    if (!showTimer) return;
     const startTime = Date.now();
 
     const timerInterval = setInterval(() => {
@@ -30,8 +31,12 @@ export const ShimmerMessages = ({ text = "Working..." }: { text?: string }) => {
       <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
         {text}
       </span>
-      <span className="text-white/40 text-[13px]">&middot;</span>
-      <span className="text-white/40 text-[13px]">{timeString}</span>
+      {showTimer && (
+        <>
+          <span className="text-white/40 text-[13px]">&middot;</span>
+          <span className="text-white/40 text-[13px]">{timeString}</span>
+        </>
+      )}
     </div>
   );
 };

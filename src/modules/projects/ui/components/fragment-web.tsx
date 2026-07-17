@@ -13,10 +13,11 @@ export function FragmentWeb({ data }: Props) {
   const finalUrl = displayUrl ? `${displayUrl}?v=${cacheBuster}` : undefined;
 
   return (
-    <div className="flex flex-col w-full h-full">
+    <div className="flex flex-col w-full h-full overflow-hidden">
       <iframe
         key={data.id}
-        className="h-full w-full border-none"
+        className="h-full border-none"
+        style={{ width: 'calc(100% + 20px)' }}
         sandbox="allow-forms allow-scripts allow-same-origin"
         loading="lazy"
         src={finalUrl}

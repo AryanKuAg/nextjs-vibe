@@ -1,14 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import "remixicon/fonts/remixicon.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useTRPC } from "@/trpc/client";
 
 import { useRouter } from "next/navigation";
 
@@ -18,15 +23,23 @@ interface Props {
 
 export const UserControl = ({ showName }: Props) => {
   const router = useRouter();
+  const trpc = useTRPC();
   const { user } = useUser();
   const { signOut } = useClerk();
   const [isMounted, setIsMounted] = useState(false);
+
+  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   if (!isMounted || !user) return null;
+
+  const isPaid = usage?.plan && usage.plan !== "free";
+  const remaining = Number(usage?.remainingCredits || 0);
+  const total = Number(usage?.totalCredits || 1);
+  const progressPercent = Math.min((remaining / total) * 100, 100);
 
   return (
     <DropdownMenu>
@@ -46,48 +59,99 @@ export const UserControl = ({ showName }: Props) => {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-onest rounded-xl shadow-xl"
+        className="w-[216px]  bg-[#2f2f2f] text-white font-onest rounded-[10px] shadow-xl border-0 p-0"
       >
-        <div className="flex items-center gap-3 p-2 mb-2">
-          <Avatar className="h-10 w-10 rounded-md">
-            <AvatarImage src={user.imageUrl} />
-            <AvatarFallback className="rounded-md bg-[#F1336E] text-white">
-              {user.firstName?.charAt(0) || user.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <span className="text-[15px] font-[500] leading-none mb-1 text-white">
-              {user.fullName || "User"}
-            </span>
-            <span className="text-[13px] text-[#8A8A88] truncate">
-              {user.primaryEmailAddress?.emailAddress}
-            </span>
+        {/* User info header */}
+        <div className="flex items-start justify-between gap-2 p-3">
+          <div className="flex flex-col gap-1 min-w-0">
+            <Avatar className="h-[20px] w-[20px] rounded-[6px] mb-1 shrink-0">
+              <AvatarImage src={user.imageUrl} />
+              <AvatarFallback className="rounded-[8px] bg-[#F1336E] text-white">
+                {user.firstName?.charAt(0) || user.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col gap-0 leading-[18px]">
+              <span className="text-xs text-white truncate">
+                {user.fullName || "User"}
+              </span>
+              <span className="text-xs text-white-50 truncate">
+                {user.primaryEmailAddress?.emailAddress}
+              </span>
+            </div>
           </div>
+          {isPaid && (
+            <span className=" font-medium h-[20px] text-white bg-white-8 border border-white-12 rounded-[6px] px-[6px] shrink-0 text-xs ">
+              {usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1)}
+            </span>
+          )}
         </div>
 
-        <DropdownMenuItem
-          onClick={() => router.push('/projects')}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg focus:text-white"
-        >
-          <i className="ri-folder-2-line text-[#8A8A88] text-lg" />
-          <span className="text-[15px] font-medium text-[#EBEBEB]">Projects</span>
-        </DropdownMenuItem>
+        {/* Upgrade button (free) or Credits bar (paid) */}
+        {isPaid ? (
+          <div className="mb-2 px-3">
+            <div className="w-full h-[2px] bg-white-8 rounded-full overflow-hidden mb-0.5">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-white-85 leading-[16px] font-medium">
+              {remaining.toLocaleString("en-US")}/{total.toLocaleString("en-US")} Credits Left
+            </span>
+          </div>
+        ) : (
+          <Link href="/pricing" className="block mb-3 p-3">
+            <div className="w-full py-2 text-center text-[14px] font-medium text-white border border-white-16 rounded-lg hover:bg-white-4 transition-colors">
+              Upgrade
+            </div>
+          </Link>
+        )}
+        {/* Projects + Account Settings */}
+        <div className="border-t-[0.5px] border-white-8 p-1.5 flex flex-col gap-[3px]">
+          <DropdownMenuItem
+            onClick={() => router.push('/projects')}
+            className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 focus:bg-white-4 rounded-lg focus:text-white h-[28px] mb-[3px] group"
+          >
+            <i className="ri-folder-line text-white-50 text-base group-hover:text-white" />
+            <span className="text-[12px] text-white">Projects</span>
+          </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onClick={() => router.push('/manage')}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg focus:text-white"
-        >
-          <i className="ri-user-line text-[#8A8A88] text-lg" />
-          <span className="text-[15px] font-medium text-[#EBEBEB]">Manage account</span>
-        </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => router.push('/manage')}
+            className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 focus:bg-white-4 rounded-lg focus:text-white h-[28px] group"
+          >
+            <i className="ri-settings-3-line text-white-50 text-base group-hover:text-white" />
+            <span className="text-[12px] text-white">Account Settings</span>
+          </DropdownMenuItem>
+        </div>
 
-        <DropdownMenuItem
-          onClick={() => signOut({ redirectUrl: '/' })}
-          className="cursor-pointer p-2 flex items-center gap-3 hover:bg-background focus:bg-background rounded-lg mt-1 focus:text-white"
-        >
-          <i className="ri-logout-box-r-line text-[#8A8A88] text-lg" />
-          <span className="text-[15px] font-medium text-[#EBEBEB]">Sign out</span>
-        </DropdownMenuItem>
+        {/* Give Feedback + Terms And Privacy */}
+        <div className="border-t-[0.5px] border-white-8 p-1.5 flex flex-col gap-[3px]">
+          <DropdownMenuItem
+            className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 focus:bg-white-4 rounded-lg focus:text-white h-[28px] mb-[3px] group"
+          >
+            <i className="ri-chat-1-line text-white-50 text-base group-hover:text-white" />
+            <span className="text-[12px] text-white">Give Feedback</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 focus:bg-white-4 rounded-lg focus:text-white h-[28px] mb-[3px] group"
+          >
+            <i className="ri-file-text-line text-white-50 text-base group-hover:text-white" />
+            <span className="text-[12px] text-white">Terms And Privacy</span>
+          </DropdownMenuItem>
+        </div>
+
+        {/* Log Out */}
+        <div className="border-t-[0.5px] border-white-8 p-1.5 flex flex-col gap-[3px]">
+          <DropdownMenuItem
+            onClick={() => signOut({ redirectUrl: '/' })}
+            className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 focus:bg-white-4 rounded-lg focus:text-white h-[28px] group"
+          >
+            <i className="ri-logout-box-r-line text-white-50 text-base group-hover:text-white" />
+            <span className="text-[12px] text-white">Log Out</span>
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

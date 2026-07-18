@@ -111,7 +111,7 @@ export default async function BlogPost({ params }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-onest">
+    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-sans">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -157,7 +157,7 @@ export default async function BlogPost({ params }: Props) {
           )}
 
           <div
-            className="prose prose-invert prose-lg max-w-none prose-headings:font-onest prose-p:font-onest prose-a:text-primary hover:prose-a:text-primary/80 prose-img:rounded-xl"
+            className="prose prose-invert prose-lg max-w-none prose-headings:font-sans prose-p:font-sans prose-a:text-primary hover:prose-a:text-primary/80 prose-img:rounded-xl"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
         </article>

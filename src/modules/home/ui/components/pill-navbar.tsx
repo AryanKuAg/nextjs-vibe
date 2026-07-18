@@ -77,7 +77,7 @@ const UserAvatarButton = ({ mobile = false }: { mobile?: boolean }) => {
     <DropdownMenuContent
       align="end"
       sideOffset={8}
-      className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-onest rounded-xl shadow-xl z-50"
+      className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-sans rounded-xl shadow-xl z-50"
     >
       <div className="flex items-center gap-3 p-2 mb-2">
         <Avatar className="h-10 w-10 rounded-md">
@@ -226,7 +226,7 @@ export const PillNavbar = () => {
 
       <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-20 w-full md:w-max px-4">
         <div className="flex flex-col gap-2 relative w-full">
-          <div className="flex items-center justify-between md:justify-normal gap-20 h-[68px] px-2 bg-black rounded-[20px] font-onest" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          <div className="flex items-center justify-between md:justify-normal gap-20 h-[68px] px-2 bg-black rounded-[20px] font-sans" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
             {/* Left side: Logo */}
             <Link href="/" className="flex items-center gap-2 pl-2">
               <Image src="/logo.png" alt="framerate" width={32} height={32} />
@@ -285,7 +285,7 @@ export const PillNavbar = () => {
 
           {/* Mobile Dropdown Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden w-full bg-[#000] rounded-[20px] p-3 flex flex-col font-onest border border-[#2A2A2A] font-[500]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
+            <div className="md:hidden w-full bg-[#000] rounded-[20px] p-3 flex flex-col font-sans border border-[#2A2A2A] font-[500]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
               <div className="flex flex-col text-[#E0E0E0] text-[15px]">
                 <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Blog

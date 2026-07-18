@@ -37,7 +37,7 @@ const rows = [
 
 export const ComparisonSection = () => {
   return (
-    <section className="py-[60px] md:py-24 px-4 sm:px-6 max-w-[640px] mx-auto w-full font-onest font-[500]">
+    <section className="py-[60px] md:py-24 px-4 sm:px-6 max-w-[640px] mx-auto w-full font-sans font-[500]">
       {/* Header */}
       <div className="flex flex-col items-center text-center mb-12">
         <h2 className="text-3xl text-[40px] md:text-5xl text-white font-[700] leading-[1.1] mb-5 md:whitespace-nowrap font-stack-sans-notch">

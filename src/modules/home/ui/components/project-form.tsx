@@ -12,10 +12,10 @@ import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { cn } from "@/lib/utils";
+
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
-import { Hint } from "@/components/hint";
+
 
 const formSchema = z.object({
   value: z
@@ -24,7 +24,19 @@ const formSchema = z.object({
     .max(100000, { message: "Value is too long" }),
 });
 
-export const ProjectForm = () => {
+const MODELS = [
+  { id: "deepseek/deepseek-v4-flash", label: "Fable 5", emoji: "" },
+  { id: "openai/gpt-5.6-sol", label: "GPT-5.6 Sol", emoji: "" },
+  { id: "kimi/k3", label: "Kimi K3", emoji: "" },
+  { id: "anthropic/opus-4.8", label: "Opus 4.8", emoji: "" },
+  { id: "anthropic/sonnet-5", label: "Sonnet 5", emoji: "" },
+];
+
+interface ProjectFormProps {
+  showModelSelector?: boolean;
+}
+
+export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => {
   const router = useRouter();
   const trpc = useTRPC();
   const clerk = useClerk();
@@ -33,10 +45,12 @@ export const ProjectForm = () => {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Clean up object URLs
   useEffect(() => {
@@ -44,6 +58,22 @@ export const ProjectForm = () => {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
+
+  // Click outside to close model dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+
+    if (modelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [modelDropdownOpen]);
 
   // Global drag-and-drop listeners for the fullscreen overlay
   useEffect(() => {
@@ -143,8 +173,9 @@ export const ProjectForm = () => {
       return;
     }
 
-    // Persist the default model so the dashboard uses it
-    sessionStorage.setItem("pending_model", "deepseek/deepseek-v4-flash");
+    // Persist the selected model so the dashboard uses it
+    sessionStorage.setItem("pending_model", selectedModel);
+    sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
     if (uploadedImage) {
@@ -188,7 +219,7 @@ export const ProjectForm = () => {
         >
           <div className="flex flex-col items-center gap-2 text-white">
             <i className="ri-download-line text-white text-3xl mb-3" />
-            <p className="text-lg font-onest font-medium">Drop your image</p>
+            <p className="text-lg font-sans font-medium">Drop your image</p>
           </div>
         </div>
       )}
@@ -196,32 +227,25 @@ export const ProjectForm = () => {
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={cn(
-            "relative rounded-3xl overflow-hidden transition-all min-h-[148px]",
-            "bg-[#212121]/80 w-full md:w-[720px]!",
-            isFocused && "ring-1 ring-white/20 border-white/20"
-          )}
-          style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
+          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all w-full`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
           {imagePreviewUrl && (
-            <div className="px-4 pt-4">
-              <div className="relative w-fit">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imagePreviewUrl}
-                  alt="Uploaded"
-                  className="w-16 h-16 rounded-xl object-cover border border-white/10"
-                />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full border border-white/10 text-white/70 hover:text-white text-[10px]"
-                >
-                  <i className="ri-close-line" />
-                </button>
-              </div>
+            <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreviewUrl}
+                alt="Uploaded"
+                className="w-16 h-16 rounded-[4px] object-cover"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white/50 hover:text-white border border-white/10 text-xs"
+              >
+                <i className="ri-close-line" />
+              </button>
             </div>
           )}
 
@@ -233,17 +257,9 @@ export const ProjectForm = () => {
               <TextareaAutosize
                 {...field}
                 disabled={isPending}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                minRows={3}
-                maxRows={10}
-                className={cn(
-                  "w-full resize-none border-none outline-none",
-                  "px-4 pt-4 ",
-                  "text-sm font-onest leading-relaxed text-white font-[500]",
-                  "placeholder:text-white/40 placeholder:whitespace-nowrap placeholder:text-[14px] ",
-                  "transition-colors bg-transparent placeholder:mt-1   placeholder:font-[500]"
-                )}
+                minRows={1}
+                maxRows={12}
+                className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
                 placeholder="Describe your website..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -256,93 +272,80 @@ export const ProjectForm = () => {
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center justify-between px-4 pb-4 font-onest pt-3">
-            <div className="flex gap-x-1 items-center flex-1">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg, image/png"
-                className="hidden"
-                onChange={handleFileInputChange}
-              />
-              <Hint text="Add photo" side="top" >
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent hover:bg-white/4 text-white transition-colors"
-                >
-                  <i className="ri-add-line text-base" />
-                </button>
-              </Hint>
-              {/* <div className="relative" ref={dropdownRef}>
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg, image/png"
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isPending}
+              className="w-8 h-8 flex shrink-0 items-center justify-center rounded-lg border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
+              title="Attach image"
+            >
+              <i className="ri-add-line" />
+            </button>
+
+            {showModelSelector && (
+              <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#2c2c2c] text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
+                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg border border-[#333] text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.emoji}</span>
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
-                  <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                  <span className="whitespace-nowrap">{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                  <i className="ri-arrow-up-s-line mt-0.5 text-white" />
                 </div>
 
                 {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-background border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
+                  <div className="absolute bottom-10 left-0 z-50 bg-[#1c1c1c] border border-white-8 rounded-[8px] overflow-hidden min-w-[150px] shadow-xl">
                     {MODELS.map((model) => (
                       <button
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-sans transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-white-50"}`}
                       >
-                        <span>{model.emoji}</span>
-                        <span>{model.label}</span>
+                        <span className="whitespace-nowrap">{model.label}</span>
                         {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
                       </button>
                     ))}
                   </div>
                 )}
-              </div> */}
-            </div>
-
-            <div className="flex items-center gap-2">
-
-              <div className="flex gap-2 ml-auto">
-                {/* <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
-                  <i className="ri-sparkling-fill text-white text-sm" />
-                  <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
-                </div> */}
-                {isButtonDisabled ? (
-                  <button
-                    type="submit"
-                    disabled
-                    className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white/40 text-[#1C1C1C] cursor-not-allowed"
-                  >
-                    {isPending ? (
-                      <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                    ) : (
-                      <i className="ri-arrow-up-line text-[16px] rotate-90" />
-                    )}
-                  </button>
-                ) : (
-                  <Hint text="Generate" side="top">
-                    <button
-                      type="submit"
-                      className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white text-[#1C1C1C]"
-                    >
-                      {isPending ? (
-                        <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                      ) : (
-                        <i className="ri-arrow-up-line text-[16px] rotate-90" />
-                      )}
-                    </button>
-                  </Hint>
-                )}
               </div>
+            )}
+
+            <div className="flex gap-2 ml-auto shrink-0">
+              {isButtonDisabled ? (
+                <button
+                  type="submit"
+                  disabled
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all bg-[#333] text-[#777]"
+                >
+                  <i className="ri-arrow-up-line font-bold" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all bg-white text-black hover:bg-[#ddd]"
+                >
+                  {isPending ? (
+                    <i className="ri-loader-4-line animate-spin inline-block" />
+                  ) : (
+                    <i className="ri-arrow-up-line font-bold" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>
 
         {/* ── Template chips ── */}
-        {/* <div className="hidden md:flex flex-wrap justify-center gap-2 font-onest">
+        {/* <div className="hidden md:flex flex-wrap justify-center gap-2 font-sans">
           {SUGGESTED_PROMPTS.map((item) => (
             <button
               key={item.label}

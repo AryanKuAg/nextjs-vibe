@@ -212,10 +212,10 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-sans transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
-                        <div className="flex w-full items-center font-onest whitespace-nowrap">
+                        <div className="flex w-full items-center font-sans whitespace-nowrap">
                           <span className="whitespace-nowrap">{model.label}</span>
                           {selectedModel === model.id && <i className="ri-check-line ml-auto text-white ml-2" />}
                         </div>
@@ -246,7 +246,7 @@ export const VideoBuilder = ({ projectId, selectedSceneUrl, isGenerating, onBack
           </div>
 
           <Button
-            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-onest text-sm h-9 hover:bg-white/5! font-[400]"
+            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-sans text-sm h-9 hover:bg-white/5! font-[400]"
             onClick={onBack}
           >
             Back

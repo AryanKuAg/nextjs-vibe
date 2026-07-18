@@ -44,7 +44,7 @@ export default function DashboardRedirectPage() {
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <i className="ri-loader-4-line text-3xl text-white animate-spin" />
-        <p className="text-sm text-[#8A8A8A] font-onest">Taking you to your dashboard...</p>
+        <p className="text-sm text-[#8A8A8A] font-sans">Taking you to your dashboard...</p>
       </div>
     </div>
   );

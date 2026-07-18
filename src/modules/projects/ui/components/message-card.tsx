@@ -26,7 +26,7 @@ const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", sho
 
   return (
     <div className="flex items-center gap-2 mb-0.5">
-      <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+      <span className="font-normal text-[14px] bg-gradient-to-r from-white/30 via-white to-white/30 bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
         {text}
       </span>
       {showTimer && (
@@ -59,7 +59,7 @@ const UserMessage = ({ content }: UserMessageProps) => {
   return (
     <div className="flex justify-end pb-4 pr-2 pl-10">
       <div className="flex flex-col max-w-[80%] w-fit">
-        <Card className="rounded-[16px] bg-[#212121] p-4 shadow-none border-none break-words text-[15px] leading-relaxed text-white/90 relative overflow-hidden">
+        <Card className="rounded-[10px] bg-white-8 px-3 py-2 shadow-none border-none break-words text-sm leading-relaxed text-white relative overflow-hidden">
           <div
             ref={contentRef}
             className={cn(
@@ -173,7 +173,7 @@ const AssistantMessage = ({
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [actionSubmittedAt, setActionSubmittedAt] = useState<Date | null>(null);
-  
+
   const submitted = localSubmitted || isInteractiveSubmitted || isMockSubmitted;
 
   useEffect(() => {
@@ -239,7 +239,7 @@ const AssistantMessage = ({
       type === "ERROR" && "text-red-700 dark:text-red-500",
     )}>
       <div className="flex flex-col gap-y-4 pt-0.5 w-full">
-        <div className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+        <div className="text-white text-sm leading-[20px] whitespace-pre-wrap">
           {type === "INTERACTIVE" && interactiveContent ? (
             (!submitted && isLastMessage) ? (
               <div className="flex flex-col gap-3">
@@ -253,17 +253,17 @@ const AssistantMessage = ({
                     )}
                     <div className="w-full max-w-[500px] aspect-video rounded-xl overflow-hidden border border-[#333] bg-[#1a1a1a]">
                       {interactiveContent.mediaUrl.endsWith(".mp4") ? (
-                        <video 
-                          src={interactiveContent.mediaUrl} 
-                          autoPlay 
-                          loop 
-                          muted 
+                        <video
+                          src={interactiveContent.mediaUrl}
+                          autoPlay
+                          loop
+                          muted
                           playsInline
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <img 
-                          src={interactiveContent.mediaUrl} 
+                        <img
+                          src={interactiveContent.mediaUrl}
                           alt="Generated scene"
                           className="w-full h-full object-cover"
                         />
@@ -285,10 +285,10 @@ const AssistantMessage = ({
                           onClick={() => handleAction(btn.action)}
                           disabled={isSubmitting}
                           className={cn(
-                            "px-2 py-1 rounded-[8px] text-[14px] font-medium transition-all duration-200 border",
+                            "px-2  rounded-[8px] text-[14px] font-normal border h-[28px] leading-[20px]",
                             isSelected
-                              ? "bg-white text-black border-white hover:bg-gray-200" 
-                              : "bg-transparent text-white border-[#333] hover:bg-white/5"
+                              ? "bg-white text-black border-white hover:bg-gray-200"
+                              : "bg-transparent text-white border-white-8 hover:bg-white-8"
                           )}
                         >
                           {btn.label}
@@ -301,9 +301,9 @@ const AssistantMessage = ({
             ) : (
               isLastMessage ? (
                 <div className="flex flex-col gap-3">
-                  <InteractiveMessageHeader 
-                    createdAt={actionSubmittedAt || createdAt} 
-                    text={getLoadingText()} 
+                  <InteractiveMessageHeader
+                    createdAt={actionSubmittedAt || createdAt}
+                    text={getLoadingText()}
                     showTimer={getLoadingText() === "Building website..."}
                   />
                 </div>

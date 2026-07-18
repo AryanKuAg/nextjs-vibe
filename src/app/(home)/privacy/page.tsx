@@ -27,7 +27,7 @@ export const metadata = {
 };
 
 const LegalFooter = () => (
-  <footer className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-onest gap-4">
+  <footer className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-sans gap-4">
     <span>2026 © Framerate</span>
 
     <nav className="flex gap-4">
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background font-onest">
+    <main className="min-h-screen bg-background font-sans">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

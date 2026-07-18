@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+// import Link from "next/link";
 import { Suspense, useState, useTransition, useEffect } from "react";
 import "remixicon/fonts/remixicon.css";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +34,7 @@ export const ProjectView = ({ projectId }: Props) => {
     trpc.projects.getOne.queryOptions({ id: projectId })
   );
 
-  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+  // const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [fragmentKey, setFragmentKey] = useState(0);
@@ -125,9 +125,7 @@ export const ProjectView = ({ projectId }: Props) => {
             </Suspense>
           </ErrorBoundary>
         </ResizablePanel>
-
-        <ResizableHandle className="w-2 bg-transparent hover:bg-white-4 transition-colors" />
-
+        <ResizableHandle className="w-px bg-transparent hover:bg-white-4 transition-colors" />
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
           minSize={30}

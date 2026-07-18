@@ -57,7 +57,7 @@ export const Footer = () => {
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
-      <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-onest font-[500]">
+      <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-sans font-[500]">
         {/* Rounded card container */}
         <div className="rounded-[24px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8  bg-gradient-to-b from-[#282828] to-[#282828]/40">
           {/* Main grid row */}

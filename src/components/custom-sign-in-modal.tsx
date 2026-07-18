@@ -64,7 +64,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
       </button>
 
       {showDesktopOnlyMessage ? (
-        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-onest">
+        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-sans">
           <Image
             src="/logo.png"
             alt="Logo"
@@ -123,7 +123,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
               ) : (
                 <Image src="/google.svg" alt="Google" width={16} height={16} />
               )}
-              <span className="text-[15px] font-[500] font-onest">
+              <span className="text-[15px] font-[500] font-sans">
                 Get started
               </span>
             </button>

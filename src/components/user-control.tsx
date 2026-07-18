@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,7 +50,7 @@ export const UserControl = ({ showName }: Props) => {
           </AvatarFallback>
         </Avatar>
         {showName && (
-          <span className="text-sm text-white font-onest truncate max-w-[100px] hidden sm:inline-block">
+          <span className="text-sm text-white font-sans truncate max-w-[100px] hidden sm:inline-block">
             {user.fullName || user.firstName}
           </span>
         )}
@@ -59,7 +58,7 @@ export const UserControl = ({ showName }: Props) => {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-[216px]  bg-[#2f2f2f] text-white font-onest rounded-[10px] shadow-xl border-0 p-0"
+        className="w-[216px]  bg-[#2f2f2f] text-white font-sans rounded-[10px] shadow-xl border-0 p-0"
       >
         {/* User info header */}
         <div className="flex items-start justify-between gap-2 p-3">

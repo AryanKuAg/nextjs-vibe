@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center font-onest px-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center font-sans px-6">
       <Link href="/" className="flex items-center gap-2 mb-8">
         <Image src="/logo.png" alt="Framerate" width={24} height={24} />
         <span className="text-white text-lg">Framerate</span>

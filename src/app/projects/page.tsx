@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -143,42 +144,33 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white font-onest flex flex-col font-mono selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-sans flex flex-col font-mono selection:bg-[#F1336E]/30">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[#2A2A28]">
-        <div className="flex items-center gap-2 text-sm text-[#8A8A8A]">
-          <button
-            onClick={handleDashboardClick}
-            disabled={createProject.isPending}
-            className="hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {createProject.isPending ? "Creating..." : "Dashboard"}
-          </button>
-          <i className="ri-arrow-right-s-line" />
-          <span className="text-[#EBEBEB]">Projects</span>
+      <header className="flex items-center justify-between p-6 md:px-8">
+        <div className="flex items-center gap-3 text-[13px] text-white/50 font-medium">
+          <Image src="/logo.png" alt="Framerate" width={24} height={24} className="mr-2" />
+          <Link href="/" className="hover:text-white transition-colors duration-200">
+            Home
+          </Link>
+          <span className="text-white/30">/</span>
+          <span className="text-white">Projects</span>
         </div>
-
-        <div className="flex items-center gap-4">
-          <div className="bg-[#282828] rounded-full px-3 py-1.5 text-sm text-white">
-            <i className="ri-sparkling-2-fill text-white text-sm mr-1.5" />
-            {usage ? `${Number(usage.remainingCredits).toLocaleString("en-US")} credits` : "Loading credits..."}
-          </div>
-          <UserControl showName={false} />
-        </div>
+        <UserControl showName={false} />
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-4xl mx-auto py-12 px-6 overflow-y-auto">
+      <main className="flex-1 w-full max-w-[1200px] mx-auto py-12 px-6 overflow-y-auto">
         <section>
-          <h2 className="text-xl font-bold mb-6 text-white tracking-wide">Projects</h2>
+          <h2 className="text-[15px] font-medium mb-8 text-white/80">Projects</h2>
 
           {isProjectsLoading ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Skeleton className="aspect-video w-full rounded-xl bg-[#2A2A28]" />
               <Skeleton className="aspect-video w-full rounded-xl bg-[#2A2A28]" />
               <Skeleton className="aspect-video w-full rounded-xl bg-[#2A2A28]" />
             </div>
           ) : projects && projects.length > 0 ? (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {(projects as { id: string; name: string; sceneImageUrls?: Array<string | { url?: string }> | null; prompts?: any[] | null }[]).map((project) => {
                 const thumbnails = Array.isArray(project.sceneImageUrls) ? project.sceneImageUrls : [];

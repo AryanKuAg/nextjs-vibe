@@ -28,7 +28,7 @@ export default function PricingPage() {
       <PillNavbar />
 
       {/* Hero */}
-      <header className="pt-40 pb-12 px-4 md:px-6 flex flex-col items-center text-center font-onest">
+      <header className="pt-40 pb-12 px-4 md:px-6 flex flex-col items-center text-center font-sans">
         <h1 className="text-3xl md:text-5xl text-white font-[500] leading-[1] mb-4 font-stack-sans-notch">
           Simple, transparent pricing
         </h1>

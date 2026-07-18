@@ -80,7 +80,7 @@ export const PricingCard = ({ title, desc, price, features, className, isPopular
   };
 
   return (
-    <div className={cn("relative flex flex-col  bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-[500] p-6 font-onest", isPopular && "border-2 border-white", className)}>
+    <div className={cn("relative flex flex-col  bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-[500] p-6 font-sans", isPopular && "border-2 border-white", className)}>
       {isPopular && (
         <Image
           src="/pricing_gradient.png"

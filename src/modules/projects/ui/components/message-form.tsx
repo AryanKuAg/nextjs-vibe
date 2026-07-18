@@ -98,7 +98,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
     staleTime: 30_000,
   });
   const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
-  
+
   const lastMessage = existingMessages?.[(existingMessages?.length ?? 0) - 1];
   const isWaitingForInteractive = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "INTERACTIVE";
 
@@ -113,6 +113,10 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
       if (pendingPrompt && !form.getValues().value && !isFollowUp) {
         form.setValue("value", pendingPrompt, { shouldValidate: true });
         sessionStorage.removeItem("pending_builder_prompt");
+        // Auto-submit the prompt that was carried over from the dashboard
+        setTimeout(() => {
+          form.handleSubmit(onSubmit)();
+        }, 100);
       } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
         form.setValue("value", initialPrompt, { shouldValidate: true });
       }
@@ -256,7 +260,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all duration-300 ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction ? "ring-1 ring-[#5b36ff] shadow-[0_0_15px_rgba(91,54,255,0.15)]" : ""}`}
+          className={`bg-gray-bg rounded-[12px] p-3 space-y-3 relative border ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction ? "border-purple shadow-[0_0_15px_rgba(91,54,255,0.15)]" : "border-white-8"}`}
         >
           {uploadedDataUrl && (
             <div className="relative w-fit">
@@ -289,7 +293,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                 disabled={isPending || isInteractiveSubmitting}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
+                className="w-full bg-transparent text-[14px] placeholder:text-[14px] text-white outline-none resize-none min-h-[24px] placeholder:text-white/50 mb-0 ring-0"
                 placeholder={pendingInteractiveAction ? "Enter your prompt..." : "Describe your website..."}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -306,7 +310,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
               type="button"
               onClick={() => imageInputRef.current?.click()}
               disabled={isPending}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
+              className="w-7 h-7 flex items-center justify-center rounded-[8px] border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
               title="Attach image"
             >
               <i className="ri-add-line" />
@@ -319,18 +323,22 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-[#fefefe] transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-full border border-white-8 hover:bg-white-8 text-white "
                 >
-                  <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
+                  {cancelGeneration.isPending ? (
+                    <i className="ri-loader-4-line animate-spin" />
+                  ) : (
+                    <div className="w-[10px] h-[10px] bg-current rounded-[2px]" />
+                  )}
                 </button>
               ) : isButtonDisabled ? (
                 <button
                   type="submit"
                   disabled
                   className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
-                      ? "bg-[#5b36ff] opacity-50 text-white"
+                      ? "bg-purple opacity-50 text-white"
                       : "bg-[#333] text-[#777]"
                   )}
                 >
@@ -340,9 +348,9 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                 <button
                   type="submit"
                   className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
-                      ? "bg-[#5b36ff] text-white hover:bg-[#4a2ce6]"
+                      ? "bg-purple text-white hover:bg-purple/60"
                       : "bg-white text-black hover:bg-[#ddd]"
                   )}
                 >

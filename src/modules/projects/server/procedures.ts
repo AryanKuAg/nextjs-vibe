@@ -105,33 +105,8 @@ export const projectsRouter = createTRPCRouter({
           status: "draft",
           currentStage: "SCENE",
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
-          ...(input.value.trim()
-            ? {
-              messages: {
-                create: {
-                  content: input.value,
-                  role: "USER",
-                  type: "RESULT",
-                  stage: "SCENE",
-                },
-              },
-            }
-            : {}),
         },
       });
-
-      if (input.value.trim()) {
-        await inngest.send({
-          name: "autonomous-agent/run",
-          data: {
-            prompt: input.value,
-            projectId: createdProject.id,
-            userId: ctx.auth.userId,
-            model: "deepseek/deepseek-v4-flash", // Default fallback model
-            isAgentMode: input.isAgentMode,
-          },
-        });
-      }
 
       return createdProject;
     }),

@@ -188,7 +188,7 @@ export const MessagesContainer = ({
           <button
             type="button"
             onClick={onBack}
-            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-onest text-sm hover:bg-[#282828]! font-[400] h-[32px]"
+            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-sans text-sm hover:bg-[#282828]! font-[400] h-[32px]"
           >
             Back
           </button>

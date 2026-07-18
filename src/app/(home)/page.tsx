@@ -1,68 +1,48 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
-import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
+import { useEffect, useRef, useState } from "react";
+import { SignedIn, SignedOut, useSignIn, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTRPC } from "@/trpc/client";
-import { motion } from "framer-motion";
+import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
-import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
-import { Footer } from "@/modules/home/ui/components/footer";
-import { FAQSection } from "@/modules/home/ui/components/faq-section";
-import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
-import { TestimonialsSection } from "@/modules/home/ui/components/testimonials-section";
-import { PricingSection } from "@/modules/home/ui/components/pricing-section";
-import { ComparisonSection } from "@/modules/home/ui/components/comparison-section";
+import { UserControl } from "@/components/user-control";
 
-// Isolated component — bypasses React hydration entirely via useEffect
-const HeroVideo = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
+/* ─── Site preview cards data ─── */
+const SITES = [
+  {
+    title: "Vaultone",
+    href: "https://vaultoneframerate.netlify.app",
+    imgSrc: "https://assets.framerate.space/templates/stake/template.png",
+  },
+  {
+    title: "Orbis",
+    href: "https://orbisframerate.netlify.app",
+    imgSrc: "https://assets.framerate.space/templates/planet%20robot/template.jpg",
+  },
+  {
+    title: "Theo",
+    href: "https://theoframerate.netlify.app/",
+    imgSrc: "https://assets.framerate.space/templates/Theo/Template.png",
+  },
+  {
+    title: "Strata",
+    href: "https://strataframerate.netlify.app/",
+    imgSrc: "https://assets.framerate.space/templates/stone/template.png",
+  },
+  {
+    title: "Aether",
+    href: "https://spacexmarsmission.netlify.app",
+    imgSrc: "https://assets.framerate.space/mars_template.jpg",
+  },
+  {
+    title: "Obisidian",
+    href: "https://obisidianframerate.netlify.app",
+    imgSrc: "https://assets.framerate.space/templates/turtle/template.png",
+  },
+];
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.setAttribute("preload", "auto");
-    video.className = "w-full h-full object-cover ";
-
-    const source = document.createElement("source");
-    source.src = "https://assets.framerate.space/hero_bg_480p.mp4";
-    source.type = "video/mp4";
-    video.appendChild(source);
-    container.appendChild(video);
-    video.play().catch(() => { });
-
-    return () => { container.innerHTML = ""; };
-  }, []);
-
-  return <div ref={containerRef} className="absolute inset-0 z-0 bg-[#0e0e0e] scale-105" />;
-
-  // return (
-  //   <motion.div
-  //     className="absolute inset-0 z-0 bg-[#0e0e0e]"
-  //     initial={{ opacity: 0, scale: 1.05 }}
-  //     animate={{ opacity: 1, scale: 1 }}
-  //     transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
-  //   >
-  //     {/* eslint-disable-next-line @next/next/no-img-element */}
-  //     <img
-  //       src="https://assets.framerate.space/Hero%20BG%20IMG.png"
-  //       alt="Hero Background"
-  //       className="w-full h-full object-cover opacity-80"
-  //     />
-  //   </motion.div>
-  // );
-};
-
-
-
+/* ─── Site Preview Card ─── */
 interface SitePreviewCardProps {
   title: string;
   href: string;
@@ -74,22 +54,27 @@ const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block rounded-[24px] font-onest overflow-hidden relative"
+    className="group block rounded-[12px] font-sans overflow-hidden relative"
   >
-    <div className="relative aspect-[1280/720] w-full bg-transparent">
-      <Image src={imgSrc} alt={`${title} - 3D scroll library template`} fill className="object-cover  transition-transform duration-500 group-hover:scale-105" />
+    <div className="relative aspect-[1280/720] w-full bg-grey-bg">
+      <Image
+        src={imgSrc}
+        alt={`${title} - 3D website template`}
+        fill
+        className="object-cover transition-transform duration-500 group-hover:scale-105"
+      />
 
-      {/* Top Gradient for text readability */}
-      <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+      {/* Top Gradient */}
+      <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
 
-      {/* Top Left Title */}
-      <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-        <span className="text-white font-[500] text-sm md:text-[15px]">{title}</span>
+      {/* Title */}
+      <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+        <span className="text-white font-medium text-sm">{title}</span>
       </div>
 
-      {/* Top Right Preview Pill */}
-      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-        <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-[15px] px-6 py-2.5 rounded-[16px] flex items-center justify-center font-[500] hover:bg-black/60 transition-colors">
+      {/* Preview pill */}
+      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+        <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
           Preview
         </div>
       </div>
@@ -97,64 +82,73 @@ const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
   </a>
 );
 
-interface FeatureCardProps {
-  step: string;
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}
+/* ─── Logged In Dashboard ─── */
+const LoggedInDashboard = () => {
+  return (
+    <main className="min-h-screen bg-bg font-sans flex flex-col">
+      {/* Top Navigation */}
+      <header className="flex items-center justify-between p-6 md:px-8">
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Framerate" width={24} height={24} />
 
-const BenefitCard = ({ iconClass, title, description }: { iconClass: string; title: string; description: string }) => (
-  <div className="flex flex-col p-6 bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-onest">
-    <i className={`${iconClass} text-white mb-6 text-xl`} />
-    <div className="flex flex-col">
-      <h3 className="text-[16px] text-white font-[500]">{title}</h3>
-      <p className="text-[14px] text-[#737373] pt-1.5 font-[500] leading-[1.4]">{description}</p>
-    </div>
-  </div>
-);
+        </div>
+        <UserControl />
+      </header>
 
-const FeatureCard = ({ step, title, description, children }: FeatureCardProps) => (
-  <div className="flex flex-col gap-2 group p-2 bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] font-onest">
-    <div className="relative aspect-[5/2]   overflow-hidden p-3">
-      {children}
-    </div>
-    <div className="flex flex-col">
-      <div className="text-sm text-[#737373] pl-4 pt-2 font-[500]">{step}</div>
-      <h3 className="text-[16px] text-white font-[500] pl-4 pt-2">{title}</h3>
-      <p className="text-[14px] text-[#737373] pl-4 pt-0.5 pb-4 font-[500]">{description}</p>
-    </div>
-  </div>
-);
+      {/* Main Content (Centered) */}
+      <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
+        <h1 className="text-white text-2xl md:text-[32px] font-medium mb-8 text-center">
+          Describe your 3D website. We&apos;ll build it.
+        </h1>
 
-const BrowseTemplatesButton = () => {
+        <div className="w-full max-w-3xl">
+          <ProjectForm showModelSelector />
+        </div>
+
+        {/* Templates Section */}
+        <div className="w-full max-w-[1200px] mt-24 mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-white/80 text-sm font-medium">Templates</h2>
+            <button className="px-3 py-1.5 rounded-full border border-white-12 text-white/70 text-xs font-medium hover:bg-white-4 transition-colors">
+              See more
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SITES.map((site, idx) => (
+              <SitePreviewCard
+                key={`${site.title}-${idx}`}
+                title={site.title}
+                href={site.href}
+                imgSrc={site.imgSrc}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+};
+
+
+/* ─── Logged Out View ─── */
+const LoggedOutView = () => {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { signIn, isLoaded } = useSignIn();
   const [isPending, setIsPending] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const createProject = useMutation(
-    trpc.projects.create.mutationOptions({
-      onSuccess: (data) => {
-        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}`);
-      },
-    })
-  );
 
   const handleGoogleSignIn = async () => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
+
     try {
+      // @ts-expect-error
       window.google?.accounts.id.cancel();
-    } catch { }
+    } catch {
+      // Ignore cancel errors
+    }
+
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -162,356 +156,135 @@ const BrowseTemplatesButton = () => {
     });
   };
 
-  const handleStartBuilding = async () => {
-    await createProject.mutateAsync({ value: "" });
-  };
+  useEffect(() => {
+    let animationFrameId: number;
+    let isHovered = false;
 
-  const isActionPending = isPending || createProject.isPending;
+    const container = scrollRef.current;
+    if (!container) return;
 
-  const btnClass = "px-6 py-3.5 rounded-[12px] border border-[#2c2c2c] hover:bg-white/4 transition-colors text-white text-sm font-[500] font-onest flex items-center justify-center disabled:opacity-50";
+    const handleMouseEnter = () => (isHovered = true);
+    const handleMouseLeave = () => (isHovered = false);
 
-  if (!mounted) {
-    return (
-      <button disabled className={btnClass}>
-        Browse all templates
-      </button>
-    );
-  }
+    container.addEventListener("mouseenter", handleMouseEnter);
+    container.addEventListener("mouseleave", handleMouseLeave);
 
-  return (
-    <>
-      <SignedOut>
-        <button onClick={handleGoogleSignIn} disabled={isActionPending} className={btnClass}>
-          {isActionPending ? "Loading..." : "Browse all templates"}
-        </button>
-      </SignedOut>
-      <SignedIn>
-        <button onClick={handleStartBuilding} disabled={isActionPending} className={btnClass}>
-          {isActionPending ? "Loading..." : "Browse all templates"}
-        </button>
-      </SignedIn>
-    </>
-  );
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20, filter: "blur(2px)" },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.9,
-      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
-    }
-  }
-};
-
-const heroItemVariants = {
-  hidden: { opacity: 0, y: 15, filter: "blur(4px)" },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: {
-      duration: 1.2,
-      ease: [0.16, 1, 0.3, 1] as [number, number, number, number]
-    }
-  }
-};
-
-const FadeInSection = ({ children, className, id }: { children: React.ReactNode, className?: string, id?: string }) => (
-  <motion.section
-    id={id}
-    className={className}
-    initial="hidden"
-    whileInView="visible"
-    viewport={{ once: true, amount: 0.3 }}
-    variants={{
-      visible: { transition: { staggerChildren: 0.12, delayChildren: 0.06 } },
-      hidden: {}
-    }}
-  >
-    {children}
-  </motion.section>
-);
-
-const Page = () => {
-  const jsonLd = [
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Framerate",
-      "url": "https://framerate.space",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://framerate.space/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
+    const scroll = () => {
+      if (!isHovered && container) {
+        container.scrollTop += 0.5;
+        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+          container.scrollTop = 0;
+        }
       }
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      "name": "Framerate",
-      "url": "https://framerate.space",
-      "telephone": "+919334801895",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "123 Placeholder St",
-        "addressLocality": "City",
-        "addressRegion": "ST",
-        "postalCode": "12345",
-        "addressCountry": "US"
-      },
-      "sameAs": [
-        "https://facebook.com/placeholder",
-        "https://twitter.com/placeholder",
-        "https://instagram.com/placeholder",
-        "https://linkedin.com/company/placeholder",
-        "https://youtube.com/c/placeholder"
-      ]
-    }
-  ];
+      animationFrameId = requestAnimationFrame(scroll);
+    };
+
+    animationFrameId = requestAnimationFrame(scroll);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      container.removeEventListener("mouseenter", handleMouseEnter);
+      container.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  const repeatedSites = Array.from({ length: 10 }).flatMap(() => SITES);
 
   return (
-    <main className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <PillNavbar />
+    <main className="h-screen bg-bg font-sans flex flex-col md:flex-row overflow-hidden">
+      {/* ── Left Panel (Fixed) ── */}
+      <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col justify-between p-3 md:h-screen overflow-y-auto overflow-x-hidden">
+        {/* Top: Logo + Content */}
+        <div className="flex flex-col p-3">
+          {/* Logo */}
+          <div className="flex items-center gap-2 mb-10 md:mb-16">
+            <Image src="/logo.png" alt="Framerate" width={24} height={24} />
+            <span className="text-white font-medium text-[15px]">Framerate</span>
+          </div>
 
-      {/* Hero Section */}
-      <header className="relative min-h-[100vh] flex flex-col items-center justify-end pb-6 md:pb-[40px] px-4 overflow-hidden">
-        <HeroVideo />
-
-        {/* Uniform dark tint overlay */}
-        {/* <div
-          className="absolute inset-0 z-[1] pointer-events-none"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.16)' }}
-        /> */}
-
-
-        <motion.div
-          className="relative z-10 w-full max-w-4xl mx-auto md:px-12 flex flex-col items-center"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } },
-            hidden: {}
-          }}
-        >
-          <motion.h1 variants={heroItemVariants} className="text-4xl md:text-6xl text-white font-stack-sans-notch text-center leading-[1] drop-shadow-2xl font-[700] mb-4">
+          {/* Headline */}
+          <h1 className="text-[28px] lg:text-[32px] font-stack-sans-notch text-white leading-[1.1] font-bold mb-3">
             Ship 3D websites in minutes with AI
-          </motion.h1>
-          <motion.p variants={heroItemVariants} className="font-[500] font-onest text-white mb-8 md:mb-[40px] text-sm text-center">
+          </h1>
+
+          {/* Description */}
+          <p className="text-sm text-white-50 font-medium leading-relaxed mb-6">
             Just describe your vision and watch it turn into a live, interactive experience in few minutes.
-          </motion.p>
-          <motion.div variants={heroItemVariants} className="w-full flex justify-center">
-            <ProjectForm />
-          </motion.div>
-        </motion.div>
-      </header>
+          </p>
 
-
-      {/* Features Section */}
-      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">How our 3D website builder works</motion.h2>
-          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">From prompt to cinematic website in just three simple steps.</motion.p>
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mb-8 md:mb-12">
+            <SignedOut>
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={isPending}
+                className="px-4 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium transition-colors flex items-center gap-1.5 bg-white disabled:opacity-70"
+              >
+                {isPending ? (
+                  <i className="ri-loader-4-line animate-spin text-sm" />
+                ) : (
+                  <Image src="/google.svg" alt="Google" width={14} height={14} className="shrink-0" />
+                )}
+                Sign in with Google
+              </button>
+            </SignedOut>
+            <SignedIn>
+              <button
+                onClick={() => router.push("/manage")}
+                className="px-4 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium transition-colors flex items-center gap-1.5 bg-white"
+              >
+                <i className="ri-arrow-right-line text-sm" />
+                Go to Dashboard
+              </button>
+            </SignedIn>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div variants={itemVariants}>
-            <FeatureCard
-              step="01"
-              title="Generate background"
-              description="Prompt and create a custom scene with AI."
-            >
-              <Image
-                src="/generate_background.png"
-                alt="Generate background"
-                fill
-                className="object-cover rounded-[16px]"
-              />
-            </FeatureCard>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <FeatureCard
-              step="02"
-              title="Animate the scene"
-              description="Turn your image into a smooth cinematic video."
-            >
-              <Image
-                src="/animate_the_scene.png"
-                alt="Animate the scene"
-                fill
-                className="object-cover rounded-[16px]"
-              />
-            </FeatureCard>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <FeatureCard
-              step="03"
-              title="Build your website"
-              description="Convert video into a scroll driven 3D experience."
-            >
-              <Image
-                src="/build_your_website.png"
-                alt="Build your website"
-                fill
-                className="object-cover rounded-[16px]"
-              />
-            </FeatureCard>
-          </motion.div>
+        {/* Bottom: Prompt Input */}
+        <div className="mt-auto">
+          <ProjectForm showModelSelector />
         </div>
-      </FadeInSection>
+      </div>
 
-      {/* Benefits Section */}
-      <FadeInSection id="features" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">Built for shipping 3D websites, not configuring</motion.h2>
-          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">Fastest way to go from a text prompt to a live, production-ready 3D website.</motion.p>
+      {/* ── Right Panel (Scrollable) ── */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-3 md:p-4 md:pl-0"
+        style={{ scrollBehavior: 'auto' }}
+      >
+        <div className="columns-1 md:columns-2 gap-3 md:gap-4 space-y-3 md:space-y-4">
+          {repeatedSites.map((site, idx) => (
+            <SitePreviewCard
+              key={`${site.title}-${idx}`}
+              title={site.title}
+              href={site.href}
+              imgSrc={site.imgSrc}
+            />
+          ))}
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-mouse-line"
-              title="Cinematic Scroll"
-              description="Every frame, every layer — locked at 60fps. Smooth by default."
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-play-fill"
-              title="Seamless Video Flow"
-              description="Chain multiple videos into one unbroken visual story across your entire page."
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-cpu-line"
-              title="Built by the Best Models"
-              description="Claude, Gemini, GPT — the most powerful AI available, all in one builder."
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-chat-2-line"
-              title="Iterative chat editing"
-              description="Describe any change in chat. Framerate updates your site in real time."
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-layout-grid-line"
-              title="Industry presets gallery"
-              description="Start from a template built for your world — not a blank, generic canvas."
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <BenefitCard
-              iconClass="ri-file-code-line"
-              title="Full site export"
-              description="Download clean, production-ready code. Host anywhere. No lock-in, ever."
-            />
-          </motion.div>
-        </div>
-      </FadeInSection>
-
-      {/* Real Sites Section */}
-      <FadeInSection id="sites" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col items-center mb-10">
-          <motion.h2 variants={itemVariants} className="text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700] mb-4">Scroll-driven 3D websites you&apos;ll wish were yours</motion.h2>
-          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm">Not sure where to start? Pick a scene built with our 3d scroll library.</motion.p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Vaultone"
-              href="https://vaultoneframerate.netlify.app"
-              imgSrc="https://assets.framerate.space/templates/stake/template.png"
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Orbis"
-              href="https://orbisframerate.netlify.app"
-              imgSrc="https://assets.framerate.space/templates/planet%20robot/template.jpg"
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Theo"
-              href="https://theoframerate.netlify.app/"
-              imgSrc="https://assets.framerate.space/templates/Theo/Template.png"
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Strata"
-              href="https://strataframerate.netlify.app/"
-              imgSrc="https://assets.framerate.space/templates/stone/template.png"
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Aether"
-              href="https://spacexmarsmission.netlify.app"
-              imgSrc="https://assets.framerate.space/mars_template.jpg"
-            />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <SitePreviewCard
-              title="Obisidian"
-              href="https://obisidianframerate.netlify.app"
-              imgSrc="https://assets.framerate.space/templates/turtle/template.png"
-            />
-          </motion.div>
-        </div>
-
-        <motion.div variants={itemVariants} className="mt-10 flex justify-center font-onest">
-          <BrowseTemplatesButton />
-        </motion.div>
-      </FadeInSection>
-
-      <TestimonialsSection />
-
-      <FadeInSection id="pricing" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
-        <PricingSection title="Simple, transparent pricing" desc="Flexible plans built for hobbyists, creators, and teams." />
-      </FadeInSection>
-
-      <FadeInSection>
-        <motion.div variants={itemVariants}>
-          <ComparisonSection />
-        </motion.div>
-      </FadeInSection>
-
-      {/* Pricing Section */}
-      {/* <section className="py-20 px-6 max-w-7xl mx-auto w-full">
-        <PricingSection title="Pricing" />
-      </section> */}
-
-      <FadeInSection className="py-[60px] md:py-20 px-4 sm:px-6 max-w-2xl mx-auto w-full">
-        <motion.div variants={itemVariants}>
-          <FAQSection />
-        </motion.div>
-      </FadeInSection>
-
-      {/* Final CTA Section */}
-      <FadeInSection className="px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <motion.div variants={itemVariants}>
-          <FinalCTASection />
-        </motion.div>
-      </FadeInSection>
-
-      <Footer />
+      </div>
     </main>
   );
 };
 
-export default Page;
+
+/* ─── Main Page Export ─── */
+export default function Page() {
+  const { user, isLoaded } = useUser();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isLoaded) {
+    return <div className="min-h-screen bg-bg" />;
+  }
+
+  if (user) {
+    return <LoggedInDashboard />;
+  }
+
+  return <LoggedOutView />;
+}
+

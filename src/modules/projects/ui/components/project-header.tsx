@@ -63,10 +63,10 @@ export const ProjectHeader = ({ projectId }: Props) => {
   };
 
   return (
-    <header className="p-2.5 flex justify-between items-center h-[56px] shrink-0">
-      <div className="flex items-center gap-3 pl-2">
+    <header className="p-2.5 flex justify-between items-center h-[52px] shrink-0">
+      <div className="flex items-center gap-6 pl-2">
         <Link href="/">
-          <Image src="/logo.png" alt="framerate" width={24} height={24} />
+          <Image src="/logo.png" alt="framerate" width={28} height={28} />
         </Link>
 
         {isEditing ? (

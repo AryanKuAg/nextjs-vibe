@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
+import { TemplatesModal } from "@/components/templates-modal";
 
 /* ─── Site preview cards data ─── */
 const SITES = [
@@ -54,7 +55,7 @@ const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block rounded-[12px] font-sans overflow-hidden relative"
+    className="group block rounded-[8px] font-sans overflow-hidden relative"
   >
     <div className="relative aspect-[1280/720] w-full bg-grey-bg">
       <Image
@@ -84,10 +85,11 @@ const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
 
 /* ─── Logged In Dashboard ─── */
 const LoggedInDashboard = () => {
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
   return (
     <main className="min-h-screen bg-bg font-sans flex flex-col">
       {/* Top Navigation */}
-      <header className="flex items-center justify-between p-6 md:px-8">
+      <header className="flex items-center justify-between p-3 md:px-3">
         <div className="flex items-center gap-2">
           <Image src="/logo.png" alt="Framerate" width={24} height={24} />
 
@@ -97,7 +99,7 @@ const LoggedInDashboard = () => {
 
       {/* Main Content (Centered) */}
       <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
-        <h1 className="text-white text-2xl md:text-[32px] font-medium mb-8 text-center">
+        <h1 className="text-white-85 text-2xl mb-10 text-center">
           Describe your 3D website. We&apos;ll build it.
         </h1>
 
@@ -106,15 +108,18 @@ const LoggedInDashboard = () => {
         </div>
 
         {/* Templates Section */}
-        <div className="w-full max-w-[1200px] mt-24 mb-12">
+        <div className="w-full max-w-[960px] mt-30 mb-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-white/80 text-sm font-medium">Templates</h2>
-            <button className="px-3 py-1.5 rounded-full border border-white-12 text-white/70 text-xs font-medium hover:bg-white-4 transition-colors">
+            <button
+              onClick={() => setIsTemplatesModalOpen(true)}
+              className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
+            >
               See more
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {SITES.map((site, idx) => (
               <SitePreviewCard
                 key={`${site.title}-${idx}`}
@@ -126,6 +131,11 @@ const LoggedInDashboard = () => {
           </div>
         </div>
       </div>
+      <TemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        templates={SITES}
+      />
     </main>
   );
 };

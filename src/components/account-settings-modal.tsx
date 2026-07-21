@@ -128,7 +128,7 @@ export const AccountSettingsModal = ({
                 <button
                   onClick={() => portalMutation.mutate()}
                   disabled={portalMutation.isPending || usage?.plan === "free" || !usage?.plan}
-                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[12px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium"
+                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
                 >
                   {portalMutation.isPending ? "Redirecting..." : "Manage subscription"}
                 </button>
@@ -139,7 +139,7 @@ export const AccountSettingsModal = ({
                 <span className="text-sm leading-[20px] text-white-85">Sign out</span>
                 <button
                   onClick={handleSignOut}
-                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[12px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium"
+                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
                 >
                   Sign out
                 </button>
@@ -151,7 +151,7 @@ export const AccountSettingsModal = ({
                 <button
                   onClick={handleDeleteAccount}
                   disabled={deleteAccountMutation.isPending}
-                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[12px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium"
+                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
                 >
                   {deleteAccountMutation.isPending ? "Deleting..." : "Delete account"}
                 </button>

@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 
 
 import { useTRPC } from "@/trpc/client";
@@ -230,7 +231,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all w-full`}
+          className={`bg-grey-bg rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border border-transparent focus-within:border-purple shadow-[0_4px_16px_rgba(0,0,0,0.25)]`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -240,7 +241,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
               <img
                 src={imagePreviewUrl}
                 alt="Uploaded"
-                className="w-16 h-16 rounded-[4px] object-cover"
+                className="w-12 h-12 rounded-[4px] object-cover"
               />
               <button
                 type="button"
@@ -259,11 +260,12 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
             render={({ field }) => (
               <TextareaAutosize
                 {...field}
+                autoFocus
                 disabled={isPending}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
-                placeholder="Describe your website..."
+                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[24px] placeholder:text-white-50 "
+                placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -275,7 +277,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-1 mt-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -286,39 +288,50 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
 
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={isPending}
-              className="w-8 h-8 flex shrink-0 items-center justify-center rounded-lg border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px] border border-white-8 text-white hover:bg-white-8 cursor-pointer disabled:opacity-50 text-base"
               title="Attach image"
             >
-              <i className="ri-add-line" />
+              <i className="ri-add-line text-base" />
             </button>
 
             {showModelSelector && (
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg border border-[#333] text-xs text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  className="h-7 px-2 flex items-center gap-1 rounded-lg border border-white-8 text-sm leading-[20px] text-white-85 hover:bg-white-8 cursor-pointer"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
                   <span className="whitespace-nowrap">{MODELS.find((m) => m.id === selectedModel)?.label}</span>
-                  <i className="ri-arrow-up-s-line mt-0.5 text-white" />
+                  <i className={`ri-arrow-${modelDropdownOpen ? 'up' : 'down'}-s-line text-white-85 text-xs`} />
                 </div>
 
-                {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-[#1c1c1c] border border-white-8 rounded-[8px] overflow-hidden min-w-[150px] shadow-xl">
-                    {MODELS.map((model) => (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-sans transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-white-50"}`}
-                      >
-                        <span className="whitespace-nowrap">{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <AnimatePresence>
+                  {modelDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="absolute top-9 left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col"
+                    >
+                      {MODELS.map((model) => (
+                        <button
+                          key={model.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                          className={`w-full flex items-center justify-between gap-3 px-2 py-2.5 text-sm font-sans rounded-[4px]  hover:bg-white-8 h-[28px] text-white-85`}
+                        >
+                          <span className="whitespace-nowrap">{model.label}</span>
+                          {selectedModel === model.id && <i className="ri-check-line text-white" />}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
@@ -327,19 +340,19 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
                 <button
                   type="submit"
                   disabled
-                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all bg-[#333] text-[#777]"
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white opacity-50"
                 >
-                  <i className="ri-arrow-up-line font-bold" />
+                  <i className="ri-arrow-up-line text-base" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all bg-white text-black hover:bg-[#ddd]"
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white hover:bg-purple/80 active:scale-95 transition-transform duration-200"
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />
                   ) : (
-                    <i className="ri-arrow-up-line font-bold" />
+                    <i className="ri-arrow-up-line text-base" />
                   )}
                 </button>
               )}

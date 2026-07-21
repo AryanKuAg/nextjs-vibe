@@ -67,7 +67,7 @@ function ProjectCard({ id, name, thumbnail }: ProjectCardProps) {
     <div className="flex flex-col group">
       {/* Thumbnail — navigates to project */}
       <Link href={`/projects/${id}`} className="block">
-        <div className="relative aspect-video w-full rounded-xl bg-[#2A2A28] overflow-hidden border border-[#3B3B3B] transition-colors group-hover:border-[#5A5A5A]">
+        <div className="relative aspect-video w-full rounded-[8px] bg-[#2A2A28] overflow-hidden transition-colors group-hover:border-[#5A5A5A]">
           {thumbnail ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={thumbnail} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
@@ -94,7 +94,7 @@ function ProjectCard({ id, name, thumbnail }: ProjectCardProps) {
           />
         ) : (
           <span
-            className="flex-1 min-w-0 truncate text-sm text-[#EBEBEB] font-medium group-hover:text-white transition-colors capitalize cursor-text"
+            className="flex-1 min-w-0 truncate text-xs text-white-85 font-medium group-hover:text-white transition-colors capitalize cursor-text"
             onDoubleClick={startEditing}
             title="Double-click to rename"
           >
@@ -144,24 +144,24 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white font-sans flex flex-col font-mono selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-sans flex flex-col  selection:bg-[#F1336E]/30">
       {/* Header */}
-      <header className="flex items-center justify-between p-6 md:px-8">
-        <div className="flex items-center gap-3 text-[13px] text-white/50 font-medium">
+      <header className="flex items-center justify-between p-3">
+        <div className="flex items-center gap-2 text-[14px] text-white/50 font-medium">
           <Image src="/logo.png" alt="Framerate" width={24} height={24} className="mr-2" />
-          <Link href="/" className="hover:text-white transition-colors duration-200">
+          <Link href="/" className="hover:text-white-85 transition-colors duration-200">
             Home
           </Link>
           <span className="text-white/30">/</span>
-          <span className="text-white">Projects</span>
+          <span className="text-white-85">Projects</span>
         </div>
         <UserControl showName={false} />
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-[1200px] mx-auto py-12 px-6 overflow-y-auto">
+      <main className="flex-1 w-full max-w-[1200px] mx-auto py-30 px-6 overflow-y-auto">
         <section>
-          <h2 className="text-[15px] font-medium mb-8 text-white/80">Projects</h2>
+          <h2 className="text-sm font-medium mb-8 text-white/80">Projects</h2>
 
           {isProjectsLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

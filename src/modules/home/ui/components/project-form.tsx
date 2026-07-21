@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useState, useRef, useEffect } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +44,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -149,14 +151,15 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
         router.push(url);
       },
       onError: (error) => {
-        toast.error(error.message, { duration: Infinity });
-
         if (error.data?.code === "UNAUTHORIZED") {
           clerk.openSignIn();
+          return;
         }
 
-        if (error.data?.code === "TOO_MANY_REQUESTS") {
-          router.push("/pricing");
+        if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+          setShowCreditsModal(true);
+        } else {
+          toast.error(error.message, { duration: Infinity });
         }
       },
     })
@@ -366,6 +369,10 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
       <CustomSignInModal
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
+      />
+      <CustomOutOfCreditsModal
+        isOpen={showCreditsModal}
+        onClose={() => setShowCreditsModal(false)}
       />
     </Form>
   );

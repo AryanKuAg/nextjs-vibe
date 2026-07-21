@@ -277,11 +277,28 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
   const { action } = userResponse.data;
   if (action === "CANCEL") return { next_agent: "finish" };
 
-  // After wizard, check if media is required. Since we only build 3D websites, it is ALWAYS required.
+  // "Build it for me" = fully autonomous: skip all human intervention steps
+  if (action === "BUILD_FOR_ME") {
+    // Create a progress RESULT message so the wizard INTERACTIVE message
+    // is no longer the last message and the UI shows "Working" instead
+    await step.run("agent-mode-progress-msg", async () => {
+      await prisma.message.create({
+        data: {
+          projectId,
+          role: "ASSISTANT",
+          type: "RESULT",
+          content: ""
+        }
+      });
+    });
+    return { next_agent: "frame_generation", buildPref: action, mediaRequired: true, isAgentMode: true };
+  }
+
+  // "I'll guide the visuals" = human-in-the-loop flow
   const requiresMedia = true;
   let nextAgent = "code_generation";
 
-  if (requiresMedia && !state.isAgentMode && !state.video_url && !state.start_frame_url) {
+  if (requiresMedia && !state.video_url && !state.start_frame_url) {
     nextAgent = "ask_media_intent";
   } else if (requiresMedia) {
     nextAgent = "frame_generation";
@@ -410,6 +427,10 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
   const projectId = state.projectId;
   const currentIteration = state.iteration || 0;
 
+  await step.run(`update-stage-scene-${currentIteration}`, async () => {
+    await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_SCENE" } });
+  });
+
   let frameUrl = "";
   if (process.env.NODE_ENV === "development") {
     await step.sleep(`dev-delay-${currentIteration}`, "4s");
@@ -492,10 +513,9 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
     }
   }
 
-  // If we get here, it means we timed out or received an unhandled action.
-  // We do NOT automatically proceed to video generation unless ANIMATE_VIDEO was explicitly clicked.
-  console.log("[Frame Generation] Did not receive ANIMATE_VIDEO approval. Finishing graph.");
-  return { next_agent: "finish" };
+  // Agent mode: auto-proceed to video generation with the generated frame
+  console.log("[Frame Generation] Agent mode — auto-proceeding to video generation.");
+  return { next_agent: "video_generation", start_frame_url: frameUrl };
 };
 
 const videoGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -505,6 +525,10 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
   let videoUrl = "";
   const projectId = state.projectId;
   const currentIteration = state.iteration || 0;
+
+  await step.run(`update-stage-video-${currentIteration}`, async () => {
+    await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_VIDEO" } });
+  });
 
   if (process.env.NODE_ENV === "development") {
     await step.sleep(`dev-delay-video-${currentIteration}`, "4s");

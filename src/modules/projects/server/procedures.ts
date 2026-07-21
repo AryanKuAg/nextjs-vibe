@@ -78,6 +78,7 @@ export const projectsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        await checkCredits(1);
         await consumeCredits(0); // Project metadata creation is free; generation is charged separately
       } catch (error) {
         if (error instanceof Error) {

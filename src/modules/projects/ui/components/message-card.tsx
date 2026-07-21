@@ -5,19 +5,22 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
 
-const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true }: { createdAt: Date, text?: string, showTimer?: boolean }) => {
-  const [elapsedMs, setElapsedMs] = useState(0);
+const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true, accumulatedTime = 0, isCompleted = false }: { createdAt: Date, text?: string, showTimer?: boolean, accumulatedTime?: number, isCompleted?: boolean }) => {
+  const [elapsedMs, setElapsedMs] = useState(accumulatedTime);
 
   useEffect(() => {
-    if (!showTimer) return;
+    if (!showTimer || isCompleted) {
+      setElapsedMs(accumulatedTime);
+      return;
+    }
     const startMs = new Date(createdAt).getTime();
-    setElapsedMs(Math.max(0, Date.now() - startMs));
+    setElapsedMs(Math.max(0, Date.now() - startMs) + accumulatedTime);
     const timerInterval = setInterval(() => {
-      setElapsedMs(Math.max(0, Date.now() - startMs));
+      setElapsedMs(Math.max(0, Date.now() - startMs) + accumulatedTime);
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [createdAt, showTimer]);
+  }, [createdAt, showTimer, accumulatedTime, isCompleted]);
 
   const seconds = Math.floor(elapsedMs / 1000);
   const m = Math.floor(seconds / 60);
@@ -26,7 +29,12 @@ const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", sho
 
   return (
     <div className="flex items-center gap-2 mb-0.5">
-      <span className="font-normal text-[14px] bg-gradient-to-r from-white/30 via-white to-white/30 bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+      <span className={cn(
+        "font-normal text-[14px]",
+        isCompleted 
+          ? "text-white/80" 
+          : "bg-gradient-to-r from-white/30 via-white to-white/30 bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent"
+      )}>
         {text}
       </span>
       {showTimer && (
@@ -131,6 +139,7 @@ interface AssistantMessageProps {
   content: string;
   fragment: Fragment | null;
   createdAt: Date;
+  startedAt?: Date;
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
@@ -143,12 +152,15 @@ interface AssistantMessageProps {
   currentStage?: string;
   onMockAction?: (action: string) => void;
   isMockSubmitted?: boolean;
+  sessionElapsedMs?: number;
+  onWorkingTimeUpdate?: (deltaMs: number) => void;
 };
 
 const AssistantMessage = ({
   content,
   fragment,
   createdAt,
+  startedAt,
   onFragmentClick,
   type,
   projectId,
@@ -159,7 +171,11 @@ const AssistantMessage = ({
   currentStage,
   onMockAction,
   isMockSubmitted = false,
+  sessionElapsedMs = 0,
+  onWorkingTimeUpdate,
 }: AssistantMessageProps) => {
+  const accumulatedTime = startedAt ? new Date(createdAt).getTime() - new Date(startedAt).getTime() : 0;
+  
   let interactiveContent: InteractiveContent | null = null;
   if (type === "INTERACTIVE") {
     try {
@@ -174,9 +190,23 @@ const AssistantMessage = ({
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [actionSubmittedAt, setActionSubmittedAt] = useState<Date | null>(null);
 
+  // Use the session-level accumulated time (survives across message transitions)
+  // Fall back to component-level accumulatedTime for the initial mount
+  const totalAccumulatedRef = useRef(Math.max(sessionElapsedMs, accumulatedTime));
+  const actionSubmittedAtRef = useRef<Date | null>(null);
+
   const submitted = localSubmitted || isInteractiveSubmitted || isMockSubmitted;
 
   useEffect(() => {
+    // When backend updates the message (new image/buttons), capture the
+    // time elapsed during the last working cycle and add to the running total
+    if (actionSubmittedAtRef.current) {
+      const delta = Date.now() - actionSubmittedAtRef.current.getTime();
+      totalAccumulatedRef.current += delta;
+      // Report upward so the container tracks total time across message transitions
+      onWorkingTimeUpdate?.(delta);
+      actionSubmittedAtRef.current = null;
+    }
     setLocalSubmitted(false);
     setLastAction(null);
     setActionSubmittedAt(null);
@@ -184,7 +214,9 @@ const AssistantMessage = ({
 
   const handleAction = async (action: string) => {
     if (onMockAction) {
-      setActionSubmittedAt(new Date());
+      const now = new Date();
+      setActionSubmittedAt(now);
+      actionSubmittedAtRef.current = now;
       onMockAction(action);
       setLastAction(action);
       return;
@@ -200,7 +232,9 @@ const AssistantMessage = ({
     }
 
     setIsSubmitting(true);
-    setActionSubmittedAt(new Date());
+    const now = new Date();
+    setActionSubmittedAt(now);
+    actionSubmittedAtRef.current = now;
     try {
       await fetch("/api/inngest/user-response", {
         method: "POST",
@@ -218,18 +252,22 @@ const AssistantMessage = ({
   };
 
   const getLoadingText = () => {
+    // Use currentStage as the primary source of truth (works well for agent mode)
+    if (currentStage === "GENERATING_SCENE") return "Generating scene";
+    if (currentStage === "GENERATING_VIDEO") return "Generating video";
+    if (currentStage === "EXTRACTING_FRAMES") return "Extracting frames";
+    if (currentStage === "BUILDING_SITE") return "Building website";
+
+    // Fallbacks based on interactive actions
     const isVideo = interactiveContent?.mediaUrl?.endsWith(".mp4");
-    if (lastAction === "EXTRACT_FRAMES" || (isVideo && submitted)) {
-      if (currentStage === "EXTRACTING_FRAMES") return "Extracting frames...";
-      if (currentStage === "BUILDING_SITE") return "Building website...";
-      // Fallback
-      return "Extracting frames...";
+    if (lastAction === "EXTRACT_FRAMES" || lastAction === "USE_VIDEO") {
+      return "Extracting frames";
     }
-    if (lastAction === "ANIMATE_VIDEO") return "Generating video...";
-    return isVideo ? "Generating video..." : "Generating scene...";
+    if (lastAction === "ANIMATE_VIDEO" || lastAction === "AI_CREATE") return isVideo ? "Generating video" : "Generating scene";
+    return isVideo ? "Generating video" : "Generating scene";
   };
 
-  if (type === "INTERACTIVE" && interactiveContent && !submitted && !isLastMessage) {
+  if (type === "INTERACTIVE" && interactiveContent && !isLastMessage) {
     return null;
   }
 
@@ -243,7 +281,7 @@ const AssistantMessage = ({
           {type === "INTERACTIVE" && interactiveContent ? (
             (!submitted && isLastMessage) ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader createdAt={createdAt} showTimer={false} />
+                <InteractiveMessageHeader createdAt={createdAt} showTimer={false} accumulatedTime={totalAccumulatedRef.current} />
                 {interactiveContent.mediaUrl ? (
                   <>
                     {interactiveContent.text !== "Awaiting user input" && (
@@ -251,7 +289,7 @@ const AssistantMessage = ({
                         {interactiveContent.text}
                       </div>
                     )}
-                    <div className="w-full max-w-[500px] aspect-video rounded-xl overflow-hidden border border-[#333] bg-[#1a1a1a]">
+                    <div className="w-full max-w-[500px] aspect-video rounded-[8px] overflow-hidden bg-[#1a1a1a]">
                       {interactiveContent.mediaUrl.endsWith(".mp4") ? (
                         <video
                           src={interactiveContent.mediaUrl}
@@ -259,6 +297,7 @@ const AssistantMessage = ({
                           loop
                           muted
                           playsInline
+                          controls
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -304,25 +343,42 @@ const AssistantMessage = ({
                   <InteractiveMessageHeader
                     createdAt={actionSubmittedAt || createdAt}
                     text={getLoadingText()}
-                    showTimer={getLoadingText() === "Building website..."}
+                    showTimer={true}
+                    accumulatedTime={totalAccumulatedRef.current}
                   />
                 </div>
               ) : null
             )
           ) : (
-            content || (type === "RESULT" ? (
+            type === "RESULT" && content ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader createdAt={createdAt} text="Working..." showTimer={false} />
+                <InteractiveMessageHeader 
+                  createdAt={startedAt || createdAt} 
+                  text="Completed" 
+                  showTimer={true} 
+                  accumulatedTime={totalAccumulatedRef.current}
+                  isCompleted={true}
+                />
+                <div className="text-white text-sm leading-[20px] whitespace-pre-wrap">
+                  {content}
+                </div>
               </div>
-            ) : "")
+            ) : type === "RESULT" && isLastMessage ? (
+              <div className="flex flex-col gap-3">
+                <InteractiveMessageHeader 
+                  createdAt={startedAt || createdAt} 
+                  text={getLoadingText()} 
+                  showTimer={true} 
+                  accumulatedTime={totalAccumulatedRef.current}
+                />
+              </div>
+            ) : type === "RESULT" ? (
+              null
+            ) : (
+              content
+            )
           )}
         </div>
-        {fragment && type === "RESULT" && (
-          <FragmentCard
-            fragment={fragment}
-            onFragmentClick={onFragmentClick}
-          />
-        )}
       </div>
     </div>
   )
@@ -333,6 +389,7 @@ interface MessageCardProps {
   role: MessageRole;
   fragment: Fragment | null;
   createdAt: Date;
+  startedAt?: Date;
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
@@ -345,6 +402,8 @@ interface MessageCardProps {
   currentStage?: string;
   onMockAction?: (action: string) => void;
   isMockSubmitted?: boolean;
+  sessionElapsedMs?: number;
+  onWorkingTimeUpdate?: (deltaMs: number) => void;
 };
 
 export const MessageCard = ({
@@ -352,6 +411,7 @@ export const MessageCard = ({
   role,
   fragment,
   createdAt,
+  startedAt,
   isActiveFragment,
   onFragmentClick,
   type,
@@ -363,6 +423,8 @@ export const MessageCard = ({
   currentStage,
   onMockAction,
   isMockSubmitted,
+  sessionElapsedMs,
+  onWorkingTimeUpdate,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -370,6 +432,7 @@ export const MessageCard = ({
         content={content}
         fragment={fragment}
         createdAt={createdAt}
+        startedAt={startedAt}
         isActiveFragment={isActiveFragment}
         onFragmentClick={onFragmentClick}
         type={type}
@@ -381,6 +444,8 @@ export const MessageCard = ({
         currentStage={currentStage}
         onMockAction={onMockAction}
         isMockSubmitted={isMockSubmitted}
+        sessionElapsedMs={sessionElapsedMs}
+        onWorkingTimeUpdate={onWorkingTimeUpdate}
       />
     )
   }

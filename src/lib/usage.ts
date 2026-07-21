@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 
 export const PLAN_CREDITS: Record<string, number> = {
-  free: 15,
+  free: 0,
   basic: 500,
   plus: 2000,
   pro: 3500,

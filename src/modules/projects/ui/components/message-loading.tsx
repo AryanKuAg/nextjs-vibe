@@ -44,7 +44,7 @@ export const MessageLoading = () => {
   return (
     <div className="flex group pb-4 px-3 items-start">
       <div className="flex flex-col gap-y-4 pt-0.5 w-full">
-        <ShimmerMessages />
+        <ShimmerMessages showTimer={true} />
       </div>
     </div>
   );

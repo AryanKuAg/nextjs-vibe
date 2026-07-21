@@ -80,6 +80,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const selectedModel: ModelId = "deepseek/deepseek-v4-flash";
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -98,6 +99,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
     staleTime: 30_000,
   });
   const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
+  const hasBuiltWebsite = existingMessages?.some((m: { type: string }) => m.type === "RESULT") ?? false;
 
   const lastMessage = existingMessages?.[(existingMessages?.length ?? 0) - 1];
   const isWaitingForInteractive = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "INTERACTIVE";
@@ -260,15 +262,15 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-gray-bg rounded-[12px] p-3 space-y-3 relative border ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction ? "border-purple shadow-[0_0_15px_rgba(91,54,255,0.15)]" : "border-white-8"}`}
+          className={`bg-gray-bg rounded-[12px] p-3 space-y-3 relative border ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction || isFocused ? "border-purple shadow-[0_0_15px_rgba(91,54,255,0.15)]" : "border-white-8"}`}
         >
           {uploadedDataUrl && (
-            <div className="relative w-fit">
+            <div className="relative w-fit mb-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={uploadedDataUrl}
                 alt="Attached image"
-                className="w-16 h-16 rounded-[4px] object-cover"
+                className="w-12 h-12 rounded-[4px] object-cover"
               />
               <button
                 type="button"
@@ -294,7 +296,9 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                 minRows={1}
                 maxRows={12}
                 className="w-full bg-transparent text-[14px] placeholder:text-[14px] text-white outline-none resize-none min-h-[24px] placeholder:text-white/50 mb-0 ring-0"
-                placeholder={pendingInteractiveAction ? "Enter your prompt..." : "Describe your website..."}
+                placeholder={pendingInteractiveAction ? "Enter your prompt..." : hasBuiltWebsite ? "Ask your changes..." : "Describe your website..."}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -339,7 +343,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                     "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
                       ? "bg-purple opacity-50 text-white"
-                      : "bg-[#333] text-[#777]"
+                      : "bg-purple/50 text-[#777]"
                   )}
                 >
                   <i className="ri-arrow-up-line font-bold" />
@@ -351,7 +355,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                     "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
                       ? "bg-purple text-white hover:bg-purple/60"
-                      : "bg-white text-black hover:bg-[#ddd]"
+                      : "bg-purple text-white hover:bg-purple/80 "
                   )}
                 >
                   {isPending ? (
@@ -365,6 +369,6 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
           </div>
         </form>
       </Form>
-    </div>
+    </div >
   );
 };

@@ -38,6 +38,13 @@ export const MessagesContainer = ({
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
   const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
 
+  // Track cumulative working time across all interactive messages in the session.
+  // This survives message transitions (e.g., frame gen → video gen creates new messages).
+  const sessionElapsedRef = useRef(0);
+  const onWorkingTimeUpdate = (deltaMs: number) => {
+    sessionElapsedRef.current += deltaMs;
+  };
+
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
     projectId: projectId,
@@ -50,7 +57,8 @@ export const MessagesContainer = ({
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
-
+  const isLastMessageEmptyResult = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "RESULT" && lastMessage?.content === "";
+  const isGenerating = (isLastMessageUser && !isStuck) || isLastMessageEmptyResult;
   // Reset interactive submitted state when new messages arrive or content changes
   useEffect(() => {
     setIsInteractiveSubmitted(false);
@@ -125,24 +133,37 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="pt-2 pr-1">
-          {messages.map((message, index) => (
-            <MessageCard
-              key={message.id}
-              content={message.content}
-              role={message.role}
-              fragment={message.fragment}
-              createdAt={message.createdAt}
-              isActiveFragment={activeFragment?.id === message.fragment?.id}
-              onFragmentClick={() => setActiveFragment(message.fragment)}
-              type={message.type}
-              projectId={projectId}
-              pendingInteractiveAction={pendingInteractiveAction}
-              setPendingInteractiveAction={setPendingInteractiveAction}
-              isLastMessage={index === messages.length - 1}
-              isInteractiveSubmitted={isInteractiveSubmitted}
-              currentStage={projectData?.currentStage}
-            />
-          ))}
+          {messages.map((message, index) => {
+            let startedAt = message.createdAt;
+            for (let i = index; i >= 0; i--) {
+              if (messages[i].role === "USER") {
+                startedAt = messages[i].createdAt;
+                break;
+              }
+            }
+
+            return (
+              <MessageCard
+                key={message.id}
+                content={message.content}
+                role={message.role}
+                fragment={message.fragment}
+                createdAt={message.createdAt}
+                startedAt={startedAt}
+                isActiveFragment={activeFragment?.id === message.fragment?.id}
+                onFragmentClick={() => setActiveFragment(message.fragment)}
+                type={message.type}
+                projectId={projectId}
+                pendingInteractiveAction={pendingInteractiveAction}
+                setPendingInteractiveAction={setPendingInteractiveAction}
+                isLastMessage={index === messages.length - 1}
+                isInteractiveSubmitted={isInteractiveSubmitted}
+                currentStage={projectData?.currentStage}
+                sessionElapsedMs={sessionElapsedRef.current}
+                onWorkingTimeUpdate={onWorkingTimeUpdate}
+              />
+            );
+          })}
 
           {isLastMessageUser && !isStuck && <MessageLoading />}
           {isLastMessageUser && isStuck && (
@@ -178,7 +199,7 @@ export const MessagesContainer = ({
           stage={stage}
           extractedZipUrl={extractedZipUrl}
           extractedFrameCount={extractedFrameCount}
-          isGenerating={isLastMessageUser && !isStuck}
+          isGenerating={isGenerating}
           initialPrompt={initialPrompt}
           pendingInteractiveAction={pendingInteractiveAction}
           setPendingInteractiveAction={setPendingInteractiveAction}

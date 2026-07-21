@@ -209,16 +209,16 @@ const LoggedOutView = () => {
           {/* Logo */}
           <div className="flex items-center gap-2 mb-10 md:mb-16">
             <Image src="/logo.png" alt="Framerate" width={24} height={24} />
-            <span className="text-white font-medium text-[15px]">Framerate</span>
+            <span className="text-white font-medium text-base">Framerate</span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-[28px] lg:text-[32px] font-stack-sans-notch text-white leading-[1.1] font-bold mb-3">
+          <h1 className="text-[28px] lg:text-[32px] text-white leading-[36px] font-medium mb-4 font-sans mt-12">
             Ship 3D websites in minutes with AI
           </h1>
 
           {/* Description */}
-          <p className="text-sm text-white-50 font-medium leading-relaxed mb-6">
+          <p className="text-sm text-white-50  leading-[20px] mb-8">
             Just describe your vision and watch it turn into a live, interactive experience in few minutes.
           </p>
 
@@ -228,14 +228,16 @@ const LoggedOutView = () => {
               <button
                 onClick={handleGoogleSignIn}
                 disabled={isPending}
-                className="px-4 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium transition-colors flex items-center gap-1.5 bg-white disabled:opacity-70"
+                className="px-3 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium  flex items-center gap-1.5 bg-white disabled:opacity-70 hover:opacity-80 transition-all duration-200"
               >
-                {isPending ? (
-                  <i className="ri-loader-4-line animate-spin text-sm" />
-                ) : (
-                  <Image src="/google.svg" alt="Google" width={14} height={14} className="shrink-0" />
-                )}
-                Sign in with Google
+                <div className="w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                  {isPending ? (
+                    <i className="ri-loader-4-line animate-spin text-[12px] scale-125" />
+                  ) : (
+                    <Image src="/google.svg" alt="Google" width={14} height={14} />
+                  )}
+                </div>
+                Continue with Google
               </button>
             </SignedOut>
             <SignedIn>
@@ -252,7 +254,7 @@ const LoggedOutView = () => {
 
         {/* Bottom: Prompt Input */}
         <div className="mt-auto">
-          <ProjectForm showModelSelector />
+          <ProjectForm showModelSelector dropdownDirection="up" isLandingPage />
         </div>
       </div>
 

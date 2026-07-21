@@ -36,9 +36,11 @@ const MODELS = [
 
 interface ProjectFormProps {
   showModelSelector?: boolean;
+  dropdownDirection?: "up" | "down";
+  isLandingPage?: boolean;
 }
 
-export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => {
+export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "down", isLandingPage = false }: ProjectFormProps) => {
   const router = useRouter();
   const trpc = useTRPC();
   const clerk = useClerk();
@@ -231,7 +233,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`bg-grey-bg rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border border-transparent focus-within:border-purple shadow-[0_4px_16px_rgba(0,0,0,0.25)]`}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border focus-within:border-purple ${isLandingPage ? "bg-transparent border-white-8" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -260,7 +262,7 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
             render={({ field }) => (
               <TextareaAutosize
                 {...field}
-                autoFocus
+                autoFocus={!isLandingPage}
                 disabled={isPending}
                 minRows={1}
                 maxRows={12}
@@ -311,11 +313,11 @@ export const ProjectForm = ({ showModelSelector = false }: ProjectFormProps) => 
                 <AnimatePresence>
                   {modelDropdownOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                      initial={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                      exit={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="absolute top-9 left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col"
+                      className={`absolute ${dropdownDirection === "up" ? "bottom-9" : "top-9"} left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col`}
                     >
                       {MODELS.map((model) => (
                         <button

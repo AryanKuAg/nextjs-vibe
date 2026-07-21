@@ -142,7 +142,7 @@ const ModalPricingCard = ({
           ${price}
         </span>
         <span className="text-[12px] text-white-50 mb-1.5 leading-[0px]">
-          Billed {billing === "monthly" ? "monthly" : "yearly"}
+          Billed {billing === "monthly" ? "monthly" : "monthly"}
         </span>
       </div>
 
@@ -241,9 +241,9 @@ export const CustomOutOfCreditsModal = ({
                 <button
                   onClick={() => setBilling("monthly")}
                   className={cn(
-                    "transition-colors",
+                    "transition-colors font-medium",
                     billing === "monthly"
-                      ? "text-white-85 font-medium"
+                      ? "text-white-85"
                       : "text-white/50 hover:text-white/85"
                   )}
                 >
@@ -253,9 +253,9 @@ export const CustomOutOfCreditsModal = ({
                 <button
                   onClick={() => setBilling("yearly")}
                   className={cn(
-                    "transition-colors",
+                    "transition-colors font-medium",
                     billing === "yearly"
-                      ? "text-white font-medium"
+                      ? "text-white"
                       : "text-white/50 hover:text-white/85"
                   )}
                 >

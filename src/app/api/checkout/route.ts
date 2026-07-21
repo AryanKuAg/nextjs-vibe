@@ -15,13 +15,19 @@ export async function POST(req: NextRequest) {
     const email = user.emailAddresses[0]?.emailAddress;
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
-    const { plan, returnUrl } = await req.json();
+    const { plan, billing, returnUrl } = await req.json();
 
-    const planToProduct: Record<string, string | undefined> = {
-      basic: process.env.DODO_PRODUCT_BASIC,
-      plus: process.env.DODO_PRODUCT_PLUS,
-      pro: process.env.DODO_PRODUCT_PRO,
-    };
+    const planToProduct: Record<string, string | undefined> = billing === "yearly"
+      ? {
+        basic: process.env.DODO_PRODUCT_BASIC_YEARLY,
+        plus: process.env.DODO_PRODUCT_PLUS_YEARLY,
+        pro: process.env.DODO_PRODUCT_PRO_YEARLY,
+      }
+      : {
+        basic: process.env.DODO_PRODUCT_BASIC,
+        plus: process.env.DODO_PRODUCT_PLUS,
+        pro: process.env.DODO_PRODUCT_PRO,
+      };
 
     const productId = planToProduct[plan.toLowerCase()];
 

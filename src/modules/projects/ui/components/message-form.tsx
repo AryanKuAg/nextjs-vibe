@@ -68,11 +68,6 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-const TEMPLATES = [
-  { icon: "ri-macbook-line", label: "Portfolio website" },
-  { icon: "ri-box-3-line", label: "3D product showcase" },
-  { icon: "ri-layout-masonry-line", label: "Creative agency website" },
-];
 
 export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
   const trpc = useTRPC();
@@ -239,22 +234,6 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         className="hidden"
         onChange={handleImageSelect}
       />
-
-      {!isFollowUp && (
-        <div className="flex flex-col gap-2 mb-4 px-1">
-          {TEMPLATES.map((t, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => form.setValue("value", t.label, { shouldValidate: true })}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#222] hover:bg-white/5 transition-colors self-start text-sm text-white bg-transparent"
-            >
-              <i className={`${t.icon} text-[#888]`} />
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
 
       <Form {...form}>
         <form

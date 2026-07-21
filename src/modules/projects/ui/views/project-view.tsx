@@ -217,10 +217,16 @@ export const ProjectView = ({ projectId }: Props) => {
                   )}
                 </TabsContent>
                 <TabsContent value="code" className="h-full m-0">
-                  {!!activeFragment?.files && (
+                  {!!activeFragment?.files ? (
                     <FileExplorer
                       files={activeFragment.files as { [path: string]: string }}
                     />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <p className="text-sm text-white-50 leading-relaxed">
+                        Your code will appear here
+                      </p>
+                    </div>
                   )}
                 </TabsContent>
               </div>

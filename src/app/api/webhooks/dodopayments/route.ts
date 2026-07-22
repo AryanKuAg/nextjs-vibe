@@ -30,12 +30,17 @@ export async function POST(req: NextRequest) {
       const plan = metadata.plan;
 
       if (userId && plan) {
-        console.log(`Updating usage for user ${userId} to plan ${plan}`);
+        console.log(`[WEBHOOK DEBUG] userId=${userId}, plan="${plan}", plan.toLowerCase()="${plan.toLowerCase()}"`);
+
+        const { syncCredits, PLAN_CREDITS } = await import("@/lib/usage");
+        const creditsToSet = PLAN_CREDITS[plan.toLowerCase()] || PLAN_CREDITS.free;
+        console.log(`[WEBHOOK DEBUG] PLAN_CREDITS lookup: PLAN_CREDITS["${plan.toLowerCase()}"] = ${creditsToSet}`);
+        console.log(`[WEBHOOK DEBUG] Full PLAN_CREDITS:`, JSON.stringify(PLAN_CREDITS));
 
         const subscriptionId = data.subscription_id || data.id;
-        const { syncCredits } = await import("@/lib/usage");
 
         await syncCredits(userId, plan.toLowerCase());
+        console.log(`[WEBHOOK DEBUG] syncCredits completed. Credits should now be ${creditsToSet}`);
 
         // Ensure subscriptionId is saved
         await prisma.usage.update({

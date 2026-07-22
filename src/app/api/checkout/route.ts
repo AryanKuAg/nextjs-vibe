@@ -19,14 +19,14 @@ export async function POST(req: NextRequest) {
 
     const planToProduct: Record<string, string | undefined> = billing === "yearly"
       ? {
-        basic: process.env.DODO_PRODUCT_BASIC_YEARLY,
         plus: process.env.DODO_PRODUCT_PLUS_YEARLY,
         pro: process.env.DODO_PRODUCT_PRO_YEARLY,
+        max: process.env.DODO_PRODUCT_MAX_YEARLY,
       }
       : {
-        basic: process.env.DODO_PRODUCT_BASIC,
         plus: process.env.DODO_PRODUCT_PLUS,
         pro: process.env.DODO_PRODUCT_PRO,
+        max: process.env.DODO_PRODUCT_MAX,
       };
 
     const productId = planToProduct[plan.toLowerCase()];
@@ -46,12 +46,7 @@ export async function POST(req: NextRequest) {
       environment: process.env.NODE_ENV === "development" ? "test_mode" : "live_mode",
     });
 
-    // Handle local development webhook limitations
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[Local Dev] Auto-syncing credits for ${plan} plan since webhooks cannot reach localhost without Ngrok.`);
-      const { syncCredits } = await import("@/lib/usage");
-      await syncCredits(userId, plan.toLowerCase());
-    }
+
 
     // Create a payment session/link
     const session = await dodo.checkoutSessions.create({

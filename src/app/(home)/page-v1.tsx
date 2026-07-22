@@ -13,7 +13,6 @@ import { Footer } from "@/modules/home/ui/components/footer";
 import { FAQSection } from "@/modules/home/ui/components/faq-section";
 import { FinalCTASection } from "@/modules/home/ui/components/final-cta-section";
 import { TestimonialsSection } from "@/modules/home/ui/components/testimonials-section";
-import { PricingSection } from "@/modules/home/ui/components/pricing-section";
 import { ComparisonSection } from "@/modules/home/ui/components/comparison-section";
 
 // Isolated component — bypasses React hydration entirely via useEffect
@@ -481,9 +480,7 @@ const Page = () => {
 
       <TestimonialsSection />
 
-      <FadeInSection id="pricing" className="py-[60px] md:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
-        <PricingSection title="Simple, transparent pricing" desc="Flexible plans built for hobbyists, creators, and teams." />
-      </FadeInSection>
+
 
       <FadeInSection>
         <motion.div variants={itemVariants}>

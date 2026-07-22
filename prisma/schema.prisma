@@ -74,9 +74,10 @@ model Fragment {
 }
 
 model Usage {
-  key            String    @id
-  credits        Int       @default(0)
-  expire         DateTime?
-  plan           String    @default("free") // "free", "basic", "plus", "pro"
-  subscriptionId String?
+  key               String    @id
+  credits           Int       @default(0)
+  expire            DateTime?
+  plan              String    @default("free") // "free", "basic", "plus", "pro"
+  subscriptionId    String?
+  lastCreditResetAt DateTime  @default(now())
 }

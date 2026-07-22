@@ -3,9 +3,9 @@ import { prisma } from "@/lib/db";
 
 export const PLAN_CREDITS: Record<string, number> = {
   free: 0,
-  basic: 500,
-  plus: 2000,
-  pro: 3500,
+  plus: 100,
+  pro: 500,
+  max: 1500,
 };
 
 export { MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/pricing";
@@ -16,16 +16,16 @@ export { MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/pricing";
  */
 export async function checkCredits(amount: number, overrideUserId?: string) {
   let userId = overrideUserId;
-  
+
   if (!userId) {
     const authResult = await auth();
     userId = authResult.userId ?? undefined;
   }
-  
+
   if (!userId) throw new Error("User not authenticated");
 
   const usage = await prisma.usage.findUnique({ where: { key: userId } });
-  
+
   if (!usage) {
     // Check if user exists, if not create with free credits
     await prisma.usage.create({
@@ -48,12 +48,12 @@ export async function checkCredits(amount: number, overrideUserId?: string) {
  */
 export async function consumeCredits(amount: number, overrideUserId?: string) {
   let userId = overrideUserId;
-  
+
   if (!userId) {
     const authResult = await auth();
     userId = authResult.userId ?? undefined;
   }
-  
+
   if (!userId) throw new Error("User not authenticated");
 
   // We use updateMany with a condition on credits to ensure atomicity
@@ -88,12 +88,12 @@ export async function consumeCredits(amount: number, overrideUserId?: string) {
  */
 export async function refundCredits(amount: number, overrideUserId?: string) {
   let userId = overrideUserId;
-  
+
   if (!userId) {
     const authResult = await auth();
     userId = authResult.userId ?? undefined;
   }
-  
+
   if (!userId) return;
 
   await prisma.usage.update({
@@ -110,8 +110,8 @@ export async function syncCredits(userId: string, plan: string) {
   const credits = PLAN_CREDITS[plan] || PLAN_CREDITS.free;
   await prisma.usage.upsert({
     where: { key: userId },
-    update: { credits, plan },
-    create: { key: userId, credits, plan }
+    update: { credits, plan, lastCreditResetAt: new Date() },
+    create: { key: userId, credits, plan, lastCreditResetAt: new Date() }
   });
 }
 

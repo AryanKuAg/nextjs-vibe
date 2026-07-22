@@ -15,7 +15,7 @@ interface CustomOutOfCreditsModalProps {
 
 const MODAL_PLANS = [
   {
-    key: "basic",
+    key: "plus",
     title: "Plus",
     desc: "Perfect for personal projects",
     monthlyPrice: "10",
@@ -30,7 +30,7 @@ const MODAL_PLANS = [
     ],
   },
   {
-    key: "plus",
+    key: "pro",
     title: "Pro",
     desc: "Built for active creators",
     monthlyPrice: "20",
@@ -46,11 +46,11 @@ const MODAL_PLANS = [
     ],
   },
   {
-    key: "pro",
+    key: "max",
     title: "Max",
     desc: "Made for teams and studios",
     monthlyPrice: "40",
-    yearlyPrice: "32",
+    yearlyPrice: "33",
     features: [
       "1,500 credits",
       "Frontier AI models",
@@ -100,7 +100,7 @@ const ModalPricingCard = ({
         body: JSON.stringify({
           plan: plan.key,
           billing,
-          returnUrl: `${window.location.origin}/dashboard`,
+          returnUrl: window.location.origin,
         }),
       });
 
@@ -142,7 +142,7 @@ const ModalPricingCard = ({
           ${price}
         </span>
         <span className="text-[12px] text-white-50 mb-1.5 leading-[0px]">
-          Billed {billing === "monthly" ? "monthly" : "monthly"}
+          {billing === "monthly" ? "Billed monthly" : "per month, billed annually"}
         </span>
       </div>
 
@@ -184,7 +184,7 @@ export const CustomOutOfCreditsModal = ({
   isOpen,
   onClose,
 }: CustomOutOfCreditsModalProps) => {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
 
   return (
     <AnimatePresence>

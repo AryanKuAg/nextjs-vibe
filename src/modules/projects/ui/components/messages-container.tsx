@@ -17,6 +17,47 @@ interface Props {
   setActiveFragment: (fragment: Fragment | null) => void;
 };
 
+function useGenerationTimer(isWorking: boolean, sessionKey: string) {
+  const [elapsedMs, setElapsedMs] = useState(() => {
+    if (typeof window !== "undefined") {
+      return parseInt(sessionStorage.getItem(sessionKey) || "0", 10);
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (!isWorking) {
+      sessionStorage.removeItem(sessionKey + "_last_tick");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const lastTickStr = sessionStorage.getItem(sessionKey + "_last_tick");
+      const lastTick = lastTickStr ? parseInt(lastTickStr, 10) : now;
+      const delta = now - lastTick;
+      
+      setElapsedMs(prev => {
+        const next = prev + delta;
+        sessionStorage.setItem(sessionKey, next.toString());
+        return next;
+      });
+      sessionStorage.setItem(sessionKey + "_last_tick", now.toString());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isWorking, sessionKey]);
+
+  return {
+    elapsedMs,
+    reset: () => {
+      sessionStorage.setItem(sessionKey, "0");
+      sessionStorage.removeItem(sessionKey + "_last_tick");
+      setElapsedMs(0);
+    }
+  };
+}
+
 export const MessagesContainer = ({
   projectId,
   activeFragment,
@@ -36,14 +77,7 @@ export const MessagesContainer = ({
   const lastUserMessageTimestampRef = useRef<number | null>(null);
   const [isStuck, setIsStuck] = useState(false);
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
-  const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
-
-  // Track cumulative working time across all interactive messages in the session.
-  // This survives message transitions (e.g., frame gen → video gen creates new messages).
-  const sessionElapsedRef = useRef(0);
-  const onWorkingTimeUpdate = (deltaMs: number) => {
-    sessionElapsedRef.current += deltaMs;
-  };
+  const [interactiveSubmittedAt, setInteractiveSubmittedAt] = useState<Date | null>(null);
 
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
@@ -59,9 +93,12 @@ export const MessagesContainer = ({
   const isLastMessageUser = lastMessage?.role === "USER";
   const isLastMessageEmptyResult = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "RESULT" && lastMessage?.content === "";
   const isGenerating = (isLastMessageUser && !isStuck) || isLastMessageEmptyResult;
+  const isWorking = (isLastMessageUser && !isStuck) || isLastMessageEmptyResult || interactiveSubmittedAt !== null;
+  const generationTimer = useGenerationTimer(isWorking, `vibe_timer_${projectId}_${stage}`);
+
   // Reset interactive submitted state when new messages arrive or content changes
   useEffect(() => {
-    setIsInteractiveSubmitted(false);
+    setInteractiveSubmittedAt(null);
   }, [lastMessage?.id, lastMessage?.content]);
 
   // Track when user message arrived; detect if stuck after timeout
@@ -69,6 +106,7 @@ export const MessagesContainer = ({
     if (isLastMessageUser) {
       if (lastUserMessageTimestampRef.current === null) {
         lastUserMessageTimestampRef.current = Date.now();
+        generationTimer.reset();
       }
 
       const timer = setTimeout(() => {
@@ -157,15 +195,14 @@ export const MessagesContainer = ({
                 pendingInteractiveAction={pendingInteractiveAction}
                 setPendingInteractiveAction={setPendingInteractiveAction}
                 isLastMessage={index === messages.length - 1}
-                isInteractiveSubmitted={isInteractiveSubmitted}
-                currentStage={projectData?.currentStage}
-                sessionElapsedMs={sessionElapsedRef.current}
-                onWorkingTimeUpdate={onWorkingTimeUpdate}
+                messageId={message.id}
+                globalElapsedMs={generationTimer.elapsedMs}
+                onActionSubmit={() => setInteractiveSubmittedAt(new Date())}
               />
             );
           })}
 
-          {isLastMessageUser && !isStuck && <MessageLoading />}
+          {isLastMessageUser && !isStuck && <MessageLoading globalElapsedMs={generationTimer.elapsedMs} />}
           {isLastMessageUser && isStuck && (
             <div className="px-2 pb-4 flex items-start gap-2.5">
               <div className="flex flex-col gap-1.5">
@@ -203,7 +240,7 @@ export const MessagesContainer = ({
           initialPrompt={initialPrompt}
           pendingInteractiveAction={pendingInteractiveAction}
           setPendingInteractiveAction={setPendingInteractiveAction}
-          setIsInteractiveSubmitted={setIsInteractiveSubmitted}
+          setInteractiveSubmittedAt={setInteractiveSubmittedAt}
         />
         {onBack && (
           <button

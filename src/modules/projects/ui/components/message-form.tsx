@@ -26,7 +26,7 @@ interface Props {
   initialPrompt?: string;
   pendingInteractiveAction?: string | null;
   setPendingInteractiveAction?: (action: string | null) => void;
-  setIsInteractiveSubmitted?: (v: boolean) => void;
+  setInteractiveSubmittedAt?: (v: Date | null) => void;
 };
 
 const formSchema = z.object({
@@ -69,7 +69,7 @@ const processImageFile = (file: File): Promise<string> =>
   });
 
 
-export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setInteractiveSubmittedAt }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -195,7 +195,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         });
         form.setValue("value", "");
         setPendingInteractiveAction?.(null);
-        setIsInteractiveSubmitted?.(true);
+        setInteractiveSubmittedAt?.(new Date());
       } catch (error) {
         console.error(error);
         toast.error("Failed to send response");

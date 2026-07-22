@@ -5,24 +5,8 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Fragment, MessageRole, MessageType } from "@prisma/client";
 
-const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", showTimer = true, accumulatedTime = 0, isCompleted = false }: { createdAt: Date, text?: string, showTimer?: boolean, accumulatedTime?: number, isCompleted?: boolean }) => {
-  const [elapsedMs, setElapsedMs] = useState(accumulatedTime);
-
-  useEffect(() => {
-    if (!showTimer || isCompleted) {
-      setElapsedMs(accumulatedTime);
-      return;
-    }
-    const startMs = new Date(createdAt).getTime();
-    setElapsedMs(Math.max(0, Date.now() - startMs) + accumulatedTime);
-    const timerInterval = setInterval(() => {
-      setElapsedMs(Math.max(0, Date.now() - startMs) + accumulatedTime);
-    }, 1000);
-
-    return () => clearInterval(timerInterval);
-  }, [createdAt, showTimer, accumulatedTime, isCompleted]);
-
-  const seconds = Math.floor(elapsedMs / 1000);
+const InteractiveMessageHeader = ({ text = "Awaiting user input", showTimer = true, displayTime = 0, isCompleted = false }: { text?: string, showTimer?: boolean, displayTime?: number, isCompleted?: boolean }) => {
+  const seconds = Math.floor(displayTime / 1000);
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   const timeString = m > 0 ? `${m}m ${s}s` : `${seconds}s`;
@@ -31,8 +15,8 @@ const InteractiveMessageHeader = ({ createdAt, text = "Awaiting user input", sho
     <div className="flex items-center gap-2 mb-0.5">
       <span className={cn(
         "font-normal text-[14px]",
-        isCompleted 
-          ? "text-white/80" 
+        isCompleted
+          ? "text-white/80"
           : "bg-gradient-to-r from-white/30 via-white to-white/30 bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent"
       )}>
         {text}
@@ -148,12 +132,13 @@ interface AssistantMessageProps {
   setPendingInteractiveAction: (action: string | null) => void;
   onActionSubmit?: () => void;
   isLastMessage?: boolean;
-  isInteractiveSubmitted?: boolean;
+  interactiveSubmittedAt?: Date | null;
   currentStage?: string;
   onMockAction?: (action: string) => void;
   isMockSubmitted?: boolean;
-  sessionElapsedMs?: number;
-  onWorkingTimeUpdate?: (deltaMs: number) => void;
+  isMockSubmitted?: boolean;
+  messageId: string;
+  globalElapsedMs: number;
 };
 
 const AssistantMessage = ({
@@ -167,15 +152,16 @@ const AssistantMessage = ({
   pendingInteractiveAction,
   setPendingInteractiveAction,
   isLastMessage = false,
-  isInteractiveSubmitted = false,
+  interactiveSubmittedAt = null,
   currentStage,
   onMockAction,
   isMockSubmitted = false,
-  sessionElapsedMs = 0,
-  onWorkingTimeUpdate,
+  messageId,
+  globalElapsedMs,
+  onActionSubmit,
 }: AssistantMessageProps) => {
   const accumulatedTime = startedAt ? new Date(createdAt).getTime() - new Date(startedAt).getTime() : 0;
-  
+
   let interactiveContent: InteractiveContent | null = null;
   if (type === "INTERACTIVE") {
     try {
@@ -188,35 +174,32 @@ const AssistantMessage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
-  const [actionSubmittedAt, setActionSubmittedAt] = useState<Date | null>(null);
-
-  // Use the session-level accumulated time (survives across message transitions)
-  // Fall back to component-level accumulatedTime for the initial mount
-  const totalAccumulatedRef = useRef(Math.max(sessionElapsedMs, accumulatedTime));
-  const actionSubmittedAtRef = useRef<Date | null>(null);
-
-  const submitted = localSubmitted || isInteractiveSubmitted || isMockSubmitted;
+  const [lockedTime, setLockedTime] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`locked_time_${messageId}`);
+      if (saved) return parseInt(saved, 10);
+    }
+    return null;
+  });
 
   useEffect(() => {
-    // When backend updates the message (new image/buttons), capture the
-    // time elapsed during the last working cycle and add to the running total
-    if (actionSubmittedAtRef.current) {
-      const delta = Date.now() - actionSubmittedAtRef.current.getTime();
-      totalAccumulatedRef.current += delta;
-      // Report upward so the container tracks total time across message transitions
-      onWorkingTimeUpdate?.(delta);
-      actionSubmittedAtRef.current = null;
+    if (!isLastMessage && lockedTime === null) {
+      setLockedTime(globalElapsedMs);
+      sessionStorage.setItem(`locked_time_${messageId}`, globalElapsedMs.toString());
     }
+  }, [isLastMessage, lockedTime, globalElapsedMs, messageId]);
+
+  const displayTime = lockedTime !== null ? lockedTime : (isLastMessage ? globalElapsedMs : accumulatedTime);
+
+  const submitted = localSubmitted || !!interactiveSubmittedAt || isMockSubmitted;
+
+  useEffect(() => {
     setLocalSubmitted(false);
     setLastAction(null);
-    setActionSubmittedAt(null);
   }, [content]);
 
   const handleAction = async (action: string) => {
     if (onMockAction) {
-      const now = new Date();
-      setActionSubmittedAt(now);
-      actionSubmittedAtRef.current = now;
       onMockAction(action);
       setLastAction(action);
       return;
@@ -232,9 +215,6 @@ const AssistantMessage = ({
     }
 
     setIsSubmitting(true);
-    const now = new Date();
-    setActionSubmittedAt(now);
-    actionSubmittedAtRef.current = now;
     try {
       await fetch("/api/inngest/user-response", {
         method: "POST",
@@ -244,6 +224,7 @@ const AssistantMessage = ({
       setLastAction(action);
       setLocalSubmitted(true);
       setPendingInteractiveAction(null);
+      if (onActionSubmit) onActionSubmit();
     } catch (error) {
       console.error("Failed to submit action", error);
     } finally {
@@ -281,7 +262,7 @@ const AssistantMessage = ({
           {type === "INTERACTIVE" && interactiveContent ? (
             (!submitted && isLastMessage) ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader createdAt={createdAt} showTimer={false} accumulatedTime={totalAccumulatedRef.current} />
+                <InteractiveMessageHeader displayTime={displayTime} showTimer={false} />
                 {interactiveContent.mediaUrl ? (
                   <>
                     {interactiveContent.text !== "Awaiting user input" && (
@@ -341,10 +322,9 @@ const AssistantMessage = ({
               isLastMessage ? (
                 <div className="flex flex-col gap-3">
                   <InteractiveMessageHeader
-                    createdAt={actionSubmittedAt || createdAt}
                     text={getLoadingText()}
                     showTimer={true}
-                    accumulatedTime={totalAccumulatedRef.current}
+                    displayTime={displayTime}
                   />
                 </div>
               ) : null
@@ -352,11 +332,10 @@ const AssistantMessage = ({
           ) : (
             type === "RESULT" && content ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader 
-                  createdAt={startedAt || createdAt} 
-                  text="Completed" 
-                  showTimer={true} 
-                  accumulatedTime={totalAccumulatedRef.current}
+                <InteractiveMessageHeader
+                  text="Completed"
+                  showTimer={true}
+                  displayTime={displayTime}
                   isCompleted={true}
                 />
                 <div className="text-white text-sm leading-[20px] whitespace-pre-wrap">
@@ -365,11 +344,10 @@ const AssistantMessage = ({
               </div>
             ) : type === "RESULT" && isLastMessage ? (
               <div className="flex flex-col gap-3">
-                <InteractiveMessageHeader 
-                  createdAt={startedAt || createdAt} 
-                  text={getLoadingText()} 
-                  showTimer={true} 
-                  accumulatedTime={totalAccumulatedRef.current}
+                <InteractiveMessageHeader
+                  text={getLoadingText()}
+                  showTimer={true}
+                  displayTime={displayTime}
                 />
               </div>
             ) : type === "RESULT" ? (
@@ -398,12 +376,12 @@ interface MessageCardProps {
   setPendingInteractiveAction: (action: string | null) => void;
   onActionSubmit?: () => void;
   isLastMessage?: boolean;
-  isInteractiveSubmitted?: boolean;
+  interactiveSubmittedAt?: Date | null;
   currentStage?: string;
   onMockAction?: (action: string) => void;
   isMockSubmitted?: boolean;
-  sessionElapsedMs?: number;
-  onWorkingTimeUpdate?: (deltaMs: number) => void;
+  messageId: string;
+  globalElapsedMs: number;
 };
 
 export const MessageCard = ({
@@ -419,12 +397,13 @@ export const MessageCard = ({
   pendingInteractiveAction,
   setPendingInteractiveAction,
   isLastMessage = false,
-  isInteractiveSubmitted = false,
+  interactiveSubmittedAt = null,
   currentStage,
   onMockAction,
   isMockSubmitted,
-  sessionElapsedMs,
-  onWorkingTimeUpdate,
+  messageId,
+  globalElapsedMs,
+  onActionSubmit,
 }: MessageCardProps) => {
   if (role === "ASSISTANT") {
     return (
@@ -440,12 +419,13 @@ export const MessageCard = ({
         pendingInteractiveAction={pendingInteractiveAction}
         setPendingInteractiveAction={setPendingInteractiveAction}
         isLastMessage={isLastMessage}
-        isInteractiveSubmitted={isInteractiveSubmitted}
+        interactiveSubmittedAt={interactiveSubmittedAt}
         currentStage={currentStage}
         onMockAction={onMockAction}
         isMockSubmitted={isMockSubmitted}
-        sessionElapsedMs={sessionElapsedMs}
-        onWorkingTimeUpdate={onWorkingTimeUpdate}
+        messageId={messageId}
+        globalElapsedMs={globalElapsedMs}
+        onActionSubmit={onActionSubmit}
       />
     )
   }

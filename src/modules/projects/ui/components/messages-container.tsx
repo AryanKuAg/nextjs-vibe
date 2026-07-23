@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@prisma/client";
 
+import { Fragment } from "@prisma/client";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { MessageLoading } from "./message-loading";
@@ -13,8 +13,7 @@ const STUCK_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes – site generation can t
 
 interface Props {
   projectId: string;
-  activeFragment: Fragment | null;
-  setActiveFragment: (fragment: Fragment | null) => void;
+  setActiveFragment?: (fragment: Fragment) => void;
 };
 
 function useGenerationTimer(isWorking: boolean, sessionKey: string) {
@@ -60,7 +59,6 @@ function useGenerationTimer(isWorking: boolean, sessionKey: string) {
 
 export const MessagesContainer = ({
   projectId,
-  activeFragment,
   setActiveFragment,
   stage = "SITE",
   extractedZipUrl,
@@ -72,6 +70,7 @@ export const MessagesContainer = ({
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastAssistantMessageIdRef = useRef<string | null>(null);
+
 
   // Track when the last user message was sent to detect stuck state
   const lastUserMessageTimestampRef = useRef<number | null>(null);
@@ -87,7 +86,7 @@ export const MessagesContainer = ({
     refetchInterval: 2000,
   }));
 
-  const { data: projectData } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
+  useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
@@ -158,7 +157,9 @@ export const MessagesContainer = ({
       lastAssistantMessage?.fragment &&
       lastAssistantMessage.id !== lastAssistantMessageIdRef.current
     ) {
-      setActiveFragment(lastAssistantMessage.fragment);
+      if (setActiveFragment) {
+        setActiveFragment(lastAssistantMessage.fragment);
+      }
       lastAssistantMessageIdRef.current = lastAssistantMessage.id;
     }
   }, [messages, setActiveFragment]);
@@ -185,11 +186,8 @@ export const MessagesContainer = ({
                 key={message.id}
                 content={message.content}
                 role={message.role}
-                fragment={message.fragment}
                 createdAt={message.createdAt}
                 startedAt={startedAt}
-                isActiveFragment={activeFragment?.id === message.fragment?.id}
-                onFragmentClick={() => setActiveFragment(message.fragment)}
                 type={message.type}
                 projectId={projectId}
                 pendingInteractiveAction={pendingInteractiveAction}

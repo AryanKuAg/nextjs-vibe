@@ -627,6 +627,7 @@ export const BackgroundBuilderLeft = ({
       <TemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
+        templates={[]}
         onSelect={(t) => {
           if (onApplyTemplate) {
             onApplyTemplate(t.blocks);

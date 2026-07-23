@@ -117,7 +117,6 @@ export const ProjectView = ({ projectId }: Props) => {
             <Suspense fallback={<div className="flex-1 flex items-center justify-center"><i className="ri-loader-4-line animate-spin inline-block text-2xl text-white" /></div>}>
               <MessagesContainer
                 projectId={projectId}
-                activeFragment={activeFragment}
                 setActiveFragment={setActiveFragment}
                 stage="SITE"
                 initialPrompt={""}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";

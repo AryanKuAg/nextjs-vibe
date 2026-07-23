@@ -5,7 +5,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messag
 import { RunnableConfig } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
-import { generateFramesFunction, extractFramesFunction } from "./mediaAgents";
+import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import fs from "fs/promises";
 import path from "path";
@@ -40,14 +40,6 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  extracted_zip_url: Annotation<string | null>({
-    reducer: (x, y) => y ?? x,
-    default: () => null,
-  }),
-  extracted_frame_count: Annotation<number | null>({
-    reducer: (x, y) => y ?? x,
-    default: () => null,
-  }),
   css_content: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
@@ -56,7 +48,7 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  next_agent: Annotation<"frame_extraction" | "frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template">({
+  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template">({
     reducer: (x, y) => y ?? x,
     default: () => "finish",
   }),
@@ -402,24 +394,6 @@ const askVideoIntentNode = async (state: typeof AgentState.State, config: Runnab
   return { next_agent: "video_generation", interactiveMessageId: message.id };
 };
 
-const frameExtractionNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
-  console.log("[Frame Extraction] Extracting frames...");
-  const step = config.configurable?.step;
-
-  await step.run("update-stage-extracting", async () => {
-    await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "EXTRACTING_FRAMES" } });
-  });
-
-  const result = await step.invoke("extract-frames", {
-    function: extractFramesFunction,
-    data: {
-      projectId: state.projectId,
-      videoUrl: state.video_url,
-    }
-  });
-
-  return { next_agent: "select_template", extracted_zip_url: result.zipUrl, extracted_frame_count: result.frameCount };
-};
 
 const frameGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   console.log("[Frame Generation] Generating frames...");
@@ -602,10 +576,7 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
         return { next_agent: "finish" };
       }
       if (action === "USE_VIDEO") {
-        if (state.experiencePref === "HERO_ONLY") {
-          return { next_agent: "select_template", video_url: videoUrl };
-        }
-        return { next_agent: "frame_extraction", video_url: videoUrl };
+        return { next_agent: "select_template", video_url: videoUrl };
       }
     }
 
@@ -613,10 +584,7 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
     return { next_agent: "finish" };
   }
 
-  if (state.experiencePref === "HERO_ONLY") {
-    return { next_agent: "select_template", video_url: videoUrl };
-  }
-  return { next_agent: "frame_extraction", video_url: videoUrl };
+  return { next_agent: "select_template", video_url: videoUrl };
 };
 
 const selectTemplateNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -656,9 +624,6 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   if (state.video_url) {
     finalPrompt = finalPrompt.replace("{{VIDEO_URL}}", state.video_url);
   }
-  if (state.extracted_zip_url) {
-    finalPrompt = finalPrompt.replace("{{ZIP_URL}}", state.extracted_zip_url);
-  }
 
   // Combine user's original instructions with the template prompt to ensure nothing is lost
   finalPrompt = `${finalPrompt}\n\nAdditional user instructions:\n${state.current_prompt}`;
@@ -674,21 +639,12 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
     await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "BUILDING_SITE" } });
   });
 
-  let zipUrl = state.extracted_zip_url;
-  if (!zipUrl) {
-    const match = state.current_prompt.match(/https?:\/\/[^\s]+(?:\.zip)/i);
-    if (match) {
-      zipUrl = match[0];
-    }
-  }
-
   await step.invoke("generate-code", {
     function: codeAgentFunction,
     data: {
       projectId: state.projectId,
       value: state.current_prompt,
-      videoUrl: zipUrl || undefined, // Only pass ZIP URLs, otherwise it incorrectly triggers 3D canvas scroll logic
-      frameCount: state.extracted_frame_count || undefined,
+      videoUrl: state.video_url || undefined,
       model: "deepseek/deepseek-v4-flash",
       userId: state.userId
     }
@@ -725,7 +681,6 @@ const workflow = new StateGraph(AgentState)
   .addNode("ask_wizard_build", askWizardBuildNode)
   .addNode("ask_media_intent", askMediaIntentNode)
   .addNode("ask_video_intent", askVideoIntentNode)
-  .addNode("frame_extraction", frameExtractionNode)
   .addNode("frame_generation", frameGenerationNode)
   .addNode("video_generation", videoGenerationNode)
   .addNode("select_template", selectTemplateNode)
@@ -737,7 +692,6 @@ const workflow = new StateGraph(AgentState)
     ask_media_intent: "ask_media_intent",
     frame_generation: "frame_generation",
     video_generation: "video_generation",
-    frame_extraction: "frame_extraction",
     code_generation: "code_generation",
     reject: "reject",
     finish: END,
@@ -760,7 +714,6 @@ const workflow = new StateGraph(AgentState)
     finish: END,
     video_generation: "video_generation",
   })
-  .addEdge("frame_extraction", "select_template")
   .addConditionalEdges("frame_generation", (state) => state.next_agent, {
     frame_generation: "frame_generation",
     video_generation: "video_generation",
@@ -769,7 +722,6 @@ const workflow = new StateGraph(AgentState)
   })
   .addConditionalEdges("video_generation", (state) => state.next_agent, {
     video_generation: "video_generation",
-    frame_extraction: "frame_extraction",
     select_template: "select_template",
     finish: END,
   })

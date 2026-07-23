@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+
 
 function formatTimer(seconds: number) {
   if (seconds < 60) return `${seconds}s`;

@@ -79,13 +79,7 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-    let videoUrl = event.data.videoUrl;
-    if (!videoUrl && event.data.frameCount) {
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      videoUrl = `${cdnBase}/frames/${event.data.projectId}/frames.zip`;
-      console.log(`DEBUG: Reconstructed deterministic videoUrl from project ID: ${videoUrl}`);
-    }
+    const videoUrl = event.data.videoUrl;
 
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
@@ -164,51 +158,6 @@ export const codeAgentFunction = inngest.createFunction(
         };
         readDirRecursive(templatesDir);
 
-        if (!videoUrl) {
-          const PROTECTED_FILES = [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ];
-          for (const file of PROTECTED_FILES) {
-            delete files[file];
-          }
-          files["src/App.tsx"] = `export default function App() {\n  return (\n    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-8">\n      <h1 className="text-4xl font-bold mb-4">Hello World</h1>\n      <p className="text-lg text-muted-foreground">Start building your application here.</p>\n    </div>\n  );\n}\n`;
-        }
-      } else {
-        // Enforce golden templates on follow-ups to keep them synced and prevent dummy components
-        if (videoUrl) {
-          const PROTECTED_FILES = [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ];
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(templatesDir, file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              files[file] = fs.readFileSync(templatePath, "utf-8");
-            }
-          }
-        }
-      }
-
-      // ALWAYS dynamically replace frame count, even on follow-up prompts
-      if (event.data.frameCount) {
-        const frameContent = files["src/constants/frames.ts"];
-        if (frameContent) {
-          files["src/constants/frames.ts"] = frameContent.replace(
-            /export const TOTAL_FRAMES = \d+;?/,
-            `export const TOTAL_FRAMES = ${event.data.frameCount};`
-          );
-        }
       }
 
       return files;
@@ -223,15 +172,6 @@ export const codeAgentFunction = inngest.createFunction(
         return null;
       }
 
-      const PROTECTED_FILES = videoUrl ? [
-        "src/components/CanvasScroll.tsx",
-        "src/components/Preloader.tsx",
-        "src/store/useStore.ts",
-        "src/constants/frames.ts",
-        "src/components/headers/DotNav.tsx",
-        "src/components/headers/FullWidthNav.tsx",
-        "src/components/headers/PillNav.tsx",
-      ] : [];
 
       // Helper function to write a file absolute to /home/user and ensure directory exists
       const writeSandboxFile = async (sandbox: Sandbox, filePath: string, content: string) => {
@@ -248,31 +188,6 @@ export const codeAgentFunction = inngest.createFunction(
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
-
-        try {
-          const sandbox = await getSandbox(sandboxId);
-          const fs = await import("fs");
-          const path = await import("path");
-
-          // Ensure all protected template files are present and correct in the hot sandbox
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              const content = fs.readFileSync(templatePath, "utf-8");
-              await writeSandboxFile(sandbox, file, content);
-              console.log(`DEBUG: Force-wrote template file ${file} to hot sandbox`);
-            }
-          }
-
-          // We MUST still update the frames.ts file in case the user extracted new frames
-          // between prompts, otherwise the hot sandbox will retain the old frame count.
-          if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
-            await writeSandboxFile(sandbox, "src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
-            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
-          }
-        } catch (e) {
-          console.error("Failed to ensure template files in hot sandbox", e);
-        }
 
         return null;
       }
@@ -292,21 +207,6 @@ export const codeAgentFunction = inngest.createFunction(
         }
       }
 
-      // Also force-write the templates just to be safe on fresh sandbox
-      try {
-        const fs = await import("fs");
-        const path = await import("path");
-        for (const file of PROTECTED_FILES) {
-          const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-          if (fs.existsSync(templatePath)) {
-            const content = fs.readFileSync(templatePath, "utf-8");
-            await writeSandboxFile(sandbox, file, content);
-            console.log(`DEBUG: Force-wrote template file ${file} to new sandbox`);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to ensure template files on new sandbox hydration", e);
-      }
 
       console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
     });
@@ -551,43 +451,33 @@ export const codeAgentFunction = inngest.createFunction(
     }
 
     if (videoUrl) {
-      currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
-The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
-You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
+      currentPrompt = `## SCROLL-DRIVEN VIDEO BACKGROUND (Patch — OVERRIDES any conflicting instructions above)
+Adds a full-page scroll-scrubbed video background using ScrollyVideo. It must play/scrub across the ENTIRE page — from the first section to the last — regardless of how many sections exist.
 
-Specifically, you ALREADY HAVE:
-1. \`src/components/CanvasScroll.tsx\` - Handles the high-performance background frame rendering.
-2. \`src/components/Preloader.tsx\` - A full-screen aura loading state.
-3. \`src/components/Navbar.tsx\` - A default pill-shaped navigation bar.
-4. \`src/components/headers/\` - A directory containing alternative header templates (\`DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`).
-5. \`src/store/useStore.ts\` - Global state management for frames.
-6. \`src/App.tsx\` - The layout wrapper that combines these components.
+### Setup
+Ensure you run \`npm install scrolly-video --save\`
 
-YOUR ONLY JOB:
-1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
-2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
-3. CREATE HIGHLY UNIQUE DESIGNS: You are highly encouraged to invent entirely NEW layouts, typography choices, color palettes, and unconventional structures. DO NOT default to the provided pill-shaped Navbar. You MUST redesign the navigation or use one of the alternative headers to match the specific vibe of the user's prompt. DO NOT build the exact same centered-text hero section every time. Introduce grids, side-panels, bento boxes, etc.
-4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
-5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
-6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
+Create src/components/ScrollFrames.tsx with EXACTLY this:
+import ScrollyVideo from 'scrolly-video/dist/ScrollyVideo.esm.jsx';
+export default function ScrollFrames() {
+  return <ScrollyVideo src="${videoUrl}" />;
+}
+Do not pass sticky, full, trackScroll, or cover props — leave them at their defaults (all true). Do not add scroll listeners, rAF loops, manual currentTime code, or loading overlays. The package handles all of it internally via position: sticky.
+
+### MANDATORY structural rules
+1. <ScrollFrames /> is the FIRST child at the root of App.tsx, before all other components, not wrapped in any div.
+2. CRITICAL — DO NOT set \`overflow: hidden\`, \`overflow-x: hidden\`, \`overflow-y: hidden\`, \`overflow: auto\`, or \`overflow: scroll\` on \`html\`, \`body\`, \`#root\`, or ANY element that is an ancestor of, or a sibling sharing a parent with, \`<ScrollFrames />\` (this includes any top-level wrapper div in App.tsx). Setting overflow on any of these breaks the sticky video after one viewport's worth of scroll — this is the exact bug to avoid. If horizontal scroll clipping is needed, apply \`overflow-x: hidden\` only on a nested content wrapper that sits inside a section, never at the App.tsx root or on html/body.
+3. Do not give the ScrollFrames parent a fixed or constrained height. Its sticky range is determined by the height of its containing block, which must equal the full page's scroll height — so nothing above it in the tree may cap that height.
+4. After generating the code, verify in the rendered output: the ScrollyVideo container's computed \`position\` must be \`sticky\` with \`top: 0\`. If it computes as \`static\`, search the CSS/App.tsx for overflow rules on html/body/#root/root wrapper and remove them.
+5. If the prompt above describes a different video approach (canvas frames, manual currentTime scrubbing, HLS.js, frame extraction, requestAnimationFrame loops), ignore it and use this ScrollyVideo setup instead.
+6. All other content (navbar, hero text, sections, footer) renders after \`<ScrollFrames />\` as normal siblings; it layers on top via normal z-index/document flow.
 7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
 8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
-9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
-11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
-13. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
-14. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
-15. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
-    - \`src/components/CanvasScroll.tsx\`
-    - \`src/components/Preloader.tsx\`
-    - \`src/store/useStore.ts\`
-    - \`src/constants/frames.ts\`
-    - \`src/components/headers/DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`
-    DO NOT attempt to modify these files. DO NOT recreate them.
-
-When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
-=== END TEMPLATE ARCHITECTURE INSTRUCTION ===
+9. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
+10. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
+11. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
+12. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
+13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
 
 ` + currentPrompt;
     } else {

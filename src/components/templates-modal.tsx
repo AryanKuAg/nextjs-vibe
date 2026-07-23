@@ -14,6 +14,8 @@ interface TemplatesModalProps {
   isOpen: boolean;
   onClose: () => void;
   templates: Template[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onSelect?: (t: any) => void;
 }
 
 export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalProps) {

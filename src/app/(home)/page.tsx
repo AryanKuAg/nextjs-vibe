@@ -153,7 +153,7 @@ const LoggedOutView = () => {
     setIsPending(true);
 
     try {
-      // @ts-expect-error
+
       window.google?.accounts.id.cancel();
     } catch {
       // Ignore cancel errors

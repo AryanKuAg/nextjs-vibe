@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+
 import "remixicon/fonts/remixicon.css";
 
 import { useTRPC } from "@/trpc/client";
@@ -118,30 +118,14 @@ function ProjectCard({ id, name, thumbnail }: ProjectCardProps) {
 
 export default function ProjectsPage() {
   const trpc = useTRPC();
-  const router = useRouter();
-  const queryClient = useQueryClient();
 
-  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+
+  useQuery(trpc.usage.status.queryOptions());
   const { data: projects, isLoading: isProjectsLoading } = useQuery(trpc.projects.getMany.queryOptions());
 
-  const createProject = useMutation(
-    trpc.projects.create.mutationOptions({
-      onSuccess: (data) => {
-        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}`);
-      },
-    })
-  );
 
-  const handleDashboardClick = async () => {
-    if (projects && projects.length > 0) {
-      const latest = projects[0] as { id: string };
-      router.push(`/projects/${latest.id}`);
-    } else {
-      await createProject.mutateAsync({ value: "" });
-    }
-  };
+
+
 
   return (
     <div className="min-h-screen bg-background text-white font-sans flex flex-col  selection:bg-[#F1336E]/30">

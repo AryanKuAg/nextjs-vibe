@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
-import { Fragment, MessageRole, MessageType } from "@prisma/client";
+import { MessageRole, MessageType } from "@prisma/client";
 
 const InteractiveMessageHeader = ({ text = "Awaiting user input", showTimer = true, displayTime = 0, isCompleted = false }: { text?: string, showTimer?: boolean, displayTime?: number, isCompleted?: boolean }) => {
   const seconds = Math.floor(displayTime / 1000);
@@ -83,36 +83,6 @@ const UserMessage = ({ content }: UserMessageProps) => {
   );
 }
 
-interface FragmentCardProps {
-  fragment: Fragment;
-  onFragmentClick: (fragment: Fragment) => void;
-};
-
-const FragmentCard = ({
-  fragment,
-  onFragmentClick,
-}: FragmentCardProps) => {
-  return (
-    <button
-      className={cn(
-        "flex items-start text-start gap-2  rounded-lg  w-fit p-3 bg-white text-[#272725]"
-      )}
-      onClick={() => onFragmentClick(fragment)}
-    >
-      <i className="ri-code-s-slash-line size-4 mt-0.5" />
-      <div className="flex flex-col flex-1">
-        <span className="text-sm font-medium line-clamp-1">
-          {fragment.title}
-        </span>
-        <span className="text-sm">Preview</span>
-      </div>
-      <div className="flex items-center justify-center mt-0.5">
-        <i className="ri-arrow-right-s-line size-4" />
-      </div>
-    </button>
-  );
-};
-
 interface InteractiveContent {
   text: string;
   mediaUrl?: string;
@@ -121,11 +91,8 @@ interface InteractiveContent {
 
 interface AssistantMessageProps {
   content: string;
-  fragment: Fragment | null;
   createdAt: Date;
   startedAt?: Date;
-  isActiveFragment: boolean;
-  onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
   projectId: string;
   pendingInteractiveAction: string | null;
@@ -136,17 +103,14 @@ interface AssistantMessageProps {
   currentStage?: string;
   onMockAction?: (action: string) => void;
   isMockSubmitted?: boolean;
-  isMockSubmitted?: boolean;
   messageId: string;
   globalElapsedMs: number;
 };
 
 const AssistantMessage = ({
   content,
-  fragment,
   createdAt,
   startedAt,
-  onFragmentClick,
   type,
   projectId,
   pendingInteractiveAction,
@@ -236,13 +200,12 @@ const AssistantMessage = ({
     // Use currentStage as the primary source of truth (works well for agent mode)
     if (currentStage === "GENERATING_SCENE") return "Generating scene";
     if (currentStage === "GENERATING_VIDEO") return "Generating video";
-    if (currentStage === "EXTRACTING_FRAMES") return "Extracting frames";
     if (currentStage === "BUILDING_SITE") return "Building website";
 
     // Fallbacks based on interactive actions
     const isVideo = interactiveContent?.mediaUrl?.endsWith(".mp4");
-    if (lastAction === "EXTRACT_FRAMES" || lastAction === "USE_VIDEO") {
-      return "Extracting frames";
+    if (lastAction === "USE_VIDEO") {
+      return "Building website";
     }
     if (lastAction === "ANIMATE_VIDEO" || lastAction === "AI_CREATE") return isVideo ? "Generating video" : "Generating scene";
     return isVideo ? "Generating video" : "Generating scene";
@@ -365,11 +328,8 @@ const AssistantMessage = ({
 interface MessageCardProps {
   content: string;
   role: MessageRole;
-  fragment: Fragment | null;
   createdAt: Date;
   startedAt?: Date;
-  isActiveFragment: boolean;
-  onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
   projectId: string;
   pendingInteractiveAction: string | null;
@@ -382,16 +342,13 @@ interface MessageCardProps {
   isMockSubmitted?: boolean;
   messageId: string;
   globalElapsedMs: number;
-};
+}
 
 export const MessageCard = ({
   content,
   role,
-  fragment,
   createdAt,
   startedAt,
-  isActiveFragment,
-  onFragmentClick,
   type,
   projectId,
   pendingInteractiveAction,
@@ -409,11 +366,8 @@ export const MessageCard = ({
     return (
       <AssistantMessage
         content={content}
-        fragment={fragment}
         createdAt={createdAt}
         startedAt={startedAt}
-        isActiveFragment={isActiveFragment}
-        onFragmentClick={onFragmentClick}
         type={type}
         projectId={projectId}
         pendingInteractiveAction={pendingInteractiveAction}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";

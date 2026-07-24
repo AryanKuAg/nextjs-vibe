@@ -3,7 +3,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSystemPrompt, type CodeAgentMode } from "@/prompt";
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
@@ -12,7 +12,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 import { Storage } from "@google-cloud/storage";
 
 
-import { consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
+import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 
@@ -35,6 +35,33 @@ interface AgentState {
   summary: string;
   files: { [path: string]: string };
 };
+
+// Scaffold App.tsx used when the site has NO full-page scroll video (hero-only
+// and standard modes). The default template App.tsx imports ScrollFrames, which
+// is deliberately not seeded in these modes — seeding it would not compile.
+const NON_FULL_PAGE_APP_SEED = `// @ts-nocheck
+import { Navbar } from "./components/Navbar";
+
+import { Hero } from "./components/sections/Hero";
+import { Features } from "./components/sections/Features";
+import { Details } from "./components/sections/Details";
+import { Footer } from "./components/sections/Footer";
+
+export default function App() {
+  return (
+    <>
+      <Navbar />
+
+      <main className="w-full relative z-10 flex flex-col">
+        <Hero />
+        <Features />
+        <Details />
+        <Footer />
+      </main>
+    </>
+  );
+}
+`;
 
 export const codeAgentFunction = inngest.createFunction(
   {
@@ -78,9 +105,6 @@ export const codeAgentFunction = inngest.createFunction(
         where: { id: event.data.projectId }
       });
     });
-
-    const videoUrl = event.data.videoUrl;
-    const experiencePref = event.data.experiencePref; // "FULL_PAGE" | "HERO_ONLY" | undefined
 
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
@@ -132,6 +156,52 @@ export const codeAgentFunction = inngest.createFunction(
       return messageWithFragment.fragment;
     });
 
+    // --- VIDEO & MODE DERIVATION ---
+    // The event payload is not trusted as the only source: follow-up events may
+    // arrive without videoUrl/experiencePref (or with videoUrls entries that are
+    // {url, blockIndex} objects). We derive the durable truth from the project
+    // row and the latest fragment so iterations never lose the video wiring.
+    const videoContext = await step.run("derive-video-context", async () => {
+      const normalizeUrl = (v: unknown): string | undefined => {
+        if (typeof v === "string" && v.trim() !== "") return v;
+        if (v && typeof v === "object" && "url" in v && typeof (v as { url: unknown }).url === "string") {
+          return (v as { url: string }).url;
+        }
+        return undefined;
+      };
+
+      let videoUrl = normalizeUrl(event.data.videoUrl);
+      if (!videoUrl) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stored = (project as any)?.videoUrls;
+        const urls = Array.isArray(stored) ? stored : [];
+        videoUrl = normalizeUrl(urls[urls.length - 1]);
+      }
+
+      let experiencePref: string | undefined = event.data.experiencePref;
+      if (!experiencePref && latestFragment) {
+        // Derive from the built site itself: full-page sites always carry the
+        // protected ScrollFrames component; hero sites have a video but no ScrollFrames.
+        const files = (latestFragment.files || {}) as Record<string, string>;
+        if (files["src/components/ScrollFrames.tsx"]) {
+          experiencePref = "FULL_PAGE";
+        } else if (videoUrl) {
+          experiencePref = "HERO_ONLY";
+        }
+      }
+
+      const mode: CodeAgentMode = !videoUrl
+        ? "STANDARD"
+        : experiencePref === "HERO_ONLY" ? "HERO_ONLY" : "FULL_PAGE";
+
+      console.log(`DEBUG: Derived video context — mode: ${mode}, videoUrl: ${videoUrl ? "present" : "none"}`);
+      return { videoUrl: videoUrl ?? null, mode };
+    });
+
+    const videoUrl = videoContext.videoUrl;
+    const mode = videoContext.mode as CodeAgentMode;
+    const isNewBuild = !latestFragment;
+
     const initialFiles = await step.run("get-initial-files", async () => {
       let files: Record<string, string> = {};
       if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
@@ -153,13 +223,20 @@ export const codeAgentFunction = inngest.createFunction(
               readDirRecursive(fullPath);
             } else {
               const relativePath = path.relative(templatesDir, fullPath);
-              // Skip ScrollFrames template in HERO_ONLY mode (hero uses plain <video>, not scrolly-video)
-              if (relativePath === "components/ScrollFrames.tsx" && event.data.experiencePref === "HERO_ONLY") {
+              // ScrollFrames only exists in full-page mode — hero uses a plain
+              // <video>, standard has no video, and an unseeded video URL
+              // placeholder would render a broken player.
+              if (relativePath === "components/ScrollFrames.tsx" && mode !== "FULL_PAGE") {
                 continue;
               }
               let content = fs.readFileSync(fullPath, "utf-8");
-              if (event.data.videoUrl && relativePath === "components/ScrollFrames.tsx") {
-                content = content.replace("VIDEO_URL_HERE", event.data.videoUrl);
+              if (relativePath === "components/ScrollFrames.tsx" && videoUrl) {
+                content = content.replaceAll("VIDEO_URL_HERE", videoUrl);
+              }
+              // Without ScrollFrames, the default App.tsx would not compile —
+              // seed a variant that skips the import.
+              if (relativePath === "App.tsx" && mode !== "FULL_PAGE") {
+                content = NON_FULL_PAGE_APP_SEED;
               }
               files[`src/${relativePath}`] = content;
             }
@@ -221,45 +298,59 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     const previousMessages = await step.run("get-previous-messages", async () => {
-      const formattedMessages: Message[] = [];
-
+      // History hygiene: only real conversational turns reach the model.
+      // Interactive button payloads, empty progress markers, infra errors, and
+      // the duplicated current prompt would derail a lightweight model.
       const messages = await prisma.message.findMany({
         where: {
           projectId: event.data.projectId,
+          type: "RESULT",
+          content: { not: "" },
         },
         orderBy: {
           createdAt: "desc",
         },
-        take: 5,
+        take: 10,
       });
 
+      const isNoise = (content: string) =>
+        content.startsWith("The code agent encountered a critical infrastructure error") ||
+        content.startsWith("Autonomous agent encountered an error") ||
+        content === "Generation was manually stopped.";
+
+      const formattedMessages: Message[] = [];
+      let skippedCurrentPrompt = false;
+
       for (const message of messages) {
+        let content = message.content.trim();
+        if (!content || isNoise(content)) continue;
+
+        // The newest USER message is the prompt currently being processed — it
+        // is already in the task input; including it twice confuses the model.
+        if (!skippedCurrentPrompt && message.role === "USER" && content === event.data.value?.trim()) {
+          skippedCurrentPrompt = true;
+          continue;
+        }
+
+        content = content.replace(/<\/?task_summary>/g, "").trim();
+        if (content.length > 1500) content = content.slice(0, 1500) + " …[truncated]";
+
         formattedMessages.push({
           type: "text",
           role: message.role === "ASSISTANT" ? "assistant" : "user",
-          content: message.content,
-        })
+          content,
+        });
+
+        if (formattedMessages.length >= 4) break;
       }
 
       return formattedMessages.reverse();
     });
 
-    const previousFiles = await step.run("get-previous-files", async () => {
-      if (!event.data.isFollowUp) return null;
-
-      const latestMessage = await prisma.message.findFirst({
-        where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
-        orderBy: { createdAt: "desc" },
-        include: { fragment: true }
-      });
-
-      return (latestMessage?.fragment?.files as Record<string, string>) || null;
-    });
-
     const state = createState<AgentState>(
       {
         summary: "",
-        files: previousFiles || (initialFiles as Record<string, string>),
+        files: initialFiles as Record<string, string>,
       },
       {
         messages: previousMessages as Message[],
@@ -316,7 +407,7 @@ export const codeAgentFunction = inngest.createFunction(
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
 
-                const PROTECTED_FILES = videoUrl ? [
+                const PROTECTED_FILES = mode === "FULL_PAGE" ? [
                   "src/components/ScrollFrames.tsx",
                 ] : [];
 
@@ -335,7 +426,7 @@ export const codeAgentFunction = inngest.createFunction(
                   }
 
                   // Strict enforcement for App.tsx integrity
-                  if (videoUrl && file.path === "src/App.tsx") {
+                  if (mode === "FULL_PAGE" && file.path === "src/App.tsx") {
                     const c = file.content;
                     if (!c.includes("<ScrollFrames") && !c.includes("ScrollyVideo")) {
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <ScrollFrames /> from App.tsx. You MUST include it as the first child.");
@@ -405,14 +496,15 @@ export const codeAgentFunction = inngest.createFunction(
       ];
     };
 
+    // The system prompt is assembled per mode — one voice, no conflicting layers.
+    const systemPrompt = buildCodeAgentSystemPrompt(mode, videoUrl);
+
     // Factory function: creates an agent with unique name and step IDs per attempt.
     const createCodeAgentForAttempt = (attemptIndex: number, iterIndex: number = 0) => {
       return createAgent<AgentState>({
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
-        system: PROMPT,
-        // Using 1.5-pro-002 for the highest reliability in tool-calling.
-        // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
+        system: systemPrompt,
         model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
@@ -429,90 +521,40 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
-    let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
     let finalFiles = state.data.files;
 
-    // --- CONTEXT INJECTION FOR ITERATIONS ---
-    const hasExistingFiles = Object.keys(initialFiles).length > 0;
-    if (hasExistingFiles) {
-      currentPrompt += `\n\n=== CURRENT PROJECT STATE ===\n`;
-      currentPrompt += `You are modifying an existing project. Here are the current files:\n\n`;
-
-      for (const [path, content] of Object.entries(initialFiles)) {
-        // Skip injecting lockfiles or assets to save tokens and prevent confusion
+    // --- TASK INPUT ASSEMBLY ---
+    // The mode-specific rules live in the system prompt. The task input is just:
+    // the Build Brief (new builds) or the change request (iterations), plus the
+    // current file contents — clearly framed for each case.
+    const renderFiles = (files: Record<string, string>) => {
+      let out = "";
+      for (const [path, content] of Object.entries(files)) {
         if (path.includes('package-lock.json') || path.includes('node_modules')) continue;
-
-        currentPrompt += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
+        out += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
       }
+      return out;
+    };
 
-      currentPrompt += `=== END PROJECT STATE ===\n\n`;
-      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`editFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
-    }
-
-    if (videoUrl && experiencePref !== "HERO_ONLY") {
-      // === FULL PAGE MODE: scrolly-video across entire page ===
-      currentPrompt = `## SCROLL-DRIVEN VIDEO BACKGROUND (Patch — OVERRIDES any conflicting instructions above)
-Adds a full-page scroll-scrubbed video background using ScrollyVideo. It must play/scrub across the ENTIRE page — from the first section to the last — regardless of how many sections exist.
-
-### Setup
-Ensure you run \`npm install scrolly-video --save\`
-
-Create src/components/ScrollFrames.tsx with EXACTLY this:
-import ScrollyVideo from 'scrolly-video/dist/ScrollyVideo.esm.jsx';
-export default function ScrollFrames() {
-  return <ScrollyVideo src="${videoUrl}" />;
-}
-Do not pass sticky, full, trackScroll, or cover props — leave them at their defaults (all true). Do not add scroll listeners, rAF loops, manual currentTime code, or loading overlays. The package handles all of it internally via position: sticky.
-
-### MANDATORY structural rules
-1. <ScrollFrames /> is the FIRST child at the root of App.tsx, before all other components, not wrapped in any div.
-2. CRITICAL — DO NOT set \`overflow: hidden\`, \`overflow-x: hidden\`, \`overflow-y: hidden\`, \`overflow: auto\`, or \`overflow: scroll\` on \`html\`, \`body\`, \`#root\`, or ANY element that is an ancestor of, or a sibling sharing a parent with, \`<ScrollFrames />\` (this includes any top-level wrapper div in App.tsx). Setting overflow on any of these breaks the sticky video after one viewport's worth of scroll — this is the exact bug to avoid. If horizontal scroll clipping is needed, apply \`overflow-x: hidden\` only on a nested content wrapper that sits inside a section, never at the App.tsx root or on html/body.
-3. Do not give the ScrollFrames parent a fixed or constrained height. Its sticky range is determined by the height of its containing block, which must equal the full page's scroll height — so nothing above it in the tree may cap that height.
-4. After generating the code, verify in the rendered output: the ScrollyVideo container's computed \`position\` must be \`sticky\` with \`top: 0\`. If it computes as \`static\`, search the CSS/App.tsx for overflow rules on html/body/#root/root wrapper and remove them.
-5. If the prompt above describes a different video approach (canvas frames, manual currentTime scrubbing, HLS.js, frame extraction, requestAnimationFrame loops), ignore it and use this ScrollyVideo setup instead.
-6. All other content (navbar, hero text, sections, footer) renders after \`<ScrollFrames />\` as normal siblings; it layers on top via normal z-index/document flow.
-7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
-8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
-9. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
-10. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-11. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
-12. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
-13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
-
-` + currentPrompt;
-    } else if (videoUrl && experiencePref === "HERO_ONLY") {
-      // === HERO ONLY MODE: normal <video> in hero section, traditional website below ===
-      currentPrompt = `## HERO VIDEO BACKGROUND (Patch — OVERRIDES any conflicting instructions above)
-This site has a video that plays ONLY in the Hero section. The rest of the page is a normal, traditional website with solid backgrounds and standard scrolling.
-
-### Hero Section Rules
-1. The Hero section MUST contain a \`<video>\` element as its background. Use this exact video URL: "${videoUrl}"
-2. The video MUST autoplay, loop, be muted, and use playsInline. Example:
-   \`<video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />\`
-3. The Hero section MUST be \`relative\` positioned with \`overflow-hidden\` and a height of \`h-screen\` or \`min-h-screen\`.
-4. Place your hero text content (heading, subheading, CTA buttons) as an overlay on top of the video using \`absolute\` or \`relative\` positioning with a higher \`z-index\`.
-5. You MAY add a subtle dark gradient overlay (\`bg-gradient-to-b from-black/40 to-black/60\`) between the video and the text to ensure readability.
-6. Do NOT use scrolly-video, ScrollyVideo, ScrollFrames, or any scroll-scrubbing library. This is a plain HTML5 \`<video>\` tag.
-7. Do NOT install any extra packages for the video. The native \`<video>\` element is all you need.
-
-### Rest of the Page
-8. ALL sections BELOW the Hero (Features, About, Pricing, Footer, etc.) are a completely normal website. Use solid backgrounds (\`bg-white\`, \`bg-gray-900\`, \`bg-black\`, etc.) and normal styling. These sections scroll normally — no transparency tricks needed.
-9. Build a beautiful, full website with at least 4-5 sections total (Hero + 3-4 content sections + Footer).
-10. You have full creative freedom for the sections below the hero. Make them visually stunning with proper colors, cards, grids, etc.
-11. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-12. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application (except the \`<video>\` tag in the hero). We do not have any images to load, so using \`<img>\` tags will result in broken images.
-
-` + currentPrompt;
+    let currentPrompt: string;
+    if (isNewBuild) {
+      currentPrompt = `${event.data.value}\n\n`;
+      currentPrompt += `=== STARTER SCAFFOLD (current project files) ===\n`;
+      currentPrompt += `This is a BRAND NEW project. The files below are a generic scaffold seeded by the platform — their copy, styling, and section content are PLACEHOLDERS.\n`;
+      currentPrompt += `You MUST replace the placeholder content of App.tsx, index.css, index.html, and every section/component so the finished site matches the brief above. Keep the structural wiring intact` +
+        (mode === "FULL_PAGE" ? ` (in particular: <ScrollFrames /> stays the first child of App.tsx — never modify or recreate ScrollFrames itself)` : "") + `.\n\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END STARTER SCAFFOLD ===`;
     } else {
-      currentPrompt = `=== STANDARD WEBSITE ARCHITECTURE ===
-Build a standard, high-quality React application based on the user's prompt. 
-You have full creative freedom. There is no background video, so you can use any colors, backgrounds, or layouts you want.
-Create unique, stunning designs. Do NOT just make a plain white page.
-=== END STANDARD WEBSITE ARCHITECTURE ===
-
-` + currentPrompt;
+      currentPrompt = `=== CHANGE REQUEST ===\n${event.data.value}\n=== END CHANGE REQUEST ===\n\n`;
+      currentPrompt += `=== CURRENT PROJECT STATE ===\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END PROJECT STATE ===\n\n`;
+      currentPrompt += `You are updating the existing project above based on the change request. ONLY modify the specific files that require changes via editFiles. Do NOT rewrite the entire application. Keep the existing design, components, and structure intact unless the request explicitly asks to change them.`;
     }
+
+    // (Mode-specific video/architecture rules live in the system prompt — no patches here.)
 
     // Inject image reference into the prompt when a user attaches an image
     if (event.data.imageUrl) {
@@ -520,14 +562,11 @@ Create unique, stunning designs. Do NOT just make a plain white page.
     }
 
     // --- 1. INITIAL GENERATION (The Creator) ---
-
-    // --- 1. INITIAL GENERATION (The Creator) ---
-    // Run the main massive agent exactly once to build the features
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,
       agents: [initialAgent],
-      maxIter: 5,
+      maxIter: 8,
       defaultState: state,
       router: async ({ network }) => {
         if (await checkCancellation(event.data.projectId)) return;
@@ -539,8 +578,44 @@ Create unique, stunning designs. Do NOT just make a plain white page.
     });
 
     console.log('DEBUG: Running initial Creator agent...');
-    const result = await initialNetwork.run(currentPrompt, { state });
+    let result = await initialNetwork.run(currentPrompt, { state });
     if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+
+    // --- VERIFICATION: the agent must have actually changed something. ---
+    // A lazy model can emit a task summary without a single tool call; the seeded
+    // scaffold compiles, so without this check the untouched template would ship
+    // as a "success". One corrective re-run before we accept the result.
+    const seedFiles = initialFiles as Record<string, string>;
+    const hasRealChanges = (files: Record<string, string> | undefined) =>
+      Object.entries(files || {}).some(([p, c]) => seedFiles[p] !== c);
+
+    if (!hasRealChanges(result.state.data.files)) {
+      console.warn("DEBUG: Creator agent made no file changes. Running one corrective attempt...");
+      const retryState = createState<AgentState>(
+        { summary: "", files: state.data.files },
+        { messages: previousMessages as Message[] },
+      );
+      const retryAgent = createCodeAgentForAttempt(0, 1);
+      const retryNetwork = createNetwork<AgentState>({
+        name: `coding-agent-network-run-${runId}-retry`,
+        agents: [retryAgent],
+        maxIter: 8,
+        defaultState: retryState,
+        router: async ({ network }) => {
+          if (await checkCancellation(event.data.projectId)) return;
+          if (network.state.data.summary) return;
+          return retryAgent;
+        },
+        defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+      });
+
+      const correctivePrompt = currentPrompt +
+        `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${isNewBuild ? "scaffold placeholders MUST be replaced with the brief's content" : "requested change MUST be applied"}. Call the editFiles tool now with the actual file contents, THEN print the task summary.`;
+
+      result = await retryNetwork.run(correctivePrompt, { state: retryState });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+      state.data.files = result.state.data.files;
+    }
 
     finalSummary = result.state.data.summary || "";
     finalFiles = result.state.data.files;
@@ -568,24 +643,8 @@ Create unique, stunning designs. Do NOT just make a plain white page.
           }
 
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
-          try {
-            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
-          } catch {
-            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
-          }
-
-          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
-          try {
-            await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr) {
-            const err = tsErr as { stdout?: string, stderr?: string, message?: string };
-            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `TypeScript Error:\n${tsErrorLog || err.message}` };
-          }
-
-          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
-          try {
-            // Safeguard: Fix common AI-generated code issues before build
+          // Deterministic source fixes run BEFORE the type check so the fixer
+          // agent is only invoked for errors the scripts cannot repair.
             const fixPathsScript = `
 const fs = require('fs');
 const path = require('path');
@@ -674,7 +733,7 @@ function fixPaths(dir) {
           } else if (originalName === 'Youtube') {
             svgPath = '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />';
           }
-          svgDeclarations += \`const \${localName} = (props) => (
+          svgDeclarations += \`const \${localName} = (props\${p.endsWith('.tsx') ? ': any' : ''}) => (
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
     \${svgPath}
   </svg>
@@ -690,11 +749,30 @@ function fixPaths(dir) {
 }
 fixPaths(process.argv[2]);
 `;
+          try {
             await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
-
-            // Run pre-build to fix source files
             await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
+          } catch (e) {
+            console.error("DEBUG: fix-paths pre-pass failed (continuing)", e);
+          }
 
+          try {
+            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
+          } catch {
+            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
+          }
+
+          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
+          try {
+            await sandbox.commands.run("npx tsc --noEmit");
+          } catch (tsErr) {
+            const err = tsErr as { stdout?: string, stderr?: string, message?: string };
+            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
+            return { success: false, error: `TypeScript Error:\n${tsErrorLog || err.message}` };
+          }
+
+          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
+          try {
             await sandbox.commands.run("npm run build --silent -- --base=./");
 
             // Run post-build to fix bundled output files
@@ -800,12 +878,8 @@ fixPaths(process.argv[2]);
       state.data.files = fixResult.state.data.files;
       finalFiles = state.data.files;
 
-      await step.run(`charge-credits-fixer-run-${runId}-attempt-${attempt}`, async () => {
-        const model = event.data.model || "deepseek/deepseek-v4-flash";
-        const cost = FOLLOW_UP_COSTS[model] || 5;
-        await consumeCredits(cost, event.data.userId);
-      });
-
+      // Fixer attempts repair the platform's own generation failures —
+      // the user is never charged for them.
       attempt++;
     }
     const fragmentTitleGenerator = createAgent({
@@ -823,10 +897,13 @@ fixPaths(process.argv[2]);
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
-    const { output: responseOutput } = await responseGenerator.run(finalSummary);
+    // Only generate a cheerful "here's what I built" message when the build
+    // actually succeeded — otherwise the user gets an honest failure notice.
+    const responseOutput = isBuildSuccessful
+      ? (await responseGenerator.run(finalSummary)).output
+      : undefined;
 
-    console.log('hola', isBuildSuccessful);
-    // ... continues to deploymentUrl ...
+    console.log('DEBUG: Build successful:', isBuildSuccessful);
 
     const deploymentUrl = await step.run("deploy-to-gcp", async () => {
       if (!isBuildSuccessful) {
@@ -1014,10 +1091,15 @@ fixPaths(process.argv[2]);
     });
 
     await step.run("save-result", async () => {
+      const successContent = parseAgentOutput(responseOutput) || finalSummary;
+      const failureContent =
+        "I generated the site, but the automated build could not be fully repaired after several attempts, so it was not deployed. " +
+        "The live preview may show errors. Please send a follow-up prompt describing what to adjust (or simply ask me to fix the errors) and I'll repair it.";
+
       return await prisma.message.create({
         data: {
           projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput) || finalSummary,
+          content: isBuildSuccessful ? successContent : failureContent,
           role: "ASSISTANT",
           type: "RESULT",
           fragment: {

@@ -88,13 +88,27 @@ export const messagesRouter = createTRPCRouter({
       // With the new 3-stage flow, code-agent is fired via projects.buildSite instead,
       // but if an existing project UI uses this for regular chat, we still fire it.
       if (input.stage === "SITE" && !isSyntheticMessage) {
+        // videoUrls entries are stored as { url, blockIndex } objects (older rows
+        // may hold plain strings). Always send a plain URL string — the code
+        // agent additionally re-derives this from the project row as a fallback.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const storedUrls = (existingProject as any).videoUrls;
+        const urls: unknown[] = Array.isArray(storedUrls) ? storedUrls : [];
+        const latest = urls[urls.length - 1];
+        const latestVideoUrl =
+          typeof latest === "string"
+            ? latest
+            : latest && typeof latest === "object" && typeof (latest as { url?: unknown }).url === "string"
+              ? (latest as { url: string }).url
+              : undefined;
+
         await inngest.send({
           name: "code-agent/run",
           data: {
             value: input.value,
             projectId: input.projectId,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            videoUrl: ((existingProject as any).videoUrls as string[])?.[0] || undefined,
+            videoUrl: latestVideoUrl,
+            isFollowUp: true,
             model: input.model,
             userId: ctx.auth.userId,
           },

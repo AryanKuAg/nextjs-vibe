@@ -28,6 +28,13 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => "",
   }),
+  // The user's website request (sanitized). WRITE_PROMPT buttons overwrite
+  // current_prompt with media prompts — this field keeps the site spec intact
+  // for template selection and the Build Brief compiler.
+  site_prompt: Annotation<string>({
+    reducer: (x, y) => y ?? x,
+    default: () => "",
+  }),
   start_frame_url: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
@@ -103,8 +110,20 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
   const step = config.configurable?.step;
   console.log("[Supervisor] Routing request...");
 
+  // A project that already has a built site (a fragment) is in follow-up mode:
+  // we never regenerate media for follow-ups, we route straight to the code agent.
+  const hasExistingSite = await step.run("check-existing-site", async () => {
+    const existing = await prisma.message.findFirst({
+      where: { projectId: state.projectId, fragment: { isNot: null } },
+      select: { id: true },
+    });
+    return Boolean(existing);
+  });
+
   const response = await step.run("supervisor-routing", async () => {
-    await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "SCENE" } });
+    if (!hasExistingSite) {
+      await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "SCENE" } });
+    }
 
     const prompt = state.current_prompt;
     const sysMsg = new SystemMessage(
@@ -131,7 +150,6 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
       "For example, if they asked 'generate an image of a dog', suggest: " +
       "'Try something like: \"Build me a pet adoption website with a hero section featuring a golden retriever\"'\n\n" +
       "Valid routes for accepted requests:\n" +
-      " 'frame_extraction' - if the user asks for a continuous sequence from a previous video.\n" +
       " 'frame_generation' - if they ask for a new scene without providing a video.\n" +
       " 'video_generation' - if a start frame exists but needs animation.\n" +
       " 'code_generation' - if the user provides a video URL, or if they just ask to build the website without media generation.\n" +
@@ -147,53 +165,62 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
-        next_agent: z.enum(["frame_extraction", "frame_generation", "video_generation", "code_generation", "reject", "finish"]),
-        rejection_reason: z.string().optional().describe("A short, friendly explanation of why the request was rejected. Only required when next_agent is 'reject'."),
+        next_agent: z.enum(["frame_generation", "video_generation", "code_generation", "reject", "finish"]),
+        rejection_reason: z.string().nullable().optional().describe("A short, friendly explanation of why the request was rejected. Only required when next_agent is 'reject'."),
         requiresWizard: z.boolean().describe("True if the prompt is generic and needs the wizard to gather preferences. MUST be false if the prompt is highly detailed, includes a URL, or has specific implementation instructions."),
       })
     );
 
-    return await structuredLlm.invoke([sysMsg, new HumanMessage(prompt)]);
+    try {
+      return await structuredLlm.invoke([sysMsg, new HumanMessage(prompt)]);
+    } catch (e) {
+      // Structured output can fail on lightweight models — never crash the run.
+      console.warn("[Supervisor] Structured output failed, using safe fallback route.", e);
+      return {
+        next_agent: "frame_generation" as const,
+        rejection_reason: null,
+        requiresWizard: !hasExistingSite && prompt.length <= 800,
+      };
+    }
   });
 
-  const isMediaRequired = true; // Platform ONLY builds 3D websites, so media is ALWAYS required
+  const isMediaRequired = true; // Platform ONLY builds video-background websites, so media is ALWAYS required
   const hasVideoUrlInPrompt = /https?:\/\/[^\s]+(?:\.mp4|\.webm|\.m3u8|cloudfront\.net)/i.test(state.current_prompt);
-  
-  // Override LLM if prompt is highly detailed or contains a video URL
-  let requiresWizard = response.requiresWizard;
-  if (hasVideoUrlInPrompt || state.current_prompt.length > 800) {
-    requiresWizard = false;
-  }
+  const isDetailedPrompt = state.current_prompt.length > 800 || hasVideoUrlInPrompt;
+  const requiresWizard = response.requiresWizard && !isDetailedPrompt;
 
-  console.log("[Supervisor] Intial Route:", response.next_agent, "| Media Required (Final):", isMediaRequired, "| Requires Wizard:", requiresWizard);
+  console.log("[Supervisor] Initial Route:", response.next_agent, "| Existing site:", hasExistingSite, "| Requires Wizard:", requiresWizard);
 
   if (response.rejection_reason) {
     console.log("[Supervisor] Rejection reason:", response.rejection_reason);
   }
 
-  let final_agent = response.next_agent;
+  let final_agent: typeof AgentState.State["next_agent"] = response.next_agent;
 
-  // Force detailed prompts through the sanitizer → image → video → code pipeline
-  if (state.current_prompt.length > 800) {
-    final_agent = "sanitize_prompt";
-  } else if (hasVideoUrlInPrompt && final_agent !== "reject") {
-    if (!state.current_prompt.toLowerCase().includes("extract")) {
+  // The reject decision is never overridden — guardrails win over routing heuristics.
+  if (final_agent !== "reject") {
+    if (hasExistingSite) {
+      // Follow-up on a built site: straight to the code agent, never regenerate media.
+      final_agent = "code_generation";
+      console.log("[Supervisor] Existing site detected. Routing follow-up to code_generation.");
+    } else if (requiresWizard && !state.experiencePref && !state.buildPref) {
+      final_agent = "ask_wizard_3d";
+      console.log("[Supervisor] Generic prompt detected. Routing to ask_wizard_3d");
+    } else if (final_agent !== "finish") {
+      // Every new build flows through the sanitizer: it strips background
+      // instructions, detects FULL_PAGE vs HERO_ONLY, and extracts image assets.
+      // The sanitizer then routes to HITL (ask_media_intent) or agent-mode media.
       final_agent = "sanitize_prompt";
     }
   }
 
-  // Path 2 & 3: Wizard Routing
-  if (requiresWizard && !state.experiencePref && !state.buildPref) {
-    final_agent = "ask_wizard_3d";
-    console.log("[Supervisor] Generic prompt detected. Routing to ask_wizard_3d");
-  }
-  // Path 1 (Smart Orchestration) / After Wizard: Check Media Intent
-  else if (isMediaRequired && !state.isAgentMode && !state.video_url && !state.start_frame_url && !hasVideoUrlInPrompt) {
-    final_agent = "ask_media_intent";
-    console.log("[Supervisor] HITL Override: Routing to ask_media_intent");
-  }
-
-  return { next_agent: final_agent, rejection_reason: response.rejection_reason ?? null, mediaRequired: isMediaRequired };
+  return {
+    next_agent: final_agent,
+    rejection_reason: response.rejection_reason ?? null,
+    mediaRequired: isMediaRequired,
+    // Detailed prompts auto-proceed through the pipeline without approval stops.
+    isAgentMode: state.isAgentMode || isDetailedPrompt,
+  };
 };
 
 const askWizard3DNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -611,15 +638,26 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
       "You are a prompt sanitizer for Framerate, an AI website builder that generates scroll-driven video background websites.\n\n" +
       "Your job:\n" +
       "1. REMOVE any instructions about custom backgrounds (gradients, particles, 3D scenes, starry skies, three.js, canvas animations, etc.). The background is ALWAYS our generated video — the user cannot override this.\n" +
-      "2. KEEP everything about content, layout, structure, sections, typography, animations, CSS, colors (for foreground elements), and UI components.\n" +
-      "3. DETECT the experience preference:\n" +
+      "2. REMOVE any instructions asking for images, photos, stock pictures, or image placeholders — generated sites never contain images.\n" +
+      "3. KEEP everything about content, layout, structure, sections, typography, animations, CSS, colors (for foreground elements), and UI components.\n" +
+      "4. DETECT the experience preference:\n" +
       "   - Default to FULL_PAGE (video scrubs across the entire page as user scrolls)\n" +
       "   - Only choose HERO_ONLY if the user explicitly says something like 'video in hero section only', 'banner video at the top', or 'hero with video background and normal page below'\n" +
-      "4. DETECT if there's a direct image URL in the prompt (must end with .png, .jpg, .jpeg, or .webp).\n" +
-      "5. Do NOT change the meaning or intent of the prompt. Only strip background-related parts."
+      "5. DETECT if there's a direct image URL in the prompt (must end with .png, .jpg, .jpeg, or .webp).\n" +
+      "6. Do NOT change the meaning or intent of the prompt. Only strip the parts described above."
     );
 
-    return await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+    try {
+      return await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+    } catch (e) {
+      // Never crash the run on a structured-output failure — pass the prompt through.
+      console.warn("[Sanitize Prompt] Structured output failed, using passthrough fallback.", e);
+      return {
+        sanitized_prompt: state.current_prompt,
+        experience_pref: "FULL_PAGE" as const,
+        detected_image_url: null,
+      };
+    }
   });
 
   // If user provided an image URL, validate resolution (must be at least 480p desktop: 854x480)
@@ -646,86 +684,166 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
     }
   }
 
-  // Create a progress message so UI shows "Working"
-  await step.run("sanitize-progress-msg", async () => {
-    await prisma.message.create({
-      data: {
-        projectId: state.projectId,
-        role: "ASSISTANT",
-        type: "RESULT",
-        content: ""
-      }
+  // A user-chosen preference (wizard buttons / event data) always wins over detection.
+  const experiencePref = state.experiencePref ?? result.experience_pref;
+
+  // Create a progress message so the UI shows "Working" while media generates autonomously
+  if (state.isAgentMode || startFrameUrl) {
+    await step.run("sanitize-progress-msg", async () => {
+      await prisma.message.create({
+        data: {
+          projectId: state.projectId,
+          role: "ASSISTANT",
+          type: "RESULT",
+          content: ""
+        }
+      });
     });
-  });
+  }
 
   // If we have a valid start frame, skip image generation and go straight to video
   if (startFrameUrl) {
     return {
       next_agent: "video_generation" as const,
       current_prompt: result.sanitized_prompt,
-      experiencePref: result.experience_pref,
+      site_prompt: result.sanitized_prompt,
+      experiencePref,
       start_frame_url: startFrameUrl,
-      isAgentMode: true,
       mediaRequired: true,
     };
   }
 
-  // Otherwise, go through the full pipeline: image → video → code
+  // Agent mode (detailed prompts): auto-proceed through image → video → code.
+  // Human-in-the-loop mode: ask the user about the background scene first.
   return {
-    next_agent: "frame_generation" as const,
+    next_agent: state.isAgentMode ? ("frame_generation" as const) : ("ask_media_intent" as const),
     current_prompt: result.sanitized_prompt,
-    experiencePref: result.experience_pref,
-    isAgentMode: true,
+    site_prompt: result.sanitized_prompt,
+    experiencePref,
     mediaRequired: true,
   };
 };
 
+// --- Build Brief Spec Compiler ---------------------------------------------
+// Resolves the user's request + a layout skeleton into ONE unified brief BEFORE
+// the code agent runs, so the code agent never has to arbitrate between
+// conflicting instruction layers (template vs user vs platform rules).
+
+const BuildBriefSchema = z.object({
+  site_name: z.string().describe("Short brand/site name derived from the user's request"),
+  tagline: z.string().describe("One-line tagline for the site"),
+  tone: z.string().describe("3-6 adjectives describing the visual and copy tone"),
+  heading_font: z.string().describe("A distinctive Google Fonts display/heading font matching the tone (e.g. 'Space Grotesk', 'Manrope', 'Playfair Display', 'Fraunces')"),
+  body_font: z.string().describe("A complementary Google Fonts body font (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
+  accent_color: z.string().describe("ONE accent color as a hex code fitting the brand. Never purple-pink gradient territory unless the user demands it."),
+  nav_style: z.string().describe("One sentence: the navigation labels and CTA button wording"),
+  sections: z.array(z.object({
+    id: z.string().describe("kebab-case section id used for anchor links"),
+    heading: z.string().describe("The actual heading copy for this section"),
+    content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. No images ever — content is typography, numbers, lists, and inline SVG only."),
+  })).min(3).max(6).describe("4-5 sections in page order; the last one is always the footer"),
+  must_honor: z.array(z.string()).describe("Verbatim requirements from the user's request that MUST appear in the final site (specific copy, features, section names, colors). Empty array if none."),
+});
+
+type BuildBrief = z.infer<typeof BuildBriefSchema>;
+
+const renderBuildBrief = (brief: BuildBrief, skeleton: { id: string; prompt_template: string }): string => {
+  const sections = brief.sections
+    .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}" — ${s.content_outline}`)
+    .join("\n");
+  const mustHonor = brief.must_honor.length > 0
+    ? `\nMust honor (verbatim user requirements — these win over everything else in this brief):\n${brief.must_honor.map((m) => `- ${m}`).join("\n")}`
+    : "";
+
+  return `=== BUILD BRIEF (single source of truth for content & design) ===
+Site name: ${brief.site_name}
+Tagline: ${brief.tagline}
+Tone: ${brief.tone}
+Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import both from Google Fonts at the top of src/index.css)
+Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
+Navigation: ${brief.nav_style}
+
+Sections (in this order):
+${sections}
+${mustHonor}
+=== END BUILD BRIEF ===
+
+=== LAYOUT SKELETON: ${skeleton.id} (structure & motion guidance — fill it with the brief's content) ===
+${skeleton.prompt_template}
+=== END LAYOUT SKELETON ===`;
+};
+
 const selectTemplateNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
-  console.log("[Select Template] Selecting template based on experiencePref...");
+  console.log("[Select Template] Selecting skeleton & compiling build brief...");
   const step = config.configurable?.step;
+
+  // The website request — never the media prompt a user may have typed via
+  // the WRITE_PROMPT buttons (which overwrite current_prompt).
+  const sitePrompt = state.site_prompt || state.current_prompt;
 
   const templateFile = state.experiencePref === "HERO_ONLY"
     ? "hero_templates.json"
     : "full_page_templates.json";
 
-  const response = await step.run("select-template-llm", async () => {
+  const skeleton = await step.run("select-skeleton-llm", async () => {
     const templatesPath = path.join(process.cwd(), "src/lib/templates", templateFile);
     const templatesData = await fs.readFile(templatesPath, "utf-8");
     const templates = JSON.parse(templatesData);
 
     const sysMsg = new SystemMessage(
-      "You are an expert design selector. Your job is to select the most appropriate website layout template based on the user's prompt.\n" +
-      "You must return the exact ID of the template that best matches the requested vibe, style, or layout.\n\n" +
-      "Available Templates:\n" +
+      "You are an expert design selector. Select the layout skeleton whose structure best fits the user's request (vibe, industry, content shape).\n" +
+      "Return the exact ID of the best match.\n\n" +
+      "Available skeletons:\n" +
       templates.map((t: { id: string; description: string }) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
     );
 
     const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
-        template_id: z.string().describe("The ID of the chosen template"),
+        template_id: z.string().describe("The ID of the chosen skeleton"),
       })
     );
 
     let result;
     try {
-      result = await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+      result = await structuredLlm.invoke([sysMsg, new HumanMessage(sitePrompt)]);
     } catch (e) {
-      console.warn("[Select Template] Output parsing failed, falling back to default template.", e);
+      console.warn("[Select Template] Output parsing failed, falling back to default skeleton.", e);
       result = { template_id: templates[0].id };
     }
 
-    const selectedTemplate = templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
-    return selectedTemplate;
+    return templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
   });
 
-  let finalPrompt = response.prompt_template;
-  if (state.video_url) {
-    finalPrompt = finalPrompt.replace("{{VIDEO_URL}}", state.video_url);
-  }
+  const brief = await step.run("compile-build-brief", async () => {
+    const mode = state.experiencePref === "HERO_ONLY" ? "HERO_ONLY" : "FULL_PAGE";
+    const sysMsg = new SystemMessage(
+      "You are the creative director of Framerate, an AI website builder whose sites always have a platform-generated video background. " +
+      "Turn the user's request into a concrete build brief for the coding agent.\n\n" +
+      "Hard platform constraints (bake these into the brief, never contradict them):\n" +
+      `- Mode: ${mode === "HERO_ONLY" ? "the video plays only in the hero; sections below use solid backgrounds" : "the video scrubs behind the ENTIRE page; all section backgrounds are transparent"}.\n` +
+      "- The background is ALWAYS the platform's video. Never mention alternative backgrounds (gradients, 3D, particles).\n" +
+      "- Sites contain NO images of any kind. Content outlines must never reference photos, screenshots, avatars, or logo images — visuals come from typography, color, thin borders, inline SVG shapes, and motion.\n" +
+      "- Aesthetic: minimal, classy, editorial, a little creative. Never generic-template. One accent color only.\n" +
+      "- 4-5 sections total, footer last, realistic specific copy directions (no lorem ipsum).\n\n" +
+      "Extract every specific requirement the user stated (exact copy, features, section names, colors) into must_honor. " +
+      "Where the user was vague, make confident, tasteful decisions that fit their idea."
+    );
 
-  // Combine user's original instructions with the template prompt to ensure nothing is lost
-  finalPrompt = `${finalPrompt}\n\nAdditional user instructions:\n${state.current_prompt}`;
+    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const structuredLlm = routerModel.withStructuredOutput(BuildBriefSchema);
+
+    try {
+      return await structuredLlm.invoke([sysMsg, new HumanMessage(sitePrompt)]);
+    } catch (e) {
+      console.warn("[Compile Build Brief] Structured output failed, code agent will receive the raw request.", e);
+      return null;
+    }
+  });
+
+  const finalPrompt = brief
+    ? renderBuildBrief(brief, skeleton)
+    : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n=== LAYOUT SKELETON: ${skeleton.id} ===\n${skeleton.prompt_template}\n=== END LAYOUT SKELETON ===`;
 
   return { next_agent: "code_generation", current_prompt: finalPrompt };
 };
@@ -819,6 +937,7 @@ const workflow = new StateGraph(AgentState)
   .addConditionalEdges("sanitize_prompt", (state) => state.next_agent, {
     frame_generation: "frame_generation",
     video_generation: "video_generation",
+    ask_media_intent: "ask_media_intent",
     finish: END,
   })
   .addConditionalEdges("frame_generation", (state) => state.next_agent, {
@@ -875,6 +994,7 @@ export const autonomousAgentFunction = inngest.createFunction(
       projectId,
       userId,
       current_prompt: prompt,
+      site_prompt: prompt,
       isAgentMode: event.data.isAgentMode ?? false,
       buildPref: buildPref ?? null,
       experiencePref: experiencePref ?? null,

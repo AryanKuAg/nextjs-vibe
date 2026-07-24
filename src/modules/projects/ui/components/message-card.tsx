@@ -138,13 +138,14 @@ const AssistantMessage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
-  const [lockedTime, setLockedTime] = useState<number | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem(`locked_time_${messageId}`);
-      if (saved) return parseInt(saved, 10);
+  const [lockedTime, setLockedTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(`locked_time_${messageId}`);
+    if (saved) {
+      setLockedTime(parseInt(saved, 10));
     }
-    return null;
-  });
+  }, [messageId]);
 
   useEffect(() => {
     if (!isLastMessage && lockedTime === null) {
@@ -197,18 +198,23 @@ const AssistantMessage = ({
   };
 
   const getLoadingText = () => {
-    // Use currentStage as the primary source of truth (works well for agent mode)
+    // 1. Optimistic fallbacks based on the action the user just took
+    if (lastAction === "USE_VIDEO" || lastAction === "FULL_PAGE" || lastAction === "HERO_ONLY") {
+      return "Building website";
+    }
+    if (lastAction === "ANIMATE_VIDEO" || lastAction === "AI_CREATE" || lastAction === "WRITE_PROMPT") {
+      return "Generating video";
+    }
+    if (lastAction === "REGENERATE") {
+      return "Generating scene";
+    }
+
+    // 2. Fallback to the database's currentStage as the primary source of truth
     if (currentStage === "GENERATING_SCENE") return "Generating scene";
     if (currentStage === "GENERATING_VIDEO") return "Generating video";
     if (currentStage === "BUILDING_SITE") return "Building website";
 
-    // Fallbacks based on interactive actions
-    const isVideo = interactiveContent?.mediaUrl?.endsWith(".mp4");
-    if (lastAction === "USE_VIDEO") {
-      return "Building website";
-    }
-    if (lastAction === "ANIMATE_VIDEO" || lastAction === "AI_CREATE") return isVideo ? "Generating video" : "Generating scene";
-    return isVideo ? "Generating video" : "Generating scene";
+    return "Thinking";
   };
 
   if (type === "INTERACTIVE" && interactiveContent && !isLastMessage) {

@@ -80,6 +80,7 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     const videoUrl = event.data.videoUrl;
+    const experiencePref = event.data.experiencePref; // "FULL_PAGE" | "HERO_ONLY" | undefined
 
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
@@ -152,7 +153,15 @@ export const codeAgentFunction = inngest.createFunction(
               readDirRecursive(fullPath);
             } else {
               const relativePath = path.relative(templatesDir, fullPath);
-              files[`src/${relativePath}`] = fs.readFileSync(fullPath, "utf-8");
+              // Skip ScrollFrames template in HERO_ONLY mode (hero uses plain <video>, not scrolly-video)
+              if (relativePath === "components/ScrollFrames.tsx" && event.data.experiencePref === "HERO_ONLY") {
+                continue;
+              }
+              let content = fs.readFileSync(fullPath, "utf-8");
+              if (event.data.videoUrl && relativePath === "components/ScrollFrames.tsx") {
+                content = content.replace("VIDEO_URL_HERE", event.data.videoUrl);
+              }
+              files[`src/${relativePath}`] = content;
             }
           }
         };
@@ -308,13 +317,7 @@ export const codeAgentFunction = inngest.createFunction(
                 const sandbox = await getSandbox(sandboxId);
 
                 const PROTECTED_FILES = videoUrl ? [
-                  "src/components/CanvasScroll.tsx",
-                  "src/components/Preloader.tsx",
-                  "src/store/useStore.ts",
-                  "src/constants/frames.ts",
-                  "src/components/headers/DotNav.tsx",
-                  "src/components/headers/FullWidthNav.tsx",
-                  "src/components/headers/PillNav.tsx",
+                  "src/components/ScrollFrames.tsx",
                 ] : [];
 
                 for (const file of files) {
@@ -334,14 +337,11 @@ export const codeAgentFunction = inngest.createFunction(
                   // Strict enforcement for App.tsx integrity
                   if (videoUrl && file.path === "src/App.tsx") {
                     const c = file.content;
-                    if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
+                    if (!c.includes("<ScrollFrames") && !c.includes("ScrollyVideo")) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <ScrollFrames /> from App.tsx. You MUST include it as the first child.");
                     }
-                    if (/\{\/\*\s*<CanvasScroll/i.test(c) || /\/\/\s*import.*CanvasScroll/i.test(c)) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out CanvasScroll in App.tsx. Do NOT comment it out.");
-                    }
-                    if (/\{\/\*\s*<Preloader/i.test(c) || /\/\/\s*import.*Preloader/i.test(c)) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
+                    if (/\{\/\*\s*<ScrollFrames/i.test(c) || /\/\/\s*import.*ScrollFrames/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out ScrollFrames in App.tsx. Do NOT comment it out.");
                     }
                   }
 
@@ -450,7 +450,8 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`editFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
     }
 
-    if (videoUrl) {
+    if (videoUrl && experiencePref !== "HERO_ONLY") {
+      // === FULL PAGE MODE: scrolly-video across entire page ===
       currentPrompt = `## SCROLL-DRIVEN VIDEO BACKGROUND (Patch — OVERRIDES any conflicting instructions above)
 Adds a full-page scroll-scrubbed video background using ScrollyVideo. It must play/scrub across the ENTIRE page — from the first section to the last — regardless of how many sections exist.
 
@@ -478,6 +479,29 @@ Do not pass sticky, full, trackScroll, or cover props — leave them at their de
 11. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
 12. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
 13. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
+
+` + currentPrompt;
+    } else if (videoUrl && experiencePref === "HERO_ONLY") {
+      // === HERO ONLY MODE: normal <video> in hero section, traditional website below ===
+      currentPrompt = `## HERO VIDEO BACKGROUND (Patch — OVERRIDES any conflicting instructions above)
+This site has a video that plays ONLY in the Hero section. The rest of the page is a normal, traditional website with solid backgrounds and standard scrolling.
+
+### Hero Section Rules
+1. The Hero section MUST contain a \`<video>\` element as its background. Use this exact video URL: "${videoUrl}"
+2. The video MUST autoplay, loop, be muted, and use playsInline. Example:
+   \`<video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />\`
+3. The Hero section MUST be \`relative\` positioned with \`overflow-hidden\` and a height of \`h-screen\` or \`min-h-screen\`.
+4. Place your hero text content (heading, subheading, CTA buttons) as an overlay on top of the video using \`absolute\` or \`relative\` positioning with a higher \`z-index\`.
+5. You MAY add a subtle dark gradient overlay (\`bg-gradient-to-b from-black/40 to-black/60\`) between the video and the text to ensure readability.
+6. Do NOT use scrolly-video, ScrollyVideo, ScrollFrames, or any scroll-scrubbing library. This is a plain HTML5 \`<video>\` tag.
+7. Do NOT install any extra packages for the video. The native \`<video>\` element is all you need.
+
+### Rest of the Page
+8. ALL sections BELOW the Hero (Features, About, Pricing, Footer, etc.) are a completely normal website. Use solid backgrounds (\`bg-white\`, \`bg-gray-900\`, \`bg-black\`, etc.) and normal styling. These sections scroll normally — no transparency tricks needed.
+9. Build a beautiful, full website with at least 4-5 sections total (Hero + 3-4 content sections + Footer).
+10. You have full creative freedom for the sections below the hero. Make them visually stunning with proper colors, cards, grids, etc.
+11. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
+12. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application (except the \`<video>\` tag in the hero). We do not have any images to load, so using \`<img>\` tags will result in broken images.
 
 ` + currentPrompt;
     } else {
@@ -543,84 +567,6 @@ Create unique, stunning designs. Do NOT just make a plain white page.
             console.error("DEBUG: rm -rf dist failed", e);
           }
 
-          // Ensure all protected template files are present and correct in the sandbox
-          const PROTECTED_FILES = videoUrl ? [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ] : [];
-
-          const fs = await import("fs");
-          const path = await import("path");
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              try {
-                let content = fs.readFileSync(templatePath, "utf-8");
-                if (file === "src/constants/frames.ts") {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const frameCount = event.data.frameCount || (project as any)?.frameCount || 450;
-                  content = content.replace(/TOTAL_FRAMES = \d+;/, `TOTAL_FRAMES = ${frameCount};`);
-                }
-                const dir = path.dirname(file);
-                await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
-                await sandbox.files.write(`/home/user/${file}`, content);
-                console.log(`DEBUG: Force-wrote template file ${file} to sandbox`);
-              } catch (e) {
-                console.error(`Failed to force-write template file ${file}`, e);
-              }
-            }
-          }
-
-          if (videoUrl) {
-            console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            try {
-              const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-              if (zipResult.exitCode !== 0) {
-                console.error("ZIP FETCH ERR:", zipResult.stderr);
-                throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
-              }
-            } catch (zipErr) {
-              const err = zipErr as Error;
-              console.error("ZIP FETCH CAUGHT ERR:", err.message);
-              // Instead of crashing the whole verification, maybe just throw a more descriptive error
-              throw new Error(`ZIP Fetch Failed: ${err.message}`);
-            }
-          }
-
-          console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
-          const checkStructureScript = videoUrl ? `
-const fs = require('fs');
-if (fs.existsSync('src/App.tsx')) {
-  const c = fs.readFileSync('src/App.tsx', 'utf8');
-  const hasCanvas = c.includes('<CanvasScroll');
-  const hasPreloader = c.includes('<Preloader');
-  const canvasCommented = c.match(/\\{\\/\\*\\s*<CanvasScroll/);
-  const preloaderCommented = c.match(/\\{\\/\\*\\s*<Preloader/);
-  
-  if (!hasCanvas || !hasPreloader || canvasCommented || preloaderCommented) {
-    console.error('CRITICAL ERROR: App.tsx is missing <CanvasScroll /> or <Preloader />, or they are commented out. They MUST be present and active.');
-    process.exit(1);
-  }
-}
-` : `console.log("No structure check for non-video projects.");`;
-          await sandbox.files.write("/app/check-structure.js", checkStructureScript);
-          
-          try {
-            const structCheck = await sandbox.commands.run("node /app/check-structure.js");
-            if (structCheck.exitCode !== 0) {
-              return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
-            }
-          } catch (structErr) {
-             const err = structErr as { stdout?: string, stderr?: string, message?: string };
-             const structErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-             return { success: false, error: `Structural Error:\n${structErrorLog || err.message}` };
-          }
-
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
           try {
             await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
@@ -639,8 +585,7 @@ if (fs.existsSync('src/App.tsx')) {
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
-            // Safeguard: Convert absolute frame paths (/frame-) into relative paths (./frame-) 
-            // We use a robust Node script to avoid turning existing './frame-' into '.../frame-'
+            // Safeguard: Fix common AI-generated code issues before build
             const fixPathsScript = `
 const fs = require('fs');
 const path = require('path');
@@ -653,49 +598,24 @@ function fixPaths(dir) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
 
-      // Fix App.tsx dummy declarations
+      // Fix CSS unresolvable imports (like bootstrap-icons)
+      if (p.endsWith('.css')) {
+        let originalContent = content;
+        content = content.replace(/@import\\s+['"]bootstrap-icons[^;]+;?/g, '');
+        if (content !== originalContent) {
+          changed = true;
+        }
+      }
+
+      // Fix App.tsx common issues
       if (f === 'App.tsx') {
         let originalContent = content;
         
-        // Remove dummy definitions
-        const dummyPatterns = [
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*null;?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*null;?/g,
-          /function\s+Preloader\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /function\s+CanvasScroll\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /\/\/ Dummy components to satisfy imports/g,
-          /\/\/ Dummy components?/g,
-        ];
-        for (const pattern of dummyPatterns) {
-          content = content.replace(pattern, '');
-        }
-
         // Fix default to named imports
-        content = content.replace(/import\s+Preloader\s+from\s+["']([^"']+)["']/g, 'import { Preloader } from "$1"');
-        content = content.replace(/import\s+CanvasScroll\s+from\s+["']([^"']+)["']/g, 'import { CanvasScroll } from "$1"');
-        content = content.replace(/import\s+Navbar\s+from\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
-        content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
+        content = content.replace(/import\\s+Navbar\\s+from\\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
 
         // Fix alias paths
-        content = content.replace(/@\\/components\\/Preloader/g, './components/Preloader');
-        content = content.replace(/@\\/components\\/CanvasScroll/g, './components/CanvasScroll');
-        content = content.replace(/@\\/store\\/useStore/g, './store/useStore');
         content = content.replace(/@\\/components\\/Navbar/g, './components/Navbar');
-
-        // Ensure imports exist
-        const requiredImports = ${videoUrl ? `[
-          { name: 'Preloader', path: './components/Preloader' },
-          { name: 'CanvasScroll', path: './components/CanvasScroll' },
-          { name: 'useStore', path: './store/useStore' }
-        ]` : `[]`};
-
-        for (const req of requiredImports) {
-          if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {
-            content = 'import { ' + req.name + ' } from "' + req.path + '";\\n' + content;
-          }
-        }
         
         if (content !== originalContent) {
           changed = true;
@@ -735,7 +655,7 @@ function fixPaths(dir) {
       }
       
       if (importedBrands.length > 0) {
-        let svgDeclarations = '\\n// Inject missing brand icons from older Lucide versions\\n';
+        let svgDeclarations = '\\\\n// Inject missing brand icons from older Lucide versions\\\\n';
         for (const item of importedBrands) {
           const parts = item.split(/\\s+as\\s+/);
           const originalName = parts[0].trim();
@@ -758,26 +678,10 @@ function fixPaths(dir) {
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
     \${svgPath}
   </svg>
-);\\n\`;
+);\\\\n\`;
         }
         newContent = newContent + svgDeclarations;
         content = newContent;
-        changed = true;
-      }
-
-      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/assets\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/assets\\/frame-/g, '$1./frame-');
-        changed = true;
-      }
-      // Strip assets/ prefix if import.meta.url was used
-      if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\/frame-/g, 'frame-');
-        changed = true;
-      }
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/frame-/g, '$1./frame-');
         changed = true;
       }
       if (changed) fs.writeFileSync(p, content);
@@ -946,12 +850,8 @@ fixPaths(process.argv[2]);
         "    if (fs.statSync(p).isDirectory()) {",
         "      getFiles(p, fileList);",
         "    } else {",
-        "      var name = items[i].toLowerCase();",
-        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
-        "      if (!isFrame) {",
-        "        var key = p.split(path.sep).join('/').replace('dist/', '');",
-        "        fileList[key] = fs.readFileSync(p).toString('base64');",
-        "      }",
+        "      var key = p.split(path.sep).join('/').replace('dist/', '');",
+        "      fileList[key] = fs.readFileSync(p).toString('base64');",
         "    }",
         "  }",
         "  return fileList;",
@@ -1018,34 +918,7 @@ fixPaths(process.argv[2]);
         }));
       }
 
-      // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
-      // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
-      if (videoUrl) {
-        console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
-        const JSZip = (await import("jszip")).default;
-        const zipResponse = await fetch(videoUrl);
-        if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
-        const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
-        const zip = await JSZip.loadAsync(zipBuffer);
 
-        const frameEntries = Object.entries(zip.files).filter(([name, f]) => !f.dir && name.endsWith(".jpg"));
-        const frameChunkSize = 12; // Reduced to 5 to prevent socket hang up with high-quality larger frames
-        for (let i = 0; i < frameEntries.length; i += frameChunkSize) {
-          const chunk = frameEntries.slice(i, i + frameChunkSize);
-          await Promise.all(chunk.map(async ([name, zipEntry]) => {
-            const frameBuffer = await zipEntry.async("nodebuffer");
-            const meta = { metadata: { contentType: "image/jpeg" }, resumable: false };
-            // Upload to root site dir (for AI code using ./frame-N.jpg relative to the page)
-            // AND to assets/ subdir (for AI code using import.meta.url inside the JS bundle)
-            // This guarantees frames load correctly regardless of how the AI resolves paths.
-            await Promise.all([
-              bucket.file(`${sitePrefix}${name}`).save(frameBuffer, meta),
-              bucket.file(`${sitePrefix}assets/${name}`).save(frameBuffer, meta),
-            ]);
-          }));
-        }
-        console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
-      }
 
       const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
       const finalUrl = `${cdnBase}/${sitePrefix}index.html`;
@@ -1059,13 +932,7 @@ fixPaths(process.argv[2]);
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
 
-      if (videoUrl) {
-        console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
-        if (devZipResult.exitCode !== 0) {
-          throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
-        }
-      }
+
 
       // 2. Start the Vite server in the background
       await sandbox.commands.run("npm run dev -- --host 0.0.0.0 --port 3000", { background: true });
@@ -1106,9 +973,6 @@ fixPaths(process.argv[2]);
               } else {
                 const ext = path.extname(filePath).toLowerCase();
                 const normalizedPath = filePath.split(path.sep).join('/');
-                if (normalizedPath.startsWith('public/assets/frame-') && ext === '.jpg') {
-                  continue; // Hide these routing duplicates from the UI
-                }
                 if (['.jpg', '.webp'].includes(ext)) {
                    fileList[normalizedPath] = 'BINARY_ASSET_OMITTED_FROM_SYNC';
                 } else if (!['.png', '.jpeg', '.gif', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {

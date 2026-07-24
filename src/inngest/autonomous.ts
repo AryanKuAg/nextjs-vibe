@@ -48,7 +48,7 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template">({
+  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template" | "sanitize_prompt">({
     reducer: (x, y) => y ?? x,
     default: () => "finish",
   }),
@@ -173,12 +173,12 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
 
   let final_agent = response.next_agent;
 
-  // Force code_generation for highly detailed prompts or prompts with video URLs (unless explicitly asking to extract)
+  // Force detailed prompts through the sanitizer → image → video → code pipeline
   if (state.current_prompt.length > 800) {
-    final_agent = "code_generation";
+    final_agent = "sanitize_prompt";
   } else if (hasVideoUrlInPrompt && final_agent !== "reject") {
     if (!state.current_prompt.toLowerCase().includes("extract")) {
-      final_agent = "code_generation";
+      final_agent = "sanitize_prompt";
     }
   }
 
@@ -587,6 +587,99 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
   return { next_agent: "select_template", video_url: videoUrl };
 };
 
+const sanitizePromptNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Sanitize Prompt] Analyzing detailed prompt...");
+  const step = config.configurable?.step;
+
+  const result = await step.run("sanitize-prompt-llm", async () => {
+    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const structuredLlm = routerModel.withStructuredOutput(
+      z.object({
+        sanitized_prompt: z.string().describe(
+          "The user's prompt with all background-related instructions removed (e.g. 'use a starry background', 'add gradient bg', 'use three.js for 3D'). Keep everything about content, layout, structure, sections, animations, and CSS intact."
+        ),
+        experience_pref: z.enum(["FULL_PAGE", "HERO_ONLY"]).describe(
+          "FULL_PAGE if the user wants an immersive full-page scrolling experience (DEFAULT — use this unless the user clearly wants hero-only). HERO_ONLY only if the user explicitly mentions putting a video/animation ONLY in the hero/banner/header section with a normal website below."
+        ),
+        detected_image_url: z.string().nullable().describe(
+          "If the user's prompt contains a direct image URL (ending in .png, .jpg, .jpeg, .webp), extract it here. Otherwise null."
+        ),
+      })
+    );
+
+    const sysMsg = new SystemMessage(
+      "You are a prompt sanitizer for Framerate, an AI website builder that generates scroll-driven video background websites.\n\n" +
+      "Your job:\n" +
+      "1. REMOVE any instructions about custom backgrounds (gradients, particles, 3D scenes, starry skies, three.js, canvas animations, etc.). The background is ALWAYS our generated video — the user cannot override this.\n" +
+      "2. KEEP everything about content, layout, structure, sections, typography, animations, CSS, colors (for foreground elements), and UI components.\n" +
+      "3. DETECT the experience preference:\n" +
+      "   - Default to FULL_PAGE (video scrubs across the entire page as user scrolls)\n" +
+      "   - Only choose HERO_ONLY if the user explicitly says something like 'video in hero section only', 'banner video at the top', or 'hero with video background and normal page below'\n" +
+      "4. DETECT if there's a direct image URL in the prompt (must end with .png, .jpg, .jpeg, or .webp).\n" +
+      "5. Do NOT change the meaning or intent of the prompt. Only strip background-related parts."
+    );
+
+    return await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+  });
+
+  // If user provided an image URL, validate resolution (must be at least 480p desktop: 854x480)
+  let startFrameUrl: string | null = null;
+  if (result.detected_image_url) {
+    const isValid = await step.run("validate-image-resolution", async () => {
+      try {
+        const response = await fetch(result.detected_image_url!, { method: "HEAD" });
+        if (!response.ok) return false;
+        // We can't easily check pixel dimensions from a HEAD request,
+        // so we accept the image if it's reachable and has a reasonable content-length (> 50KB suggests decent resolution)
+        const contentLength = parseInt(response.headers.get("content-length") || "0", 10);
+        return contentLength > 50000; // > 50KB is likely at least 480p
+      } catch {
+        return false;
+      }
+    });
+
+    if (isValid) {
+      startFrameUrl = result.detected_image_url;
+      console.log("[Sanitize Prompt] Valid image URL detected, will skip image generation:", startFrameUrl);
+    } else {
+      console.log("[Sanitize Prompt] Image URL invalid or too small, will generate fresh image.");
+    }
+  }
+
+  // Create a progress message so UI shows "Working"
+  await step.run("sanitize-progress-msg", async () => {
+    await prisma.message.create({
+      data: {
+        projectId: state.projectId,
+        role: "ASSISTANT",
+        type: "RESULT",
+        content: ""
+      }
+    });
+  });
+
+  // If we have a valid start frame, skip image generation and go straight to video
+  if (startFrameUrl) {
+    return {
+      next_agent: "video_generation" as const,
+      current_prompt: result.sanitized_prompt,
+      experiencePref: result.experience_pref,
+      start_frame_url: startFrameUrl,
+      isAgentMode: true,
+      mediaRequired: true,
+    };
+  }
+
+  // Otherwise, go through the full pipeline: image → video → code
+  return {
+    next_agent: "frame_generation" as const,
+    current_prompt: result.sanitized_prompt,
+    experiencePref: result.experience_pref,
+    isAgentMode: true,
+    mediaRequired: true,
+  };
+};
+
 const selectTemplateNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   console.log("[Select Template] Selecting template based on experiencePref...");
   const step = config.configurable?.step;
@@ -614,7 +707,13 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       })
     );
 
-    const result = await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+    let result;
+    try {
+      result = await structuredLlm.invoke([sysMsg, new HumanMessage(state.current_prompt)]);
+    } catch (e) {
+      console.warn("[Select Template] Output parsing failed, falling back to default template.", e);
+      result = { template_id: templates[0].id };
+    }
 
     const selectedTemplate = templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
     return selectedTemplate;
@@ -645,6 +744,7 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       projectId: state.projectId,
       value: state.current_prompt,
       videoUrl: state.video_url || undefined,
+      experiencePref: state.experiencePref || undefined,
       model: "deepseek/deepseek-v4-flash",
       userId: state.userId
     }
@@ -681,6 +781,7 @@ const workflow = new StateGraph(AgentState)
   .addNode("ask_wizard_build", askWizardBuildNode)
   .addNode("ask_media_intent", askMediaIntentNode)
   .addNode("ask_video_intent", askVideoIntentNode)
+  .addNode("sanitize_prompt", sanitizePromptNode)
   .addNode("frame_generation", frameGenerationNode)
   .addNode("video_generation", videoGenerationNode)
   .addNode("select_template", selectTemplateNode)
@@ -690,6 +791,7 @@ const workflow = new StateGraph(AgentState)
   .addConditionalEdges("supervisor", (state) => state.next_agent, {
     ask_wizard_3d: "ask_wizard_3d",
     ask_media_intent: "ask_media_intent",
+    sanitize_prompt: "sanitize_prompt",
     frame_generation: "frame_generation",
     video_generation: "video_generation",
     code_generation: "code_generation",
@@ -713,6 +815,11 @@ const workflow = new StateGraph(AgentState)
   .addConditionalEdges("ask_video_intent", (state) => state.next_agent, {
     finish: END,
     video_generation: "video_generation",
+  })
+  .addConditionalEdges("sanitize_prompt", (state) => state.next_agent, {
+    frame_generation: "frame_generation",
+    video_generation: "video_generation",
+    finish: END,
   })
   .addConditionalEdges("frame_generation", (state) => state.next_agent, {
     frame_generation: "frame_generation",

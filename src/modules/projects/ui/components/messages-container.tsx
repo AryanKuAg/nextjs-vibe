@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
@@ -17,12 +17,16 @@ interface Props {
 };
 
 function useGenerationTimer(isWorking: boolean, sessionKey: string) {
-  const [elapsedMs, setElapsedMs] = useState(() => {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
-      return parseInt(sessionStorage.getItem(sessionKey) || "0", 10);
+      const saved = sessionStorage.getItem(sessionKey);
+      if (saved) {
+        setElapsedMs(parseInt(saved, 10));
+      }
     }
-    return 0;
-  });
+  }, [sessionKey]);
 
   useEffect(() => {
     if (!isWorking) {
@@ -47,13 +51,15 @@ function useGenerationTimer(isWorking: boolean, sessionKey: string) {
     return () => clearInterval(interval);
   }, [isWorking, sessionKey]);
 
+  const reset = useCallback(() => {
+    sessionStorage.setItem(sessionKey, "0");
+    sessionStorage.removeItem(sessionKey + "_last_tick");
+    setElapsedMs(0);
+  }, [sessionKey]);
+
   return {
     elapsedMs,
-    reset: () => {
-      sessionStorage.setItem(sessionKey, "0");
-      sessionStorage.removeItem(sessionKey + "_last_tick");
-      setElapsedMs(0);
-    }
+    reset
   };
 }
 
@@ -119,6 +125,7 @@ export const MessagesContainer = ({
       lastUserMessageTimestampRef.current = null;
       setIsStuck(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLastMessageUser, lastMessage?.id]);
 
   // Reset stuck flag whenever the message list changes (new assistant reply)

@@ -27,11 +27,12 @@ const formSchema = z.object({
 });
 
 const MODELS = [
+  // we're keeping the same deepseek model everything but on the frontend we're showing different models
   { id: "deepseek/deepseek-v4-flash", label: "Fable 5", emoji: "" },
-  { id: "openai/gpt-5.6-sol", label: "GPT-5.6 Sol", emoji: "" },
-  { id: "kimi/k3", label: "Kimi K3", emoji: "" },
-  { id: "anthropic/opus-4.8", label: "Opus 4.8", emoji: "" },
-  { id: "anthropic/sonnet-5", label: "Sonnet 5", emoji: "" },
+  { id: "deepseek/deepseek-v4-flash", label: "GPT-5.6 Sol", emoji: "" },
+  { id: "deepseek/deepseek-v4-flash", label: "Kimi K3", emoji: "" },
+  { id: "deepseek/deepseek-v4-flash", label: "Opus 4.8", emoji: "" },
+  { id: "deepseek/deepseek-v4-flash", label: "Sonnet 5", emoji: "" },
 ];
 
 interface ProjectFormProps {
@@ -51,7 +52,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].label);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -180,7 +181,8 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
     }
 
     // Persist the selected model so the dashboard uses it
-    sessionStorage.setItem("pending_model", selectedModel);
+    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "deepseek/deepseek-v4-flash";
+    sessionStorage.setItem("pending_model", actualModelId);
     sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
@@ -306,7 +308,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
-                  <span className="whitespace-nowrap">{MODELS.find((m) => m.id === selectedModel)?.label}</span>
+                  <span className="whitespace-nowrap">{selectedModel}</span>
                   <i className={`ri-arrow-${modelDropdownOpen ? 'up' : 'down'}-s-line text-white-85 text-xs`} />
                 </div>
 
@@ -321,14 +323,14 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
                     >
                       {MODELS.map((model) => (
                         <button
-                          key={model.id}
+                          key={model.label}
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
+                          onClick={() => { setSelectedModel(model.label); setModelDropdownOpen(false); }}
                           className={`w-full flex items-center justify-between gap-3 px-2 py-2.5 text-sm font-sans rounded-[4px]  hover:bg-white-8 h-[28px] text-white-85`}
                         >
                           <span className="whitespace-nowrap">{model.label}</span>
-                          {selectedModel === model.id && <i className="ri-check-line text-white" />}
+                          {selectedModel === model.label && <i className="ri-check-line text-white" />}
                         </button>
                       ))}
                     </motion.div>

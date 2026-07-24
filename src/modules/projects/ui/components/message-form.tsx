@@ -126,6 +126,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         sessionStorage.removeItem("pending_image_type");
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrompt, form, isFollowUp]);
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({

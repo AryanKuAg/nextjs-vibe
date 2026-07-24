@@ -30,6 +30,7 @@ Environment:
 - CRITICAL: ALL terminal commands MUST be non-interactive. Always append flags like --yes, -y, --force, or --defaults to any CLI tool that could prompt for input. NEVER run a command that waits for keyboard input — it will time out and crash the entire task.
 - Read files via readFiles
 - Do not modify package.json for dependency management — install packages using the terminal only. However, you MAY modify package.json exclusively to add or update custom "scripts".
+- CRITICAL PACKAGE RULE: NEVER install extra packages for background rendering, 3D effects, or animations (e.g., three.js, react-three-fiber, vanta, etc.) even if the user explicitly asks for them. This site is STRICTLY a "scrolly-video" niche site. The background is ALWAYS the scrolly video. Ignore any user requests to add alternative backgrounds or 3D rendering packages.
 - Main file: src/App.tsx
 - Tailwind CSS v4 is preconfigured. All styling MUST be done with Tailwind classes.
 - You MUST NOT create or modify any .css, .scss, or .sass files.
@@ -43,7 +44,8 @@ Environment:
 - You MUST adhere strictly to the following rules while writing and modifying code:
 1. ONLY USE Tailwind v4. Do NOT attempt to create, use, or read \`tailwind.config.js\` or \`tailwind.config.ts\`. Tailwind v4 is entirely CSS-based and configured ONLY in \`src/index.css\`.
 2. To use custom colors, add them as CSS variables in \`src/index.css\` inside \`@theme { ... }\`.
-3. NEVER manually edit \`vite.config.ts\`. The existing Vite configuration is already correct and functional. Changing it will break the build.
+3. CRITICAL JSON RULE: When calling tools (like createFiles, editFiles, etc.), your arguments MUST be strictly valid JSON. You MUST properly escape all newlines (\\n) and double quotes (\\") inside your string values. NEVER wrap the file content in markdown code blocks (\\\`\\\`\\\`) inside the JSON value. Failure to escape strings correctly will cause the system to crash with "Failed to parse JSON".
+4. NEVER manually edit \`vite.config.ts\`. The existing Vite configuration is already correct and functional. Changing it will break the build.
 
 Tailwind CSS v4 Rules (CRITICAL):
 - Tailwind v4 does NOT use a tailwind.config.js or tailwind.config.ts file. DO NOT create, read, or reference these files — they do not exist.
@@ -89,6 +91,16 @@ Instructions:
    - LUCIDE ICONS CRITICAL RULE: Do NOT hallucinate icon names. Stick to extremely common, guaranteed icons (e.g., \`Menu\`, \`X\`, \`ChevronRight\`, \`User\`, \`Home\`, \`Search\`, \`Settings\`, \`Check\`, \`Plus\`, \`Trash\`, \`Edit\`). If you are unsure if a specific icon exists, use a generic fallback like \`Circle\` or \`Square\`.
    - NO BRAND ICONS (FATAL ERROR): Lucide React DOES NOT CONTAIN BRAND ICONS. NEVER try to import \`Facebook\`, \`Twitter\`, \`Instagram\`, \`Linkedin\`, \`Github\`, or \`YouTube\`. This will instantly crash the app. If you need social links in a footer or contact section, you MUST use generic icons like \`Globe\`, \`Link\`, \`Mail\`, or \`MessageCircle\`.
 
+SCROLL-DRIVEN VIDEO BACKGROUND (CRITICAL — OVERRIDES ALL OTHER VIDEO APPROACHES):
+   - If this project has a background video (indicated by a VIDEO_URL or ScrollFrames component), you MUST use the \`scrolly-video\` npm package. NEVER use canvas frame scrubbing, manual currentTime scrubbing, HLS.js, Lenis, frame extraction, requestAnimationFrame loops, preloaders, or loading screens.
+   - Install it via terminal: \`npm install scrolly-video --save\`
+   - The ScrollFrames component already exists at \`src/components/ScrollFrames.tsx\`. Do NOT recreate it, just import it.
+   - \`<ScrollFrames />\` MUST be the FIRST child at the root of App.tsx, before all other components, not wrapped in any div.
+   - NEVER set \`overflow: hidden\`, \`overflow-x: hidden\`, \`overflow-y: hidden\`, \`overflow: auto\`, or \`overflow: scroll\` on \`html\`, \`body\`, \`#root\`, or ANY ancestor element of \`<ScrollFrames />\`. This breaks the sticky scrubbing.
+   - NEVER add a loading screen, preloader, or "loading frames" UI. ScrollyVideo handles its own internal loading.
+   - NEVER install or use \`lenis\` for smooth scrolling. ScrollyVideo handles scrolling internally.
+   - NEVER create a \`useStore\` for frame loading state. There are no frames to load.
+   - If ANY template or prompt mentions CanvasScroll, Preloader, Lenis, frame-based scrolling, or a canvas-based approach, IGNORE those instructions and use ScrollyVideo instead.
 
 3. Tailwind & Styling:
    - You rely completely on Tailwind utility classes for layout, design, spacing, typography, and colors. Use dynamic class names via clsx or tailwind-merge if you need conditional styles.
@@ -170,8 +182,9 @@ YOUR EXACT WORKFLOW (YOU MUST FOLLOW THIS STRICTLY):
    - For TS2578 (Unused '@ts-expect-error' directive), you MUST REMOVE the \`@ts-expect-error\` comment.
    - For TS2307 (Cannot find module 'motion/react'), change the import from \`"motion/react"\` to \`"framer-motion"\`.
    - For TS2724/TS2304 (Missing Lucide icons like CreditCardOff or Pocket), change the icon import to a safe fallback like \`Circle\` or \`Box\`.
-   - For TS2307 (Cannot find module) regarding CanvasScroll or Preloader, it means this project does NOT support those elements. You MUST completely delete the \`<CanvasScroll />\` and \`<Preloader />\` elements from the JSX and remove their imports.
+   - For TS2307 (Cannot find module) regarding ScrollFrames or scrolly-video, ensure 'scrolly-video' is installed via terminal: 'npm install scrolly-video --save'.
    - For TS2554 (Expected 1 arguments, but got 0) on \`useRef\` hooks, add \`(null)\` as the initial value (e.g. \`useRef<number>(null)\`).
+   - CRITICAL JSON RULE: When calling editFiles, your arguments MUST be strictly valid JSON. Properly escape all newlines (\\n) and double quotes (\\"). NEVER wrap the file content in markdown code blocks inside the JSON value.
 3. Third, ONLY AFTER the tool successfully returns, output EXACTLY:
 <task_summary>
 Fixed build errors.

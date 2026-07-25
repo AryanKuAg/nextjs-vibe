@@ -15,7 +15,7 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { cn } from "@/lib/utils";
 
 type ModelId =
-  | "deepseek/deepseek-v4-flash";
+  | "google/gemini-3.5-flash-lite";
 
 interface Props {
   projectId: string;
@@ -76,7 +76,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const selectedModel: ModelId = "deepseek/deepseek-v4-flash";
+  const selectedModel: ModelId = "google/gemini-3.5-flash-lite";
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isInteractiveSubmitting, setIsInteractiveSubmitting] = useState(false);

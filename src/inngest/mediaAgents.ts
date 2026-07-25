@@ -20,7 +20,7 @@ export const generateFramesFunction = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { projectId, prompt, model, userId, isDirectPrompt } = event.data;
-    
+
     await step.run("update-stage", async () => {
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "SCENE" } });
     });
@@ -29,7 +29,7 @@ export const generateFramesFunction = inngest.createFunction(
 
     const refinedPrompt = isDirectPrompt ? prompt : await step.run("refine-prompt", async () => {
       const routerModel = new ChatOpenAI({
-        modelName: "deepseek/deepseek-v4-flash",
+        modelName: "google/gemini-3.5-flash-lite",
         apiKey: process.env.OPENROUTER_API_KEY!,
         configuration: {
           baseURL: "https://openrouter.ai/api/v1",

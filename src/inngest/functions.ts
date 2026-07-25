@@ -505,7 +505,7 @@ export const codeAgentFunction = inngest.createFunction(
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
         system: systemPrompt,
-        model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+        model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -574,7 +574,7 @@ export const codeAgentFunction = inngest.createFunction(
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+      defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -606,7 +606,7 @@ export const codeAgentFunction = inngest.createFunction(
           if (network.state.data.summary) return;
           return retryAgent;
         },
-        defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+        defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
       });
 
       const correctivePrompt = currentPrompt +
@@ -645,7 +645,7 @@ export const codeAgentFunction = inngest.createFunction(
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
           // Deterministic source fixes run BEFORE the type check so the fixer
           // agent is only invoked for errors the scripts cannot repair.
-            const fixPathsScript = `
+          const fixPathsScript = `
 const fs = require('fs');
 const path = require('path');
 function fixPaths(dir) {
@@ -838,7 +838,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+        defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -886,14 +886,14 @@ fixPaths(process.argv[2]);
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+      model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "deepseek/deepseek-v4-flash"),
+      model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
@@ -1115,7 +1115,7 @@ fixPaths(process.argv[2]);
     });
 
     await step.run("charge-credits", async () => {
-      const model = event.data.model || "deepseek/deepseek-v4-flash";
+      const model = event.data.model || "google/gemini-3.5-flash-lite";
       const cost = MODEL_COSTS[model] || 100;
       await consumeCredits(cost, event.data.userId);
     });

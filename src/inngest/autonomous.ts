@@ -161,7 +161,7 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
     );
 
     // We use a fast, reliable model for routing
-    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
@@ -619,7 +619,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
   const step = config.configurable?.step;
 
   const result = await step.run("sanitize-prompt-llm", async () => {
-    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         sanitized_prompt: z.string().describe(
@@ -797,7 +797,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       templates.map((t: { id: string; description: string }) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
     );
 
-    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         template_id: z.string().describe("The ID of the chosen skeleton"),
@@ -830,7 +830,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "Where the user was vague, make confident, tasteful decisions that fit their idea."
     );
 
-    const routerModel = getOpenRouterModel("deepseek/deepseek-v4-flash");
+    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(BuildBriefSchema);
 
     try {
@@ -863,7 +863,7 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       value: state.current_prompt,
       videoUrl: state.video_url || undefined,
       experiencePref: state.experiencePref || undefined,
-      model: "deepseek/deepseek-v4-flash",
+      model: "google/gemini-3.5-flash-lite",
       userId: state.userId
     }
   });

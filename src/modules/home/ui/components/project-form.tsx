@@ -28,11 +28,11 @@ const formSchema = z.object({
 
 const MODELS = [
   // we're keeping the same deepseek model everything but on the frontend we're showing different models
-  { id: "google/gemini-3.5-flash-lite", label: "Fable 5", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Kimi K3", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Opus 4.8", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Sonnet 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Fable 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Kimi K3", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Opus 4.8", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Sonnet 5", emoji: "" },
 ];
 
 interface ProjectFormProps {
@@ -181,7 +181,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
     }
 
     // Persist the selected model so the dashboard uses it
-    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.5-flash-lite";
+    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.1-flash-lite";
     sessionStorage.setItem("pending_model", actualModelId);
     sessionStorage.setItem("pending_builder_prompt", values.value);
 

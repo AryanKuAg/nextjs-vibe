@@ -1,6 +1,6 @@
 # Framerate Pipeline Audit & Refactor Plan
 
-> Analysis only — no code changed. Target runtime model: **deepseek/deepseek-v4-flash** (cheap, literal-minded, recency-biased). Every finding below is evaluated against the question: *"will a lightweight model get this right on the first try?"*
+> Analysis only — no code changed. Target runtime model: **google/gemini-3.1-flash-lite** (cheap, literal-minded, recency-biased). Every finding below is evaluated against the question: *"will a lightweight model get this right on the first try?"*
 
 ---
 

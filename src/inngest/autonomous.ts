@@ -7,6 +7,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
+import { TASTE_BRIEF_RULES } from "@/lib/taste";
 import fs from "fs/promises";
 import path from "path";
 
@@ -32,6 +33,12 @@ export const AgentState = Annotation.Root({
   // current_prompt with media prompts — this field keeps the site spec intact
   // for template selection and the Build Brief compiler.
   site_prompt: Annotation<string>({
+    reducer: (x, y) => y ?? x,
+    default: () => "",
+  }),
+  // The prompt that actually produced the background image/video — captured at
+  // frame-generation time so the scene analyst reasons about the real scene.
+  media_prompt: Annotation<string>({
     reducer: (x, y) => y ?? x,
     default: () => "",
   }),
@@ -154,20 +161,16 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
       " 'video_generation' - if a start frame exists but needs animation.\n" +
       " 'code_generation' - if the user provides a video URL, or if they just ask to build the website without media generation.\n" +
       " 'finish' - if the task is already complete.\n" +
-      " 'reject' - if the request is off-topic, malicious, or not related to website building.\n\n" +
-      "REQUIRES WIZARD:\n" +
-      "Analyze if the user's prompt is a generic idea (e.g. 'A cyberpunk city') or a highly detailed layout/code-generation prompt (e.g. 'Build a React component with 3 sections...'). " +
-      "If it's generic, set `requiresWizard` to true. If it is highly detailed, specific, includes code snippets, CSS/layout instructions, or includes a media/video URL, you MUST set `requiresWizard` to false."
+      " 'reject' - if the request is off-topic, malicious, or not related to website building."
     );
 
     // We use a fast, reliable model for routing
-    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
+    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         next_agent: z.enum(["frame_generation", "video_generation", "code_generation", "reject", "finish"]),
         rejection_reason: z.string().nullable().optional().describe("A short, friendly explanation of why the request was rejected. Only required when next_agent is 'reject'."),
-        requiresWizard: z.boolean().describe("True if the prompt is generic and needs the wizard to gather preferences. MUST be false if the prompt is highly detailed, includes a URL, or has specific implementation instructions."),
       })
     );
 
@@ -179,17 +182,11 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
       return {
         next_agent: "frame_generation" as const,
         rejection_reason: null,
-        requiresWizard: !hasExistingSite && prompt.length <= 800,
       };
     }
   });
 
-  const isMediaRequired = true; // Platform ONLY builds video-background websites, so media is ALWAYS required
-  const hasVideoUrlInPrompt = /https?:\/\/[^\s]+(?:\.mp4|\.webm|\.m3u8|cloudfront\.net)/i.test(state.current_prompt);
-  const isDetailedPrompt = state.current_prompt.length > 800 || hasVideoUrlInPrompt;
-  const requiresWizard = response.requiresWizard && !isDetailedPrompt;
-
-  console.log("[Supervisor] Initial Route:", response.next_agent, "| Existing site:", hasExistingSite, "| Requires Wizard:", requiresWizard);
+  console.log("[Supervisor] Initial Route:", response.next_agent, "| Existing site:", hasExistingSite);
 
   if (response.rejection_reason) {
     console.log("[Supervisor] Rejection reason:", response.rejection_reason);
@@ -203,23 +200,23 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
       // Follow-up on a built site: straight to the code agent, never regenerate media.
       final_agent = "code_generation";
       console.log("[Supervisor] Existing site detected. Routing follow-up to code_generation.");
-    } else if (requiresWizard && !state.experiencePref && !state.buildPref) {
-      final_agent = "ask_wizard_3d";
-      console.log("[Supervisor] Generic prompt detected. Routing to ask_wizard_3d");
     } else if (final_agent !== "finish") {
-      // Every new build flows through the sanitizer: it strips background
-      // instructions, detects FULL_PAGE vs HERO_ONLY, and extracts image assets.
-      // The sanitizer then routes to HITL (ask_media_intent) or agent-mode media.
-      final_agent = "sanitize_prompt";
+      // EVERY first prompt gets the wizard — regardless of how detailed it is:
+      //   1. "Full page" vs "Hero only"   → experiencePref
+      //   2. "Build it for me" vs "I'll guide the visuals" → autonomy vs HITL
+      // Only skipped when both preferences were already provided on the event.
+      final_agent = (state.experiencePref && state.buildPref) ? "sanitize_prompt" : "ask_wizard_3d";
+      console.log(`[Supervisor] New build. Routing to ${final_agent}.`);
     }
   }
 
   return {
     next_agent: final_agent,
     rejection_reason: response.rejection_reason ?? null,
-    mediaRequired: isMediaRequired,
-    // Detailed prompts auto-proceed through the pipeline without approval stops.
-    isAgentMode: state.isAgentMode || isDetailedPrompt,
+    mediaRequired: true, // Platform ONLY builds video-background websites
+    // Autonomy is decided EXCLUSIVELY by the wizard's build question (or an
+    // explicit event flag when both prefs are pre-supplied). No heuristics.
+    isAgentMode: state.isAgentMode || state.buildPref === "BUILD_FOR_ME",
   };
 };
 
@@ -235,7 +232,7 @@ const askWizard3DNode = async (state: typeof AgentState.State, config: RunnableC
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "How would you like to use the 3D experience?",
+          text: "Where should the background video live?",
           buttons: [
             { label: "Full page", action: "FULL_PAGE" },
             { label: "Hero only", action: "HERO_ONLY" }
@@ -273,10 +270,10 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "How would you like to build your website?",
+          text: "How hands-on do you want to be? I can handle the scene, video, and build end to end, or pause for your approval at each step.",
           buttons: [
             { label: "Build it for me", action: "BUILD_FOR_ME" },
-            { label: "I'll guide the visuals", action: "GUIDE_VISUALS" }
+            { label: "I'll guide each step", action: "GUIDE_VISUALS" }
           ]
         })
       }
@@ -296,7 +293,10 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
   const { action } = userResponse.data;
   if (action === "CANCEL") return { next_agent: "finish" };
 
-  // "Build it for me" = fully autonomous: skip all human intervention steps
+  // Both answers flow through the sanitizer next (strips background/image
+  // instructions from the prompt). The sanitizer then routes by isAgentMode:
+  // BUILD_FOR_ME  → fully autonomous: image → video → code, zero stops
+  // GUIDE_VISUALS → human-in-the-loop: scene question + image/video approvals
   if (action === "BUILD_FOR_ME") {
     // Create a progress RESULT message so the wizard INTERACTIVE message
     // is no longer the last message and the UI shows "Working" instead
@@ -310,20 +310,10 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
         }
       });
     });
-    return { next_agent: "frame_generation", buildPref: action, mediaRequired: true, isAgentMode: true };
+    return { next_agent: "sanitize_prompt", buildPref: action, mediaRequired: true, isAgentMode: true };
   }
 
-  // "I'll guide the visuals" = human-in-the-loop flow
-  const requiresMedia = true;
-  let nextAgent = "code_generation";
-
-  if (requiresMedia && !state.video_url && !state.start_frame_url) {
-    nextAgent = "ask_media_intent";
-  } else if (requiresMedia) {
-    nextAgent = "frame_generation";
-  }
-
-  return { next_agent: nextAgent, buildPref: action, mediaRequired: requiresMedia };
+  return { next_agent: "sanitize_prompt", buildPref: action, mediaRequired: true, isAgentMode: false };
 };
 
 const askMediaIntentNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -507,16 +497,16 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
       }
       if (action === "ANIMATE_VIDEO") {
         if (!state.isAgentMode) {
-          return { next_agent: "ask_video_intent", start_frame_url: frameUrl };
+          return { next_agent: "ask_video_intent", start_frame_url: frameUrl, media_prompt: state.current_prompt };
         }
-        return { next_agent: "video_generation", start_frame_url: frameUrl };
+        return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt };
       }
     }
   }
 
   // Agent mode: auto-proceed to video generation with the generated frame
   console.log("[Frame Generation] Agent mode — auto-proceeding to video generation.");
-  return { next_agent: "video_generation", start_frame_url: frameUrl };
+  return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt };
 };
 
 const videoGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -619,7 +609,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
   const step = config.configurable?.step;
 
   const result = await step.run("sanitize-prompt-llm", async () => {
-    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
+    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         sanitized_prompt: z.string().describe(
@@ -687,20 +677,6 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
   // A user-chosen preference (wizard buttons / event data) always wins over detection.
   const experiencePref = state.experiencePref ?? result.experience_pref;
 
-  // Create a progress message so the UI shows "Working" while media generates autonomously
-  if (state.isAgentMode || startFrameUrl) {
-    await step.run("sanitize-progress-msg", async () => {
-      await prisma.message.create({
-        data: {
-          projectId: state.projectId,
-          role: "ASSISTANT",
-          type: "RESULT",
-          content: ""
-        }
-      });
-    });
-  }
-
   // If we have a valid start frame, skip image generation and go straight to video
   if (startFrameUrl) {
     return {
@@ -729,12 +705,32 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
 // the code agent runs, so the code agent never has to arbitrate between
 // conflicting instruction layers (template vs user vs platform rules).
 
+// Analyzed from the generated background frame so the site's palette, text
+// color, and readability treatment are matched to THIS video, not guessed.
+const SceneAnalysisSchema = z.object({
+  description: z.string().describe("One sentence describing what the background scene shows and its mood, based ONLY on the provided image/prompt. If neither gives real visual information, write exactly 'Scene could not be analyzed' — NEVER invent or assume scenery."),
+  brightness: z.enum(["light", "dark", "mixed"]).describe("Overall brightness of the scene"),
+  dominant_colors: z.array(z.string()).min(2).max(5).describe("Dominant scene colors as hex codes"),
+  accent_suggestion: z.string().describe("One accent hex that harmonizes with the scene but stays clearly visible against it (never a color that melts into the scene)"),
+  text_scheme: z.enum(["light-text", "dark-text"]).describe("Which text family stays readable over this scene: light-text (white/off-white) or dark-text (near-black)"),
+  scrim: z.enum(["none", "dark-soft", "dark-strong", "light-soft"]).describe("Readability veil needed between video and content: none (dark scenes), dark-soft (mixed), dark-strong (bright scenes with light text), light-soft (bright scenes with dark text)"),
+});
+
+type SceneAnalysis = z.infer<typeof SceneAnalysisSchema>;
+
+const SCRIM_CLASS: Record<SceneAnalysis["scrim"], string | null> = {
+  "none": null,
+  "dark-soft": "bg-black/25",
+  "dark-strong": "bg-black/45",
+  "light-soft": "bg-white/30",
+};
+
 const BuildBriefSchema = z.object({
   site_name: z.string().describe("Short brand/site name derived from the user's request"),
   tagline: z.string().describe("One-line tagline for the site"),
   tone: z.string().describe("3-6 adjectives describing the visual and copy tone"),
-  heading_font: z.string().describe("A distinctive Google Fonts display/heading font matching the tone (e.g. 'Space Grotesk', 'Manrope', 'Playfair Display', 'Fraunces')"),
-  body_font: z.string().describe("A complementary Google Fonts body font (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
+  heading_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Space Grotesk', 'Manrope', 'Playfair Display')"),
+  body_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
   accent_color: z.string().describe("ONE accent color as a hex code fitting the brand. Never purple-pink gradient territory unless the user demands it."),
   nav_style: z.string().describe("One sentence: the navigation labels and CTA button wording"),
   sections: z.array(z.object({
@@ -742,12 +738,47 @@ const BuildBriefSchema = z.object({
     heading: z.string().describe("The actual heading copy for this section"),
     content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. No images ever — content is typography, numbers, lists, and inline SVG only."),
   })).min(3).max(6).describe("4-5 sections in page order; the last one is always the footer"),
+  text_scheme: z.enum(["light-text", "dark-text"]).describe("Base text color family over the video, chosen from the scene analysis"),
+  scrim: z.enum(["none", "dark-soft", "dark-strong", "light-soft"]).describe("Readability veil between video and content, chosen from the scene analysis"),
   must_honor: z.array(z.string()).describe("Verbatim requirements from the user's request that MUST appear in the final site (specific copy, features, section names, colors). Empty array if none."),
 });
 
 type BuildBrief = z.infer<typeof BuildBriefSchema>;
 
-const renderBuildBrief = (brief: BuildBrief, skeleton: { id: string; prompt_template: string }): string => {
+const renderReadabilityBlock = (
+  brief: Pick<BuildBrief, "text_scheme" | "scrim">,
+  scene: SceneAnalysis | null,
+  mode: "FULL_PAGE" | "HERO_ONLY",
+): string => {
+  const scrimClass = SCRIM_CLASS[brief.scrim];
+  const darkText = brief.text_scheme === "dark-text";
+
+  const sceneLine = scene
+    ? `- Scene: ${scene.description} (brightness: ${scene.brightness}; dominant colors: ${scene.dominant_colors.join(", ")})`
+    : `- Scene: not analyzed — assume a MIXED-brightness video and keep every contrast safeguard below.`;
+
+  const scrimLine = scrimClass
+    ? (mode === "FULL_PAGE"
+      ? `- REQUIRED readability scrim: render exactly ONE <div className="fixed inset-0 ${scrimClass} pointer-events-none z-[5]" aria-hidden="true" /> in App.tsx immediately after <ScrollFrames />. All page content sits at z-10 or higher. This is the ONLY allowed full-size overlay.`
+      : `- REQUIRED readability veil inside the hero: one <div className="absolute inset-0 ${scrimClass} pointer-events-none" /> between the <video> and the hero content.`)
+    : `- No scrim needed — the scene is dark enough for light text. Do not add one.`;
+
+  return `Background video & readability (derived from the actual generated video — follow exactly):
+${sceneLine}
+- Base text color over the video: ${darkText ? "near-black (text-zinc-900 / text-zinc-800); secondary text text-zinc-700" : "white / off-white (text-white, text-white/70 for secondary)"} — applies to ALL text that sits over the video.
+${scrimLine}
+- Every display headline sitting directly on the video gets a soft text shadow: ${darkText ? "[text-shadow:0_1px_10px_rgba(255,255,255,0.45)]" : "[text-shadow:0_2px_16px_rgba(0,0,0,0.45)]"}
+- Navbar treatment: ${darkText ? "light glass (bg-white/40 backdrop-blur-md) with near-black links" : "dark glass (bg-black/30 backdrop-blur-md) with white links"} so it always separates from the scene behind it.
+- Page fallback background (visible ONLY where/while the video has not painted — the video renders on top of it): add \`body { background-color: ${darkText ? "#f2f2f0" : "#0b0b0c"}; }\` in src/index.css. This is the only background allowed on body, and no background ever goes on #root or section wrappers.
+- The accent color was chosen to harmonize with the scene's palette while staying clearly visible against it — use it exactly as specified, do not substitute.`;
+};
+
+const renderBuildBrief = (
+  brief: BuildBrief,
+  skeleton: { id: string; prompt_template: string },
+  scene: SceneAnalysis | null,
+  mode: "FULL_PAGE" | "HERO_ONLY",
+): string => {
   const sections = brief.sections
     .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}" — ${s.content_outline}`)
     .join("\n");
@@ -762,6 +793,8 @@ Tone: ${brief.tone}
 Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import both from Google Fonts at the top of src/index.css)
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
+
+${renderReadabilityBlock(brief, scene, mode)}
 
 Sections (in this order):
 ${sections}
@@ -780,6 +813,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   // The website request — never the media prompt a user may have typed via
   // the WRITE_PROMPT buttons (which overwrite current_prompt).
   const sitePrompt = state.site_prompt || state.current_prompt;
+  const briefMode = state.experiencePref === "HERO_ONLY" ? ("HERO_ONLY" as const) : ("FULL_PAGE" as const);
 
   const templateFile = state.experiencePref === "HERO_ONLY"
     ? "hero_templates.json"
@@ -797,7 +831,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       templates.map((t: { id: string; description: string }) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
     );
 
-    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
+    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         template_id: z.string().describe("The ID of the chosen skeleton"),
@@ -815,8 +849,63 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     return templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
   });
 
+  // Analyze the generated background so the design is matched to THIS video:
+  // brightness decides the text scheme + scrim, dominant colors steer the accent.
+  const sceneAnalysis: SceneAnalysis | null = await step.run("analyze-scene", async () => {
+    const sysMsg = new SystemMessage(
+      "You analyze the background scene of a website (a video generated from the given frame/prompt). " +
+      "Report its brightness, dominant colors, and mood, then recommend how site text stays readable over it:\n" +
+      "- Dark scene → light-text, scrim none\n" +
+      "- Mixed scene → light-text, scrim dark-soft\n" +
+      "- Bright scene → either light-text with scrim dark-strong (cinematic) or dark-text with scrim light-soft (airy) — pick what fits the mood\n" +
+      "The accent_suggestion must harmonize with the scene yet stay clearly visible against it (complementary or deeper-saturated tone — NEVER a color that melts into the scene).\n\n" +
+      "HONESTY RULE (CRITICAL): base every field ONLY on what the image or scene prompt actually shows. " +
+      "If you have no real visual information (no image, and the prompt does not describe the scene), do NOT invent one: " +
+      "set description to 'Scene could not be analyzed', brightness 'mixed', text_scheme 'light-text', scrim 'dark-soft', " +
+      "neutral dominant colors, and a neutral accent. An invented scene leads to an unreadable site."
+    );
+
+    const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(SceneAnalysisSchema);
+    const scenePrompt = state.media_prompt || state.current_prompt;
+    const promptText = `Scene prompt used for generation: ${scenePrompt}\n\nWebsite request (for mood context only — it does NOT describe the scene): ${sitePrompt.slice(0, 600)}`;
+
+    // Try with the actual frame image first (vision), fall back to text-only.
+    if (state.start_frame_url) {
+      try {
+        return await model.invoke([
+          sysMsg,
+          new HumanMessage({
+            content: [
+              { type: "text", text: promptText },
+              { type: "image_url", image_url: { url: state.start_frame_url } },
+            ],
+          }),
+        ]);
+      } catch (e) {
+        console.warn("[Analyze Scene] Vision analysis failed, falling back to text-only.", e);
+      }
+    }
+
+    try {
+      return await model.invoke([sysMsg, new HumanMessage(promptText)]);
+    } catch (e) {
+      console.warn("[Analyze Scene] Scene analysis failed entirely — using safe defaults.", e);
+      return null;
+    }
+  });
+
   const brief = await step.run("compile-build-brief", async () => {
-    const mode = state.experiencePref === "HERO_ONLY" ? "HERO_ONLY" : "FULL_PAGE";
+    const mode = briefMode;
+    const sceneContext = sceneAnalysis
+      ? "\n\nBACKGROUND SCENE ANALYSIS (the actual generated video — match the design to it):\n" +
+      `- Scene: ${sceneAnalysis.description}\n` +
+      `- Brightness: ${sceneAnalysis.brightness}; dominant colors: ${sceneAnalysis.dominant_colors.join(", ")}\n` +
+      `- Recommended accent: ${sceneAnalysis.accent_suggestion} (use this or a close refinement — the accent must harmonize with these scene colors while staying clearly visible against them)\n` +
+      `- text_scheme MUST be "${sceneAnalysis.text_scheme}" and scrim MUST be "${sceneAnalysis.scrim}"\n` +
+      "- Pick heading/body fonts whose personality matches this scene's mood.\n" +
+      "- Do NOT invent or embellish scene visuals beyond this analysis — if it says the scene could not be analyzed, design for an unknown mixed-brightness video and never describe imaginary scenery in the brief."
+      : "\n\nNo scene analysis available: set text_scheme to \"light-text\" and scrim to \"dark-soft\" (safe defaults for an unknown video).";
+
     const sysMsg = new SystemMessage(
       "You are the creative director of Framerate, an AI website builder whose sites always have a platform-generated video background. " +
       "Turn the user's request into a concrete build brief for the coding agent.\n\n" +
@@ -827,10 +916,12 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "- Aesthetic: minimal, classy, editorial, a little creative. Never generic-template. One accent color only.\n" +
       "- 4-5 sections total, footer last, realistic specific copy directions (no lorem ipsum).\n\n" +
       "Extract every specific requirement the user stated (exact copy, features, section names, colors) into must_honor. " +
-      "Where the user was vague, make confident, tasteful decisions that fit their idea."
+      "Where the user was vague, make confident, tasteful decisions that fit their idea.\n" +
+      TASTE_BRIEF_RULES +
+      sceneContext
     );
 
-    const routerModel = getOpenRouterModel("google/gemini-3.5-flash-lite");
+    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
     const structuredLlm = routerModel.withStructuredOutput(BuildBriefSchema);
 
     try {
@@ -842,8 +933,17 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   const finalPrompt = brief
-    ? renderBuildBrief(brief, skeleton)
-    : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n=== LAYOUT SKELETON: ${skeleton.id} ===\n${skeleton.prompt_template}\n=== END LAYOUT SKELETON ===`;
+    ? renderBuildBrief(brief, skeleton, sceneAnalysis, briefMode)
+    : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
+    `${renderReadabilityBlock(
+      {
+        text_scheme: sceneAnalysis?.text_scheme ?? "light-text",
+        scrim: sceneAnalysis?.scrim ?? "dark-soft",
+      },
+      sceneAnalysis,
+      briefMode,
+    )}\n\n` +
+    `=== LAYOUT SKELETON: ${skeleton.id} ===\n${skeleton.prompt_template}\n=== END LAYOUT SKELETON ===`;
 
   return { next_agent: "code_generation", current_prompt: finalPrompt };
 };
@@ -863,7 +963,7 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       value: state.current_prompt,
       videoUrl: state.video_url || undefined,
       experiencePref: state.experiencePref || undefined,
-      model: "google/gemini-3.5-flash-lite",
+      model: "google/gemini-3.1-flash-lite",
       userId: state.userId
     }
   });
@@ -921,6 +1021,7 @@ const workflow = new StateGraph(AgentState)
     finish: END,
   })
   .addConditionalEdges("ask_wizard_build", (state) => state.next_agent, {
+    sanitize_prompt: "sanitize_prompt",
     ask_media_intent: "ask_media_intent",
     frame_generation: "frame_generation",
     code_generation: "code_generation",

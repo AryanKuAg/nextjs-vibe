@@ -198,15 +198,24 @@ const AssistantMessage = ({
   };
 
   const getLoadingText = () => {
-    // 1. Optimistic fallbacks based on the action the user just took
+    // 1. Optimistic fallbacks based on the action the user just took.
+    // AI_CREATE / WRITE_PROMPT are reused by BOTH the scene (image) and video
+    // steps, so we disambiguate using the interactive card they were clicked on:
+    // - image approval cards carry an ANIMATE_VIDEO button → next step is the image agent
+    // - video approval cards carry a USE_VIDEO button → next step is the video agent
+    // - intent questions mention "background scene" vs "background video"
     if (lastAction === "USE_VIDEO" || lastAction === "FULL_PAGE" || lastAction === "HERO_ONLY") {
       return "Building website";
     }
-    if (lastAction === "ANIMATE_VIDEO" || lastAction === "AI_CREATE" || lastAction === "WRITE_PROMPT") {
+    if (lastAction === "ANIMATE_VIDEO") {
       return "Generating video";
     }
-    if (lastAction === "REGENERATE") {
-      return "Generating scene";
+    if (lastAction === "AI_CREATE" || lastAction === "WRITE_PROMPT" || lastAction === "REGENERATE") {
+      const buttonActions = interactiveContent?.buttons?.map((b) => b.action) ?? [];
+      const isVideoStep =
+        buttonActions.includes("USE_VIDEO") ||
+        interactiveContent?.text?.toLowerCase().includes("background video");
+      return isVideoStep ? "Generating video" : "Generating scene";
     }
 
     // 2. Fallback to the database's currentStage as the primary source of truth

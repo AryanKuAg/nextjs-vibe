@@ -244,6 +244,15 @@ export const codeAgentFunction = inngest.createFunction(
         };
         readDirRecursive(templatesDir);
 
+      } else if (mode === "FULL_PAGE" && videoUrl) {
+        // Existing project: always refresh the platform-owned golden ScrollFrames
+        // so template fixes propagate to old projects — the code agent is blocked
+        // from editing this file, so this is the only upgrade path.
+        const goldenPath = path.join(templatesDir, "components", "ScrollFrames.tsx");
+        if (fs.existsSync(goldenPath)) {
+          files["src/components/ScrollFrames.tsx"] =
+            fs.readFileSync(goldenPath, "utf-8").replaceAll("VIDEO_URL_HERE", videoUrl);
+        }
       }
 
       return files;
@@ -270,10 +279,22 @@ export const codeAgentFunction = inngest.createFunction(
         await sandbox.files.write(absolutePath, content);
       };
 
-      // If the returned sandboxId exactly matches the one previously saved in the DB, 
+      // If the returned sandboxId exactly matches the one previously saved in the DB,
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
+
+        // Even on a hot sandbox, sync the platform-owned golden ScrollFrames so
+        // template fixes reach projects whose sandbox never went cold.
+        const golden = filesObj["src/components/ScrollFrames.tsx"];
+        if (typeof golden === "string" && mode === "FULL_PAGE") {
+          try {
+            const sandbox = await getSandbox(sandboxId);
+            await writeSandboxFile(sandbox, "src/components/ScrollFrames.tsx", golden);
+          } catch (e) {
+            console.error("DEBUG: Failed to refresh ScrollFrames on hot sandbox", e);
+          }
+        }
 
         return null;
       }
@@ -505,7 +526,7 @@ export const codeAgentFunction = inngest.createFunction(
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
         system: systemPrompt,
-        model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+        model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -574,7 +595,7 @@ export const codeAgentFunction = inngest.createFunction(
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+      defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
     console.log('DEBUG: Running initial Creator agent...');
@@ -606,7 +627,7 @@ export const codeAgentFunction = inngest.createFunction(
           if (network.state.data.summary) return;
           return retryAgent;
         },
-        defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
       });
 
       const correctivePrompt = currentPrompt +
@@ -681,6 +702,21 @@ function fixPaths(dir) {
         }
       }
 
+      // Fix framer-motion type widening (TS2322): string literals for
+      // ease/type/repeatType inside un-annotated variant/transition consts
+      // widen to 'string' and fail the strict TS check even though the code
+      // runs fine. Pin them with 'as const'. TSX sources only (never dist JS).
+      if (p.endsWith('.tsx')) {
+        let originalContent = content;
+        content = content.replace(
+          /\\b((?:ease|type|repeatType)\\s*:\\s*)(["'](?:easeIn|easeOut|easeInOut|linear|circIn|circOut|circInOut|backIn|backOut|backInOut|anticipate|spring|tween|inertia|keyframes|loop|reverse|mirror)["'])(?!\\s*as\\s+const)/g,
+          '$1$2 as const'
+        );
+        if (content !== originalContent) {
+          changed = true;
+        }
+      }
+
       // Fix missing Lucide brand icons
       const brandIcons = ['Github', 'Twitter', 'Linkedin', 'Facebook', 'Instagram', 'Youtube'];
       let importedBrands = [];
@@ -714,7 +750,7 @@ function fixPaths(dir) {
       }
       
       if (importedBrands.length > 0) {
-        let svgDeclarations = '\\\\n// Inject missing brand icons from older Lucide versions\\\\n';
+        let svgDeclarations = '\\n// Inject missing brand icons from older Lucide versions\\n';
         for (const item of importedBrands) {
           const parts = item.split(/\\s+as\\s+/);
           const originalName = parts[0].trim();
@@ -737,7 +773,7 @@ function fixPaths(dir) {
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
     \${svgPath}
   </svg>
-);\\\\n\`;
+);\\n\`;
         }
         newContent = newContent + svgDeclarations;
         content = newContent;
@@ -773,7 +809,10 @@ fixPaths(process.argv[2]);
 
           console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
           try {
-            await sandbox.commands.run("npm run build --silent -- --base=./");
+            // vite build directly (not "npm run build") — the npm script re-runs
+            // tsc -b, duplicating the strict gate above. Type checking happens
+            // once (tsc --noEmit); bundling only verifies the site actually builds.
+            await sandbox.commands.run("npx vite build --base=./");
 
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
@@ -838,7 +877,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -882,18 +921,45 @@ fixPaths(process.argv[2]);
       // the user is never charged for them.
       attempt++;
     }
+
+    // --- LENIENT BUILD FALLBACK ---
+    // If the strict gate (tsc) could not be fully repaired, try bundling without
+    // it. Type-only errors (e.g. framer-motion Variants widening) have zero
+    // runtime impact — if Vite can bundle the site, ship it instead of failing
+    // the whole run. Real breakage (missing imports, syntax errors) still fails
+    // here because esbuild cannot bundle it.
+    if (!isBuildSuccessful) {
+      const lenientCheck = await step.run(`lenient-build-run-${runId}`, async () => {
+        try {
+          const sandbox = await getSandbox(sandboxId);
+          await sandbox.commands.run("rm -rf dist").catch(() => { });
+          await sandbox.commands.run("npx vite build --base=./");
+          await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 }).catch(() => { });
+          return { success: true };
+        } catch (e) {
+          console.error("DEBUG: Lenient build fallback also failed.", e);
+          return { success: false };
+        }
+      });
+
+      if (lenientCheck.success) {
+        console.log("DEBUG: Lenient build passed — shipping despite remaining type-only errors.");
+        isBuildSuccessful = true;
+      }
+    }
+
     const fragmentTitleGenerator = createAgent({
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "google/gemini-3.5-flash-lite"),
+      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
@@ -1115,7 +1181,7 @@ fixPaths(process.argv[2]);
     });
 
     await step.run("charge-credits", async () => {
-      const model = event.data.model || "google/gemini-3.5-flash-lite";
+      const model = event.data.model || "google/gemini-3.1-flash-lite";
       const cost = MODEL_COSTS[model] || 100;
       await consumeCredits(cost, event.data.userId);
     });

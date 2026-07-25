@@ -36,38 +36,33 @@ Framerate is a **niche AI website builder** that generates websites with **scrol
 
 ## Flows
 
-### Flow 1: Generic/Short Prompt (Wizard Flow)
+### Flow 1: First Prompt (ALWAYS the two wizard questions)
+
+Every accepted first prompt — short or detailed — gets the wizard:
 
 ```
-User types short/generic prompt (e.g. "A cyberpunk city")
-  → Supervisor detects generic → requiresWizard = true
-  → ask_wizard_3d: "Full page" or "Hero only?" → sets experiencePref
-  → ask_wizard_build: "Build it for me" (agent mode) or "I'll guide visuals" (HITL)
-  → ask_media_intent → frame_generation (IMAGE AGENT)
-  → User approves image → ask_video_intent → video_generation (VIDEO AGENT)
-  → User approves video → select_template (SPEC COMPILER) → code_generation (CODE AGENT)
+User types their first prompt
+  → Supervisor (reject-check only) → ask_wizard_3d
+  → Question 1: "Where should the background video live?" → Full page / Hero only → experiencePref
+  → Question 2: "How hands-on do you want to be?" → Build it for me / I'll guide each step → buildPref
+  → sanitize_prompt (strips background/image instructions; wizard's experiencePref wins over detection;
+    extracts a user-supplied image URL, validated ≥ ~50KB via HEAD request)
+  → then, by buildPref:
+
+  BUILD_FOR_ME (fully autonomous — zero stops):
+    → frame_generation → video_generation → select_template (SPEC COMPILER) → code_generation
+
+  GUIDE_VISUALS (human-in-the-loop at every step):
+    → ask_media_intent (scene question) → frame_generation + image approval buttons
+    → ask_video_intent → video_generation + video approval buttons
+    → select_template (SPEC COMPILER) → code_generation
 ```
 
-### Flow 2: Detailed Prompt (Skips Wizard)
+**Autonomy is decided EXCLUSIVELY by the wizard's build question.** No prompt-length or
+URL heuristics. The wizard is skipped only when the event already carries BOTH
+`experiencePref` and `buildPref` (programmatic invocations).
 
-```
-User types detailed prompt (>800 chars or includes a video URL)
-  → Supervisor: requiresWizard forced false, isAgentMode = true
-  → sanitize_prompt: strips background/image instructions, detects FULL_PAGE vs HERO_ONLY,
-    extracts a user-supplied image URL (validated ≥ ~50KB via HEAD request)
-  → frame_generation → video_generation (auto-approved, no HITL stops)
-  → select_template (SPEC COMPILER) → code_generation
-```
-
-### Flow 3: Medium Prompt (No Wizard, HITL)
-
-```
-Accepted non-generic prompt under 800 chars
-  → sanitize_prompt (ALL new builds are sanitized)
-  → ask_media_intent (human-in-the-loop) → frame → video approvals → select_template → code
-```
-
-### Flow 4: Follow-up on a Built Site
+### Flow 2: Follow-up on a Built Site
 
 ```
 Any prompt on a project that already has a fragment
@@ -102,8 +97,9 @@ If brief compilation fails, the code agent receives the raw request + skeleton a
 |---|---|
 | `src/inngest/autonomous.ts` | The LangGraph state machine: supervisor, wizard, sanitize_prompt, frame_generation, video_generation, select_template (spec compiler), code_generation, reject. |
 | `src/inngest/functions.ts` | The code agent (Inngest agent-kit). Derives videoUrl + mode from durable project state, assembles the system prompt per mode, runs creator → verification → self-healing fixer → deploy. |
-| `src/prompt.ts` | `buildCodeAgentSystemPrompt(mode, videoUrl)` — CORE_RULES + DESIGN_SYSTEM + one mode module (FULL_PAGE / HERO_ONLY / STANDARD) + a mode-specific final checklist. Also FIXER/RESPONSE/TITLE prompts. |
-| `src/templates/components/ScrollFrames.tsx` | Golden template for the ScrollyVideo component. `VIDEO_URL_HERE` placeholder replaced at seed time. Its sizing CSS is scoped to the first top-level div only. |
+| `src/prompt.ts` | `buildCodeAgentSystemPrompt(mode, videoUrl)` — CORE_RULES + DESIGN_SYSTEM + TASTE_MODULE + one mode module (FULL_PAGE / HERO_ONLY / STANDARD) + a mode-specific final checklist. Also FIXER/RESPONSE/TITLE prompts. |
+| `src/lib/taste.ts` | Anti-slop design-taste rules adapted from [tasteskill](https://github.com/Leonxlnx/taste-skill) (MIT) for our constraints: TASTE_MODULE (code agent), TASTE_BRIEF_RULES (Build Brief compiler: font rotation, palette bans, copy voice, layout variety), TASTE_CHECKLIST (pre-flight items). Original vendored at `docs/vendor/taste-skill.md`. Skill rules that conflict with the platform (real images, motion/react, Phosphor icons, GSAP) are deliberately overridden. |
+| `src/templates/components/ScrollFrames.tsx` | Golden template for the ScrollyVideo component. `VIDEO_URL_HERE` placeholder replaced at seed time. Its CSS is scoped to the lib's `div[data-scrolly-container]` and applies `margin-bottom: -100vh` — the sticky container occupies 100vh of flow, so without this pull-up the page content would start one viewport below the fold. |
 | `src/lib/templates/full_page_templates.json` | 3 brand-neutral full-page layout skeletons. |
 | `src/lib/templates/hero_templates.json` | 3 brand-neutral hero-only layout skeletons. |
 
@@ -147,4 +143,4 @@ If brief compilation fails, the code agent receives the raw request + skeleton a
 - **Never run `npm run dev` or `npm run build`** in the main project for testing — the user manages this manually.
 - Sandbox environments (E2B) are used for generated sites.
 - Inngest handles the agent orchestration pipeline.
-- OpenRouter + DeepSeek (`deepseek/deepseek-v4-flash`) for routing/sanitizing/brief-compiling/code generation; Grok for the fixer.
+- OpenRouter + DeepSeek (`google/gemini-3.1-flash-lite`) for routing/sanitizing/brief-compiling/code generation; Grok for the fixer.

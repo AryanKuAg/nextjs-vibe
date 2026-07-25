@@ -22,14 +22,17 @@ export const generateFramesFunction = inngest.createFunction(
     const { projectId, prompt, model, userId, isDirectPrompt } = event.data;
 
     await step.run("update-stage", async () => {
-      await prisma.project.update({ where: { id: projectId }, data: { currentStage: "SCENE" } });
+      // While the image is being generated the stage must read GENERATING_SCENE —
+      // setting "SCENE" here would make the UI shimmer show the wrong label
+      // (or fall back to a stale "Generating video") during image generation.
+      await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_SCENE" } });
     });
 
     const cost = MODEL_COSTS[model as string] ?? 10;
 
     const refinedPrompt = isDirectPrompt ? prompt : await step.run("refine-prompt", async () => {
       const routerModel = new ChatOpenAI({
-        modelName: "google/gemini-3.5-flash-lite",
+        modelName: "google/gemini-3.1-flash-lite",
         apiKey: process.env.OPENROUTER_API_KEY!,
         configuration: {
           baseURL: "https://openrouter.ai/api/v1",

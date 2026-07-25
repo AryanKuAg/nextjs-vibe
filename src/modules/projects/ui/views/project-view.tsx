@@ -202,7 +202,7 @@ export const ProjectView = ({ projectId }: Props) => {
               </div>
             </div>
 
-            <div className="flex-1 w-full pb-3 pr-3">
+            <div className="flex-1 min-h-0 w-full pb-3 pr-3">
               <div className="h-full w-full flex flex-col bg-bg border border-white-8 rounded-[12px] overflow-hidden relative">
                 <TabsContent value="preview" className="h-full m-0">
                   {activeFragment ? (

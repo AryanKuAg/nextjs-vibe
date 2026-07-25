@@ -712,6 +712,10 @@ function fixPaths(dir) {
           /\\b((?:ease|type|repeatType)\\s*:\\s*)(["'](?:easeIn|easeOut|easeInOut|linear|circIn|circOut|circInOut|backIn|backOut|backInOut|anticipate|spring|tween|inertia|keyframes|loop|reverse|mirror)["'])(?!\\s*as\\s+const)/g,
           '$1$2 as const'
         );
+        // Enforce the em/en-dash ban mechanically: these characters only ever
+        // appear in copy strings (they are invalid TS syntax outside strings),
+        // and they are the #1 AI design tell. Replace with a plain hyphen.
+        content = content.replace(/\u2014|\u2013/g, '-');
         if (content !== originalContent) {
           changed = true;
         }

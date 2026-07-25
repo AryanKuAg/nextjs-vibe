@@ -126,12 +126,12 @@ Structural rules (breaking any of these visibly breaks the site):
 2. NEVER set overflow (hidden/auto/scroll, x or y) on html, body, #root, or ANY ancestor or top-level sibling of <ScrollFrames /> — this includes any wrapper div at the App.tsx root. Overflow there kills the sticky scrubbing after one viewport of scroll. If you need horizontal clipping, apply overflow-x-hidden only on a nested wrapper INSIDE a section.
 2b. STICKY-KILLERS (equally fatal): never apply transform, translate, scale, rotate, filter, backdrop-filter, perspective, will-change, or contain to html, body, #root, or anything wrapping <ScrollFrames /> — a transformed/filtered ancestor disables position:sticky and the video scrolls away with the page. Parallax and scroll-driven transforms are allowed ONLY on content elements INSIDE sections (headings, cards), never on <main>, section wrappers, or any App.tsx-root element.
 3. Never give ScrollFrames' parent a fixed or constrained height — its sticky range must equal the full page scroll height.
-4. Backgrounds: set the Build Brief's fallback background-color on body in src/index.css (the video paints over it — it shows only while the video loads, so a white flash never appears). NEVER set any background on #root or any element that sits over the video, and never add any full-width/full-height element with a solid or semi-opaque background covering the video. ONE EXCEPTION: when the Build Brief specifies a readability scrim, render exactly one fixed inset-0 pointer-events-none translucent div (the exact class the brief gives, never more than ~45% opacity) at z-[5], immediately after <ScrollFrames />. Nothing else may cover the video.
+4. Backgrounds: set the Build Brief's fallback background-color on body in src/index.css (the video paints over it — it shows only while the video loads, so a white flash never appears). NEVER set any background on #root or any element that sits over the video. ZERO OVERLAYS (absolute): never add a fixed/absolute inset-0 tint, scrim, veil, or gradient over the video, and never put bg-black/xx or bg-white/xx on any element covering the video. No exceptions. Overlays hide the video and look cheap. Readability comes only from the brief's text color + text-shadow.
 5. All content (navbar, sections, footer) renders AFTER <ScrollFrames /> as normal siblings, layered with relative z-10.
 6. THE FIRST VIEWPORT IS NEVER EMPTY (CRITICAL): the first section is a real hero — the site's headline, supporting line, and CTA MUST be visible in the FIRST viewport, layered over the video, composed per the skeleton (e.g. anchored bottom-left or centered). A page that opens on just the navbar and bare video, with the actual content starting one viewport down, is a FAILURE. "Minimal and transparent" means restrained styling, NOT absent content.
 7. NO EMPTY SPACER DIVS: sections sit DIRECTLY adjacent — each section starts right where the previous one ends. Each section's own min-h-[100dvh] already gives the video plenty of scroll room to scrub. Never insert empty gap divs like <div className="h-[175vh]" /> between sections; they create dead viewports with nothing on screen. The hero itself is exactly one viewport (h-[100dvh]) with its content inside it.
-8. Every section background is COMPLETELY TRANSPARENT — no bg-black, bg-white, or bg-neutral-* on section wrappers. For text readability use restrained glassmorphism (bg-black/40 backdrop-blur-md) on small elements only, never on large panels.
-8b. READABILITY OVER THE VIDEO (CRITICAL): follow the Build Brief's "Background video & readability" block EXACTLY — its text color scheme, scrim, nav glass treatment, and text shadows were derived from the actual generated video. Text that blends into the video (white text on a bright sky, dark text on shadow) is a failure. Every display headline sitting directly on the video carries the brief's text-shadow.
+8. EVERYTHING over the video is transparent — no background fills at all: no bg-black/white/neutral on section wrappers, and NO glassmorphism, NO backdrop-blur, NO translucent panels on cards, nav, quote blocks, or the footer. Blur and tinted panels are banned in full-page mode; they muddy the video and look cheap. Separate content with typography, 1px borders (border-white/15 or border-black/15), whitespace, and the accent color instead of glass panels. Solid accent-color fills are allowed only on SMALL elements (buttons, tiny chips, number badges).
+8b. READABILITY OVER THE VIDEO (CRITICAL): follow the Build Brief's "Background video & readability" block EXACTLY — its text color scheme and text-shadows were derived from the actual generated video, and there are ZERO overlays. Every headline, paragraph, label, and link over the video uses the brief's text color AND its text-shadow (the shadow is on the glyphs, it does not cover the video). Text that blends into the video (white text on a bright sky, dark text on shadow) is a failure — fix it with text color + text-shadow, never with an overlay.
 9. Keep UI elements small, sleek, and highly transparent so the video shines through — that IS the design (but every section still carries its real content).
 10. Build 4 to 5 sections, each min-h-[100dvh] so there is a long satisfying scroll to scrub the video. The footer is the final section at the absolute bottom.
 `;
@@ -141,27 +141,25 @@ const HERO_ONLY_MODULE = (videoUrl: string) => `
 This site has a video background ONLY in the hero section. Below the hero it is a normal website with solid backgrounds and standard scrolling.
 
 Hero rules:
-1. The hero is ONE section (relative, overflow-hidden, min-h-[100dvh]) with THREE layers stacked inside it:
+1. The hero is ONE section (relative, overflow-hidden, min-h-[100dvh]) with TWO layers:
    (a) the background <video> filling the whole section,
-   (b) an optional readability gradient,
-   (c) the hero CONTENT — headline, supporting line, CTA — overlaid ON TOP of the video.
+   (b) the hero CONTENT — headline, supporting line, CTA — directly on top of the video. NO tint/gradient/scrim/blur layer between them.
 2. The video is a native <video> element with EXACTLY this URL: "${videoUrl}"
    <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />
 3. THE HERO IS NEVER VIDEO-ONLY (CRITICAL): the site's main headline, subtext, and primary CTA MUST render INSIDE the hero section, layered above the video with relative z-10. Leaving the hero as a bare video and starting the text content in the section below it is a FAILURE. The navbar also sits inside/over the hero at the top.
-4. Correct hero structure (follow this shape):
+4. Correct hero structure (follow this shape — NO overlay div):
    <section className="relative min-h-[100dvh] overflow-hidden flex items-center justify-center">
      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />
-     <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60" />
      <div className="relative z-10 text-center px-6">
        {/* headline + subtext + CTA here — real content from the brief */}
      </div>
    </section>
-5. Readability over the video: follow the Build Brief's "Background video & readability" block exactly (text color scheme, veil, text shadows) — it was derived from the actual generated video. If the brief specifies no scheme, default to white text over a bg-gradient-to-b from-black/40 to-black/60 overlay.
+5. Readability over the hero video: ZERO overlays. Follow the Build Brief's "Background video & readability" block exactly — its text color scheme and text-shadows were chosen for this video. Every hero text element uses that text color AND its text-shadow. Never add a gradient/tint/scrim over the hero video, and never a glass/blur panel; if the brief gives no scheme, use white text with [text-shadow:0_2px_18px_rgba(0,0,0,0.6)].
 6. Do NOT use scrolly-video, ScrollyVideo, ScrollFrames, or any scroll-scrubbing library — this is a plain HTML5 video tag, no extra packages.
 
 Below the hero:
-7. Sections below (3-4 content sections + footer) use solid backgrounds and normal scrolling — but they MUST follow the design system above: minimal, editorial, one accent color, generous whitespace. Restraint, not "stuffed with cards".
-8. Keep a coherent palette between the hero overlay and the sections below.
+7. Sections below (3-4 content sections + footer) use solid backgrounds and normal scrolling — but they MUST follow the design system above: minimal, editorial, one accent color, generous whitespace. Restraint, not "stuffed with cards". Glass/blur is allowed here (solid backgrounds), never over the hero video.
+8. Keep a coherent palette between the hero and the sections below.
 `;
 
 const STANDARD_MODULE = `
@@ -188,14 +186,16 @@ const CHECKLIST: Record<CodeAgentMode, string> = {
 - No empty spacer divs anywhere — every section sits directly against the next; scrolling never passes through a viewport with no content
 - No overflow rules on html/body/#root or any ScrollFrames ancestor/top-level sibling
 - No transform/filter/perspective/will-change on html/body/#root or anything wrapping ScrollFrames (sticky-killers); parallax transforms only on elements inside sections
-- body carries the brief's fallback background-color; no background on #root or anything over the video; the ONLY full-size overlay is the brief's readability scrim (if specified)
-- Text is readable over the video everywhere: brief's text scheme + scrim applied, text-shadow on display type, nav glass treatment per brief
+- body carries the brief's fallback background-color; no background on #root or anything over the video; ZERO overlays/scrims/tints/gradients over the video anywhere
+- NO glassmorphism, NO backdrop-blur, NO translucent panels over the video (nav, cards, quotes, footer all transparent) — separate content with borders/whitespace, not glass
+- Text is readable over the video everywhere via the brief's text color + text-shadow on ALL text over the video (headlines, body, labels, links), never via an overlay
 - 4-5 sections, each min-h-[100dvh], footer last${CHECKLIST_SHARED}
 `,
   HERO_ONLY: `
 ## FINAL CHECKLIST — verify each item before printing <task_summary>
 - Hero <video> uses the exact provided URL with autoPlay loop muted playsInline + object-cover
 - The headline, subtext, and CTA render INSIDE the hero section, overlaid on the video (relative z-10) — the hero is NEVER a bare video with the text starting below it
+- ZERO overlays over the hero video: no gradient/tint/scrim/blur layer; hero text readable via the brief's text color + text-shadow only
 - No scrolly-video / ScrollFrames anywhere; no extra packages installed for the video
 - Sections below the hero use solid backgrounds and follow the design system${CHECKLIST_SHARED}
 `,

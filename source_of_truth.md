@@ -119,9 +119,9 @@ If brief compilation fails, the code agent receives the raw request + skeleton a
 
 ## Critical CSS/HTML Rules
 
-1. **NEVER set `overflow: hidden`** on `html`, `body`, `#root`, or any ancestor of `<ScrollFrames />`. This breaks the sticky video.
+1. **NEVER set `overflow: hidden`** (or `transform`/`filter`/`perspective`) on `html`, `body`, `#root`, or any ancestor of `<ScrollFrames />`. This breaks the sticky video.
 2. **All sections must have transparent backgrounds** in full-page mode so the video shows through.
-3. **Use glassmorphism sparingly** (`bg-black/40 backdrop-blur-md`) only for text readability.
+3. **ZERO overlays over the video** — no scrims, tints, gradients, glassmorphism, or `backdrop-blur` on anything sitting over the video (full-page everywhere; hero-only inside the hero). Readability comes only from the scene-derived text color (`text_scheme`) + a text-shadow on the glyphs. Glass/blur is allowed only on solid-background sections (hero-only below the hero, standard mode).
 4. **No `<img>` tags** — we don't have images to load, they will be broken.
 5. **The `scrolly-video` component uses `position: sticky`** internally. Don't wrap it in constraining containers.
 6. **Relative imports only** in generated sites (`./components/X`) — the `@/` alias is not reliably configured in the sandbox.

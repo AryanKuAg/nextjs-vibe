@@ -712,18 +712,10 @@ const SceneAnalysisSchema = z.object({
   brightness: z.enum(["light", "dark", "mixed"]).describe("Overall brightness of the scene"),
   dominant_colors: z.array(z.string()).min(2).max(5).describe("Dominant scene colors as hex codes"),
   accent_suggestion: z.string().describe("One accent hex that harmonizes with the scene but stays clearly visible against it (never a color that melts into the scene)"),
-  text_scheme: z.enum(["light-text", "dark-text"]).describe("Which text family stays readable over this scene: light-text (white/off-white) or dark-text (near-black)"),
-  scrim: z.enum(["none", "dark-soft", "dark-strong", "light-soft"]).describe("Readability veil needed between video and content: none (dark scenes), dark-soft (mixed), dark-strong (bright scenes with light text), light-soft (bright scenes with dark text)"),
+  text_scheme: z.enum(["light-text", "dark-text"]).describe("Which text color keeps content readable over this scene WITHOUT any overlay: light-text (white/off-white) for dark scenes, dark-text (near-black) for bright scenes. For mixed scenes pick whichever wins over the busiest region of the frame."),
 });
 
 type SceneAnalysis = z.infer<typeof SceneAnalysisSchema>;
-
-const SCRIM_CLASS: Record<SceneAnalysis["scrim"], string | null> = {
-  "none": null,
-  "dark-soft": "bg-black/25",
-  "dark-strong": "bg-black/45",
-  "light-soft": "bg-white/30",
-};
 
 const BuildBriefSchema = z.object({
   site_name: z.string().describe("Short brand/site name derived from the user's request"),
@@ -739,37 +731,29 @@ const BuildBriefSchema = z.object({
     content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. No images ever — content is typography, numbers, lists, and inline SVG only."),
   })).min(3).max(6).describe("4-5 sections in page order; the last one is always the footer"),
   text_scheme: z.enum(["light-text", "dark-text"]).describe("Base text color family over the video, chosen from the scene analysis"),
-  scrim: z.enum(["none", "dark-soft", "dark-strong", "light-soft"]).describe("Readability veil between video and content, chosen from the scene analysis"),
   must_honor: z.array(z.string()).describe("Verbatim requirements from the user's request that MUST appear in the final site (specific copy, features, section names, colors). Empty array if none."),
 });
 
 type BuildBrief = z.infer<typeof BuildBriefSchema>;
 
 const renderReadabilityBlock = (
-  brief: Pick<BuildBrief, "text_scheme" | "scrim">,
+  brief: Pick<BuildBrief, "text_scheme">,
   scene: SceneAnalysis | null,
-  mode: "FULL_PAGE" | "HERO_ONLY",
 ): string => {
-  const scrimClass = SCRIM_CLASS[brief.scrim];
   const darkText = brief.text_scheme === "dark-text";
 
   const sceneLine = scene
     ? `- Scene: ${scene.description} (brightness: ${scene.brightness}; dominant colors: ${scene.dominant_colors.join(", ")})`
     : `- Scene: not analyzed — assume a MIXED-brightness video and keep every contrast safeguard below.`;
 
-  const scrimLine = scrimClass
-    ? (mode === "FULL_PAGE"
-      ? `- REQUIRED readability scrim: render exactly ONE <div className="fixed inset-0 ${scrimClass} pointer-events-none z-[5]" aria-hidden="true" /> in App.tsx immediately after <ScrollFrames />. All page content sits at z-10 or higher. This is the ONLY allowed full-size overlay.`
-      : `- REQUIRED readability veil inside the hero: one <div className="absolute inset-0 ${scrimClass} pointer-events-none" /> between the <video> and the hero content.`)
-    : `- No scrim needed — the scene is dark enough for light text. Do not add one.`;
-
   return `Background video & readability (derived from the actual generated video — follow exactly):
 ${sceneLine}
-- Base text color over the video: ${darkText ? "near-black (text-zinc-900 / text-zinc-800); secondary text text-zinc-700" : "white / off-white (text-white, text-white/70 for secondary)"} — applies to ALL text that sits over the video.
-${scrimLine}
-- Every display headline sitting directly on the video gets a soft text shadow: ${darkText ? "[text-shadow:0_1px_10px_rgba(255,255,255,0.45)]" : "[text-shadow:0_2px_16px_rgba(0,0,0,0.45)]"}
-- Navbar treatment: ${darkText ? "light glass (bg-white/40 backdrop-blur-md) with near-black links" : "dark glass (bg-black/30 backdrop-blur-md) with white links"} so it always separates from the scene behind it.
-- Page fallback background (visible ONLY where/while the video has not painted — the video renders on top of it): add \`body { background-color: ${darkText ? "#f2f2f0" : "#0b0b0c"}; }\` in src/index.css. This is the only background allowed on body, and no background ever goes on #root or section wrappers.
+- ZERO OVERLAYS (absolute, non-negotiable): NEVER place any tint, scrim, veil, gradient, or blurred panel between the video and the content — no fixed inset-0 dark/light div, no bg-black/xx or bg-white/xx over the video, no backdrop-blur on anything sitting over the video (nav, cards, footer included). Overlays and blur hide the video and look cheap. Readability comes ONLY from text color + text-shadow below.
+- Base text color over the video: ${darkText ? "near-black (text-zinc-900; secondary text-zinc-800)" : "white / off-white (text-white; secondary text-white/80)"} — applies to ALL text and UI that sits over the video. The scene analysis picked this so plain text stays legible with no overlay.
+- Every headline, paragraph, label, and link sitting over the video carries a text-shadow (this is on the glyphs only, it does NOT cover the video): ${darkText ? "[text-shadow:0_1px_12px_rgba(255,255,255,0.75)] for display type, [text-shadow:0_1px_6px_rgba(255,255,255,0.7)] for body/labels" : "[text-shadow:0_2px_18px_rgba(0,0,0,0.6)] for display type, [text-shadow:0_1px_8px_rgba(0,0,0,0.55)] for body/labels"}. This is what makes text pop against a busy video — use it everywhere over the video, not just headlines.
+- Navbar: transparent background, NO glass, NO blur, NO pill fill. Just ${darkText ? "near-black" : "white"} text links with the body text-shadow above. The primary CTA may use a SOLID accent-color fill (it is a small button, not an overlay) with contrasting label text.
+- Accent color usage over the video: solid accent fills are fine on small elements (buttons, tiny chips, number labels, 1px rules). Never a large translucent accent panel.
+- Page fallback background (behind the video, shows only during load — never an overlay): add \`body { background-color: ${darkText ? "#f2f2f0" : "#0b0b0c"}; }\` in src/index.css. This is the only background allowed on body; no background on #root or any section wrapper.
 - The accent color was chosen to harmonize with the scene's palette while staying clearly visible against it — use it exactly as specified, do not substitute.`;
 };
 
@@ -777,7 +761,6 @@ const renderBuildBrief = (
   brief: BuildBrief,
   skeleton: { id: string; prompt_template: string },
   scene: SceneAnalysis | null,
-  mode: "FULL_PAGE" | "HERO_ONLY",
 ): string => {
   const sections = brief.sections
     .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}" — ${s.content_outline}`)
@@ -794,7 +777,7 @@ Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import 
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
 
-${renderReadabilityBlock(brief, scene, mode)}
+${renderReadabilityBlock(brief, scene)}
 
 Sections (in this order):
 ${sections}
@@ -850,18 +833,19 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   // Analyze the generated background so the design is matched to THIS video:
-  // brightness decides the text scheme + scrim, dominant colors steer the accent.
+  // brightness decides the text color (there are NO overlays), dominant colors steer the accent.
   const sceneAnalysis: SceneAnalysis | null = await step.run("analyze-scene", async () => {
     const sysMsg = new SystemMessage(
       "You analyze the background scene of a website (a video generated from the given frame/prompt). " +
-      "Report its brightness, dominant colors, and mood, then recommend how site text stays readable over it:\n" +
-      "- Dark scene → light-text, scrim none\n" +
-      "- Mixed scene → light-text, scrim dark-soft\n" +
-      "- Bright scene → either light-text with scrim dark-strong (cinematic) or dark-text with scrim light-soft (airy) — pick what fits the mood\n" +
+      "The site places text directly over this video with NO overlay, tint, or scrim of any kind — readability comes only from choosing the right text color plus a text-shadow. " +
+      "Report its brightness, dominant colors, and mood, then pick the text color that stays legible over the busiest part of the scene:\n" +
+      "- Dark / mostly-dark scene → light-text (white)\n" +
+      "- Bright / mostly-light scene → dark-text (near-black)\n" +
+      "- Mixed scene → pick whichever color wins over the region where hero content sits; when unsure prefer dark-text for bright skies/meadows and light-text for night/ocean/forest scenes\n" +
       "The accent_suggestion must harmonize with the scene yet stay clearly visible against it (complementary or deeper-saturated tone — NEVER a color that melts into the scene).\n\n" +
       "HONESTY RULE (CRITICAL): base every field ONLY on what the image or scene prompt actually shows. " +
       "If you have no real visual information (no image, and the prompt does not describe the scene), do NOT invent one: " +
-      "set description to 'Scene could not be analyzed', brightness 'mixed', text_scheme 'light-text', scrim 'dark-soft', " +
+      "set description to 'Scene could not be analyzed', brightness 'mixed', text_scheme 'light-text', " +
       "neutral dominant colors, and a neutral accent. An invented scene leads to an unreadable site."
     );
 
@@ -901,10 +885,10 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       `- Scene: ${sceneAnalysis.description}\n` +
       `- Brightness: ${sceneAnalysis.brightness}; dominant colors: ${sceneAnalysis.dominant_colors.join(", ")}\n` +
       `- Recommended accent: ${sceneAnalysis.accent_suggestion} (use this or a close refinement — the accent must harmonize with these scene colors while staying clearly visible against them)\n` +
-      `- text_scheme MUST be "${sceneAnalysis.text_scheme}" and scrim MUST be "${sceneAnalysis.scrim}"\n` +
+      `- text_scheme MUST be "${sceneAnalysis.text_scheme}". There are NO overlays/scrims/blur on the site — text sits directly over the video and stays readable via this text color plus a text-shadow.\n` +
       "- Pick heading/body fonts whose personality matches this scene's mood.\n" +
       "- Do NOT invent or embellish scene visuals beyond this analysis — if it says the scene could not be analyzed, design for an unknown mixed-brightness video and never describe imaginary scenery in the brief."
-      : "\n\nNo scene analysis available: set text_scheme to \"light-text\" and scrim to \"dark-soft\" (safe defaults for an unknown video).";
+      : "\n\nNo scene analysis available: set text_scheme to \"light-text\" (a safe default for an unknown video). Still NO overlays or blur anywhere.";
 
     const sysMsg = new SystemMessage(
       "You are the creative director of Framerate, an AI website builder whose sites always have a platform-generated video background. " +
@@ -933,15 +917,11 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   const finalPrompt = brief
-    ? renderBuildBrief(brief, skeleton, sceneAnalysis, briefMode)
+    ? renderBuildBrief(brief, skeleton, sceneAnalysis)
     : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
     `${renderReadabilityBlock(
-      {
-        text_scheme: sceneAnalysis?.text_scheme ?? "light-text",
-        scrim: sceneAnalysis?.scrim ?? "dark-soft",
-      },
+      { text_scheme: sceneAnalysis?.text_scheme ?? "light-text" },
       sceneAnalysis,
-      briefMode,
     )}\n\n` +
     `=== LAYOUT SKELETON: ${skeleton.id} ===\n${skeleton.prompt_template}\n=== END LAYOUT SKELETON ===`;
 

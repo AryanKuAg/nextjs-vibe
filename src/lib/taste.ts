@@ -48,7 +48,7 @@ Before writing code, silently form one line: "Reading this as: <site kind> for <
 - Grid over flex-math: grid grid-cols-1 md:grid-cols-3 gap-6, never w-[calc(33%-1rem)]. Every multi-column layout declares its <768px collapse explicitly.
 
 ### Buttons, CTAs, forms
-- Every CTA passes contrast (WCAG AA): no white-on-white, no ghost button over the video without a scrim/border.
+- Every CTA passes contrast (WCAG AA): no white-on-white. A CTA over the video is either a solid accent-color fill or a bordered/text button with text-shadow — never relies on a scrim.
 - CTA labels: max 3 words, never wrapping to 2 lines at desktop.
 - ONE LABEL PER INTENT: "Get in touch" / "Contact us" / "Let's talk" are the same intent — pick one label and reuse it everywhere (nav, hero, footer).
 - Tactile feedback: active:scale-[0.98] or a 1px press on buttons.
@@ -61,6 +61,23 @@ Before writing code, silently form one line: "Reading this as: <site kind> for <
 - No fake-precise invented numbers (92%, 4.1×, 13.4 lb) unless the brief provides them; round honest numbers or none.
 - Re-read every visible string before finishing: anything grammatically broken, mock-poetic, or "AI trying to sound thoughtful" gets rewritten into a plain functional sentence.
 - EM-DASH BAN (zero tolerance): the characters — and – never appear anywhere visible: headlines, body, buttons, captions, quotes, attribution. Use a comma, period, colon, or plain hyphen (-). This is the single most-violated AI tell.
+
+### Minimal is NOT empty (content floor)
+"Minimal" means restrained styling, never absent substance. A section whose cells contain 2-3 words surrounded by dead space reads as unfinished, not designed. Hard floors:
+- Every list/grid cell (destination, feature, service) carries at least: a title, a one-line descriptor, AND a 1-2 sentence description or a meta row. Never title-only cells.
+- Every section has a designed ARTIFACT beyond plain text: numbered rows with real descriptions, oversized stat tiles, a marquee strip, an oversized outlined display word, a big pull-quote with a giant quotation mark, a bordered card set, or an inline SVG diagram/mark. Pick per section, never zero.
+- Distribute weight across the viewport: if the left half holds a huge heading, the right half carries content (rows, cards, copy), not emptiness. Deliberate negative space is one zone per section, not the whole section.
+
+### Cool-factor menu (pick at least 3 per page, spread across different sections)
+- An oversized OUTLINED display word (color: transparent; WebkitTextStroke: 1px accent or 1px currentColor) beside or behind a filled headline.
+- One accent-colored or italic word inside a key headline (same font family).
+- Bordered cards (1px border, transparent fill, hover: border-accent + -translate-y-1). Glass/blur fills are allowed ONLY on solid-background sections (hero-only mode below the hero, or standard mode) — NEVER over the video, where all panels stay border-only and transparent.
+- A full-width marquee strip of related words (max one per page).
+- A sticky split section: heading pinned (sticky top-24) while rows scroll past it.
+- Oversized numerals (text-7xl+, accent, font-mono or tracking-tighter) as visual anchors in numbered content.
+- A giant decorative quotation mark (text-[8rem]+, accent, 20% opacity) behind a testimonial.
+- Per-word or per-character staggered headline reveal on the hero (Framer Motion variants).
+- Two display type scales in tension on one screen (e.g. clamp 7rem headline + small uppercase tracked meta column).
 
 ### Motion
 - Every animation must be justifiable in one sentence: hierarchy, storytelling, feedback, or state change. "It looks cool" is not a reason. Informational sections can stay still.
@@ -91,6 +108,7 @@ Taste rules for the brief (anti-generic; bake these into your choices):
 - FONTS (Google Fonts only): default to a distinctive sans display, rotating between projects: Space Grotesk, Manrope, Outfit, Sora, Archivo, Bricolage Grotesque, Schibsted Grotesk, Familjen Grotesk, Instrument Sans, Geist, Syne, Inter Tight. Serif ONLY for genuinely editorial/luxury briefs (then: Playfair Display, EB Garamond, Cormorant Garamond, Newsreader, Spectral) and NEVER Fraunces or Instrument Serif. Inter only for deliberately neutral briefs.
 - ACCENT: exactly one accent color, saturation under ~80%, used consistently everywhere. No AI-purple defaults. For premium/luxury/artisan/wellness briefs the beige+brass+espresso palette is banned; rotate: cold silver+chrome, deep green+bone+amber, off-black+warm tan, cobalt+cream, terracotta+slate, monochrome+one bright pop.
 - SECTIONS: give each section a DIFFERENT layout family in its layout notes (e.g. asymmetric split, numbered full-width rows, oversized statement, offset 3-col grid, minimal footer). Never two sections with the same shape. Max 4 text elements in the hero; hero subtext ≤ 20 words.
+- CONTENT RICHNESS: every list/grid section's content_outline must name 3+ concrete items, EACH with a title plus a one-line description (e.g. "Patagonia: wind-carved granite, 9-day traverses with local gauchos"). Title-only or coordinate-only cells make the site feel empty. Testimonial quotes get a real person's name + role, never a place name.
 - COPY: headlines ≤ 8 words, concrete verbs only (never "Elevate", "Seamless", "Unleash", "Next-Gen", "Revolutionize"), realistic specific names (never "Acme"/"John Doe"), no invented fake-precise statistics, and ZERO em-dashes (—/–) in any copy you write: use commas, periods, or colons.
 - Content is image-free by platform rule: never describe photos, screenshots, avatars, or logo images in content outlines; use typography, numbers, lists, and inline SVG marks instead.
 `;
@@ -102,4 +120,5 @@ export const TASTE_CHECKLIST = `
 - Every CTA: readable contrast, ≤3 words, no wrapping, one label per intent across the page
 - Hero: ≤4 text elements, headline ≤2 lines, subtext ≤20 words, CTA visible without scrolling
 - No two sections share the same layout family; max 2 consecutive split-layout sections
+- Every list/grid cell has title + descriptor + description (no 3-word cells); every section has one designed artifact; ≥3 cool-factor moves used across the page
 - No filler-verb copy, no "Acme"/"John Doe" names, no fake-precise numbers, no div-built fake screenshots`;

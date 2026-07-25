@@ -9,7 +9,8 @@ import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
-import { Storage } from "@google-cloud/storage";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
 
 
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
@@ -975,13 +976,26 @@ fixPaths(process.argv[2]);
 
     console.log('DEBUG: Build successful:', isBuildSuccessful);
 
-    const deploymentUrl = await step.run("deploy-to-gcp", async () => {
+    const deploymentUrl = await step.run("deploy-to-r2", async () => {
       if (!isBuildSuccessful) {
-        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting GCP deployment.");
+        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting deployment.");
         return null;
       }
 
-      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for GCS deployment...");
+      if (!isR2Configured()) {
+        console.error("DEBUG: R2 is not configured (missing R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_PUBLIC_URL). Skipping deployment.");
+        return null;
+      }
+
+      if (r2PublicUrlLooksLikeApiEndpoint()) {
+        console.error(
+          "DEBUG: R2_PUBLIC_URL points at the S3 API endpoint (*.r2.cloudflarestorage.com), which is NOT publicly browsable — it needs SigV4 auth and returns 'InvalidArgument / Authorization' in a browser. " +
+          "Set R2_PUBLIC_URL to the bucket's PUBLIC url instead: enable the bucket's r2.dev Public Development URL (https://pub-xxxx.r2.dev) or bind a custom domain. Skipping deployment (the sandbox preview URL still works)."
+        );
+        return null;
+      }
+
+      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for R2 deployment...");
       const sandbox = await getSandbox(sandboxId);
 
       // Step 1: Write the extraction script as a file to the sandbox (avoids all quote/escape mangling)
@@ -1017,26 +1031,11 @@ fixPaths(process.argv[2]);
       }
 
       const files = JSON.parse(cmdResult.stdout);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const storage = new Storage(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-          }
-          : {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          }
-      );
-
-      const bucket = storage.bucket(bucketName);
+      const r2 = getR2Client();
       const sitePrefix = `sites/${event.data.projectId}/`;
 
-      // Step 2: Upload text/code assets to GCS in batches
-      console.log(`DEBUG: Pushing ${Object.keys(files).length} text assets to GCS...`);
+      // Step 2: Upload text/code assets to R2 in batches (S3 PutObject)
+      console.log(`DEBUG: Pushing ${Object.keys(files).length} assets to R2 bucket "${R2_BUCKET_NAME}"...`);
       const entries = Object.entries(files);
       const chunkSize = 25;
 
@@ -1044,32 +1043,18 @@ fixPaths(process.argv[2]);
         const chunk = entries.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
-          let contentType = "application/octet-stream";
-          const lowerPath = relativePath.toLowerCase();
-          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
-          else if (lowerPath.endsWith(".css")) contentType = "text/css";
-          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (lowerPath.endsWith(".json")) contentType = "application/json";
-          else if (lowerPath.endsWith(".png")) contentType = "image/png";
-          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
-          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
-          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
-          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
-          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
-          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
-          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
-          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
-          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
+          await r2.send(new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: `${sitePrefix}${relativePath}`,
+            Body: buffer,
+            ContentType: contentTypeFor(relativePath),
+            CacheControl: "no-cache, max-age=0",
+          }));
         }));
       }
 
-
-
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      const finalUrl = `${cdnBase}/${sitePrefix}index.html`;
-      console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
+      const finalUrl = `${r2PublicBase()}/${sitePrefix}index.html`;
+      console.log(`DEBUG: R2 deployment complete: ${finalUrl}`);
       return finalUrl;
     });
 

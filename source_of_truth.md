@@ -114,6 +114,7 @@ If brief compilation fails, the code agent receives the raw request + skeleton a
 - **Fixer**: up to 5 attempts (`x-ai/grok-4.5`); attempt ≥3 triggers the "delete the broken code" nuclear option. Fixer attempts are NEVER charged to the user.
 - **Failure honesty**: if the build can't be repaired, the user gets an explicit failure message (no deployment link, no cheery "here's what I built").
 - **Protection**: in FULL_PAGE mode, `src/components/ScrollFrames.tsx` is write-blocked and App.tsx writes are rejected if `<ScrollFrames />` is missing or commented out.
+- **Deployment**: the built `dist/` is uploaded to **Cloudflare R2** (S3-compatible) via `src/lib/r2.ts` in the `deploy-to-r2` step. The public site URL is `${R2_PUBLIC_URL}/sites/<projectId>/index.html`. Needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` (see `env.example`); if unset, deployment is skipped and the site is still viewable via the E2B sandbox URL. Generated **images and videos** still upload to GCS (unchanged).
 
 ---
 

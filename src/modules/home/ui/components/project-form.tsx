@@ -49,6 +49,10 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  // Stays true from submit through navigation so the button can't fire twice
+  // (createProject.isPending briefly drops between success and the route change,
+  // and the image branch defers the mutation inside a FileReader callback).
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -155,6 +159,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
         router.push(url);
       },
       onError: (error) => {
+        setIsRedirecting(false); // failed — let the user try again
         if (error.data?.code === "UNAUTHORIZED") {
           clerk.openSignIn();
           return;
@@ -170,6 +175,8 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
   );
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (createProject.isPending || isRedirecting) return; // guard against double-submit
+
     if (window.innerWidth < 768) {
       setShowSignInModal(true);
       return;
@@ -179,6 +186,8 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
       setShowSignInModal(true);
       return;
     }
+
+    setIsRedirecting(true); // lock the button immediately, before any async work
 
     // Persist the selected model so the dashboard uses it
     const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.1-flash-lite";
@@ -214,7 +223,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
     }
   };
 
-  const isPending = createProject.isPending;
+  const isPending = createProject.isPending || isRedirecting;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
 
   return (

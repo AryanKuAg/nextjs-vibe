@@ -105,29 +105,49 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
-      if (pendingPrompt && !form.getValues().value && !isFollowUp) {
-        form.setValue("value", pendingPrompt, { shouldValidate: true });
-        sessionStorage.removeItem("pending_builder_prompt");
-        // Auto-submit the prompt that was carried over from the dashboard
-        setTimeout(() => {
-          form.handleSubmit(onSubmit)();
-        }, 100);
-      } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
-        form.setValue("value", initialPrompt, { shouldValidate: true });
-      }
+    if (typeof window === "undefined") return;
 
-      const pendingImage = sessionStorage.getItem("pending_image_base64");
-      if (pendingImage) {
-        setUploadedDataUrl(pendingImage);
-        sessionStorage.removeItem("pending_image_base64");
-        sessionStorage.removeItem("pending_image_name");
-        sessionStorage.removeItem("pending_image_type");
-      }
+    const pendingImage = sessionStorage.getItem("pending_image_base64");
+    if (pendingImage) {
+      setUploadedDataUrl(pendingImage);
+      sessionStorage.removeItem("pending_image_base64");
+      sessionStorage.removeItem("pending_image_name");
+      sessionStorage.removeItem("pending_image_type");
+    }
+
+    const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
+    if (pendingPrompt && !isFollowUp) {
+      // Consume immediately so a StrictMode double-mount can't fire twice.
+      sessionStorage.removeItem("pending_builder_prompt");
+
+      // Optimistically show the user's message right now — no textarea
+      // populate flash, no waiting for the server round-trip. The mutation's
+      // onSuccess invalidation reconciles this with the real message.
+      const queryKey = trpc.messages.getMany.queryOptions({ projectId, stage }).queryKey;
+      queryClient.setQueryData(queryKey, (old) => {
+        const optimistic = {
+          id: `optimistic-${Date.now()}`,
+          content: pendingPrompt,
+          role: "USER",
+          type: "RESULT",
+          stage,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          projectId,
+          fragment: null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return Array.isArray(old) ? [...(old as any[]), optimistic] : [optimistic];
+      });
+
+      // Fire the generation directly — no visible form population, no delay.
+      startAutonomousGeneration.mutate({ prompt: pendingPrompt, projectId, model: selectedModel });
+    } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
+      form.setValue("value", initialPrompt, { shouldValidate: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPrompt, form, isFollowUp]);
+  }, []);
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
     onSuccess: () => {

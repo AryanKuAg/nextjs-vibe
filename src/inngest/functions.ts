@@ -1198,7 +1198,7 @@ export const veoGenerateFunction = inngest.createFunction(
     ]
   },
   async ({ event, step }) => {
-    const { projectId, prompt, model, userId } = event.data;
+    const { projectId, prompt, model, userId, refinePrompt, imagePrompt } = event.data;
     const cost = MODEL_COSTS[model as string] || 25;
 
     try {
@@ -1208,6 +1208,42 @@ export const veoGenerateFunction = inngest.createFunction(
           data: { currentStage: "GENERATING_VIDEO" }
         });
       });
+
+      // Opt-in only: refine when the agent invented the prompt ("Let AI Create" /
+      // "Build it for me"). A prompt the user typed themselves is never rewritten.
+      // Without this the raw website request reaches the video model with no camera
+      // direction, and it fills the gap with cuts and cross-fades.
+      const videoPrompt: string = !refinePrompt
+        ? prompt
+        : await step.run("refine-video-prompt", async () => {
+          try {
+            const { ChatOpenAI } = await import("@langchain/openai");
+            const { HumanMessage, SystemMessage } = await import("@langchain/core/messages");
+            const { VIDEO_PROMPT_SYSTEM, VIDEO_PROMPT_SUFFIX, buildVideoRefinerInput } =
+              await import("@/lib/media-prompts");
+
+            const routerModel = new ChatOpenAI({
+              modelName: "google/gemini-3.1-flash-lite",
+              apiKey: process.env.OPENROUTER_API_KEY!,
+              configuration: { baseURL: "https://openrouter.ai/api/v1" },
+            });
+
+            const response = await routerModel.invoke([
+              new SystemMessage(VIDEO_PROMPT_SYSTEM),
+              new HumanMessage(buildVideoRefinerInput(prompt, imagePrompt)),
+            ]);
+
+            const refined = (response.content as string).trim();
+            if (!refined) return `${prompt}. ${VIDEO_PROMPT_SUFFIX}`;
+            return `${refined} ${VIDEO_PROMPT_SUFFIX}`;
+          } catch (err) {
+            // Never fail the render over prompt polish — fall back to the raw
+            // prompt plus the hard no-transition constraints.
+            console.error("[Video] Prompt refinement failed, using fallback:", err);
+            const { VIDEO_PROMPT_SUFFIX } = await import("@/lib/media-prompts");
+            return `${prompt}. ${VIDEO_PROMPT_SUFFIX}`;
+          }
+        });
 
       const videoUri = await step.run("generate-video", async () => {
         let base64VideoData: string | null = null;
@@ -1221,7 +1257,7 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
 
-          const input: Record<string, unknown> = { prompt };
+          const input: Record<string, unknown> = { prompt: videoPrompt };
 
           if (targetModel === "prunaai/p-video") {
             input.fps = 24;
@@ -1361,7 +1397,7 @@ export const veoGenerateFunction = inngest.createFunction(
             },
             body: JSON.stringify({
               model: actualModel,
-              prompt: prompt,
+              prompt: videoPrompt,
               audio: false,
               generate_audio: false, // Added as fallback for different providers
               ...(frame_images.length > 0 ? { frame_images } : {})

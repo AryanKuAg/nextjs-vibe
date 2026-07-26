@@ -5,6 +5,7 @@ import Replicate from "replicate";
 import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { IMAGE_PROMPT_SYSTEM } from "@/lib/media-prompts";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
@@ -39,14 +40,12 @@ export const generateFramesFunction = inngest.createFunction(
         },
       });
 
-      const sysMsg = new SystemMessage(
-        "You are an expert image prompt engineer. The user will provide a prompt for building a website. " +
-        "Your job is to extract the visual elements of the request and write a highly descriptive, visually-focused prompt specifically for generating a cinematic scene or hero image. " +
-        "Focus on lighting, subject, style, color palette, and atmosphere. Do NOT include text, UI elements, buttons, or website layouts in the image prompt."
-      );
+      // The image is frame one of an FPV drone shot — IMAGE_PROMPT_SYSTEM composes
+      // for that flight (depth layers, an opening to fly through, deep focus).
+      const sysMsg = new SystemMessage(IMAGE_PROMPT_SYSTEM);
 
       const response = await routerModel.invoke([sysMsg, new HumanMessage(prompt)]);
-      return response.content as string;
+      return (response.content as string).trim();
     });
 
     const frameUrl = await step.run("generate-image", async () => {
@@ -118,7 +117,9 @@ export const generateFramesFunction = inngest.createFunction(
       await consumeCredits(cost, userId);
     });
 
-    return { frameUrl };
+    // refinedPrompt is returned so the video agent can describe motion through
+    // this exact scene instead of guessing from the raw website request.
+    return { frameUrl, refinedPrompt };
   }
 );
 

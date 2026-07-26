@@ -42,6 +42,12 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => "",
   }),
+  // The refined image prompt that actually produced frame one. The video agent
+  // anchors its camera move on this so the motion matches the real scene.
+  image_prompt: Annotation<string>({
+    reducer: (x, y) => y ?? x,
+    default: () => "",
+  }),
   start_frame_url: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
@@ -362,7 +368,8 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
     return { next_agent: "frame_generation", current_prompt: payload, isDirectPrompt: true, interactiveMessageId: message.id };
   }
 
-  return { next_agent: "frame_generation", interactiveMessageId: message.id };
+  // "Let AI Create" (or timeout): the agent authors the prompt.
+  return { next_agent: "frame_generation", isDirectPrompt: false, interactiveMessageId: message.id };
 };
 
 const askVideoIntentNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -408,7 +415,10 @@ const askVideoIntentNode = async (state: typeof AgentState.State, config: Runnab
     return { next_agent: "video_generation", current_prompt: payload, isDirectPrompt: true, interactiveMessageId: message.id };
   }
 
-  return { next_agent: "video_generation", interactiveMessageId: message.id };
+  // "Let AI Create" (or timeout). isDirectPrompt is sticky across the graph, so it
+  // must be cleared here — otherwise a user-written IMAGE prompt would be reused
+  // verbatim as the video prompt and skip the FPV camera direction entirely.
+  return { next_agent: "video_generation", isDirectPrompt: false, interactiveMessageId: message.id };
 };
 
 
@@ -423,6 +433,7 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
   });
 
   let frameUrl = "";
+  let imagePrompt = "";
   if (process.env.NODE_ENV === "development") {
     await step.sleep(`dev-delay-${currentIteration}`, "4s");
     frameUrl = "https://assets.framerate.space/Hero%20BG%20IMG.png";
@@ -440,6 +451,7 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
       }
     });
     frameUrl = result.frameUrl;
+    imagePrompt = result.refinedPrompt || "";
   }
 
   if (!state.isAgentMode) {
@@ -481,7 +493,9 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
     if (userResponse) {
       const { action, payload } = userResponse.data;
       if (action === "REGENERATE" || action === "AI_CREATE") {
-        return { next_agent: "frame_generation", iteration: currentIteration + 1 };
+        // "Let AI Recreate" hands authorship back to the agent — clear the flag so
+        // the refiner runs again instead of replaying the user's earlier prompt.
+        return { next_agent: "frame_generation", iteration: currentIteration + 1, isDirectPrompt: false };
       }
       if (action === "WRITE_PROMPT") {
         return {
@@ -497,16 +511,18 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
       }
       if (action === "ANIMATE_VIDEO") {
         if (!state.isAgentMode) {
-          return { next_agent: "ask_video_intent", start_frame_url: frameUrl, media_prompt: state.current_prompt };
+          return { next_agent: "ask_video_intent", start_frame_url: frameUrl, media_prompt: state.current_prompt, image_prompt: imagePrompt };
         }
-        return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt };
+        // Agent mode: the user never authors the video prompt, so the video agent
+        // must invent it rather than inherit the image prompt.
+        return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt, image_prompt: imagePrompt, isDirectPrompt: false };
       }
     }
   }
 
   // Agent mode: auto-proceed to video generation with the generated frame
   console.log("[Frame Generation] Agent mode — auto-proceeding to video generation.");
-  return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt };
+  return { next_agent: "video_generation", start_frame_url: frameUrl, media_prompt: state.current_prompt, image_prompt: imagePrompt, isDirectPrompt: false };
 };
 
 const videoGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -529,7 +545,11 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
       function: veoGenerateFunction,
       data: {
         projectId: state.projectId,
-        prompt: state.current_prompt,
+        // When the user wrote the prompt we send it verbatim; otherwise the video
+        // agent turns the site request into an FPV camera move through frame one.
+        prompt: state.isDirectPrompt ? state.current_prompt : (state.site_prompt || state.current_prompt),
+        refinePrompt: !state.isDirectPrompt,
+        imagePrompt: state.image_prompt || undefined,
         model: "bytedance/seedance-1.5-pro",
         imageUrl: state.start_frame_url || undefined,
         endImageUrl: state.end_frame_url || undefined,
@@ -578,7 +598,7 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
     if (userResponse) {
       const { action, payload } = userResponse.data;
       if (action === "REGENERATE" || action === "AI_CREATE") {
-        return { next_agent: "video_generation", iteration: currentIteration + 1 };
+        return { next_agent: "video_generation", iteration: currentIteration + 1, isDirectPrompt: false };
       }
       if (action === "WRITE_PROMPT") {
         return {

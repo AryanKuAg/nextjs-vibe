@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
       return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`,
       metadata: {
         userId,
-        plan
+        plan,
+        billing: billing === "yearly" ? "yearly" : "monthly"
       }
     });
 

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -247,10 +247,8 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Follow-up prompts cost varies by model.
-      // First-time generation costs 80 credits.
-      const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
-      await checkCredits(cost);
+      // Code generation is charged per user message, not per agent run.
+      await checkCredits(AGENT_COSTS.CODE);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -261,6 +259,8 @@ export const projectsRouter = createTRPCRouter({
           stage: "SITE",
         },
       });
+
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
 
       await inngest.send({
         name: "code-agent/run",
@@ -301,8 +301,25 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Base initialization cost for autonomous mode
-      await checkCredits(10); 
+      // A project that already produced a fragment has a live site — anything after
+      // that is a follow-up edit, which skips the wizard instead of rebuilding.
+      const existingFragment = await prisma.fragment.findFirst({
+        where: { message: { projectId: input.projectId } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      const isFollowUp = Boolean(existingFragment);
+
+      // The original site request, so media agents regenerating a background still
+      // know what the site is about even when the follow-up message is just
+      // "make another video".
+      const firstUserMessage = await prisma.message.findFirst({
+        where: { projectId: input.projectId, role: "USER" },
+        orderBy: { createdAt: "asc" },
+        select: { content: true },
+      });
+
+      await checkCredits(AGENT_COSTS.CODE);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -314,23 +331,32 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
+      // Charged once per user message. The code agent may run several times for this
+      // message (template pass, lenient rebuild, retries) and must not charge again.
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
       await inngest.send({
         name: "autonomous-agent/run",
         data: {
           prompt: input.prompt,
+          sitePrompt: firstUserMessage?.content || input.prompt,
           projectId: input.projectId,
           model: input.model,
           userId: ctx.auth.userId,
           isAgentMode: input.isAgentMode,
+          isFollowUp,
         },
       });
 
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          currentStage: "SCENE",
-        },
-      });
+      // Only a fresh build walks the SCENE -> VIDEO -> SITE pipeline. Resetting the
+      // stage on a follow-up would throw the UI back to the scene step and hide the
+      // site the user is asking us to edit.
+      if (!isFollowUp) {
+        await prisma.project.update({
+          where: { id: input.projectId },
+          data: { currentStage: "SCENE" },
+        });
+      }
 
       return createdMessage;
     }),

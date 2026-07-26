@@ -32,7 +32,8 @@ Before writing code, silently form one line: "Reading this as: <site kind> for <
 - ONE accent color, locked page-wide: the same accent in the hero is the accent in the footer. A second accent appearing in section 4 is a failure. Saturation under ~80%.
 - THE LILA RULE: no AI-purple/violet glows, no purple-pink or blue-purple gradients, no neon outer glows, no gradient text on large headlines — unless the user explicitly asked for purple.
 - PREMIUM-CONSUMER PALETTE BAN: for luxury/wellness/artisan/craft briefs, the default beige+cream background with brass/clay/oxblood accents and espresso text is BANNED (it is the #1 AI tell). Rotate real alternatives instead: cold silver+chrome+smoke; deep green+bone+amber; off-black+warm tan; cobalt+cream; terracotta+slate; pure monochrome+one bright pop.
-- No pure #000000 or #ffffff — use off-black (zinc-950-like) and off-white. Tint shadows toward the background hue; never pure-black drop shadows.
+- No pure #000000 or #ffffff — use off-black (zinc-950-like) and off-white.
+- NO SHADOWS ANYWHERE (absolute): no text-shadow, no box-shadow, no drop-shadow, no glow, on any element — not on text, buttons, cards, navbars or panels. No shadow-*, drop-shadow-* or [text-shadow:...] utilities. Shadows read as cheap and dated. Separation comes from typography scale, weight, 1px borders, whitespace and the accent color.
 - ONE THEME per page. Sections never flip from dark to light mid-scroll (in full-page video mode the "theme" is the overlay treatment — keep it consistent in every section).
 
 ### Layout
@@ -48,7 +49,7 @@ Before writing code, silently form one line: "Reading this as: <site kind> for <
 - Grid over flex-math: grid grid-cols-1 md:grid-cols-3 gap-6, never w-[calc(33%-1rem)]. Every multi-column layout declares its <768px collapse explicitly.
 
 ### Buttons, CTAs, forms
-- Every CTA passes contrast (WCAG AA): no white-on-white. A CTA over the video is either a solid accent-color fill or a bordered/text button with text-shadow — never relies on a scrim.
+- Every CTA passes contrast (WCAG AA): no white-on-white. A CTA over the video is either a solid accent-color fill or a bordered/text button — flat, with no shadow, and never relying on a scrim.
 - CTA labels: max 3 words, never wrapping to 2 lines at desktop.
 - ONE LABEL PER INTENT: "Get in touch" / "Contact us" / "Let's talk" are the same intent — pick one label and reuse it everywhere (nav, hero, footer).
 - Tactile feedback: active:scale-[0.98] or a 1px press on buttons.

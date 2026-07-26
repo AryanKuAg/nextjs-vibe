@@ -2,10 +2,10 @@ import { inngest } from "./client";
 import { prisma } from "@/lib/db";
 import { Storage } from "@google-cloud/storage";
 import Replicate from "replicate";
-import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { IMAGE_PROMPT_SYSTEM } from "@/lib/media-prompts";
+import { getImageSystemPrompt, stripMachineWords } from "@/lib/media-prompts";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
@@ -20,7 +20,7 @@ export const generateFramesFunction = inngest.createFunction(
     ]
   },
   async ({ event, step }) => {
-    const { projectId, prompt, model, userId, isDirectPrompt } = event.data;
+    const { projectId, prompt, userId, isDirectPrompt, experiencePref } = event.data;
 
     await step.run("update-stage", async () => {
       // While the image is being generated the stage must read GENERATING_SCENE —
@@ -29,7 +29,8 @@ export const generateFramesFunction = inngest.createFunction(
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_SCENE" } });
     });
 
-    const cost = MODEL_COSTS[model as string] ?? 10;
+    // Charged per image-agent run — a regenerate is a new run the user asked for.
+    const cost = AGENT_COSTS.IMAGE;
 
     const refinedPrompt = isDirectPrompt ? prompt : await step.run("refine-prompt", async () => {
       const routerModel = new ChatOpenAI({
@@ -40,12 +41,14 @@ export const generateFramesFunction = inngest.createFunction(
         },
       });
 
-      // The image is frame one of an FPV drone shot — IMAGE_PROMPT_SYSTEM composes
-      // for that flight (depth layers, an opening to fly through, deep focus).
-      const sysMsg = new SystemMessage(IMAGE_PROMPT_SYSTEM);
+      // The image is frame one of the background video, so it is composed for the
+      // move that follows: HERO_ONLY loops in place (calm plate + ambient motion),
+      // FULL_PAGE is flown through (depth layers, an opening, deep focus).
+      const sysMsg = new SystemMessage(getImageSystemPrompt(experiencePref));
 
       const response = await routerModel.invoke([sysMsg, new HumanMessage(prompt)]);
-      return (response.content as string).trim();
+      // A named machine gets drawn — strip it before the image model ever sees it.
+      return stripMachineWords((response.content as string).trim());
     });
 
     const frameUrl = await step.run("generate-image", async () => {

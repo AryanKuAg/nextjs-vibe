@@ -8,7 +8,7 @@ export const PLAN_CREDITS: Record<string, number> = {
   max: 1500,
 };
 
-export { MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/pricing";
+export { MODEL_COSTS, FOLLOW_UP_COSTS, AGENT_COSTS } from "@/lib/pricing";
 
 
 /**

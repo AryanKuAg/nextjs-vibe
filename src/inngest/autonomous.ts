@@ -68,7 +68,7 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template" | "sanitize_prompt">({
+  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template" | "sanitize_prompt" | "followup_router">({
     reducer: (x, y) => y ?? x,
     default: () => "finish",
   }),
@@ -89,6 +89,19 @@ export const AgentState = Annotation.Root({
     default: () => false,
   }),
   isDirectPrompt: Annotation<boolean>({
+    reducer: (x, y) => y ?? x,
+    default: () => false,
+  }),
+  // True when the project already has a built site. Follow-ups skip the wizard
+  // entirely and never ask the user a question — they just apply the change.
+  isFollowUp: Annotation<boolean>({
+    reducer: (x, y) => y ?? x,
+    default: () => false,
+  }),
+  // True when a follow-up only swaps the background media. The code agent then
+  // gets a locked-down "rewire the video, change nothing else" instruction — the
+  // media prompt must NEVER reach it as a site brief or it redesigns the page.
+  media_only_update: Annotation<boolean>({
     reducer: (x, y) => y ?? x,
     default: () => false,
   }),
@@ -447,7 +460,8 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         startFrameUrl: state.start_frame_url || undefined,
         userId: state.userId,
         isAgentMode: state.isAgentMode,
-        isDirectPrompt: state.isDirectPrompt
+        isDirectPrompt: state.isDirectPrompt,
+        experiencePref: state.experiencePref || undefined
       }
     });
     frameUrl = result.frameUrl;
@@ -546,10 +560,16 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
       data: {
         projectId: state.projectId,
         // When the user wrote the prompt we send it verbatim; otherwise the video
-        // agent turns the site request into an FPV camera move through frame one.
-        prompt: state.isDirectPrompt ? state.current_prompt : (state.site_prompt || state.current_prompt),
+        // agent authors the move for this mode — a held, loopable hero shot for
+        // HERO_ONLY, an FPV flight through frame one for FULL_PAGE.
+        // On a media follow-up current_prompt IS the user's new background request,
+        // so it wins over the original site prompt (which describes the old scene).
+        prompt: (state.isDirectPrompt || state.media_only_update)
+          ? state.current_prompt
+          : (state.site_prompt || state.current_prompt),
         refinePrompt: !state.isDirectPrompt,
         imagePrompt: state.image_prompt || undefined,
+        experiencePref: state.experiencePref || undefined,
         model: "bytedance/seedance-1.5-pro",
         imageUrl: state.start_frame_url || undefined,
         endImageUrl: state.end_frame_url || undefined,
@@ -619,6 +639,13 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
 
     console.log("[Video Generation] Did not receive USE_VIDEO approval. Finishing graph.");
     return { next_agent: "finish" };
+  }
+
+  // On a follow-up the site already exists and the user only asked for new media —
+  // re-running select_template would recompile the brief and redesign the whole
+  // page. Go straight to the code agent so it rewires the new video in place.
+  if (state.isFollowUp) {
+    return { next_agent: "code_generation", video_url: videoUrl };
   }
 
   return { next_agent: "select_template", video_url: videoUrl };
@@ -768,10 +795,11 @@ const renderReadabilityBlock = (
 
   return `Background video & readability (derived from the actual generated video — follow exactly):
 ${sceneLine}
-- ZERO OVERLAYS (absolute, non-negotiable): NEVER place any tint, scrim, veil, gradient, or blurred panel between the video and the content — no fixed inset-0 dark/light div, no bg-black/xx or bg-white/xx over the video, no backdrop-blur on anything sitting over the video (nav, cards, footer included). Overlays and blur hide the video and look cheap. Readability comes ONLY from text color + text-shadow below.
-- Base text color over the video: ${darkText ? "near-black (text-zinc-900; secondary text-zinc-800)" : "white / off-white (text-white; secondary text-white/80)"} — applies to ALL text and UI that sits over the video. The scene analysis picked this so plain text stays legible with no overlay.
-- Every headline, paragraph, label, and link sitting over the video carries a text-shadow (this is on the glyphs only, it does NOT cover the video): ${darkText ? "[text-shadow:0_1px_12px_rgba(255,255,255,0.75)] for display type, [text-shadow:0_1px_6px_rgba(255,255,255,0.7)] for body/labels" : "[text-shadow:0_2px_18px_rgba(0,0,0,0.6)] for display type, [text-shadow:0_1px_8px_rgba(0,0,0,0.55)] for body/labels"}. This is what makes text pop against a busy video — use it everywhere over the video, not just headlines.
-- Navbar: transparent background, NO glass, NO blur, NO pill fill. Just ${darkText ? "near-black" : "white"} text links with the body text-shadow above. The primary CTA may use a SOLID accent-color fill (it is a small button, not an overlay) with contrasting label text.
+- ZERO OVERLAYS (absolute, non-negotiable): NEVER place any tint, scrim, veil, gradient, or blurred panel between the video and the content — no fixed inset-0 dark/light div, no bg-black/xx or bg-white/xx over the video, no backdrop-blur on anything sitting over the video (nav, cards, footer included). Overlays and blur hide the video and look cheap.
+- ZERO SHADOWS (absolute, non-negotiable): NO text-shadow, NO drop-shadow, NO box-shadow, NO glow — anywhere on the site, on any element, over the video or not. Never use shadow-*, drop-shadow-*, or any [text-shadow:...] arbitrary value. Shadows look cheap and dated. Readability comes from text COLOR and WEIGHT alone, exactly as specified below.
+- Base text color over the video: ${darkText ? "near-black (text-zinc-900; secondary text-zinc-800)" : "white / off-white (text-white; secondary text-white/85)"} — applies to ALL text and UI that sits over the video. The scene analysis picked this so plain text stays legible with no overlay and no shadow.
+- Because there is nothing to lean on but contrast, type must carry itself: display headlines are heavy (font-bold/font-black) and large; body copy over the video stays at a comfortable size with medium weight (never thin/light, never a faint tint like text-white/50). Keep text over the calmest region of the frame.
+- Navbar: transparent background, NO glass, NO blur, NO pill fill, NO shadow. Just ${darkText ? "near-black" : "white"} text links at medium weight. The primary CTA may use a SOLID accent-color fill (it is a small button, not an overlay) with contrasting label text — a flat fill with no shadow.
 - Accent color usage over the video: solid accent fills are fine on small elements (buttons, tiny chips, number labels, 1px rules). Never a large translucent accent panel.
 - Page fallback background (behind the video, shows only during load — never an overlay): add \`body { background-color: ${darkText ? "#f2f2f0" : "#0b0b0c"}; }\` in src/index.css. This is the only background allowed on body; no background on #root or any section wrapper.
 - The accent color was chosen to harmonize with the scene's palette while staying clearly visible against it — use it exactly as specified, do not substitute.`;
@@ -857,7 +885,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   const sceneAnalysis: SceneAnalysis | null = await step.run("analyze-scene", async () => {
     const sysMsg = new SystemMessage(
       "You analyze the background scene of a website (a video generated from the given frame/prompt). " +
-      "The site places text directly over this video with NO overlay, tint, or scrim of any kind — readability comes only from choosing the right text color plus a text-shadow. " +
+      "The site places text directly over this video with NO overlay, tint, or scrim of any kind, and NO text-shadow or glow — readability comes ONLY from choosing the right text color, so this choice is critical. " +
       "Report its brightness, dominant colors, and mood, then pick the text color that stays legible over the busiest part of the scene:\n" +
       "- Dark / mostly-dark scene → light-text (white)\n" +
       "- Bright / mostly-light scene → dark-text (near-black)\n" +
@@ -905,7 +933,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       `- Scene: ${sceneAnalysis.description}\n` +
       `- Brightness: ${sceneAnalysis.brightness}; dominant colors: ${sceneAnalysis.dominant_colors.join(", ")}\n` +
       `- Recommended accent: ${sceneAnalysis.accent_suggestion} (use this or a close refinement — the accent must harmonize with these scene colors while staying clearly visible against them)\n` +
-      `- text_scheme MUST be "${sceneAnalysis.text_scheme}". There are NO overlays/scrims/blur on the site — text sits directly over the video and stays readable via this text color plus a text-shadow.\n` +
+      `- text_scheme MUST be "${sceneAnalysis.text_scheme}". There are NO overlays/scrims/blur and NO shadows anywhere on the site — text sits directly over the video and stays readable via this text color and heavy type alone.\n` +
       "- Pick heading/body fonts whose personality matches this scene's mood.\n" +
       "- Do NOT invent or embellish scene visuals beyond this analysis — if it says the scene could not be analyzed, design for an unknown mixed-brightness video and never describe imaginary scenery in the brief."
       : "\n\nNo scene analysis available: set text_scheme to \"light-text\" (a safe default for an unknown video). Still NO overlays or blur anywhere.";
@@ -956,11 +984,23 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
     await prisma.project.update({ where: { id: state.projectId }, data: { currentStage: "BUILDING_SITE" } });
   });
 
+  // On a media-only follow-up the user asked for a new background, NOT a new site.
+  // current_prompt holds the media description at this point, so passing it through
+  // would make the code agent redesign the page around it. Send an explicit
+  // swap-only instruction instead.
+  const codeInstruction = state.media_only_update
+    ? "MEDIA-ONLY UPDATE. The background video has been regenerated and its URL has changed. " +
+    "Update ONLY the background video source URL to the new one provided. " +
+    "Do NOT change anything else: keep every headline, paragraph, button label, section, " +
+    "font, color, accent and layout exactly as they are. This is a one-line source swap, " +
+    "not a redesign. Do not restyle the site to match the new video."
+    : state.current_prompt;
+
   await step.invoke("generate-code", {
     function: codeAgentFunction,
     data: {
       projectId: state.projectId,
-      value: state.current_prompt,
+      value: codeInstruction,
       videoUrl: state.video_url || undefined,
       experiencePref: state.experiencePref || undefined,
       model: "google/gemini-3.1-flash-lite",
@@ -969,6 +1009,142 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   return { next_agent: "finish" };
+};
+
+// Follow-up router — the entry point once a site already exists.
+//
+// Follow-ups must never re-run the wizard or ask the user anything: the user has
+// already answered those questions and just wants a change applied. This node
+// classifies what the change actually touches and jumps straight to that agent.
+const FollowUpIntentSchema = z.object({
+  target: z.enum(["MEDIA_SCENE", "MEDIA_MOTION", "CODE"]).describe(
+    "MEDIA_SCENE if the background should show DIFFERENT CONTENT — a new place, subject, mood or look " +
+    "(e.g. 'change the video to a coral reef', 'make the background a snowy mountain', 'make it darker and more menacing'). " +
+    "This regenerates the background image AND the video. " +
+    "MEDIA_MOTION only if the scene content stays exactly the same and just the movement or the take itself should change " +
+    "(e.g. 'make another one', 'regenerate the video', 'make the motion slower'). " +
+    "CODE for everything else — copy, colors, layout, sections, fonts, buttons, spacing, adding or removing content."
+  ),
+  media_prompt: z.string().describe(
+    "The user's description of what the new background should be, copied VERBATIM from their message with any " +
+    "instruction words removed (e.g. from 'change the video to australias coral reef (make it more devil)' return " +
+    "'australias coral reef, make it more devil'). Return an empty string if they described nothing."
+  ),
+});
+
+const followUpRouterNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  console.log("[Follow-up Router] Classifying follow-up request...");
+  const step = config.configurable?.step;
+
+  const intent = await step.run("classify-followup", async () => {
+    const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(FollowUpIntentSchema);
+    try {
+      return await model.invoke([
+        new SystemMessage(
+          "You route follow-up requests for an AI website builder. The user already has a finished site with an " +
+          "AI-generated background image and a background video generated FROM that image. Decide what their " +
+          "message is asking to change.\n\n" +
+          "KEY RULE: the video is generated from the background image, so the image decides what the video shows. " +
+          "If the user wants the background to show anything different at all, that is MEDIA_SCENE — the image must " +
+          "be regenerated first, otherwise the video cannot possibly change.\n\n" +
+          "Examples:\n" +
+          "- 'change the video to australias coral reef (make it more devil)' -> MEDIA_SCENE, media_prompt 'australias coral reef, make it more devil'\n" +
+          "- 'change the background scene to a snowy mountain' -> MEDIA_SCENE, media_prompt 'a snowy mountain'\n" +
+          "- 'make the background darker and moodier' -> MEDIA_SCENE, media_prompt 'darker and moodier'\n" +
+          "- 'I don't like the video, make another one' -> MEDIA_MOTION, media_prompt ''\n" +
+          "- 'regenerate the video' -> MEDIA_MOTION, media_prompt ''\n" +
+          "- 'change the button color to green' -> CODE, media_prompt ''\n" +
+          "- 'the headline should say Welcome Home' -> CODE, media_prompt ''\n" +
+          "- 'add a pricing section' -> CODE, media_prompt ''\n\n" +
+          "If the message is not about the background image or video at all, always choose CODE."
+        ),
+        new HumanMessage(state.current_prompt),
+      ]);
+    } catch (e) {
+      console.warn("[Follow-up Router] Classification failed, defaulting to CODE.", e);
+      return { target: "CODE" as const, media_prompt: "" };
+    }
+  });
+
+  console.log(`[Follow-up Router] target=${intent.target} hasPrompt=${Boolean(intent.media_prompt)}`);
+
+  // Carry the existing media forward so we only regenerate what was asked for.
+  const existing = await step.run("load-existing-media", async () => {
+    const project = await prisma.project.findUnique({
+      where: { id: state.projectId },
+      select: { sceneImageUrls: true, videoUrls: true },
+    });
+    const scenes = Array.isArray(project?.sceneImageUrls) ? project.sceneImageUrls : [];
+    const videos = Array.isArray(project?.videoUrls) ? project.videoUrls : [];
+    const lastScene = scenes[scenes.length - 1] as { url?: string } | undefined;
+    const lastVideo = videos[videos.length - 1] as { url?: string } | undefined;
+
+    // experiencePref lives only in graph state, so a follow-up starts without it
+    // and would fall back to FULL_PAGE — giving a hero site a flying video.
+    // Recover it from the built site the same way the code agent does: full-page
+    // sites carry ScrollFrames, hero sites have a video but no ScrollFrames.
+    let experiencePref: string | null = null;
+    const fragment = await prisma.fragment.findFirst({
+      where: { message: { projectId: state.projectId } },
+      orderBy: { createdAt: "desc" },
+      select: { files: true },
+    });
+    if (fragment?.files && typeof fragment.files === "object") {
+      const files = fragment.files as Record<string, string>;
+      experiencePref = files["src/components/ScrollFrames.tsx"] ? "FULL_PAGE" : "HERO_ONLY";
+    }
+
+    return {
+      frameUrl: lastScene?.url ?? null,
+      videoUrl: lastVideo?.url ?? null,
+      experiencePref,
+    };
+  });
+
+  console.log(`[Follow-up Router] experiencePref resolved to ${existing.experiencePref ?? "unknown"}`);
+
+  // A user-supplied media description is passed through verbatim; a bare
+  // "make another one" lets the media agents re-invent from the site request.
+  const userWroteMediaPrompt = Boolean(intent.media_prompt?.trim());
+  const mediaPrompt = userWroteMediaPrompt ? intent.media_prompt.trim() : state.site_prompt;
+
+  // The scene changed, so the IMAGE must be regenerated first. Animating the old
+  // frame would just replay the old scene — the video model is image-to-video, so
+  // whatever is in the frame wins over anything the text prompt says.
+  if (intent.target === "MEDIA_SCENE") {
+    return {
+      next_agent: "frame_generation",
+      current_prompt: mediaPrompt,
+      isDirectPrompt: false,
+      // Drop the old frame so frame_generation starts clean.
+      start_frame_url: null,
+      video_url: existing.videoUrl,
+      experiencePref: existing.experiencePref,
+      media_only_update: true,
+    };
+  }
+
+  // Same scene, just a different take — reuse the approved frame.
+  if (intent.target === "MEDIA_MOTION") {
+    return {
+      next_agent: "video_generation",
+      current_prompt: mediaPrompt,
+      isDirectPrompt: false,
+      start_frame_url: existing.frameUrl,
+      video_url: existing.videoUrl,
+      experiencePref: existing.experiencePref,
+      media_only_update: true,
+    };
+  }
+
+  // CODE: keep the user's words exactly — the code agent edits from the message.
+  return {
+    next_agent: "code_generation",
+    current_prompt: state.current_prompt,
+    video_url: existing.videoUrl,
+    experiencePref: existing.experiencePref,
+    media_only_update: false,
+  };
 };
 
 // Reject node — handles off-topic, malicious, and non-website-building requests
@@ -1004,8 +1180,19 @@ const workflow = new StateGraph(AgentState)
   .addNode("video_generation", videoGenerationNode)
   .addNode("select_template", selectTemplateNode)
   .addNode("code_generation", codeGenerationNode)
+  .addNode("followup_router", followUpRouterNode)
   .addNode("reject", rejectNode)
-  .addEdge(START, "supervisor")
+  // A project with an existing site skips the wizard entirely.
+  .addConditionalEdges(START, (state) => (state.isFollowUp ? "followup_router" : "supervisor"), {
+    followup_router: "followup_router",
+    supervisor: "supervisor",
+  })
+  .addConditionalEdges("followup_router", (state) => state.next_agent, {
+    frame_generation: "frame_generation",
+    video_generation: "video_generation",
+    code_generation: "code_generation",
+    finish: END,
+  })
   .addConditionalEdges("supervisor", (state) => state.next_agent, {
     ask_wizard_3d: "ask_wizard_3d",
     ask_media_intent: "ask_media_intent",
@@ -1050,6 +1237,7 @@ const workflow = new StateGraph(AgentState)
   .addConditionalEdges("video_generation", (state) => state.next_agent, {
     video_generation: "video_generation",
     select_template: "select_template",
+    code_generation: "code_generation",
     finish: END,
   })
   .addEdge("select_template", "code_generation")
@@ -1090,13 +1278,16 @@ export const autonomousAgentFunction = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { projectId, prompt, userId, buildPref, experiencePref } = event.data;
+    const isFollowUp = event.data.isFollowUp ?? false;
 
     const initialState = {
       projectId,
       userId,
       current_prompt: prompt,
-      site_prompt: prompt,
-      isAgentMode: event.data.isAgentMode ?? false,
+      site_prompt: event.data.sitePrompt || prompt,
+      isFollowUp,
+      // Follow-ups never prompt the user for approval — they just apply the change.
+      isAgentMode: isFollowUp ? true : (event.data.isAgentMode ?? false),
       buildPref: buildPref ?? null,
       experiencePref: experiencePref ?? null,
       messages: [new HumanMessage(prompt)],

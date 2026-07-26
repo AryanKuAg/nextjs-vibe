@@ -13,7 +13,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
 
 
-import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 
 // Constants moved to usage.ts
 
@@ -1169,11 +1169,11 @@ fixPaths(process.argv[2]);
       });
     });
 
-    await step.run("charge-credits", async () => {
-      const model = event.data.model || "google/gemini-3.1-flash-lite";
-      const cost = MODEL_COSTS[model] || 100;
-      await consumeCredits(cost, event.data.userId);
-    });
+    // NOTE: the code agent deliberately does NOT charge here. One user message can
+    // invoke it several times (template pass, lenient rebuild, retries) and the user
+    // must pay AGENT_COSTS.CODE once per message, not once per run. The charge is
+    // made by the caller that owns the message — see startAutonomousGeneration and
+    // buildSite in modules/projects/server/procedures.ts.
 
     return {
       url: deploymentUrl || sandboxUrl,
@@ -1198,8 +1198,9 @@ export const veoGenerateFunction = inngest.createFunction(
     ]
   },
   async ({ event, step }) => {
-    const { projectId, prompt, model, userId, refinePrompt, imagePrompt } = event.data;
-    const cost = MODEL_COSTS[model as string] || 25;
+    const { projectId, prompt, model, userId, refinePrompt, imagePrompt, experiencePref } = event.data;
+    // Charged per video-agent run — a regenerate is a new run the user asked for.
+    const cost = AGENT_COSTS.VIDEO;
 
     try {
       await step.run("update-project-stage-generating", async () => {
@@ -1219,7 +1220,7 @@ export const veoGenerateFunction = inngest.createFunction(
           try {
             const { ChatOpenAI } = await import("@langchain/openai");
             const { HumanMessage, SystemMessage } = await import("@langchain/core/messages");
-            const { VIDEO_PROMPT_SYSTEM, VIDEO_PROMPT_SUFFIX, buildVideoRefinerInput } =
+            const { getVideoSystemPrompt, getVideoPromptSuffix, buildVideoRefinerInput, stripMachineWords } =
               await import("@/lib/media-prompts");
 
             const routerModel = new ChatOpenAI({
@@ -1228,20 +1229,23 @@ export const veoGenerateFunction = inngest.createFunction(
               configuration: { baseURL: "https://openrouter.ai/api/v1" },
             });
 
+            const suffix = getVideoPromptSuffix(experiencePref);
             const response = await routerModel.invoke([
-              new SystemMessage(VIDEO_PROMPT_SYSTEM),
-              new HumanMessage(buildVideoRefinerInput(prompt, imagePrompt)),
+              new SystemMessage(getVideoSystemPrompt(experiencePref)),
+              new HumanMessage(buildVideoRefinerInput(prompt, imagePrompt, experiencePref)),
             ]);
 
-            const refined = (response.content as string).trim();
-            if (!refined) return `${prompt}. ${VIDEO_PROMPT_SUFFIX}`;
-            return `${refined} ${VIDEO_PROMPT_SUFFIX}`;
+            // Strip machine words even from the model's own output — naming a
+            // drone is what makes the video model render one in frame.
+            const refined = stripMachineWords((response.content as string).trim());
+            if (!refined) return `${stripMachineWords(prompt)}. ${suffix}`;
+            return `${refined} ${suffix}`;
           } catch (err) {
             // Never fail the render over prompt polish — fall back to the raw
             // prompt plus the hard no-transition constraints.
             console.error("[Video] Prompt refinement failed, using fallback:", err);
-            const { VIDEO_PROMPT_SUFFIX } = await import("@/lib/media-prompts");
-            return `${prompt}. ${VIDEO_PROMPT_SUFFIX}`;
+            const { getVideoPromptSuffix, stripMachineWords } = await import("@/lib/media-prompts");
+            return `${stripMachineWords(prompt)}. ${getVideoPromptSuffix(experiencePref)}`;
           }
         });
 
@@ -1281,7 +1285,10 @@ export const veoGenerateFunction = inngest.createFunction(
             input.duration = 4;
             input.resolution = "720p";
             input.aspect_ratio = "16:9";
-            input.camera_fixed = false;
+            // Hero backgrounds loop, so the camera is pinned at the model level —
+            // any sustained translation makes the last frame mismatch the first
+            // and the loop point reads as a jump cut.
+            input.camera_fixed = experiencePref === "HERO_ONLY";
             input.generate_audio = false; // Usually it's better to default to false unless explicitly needed
             if (event.data.imageUrl) {
               input.image = event.data.imageUrl;

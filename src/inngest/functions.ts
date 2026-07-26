@@ -1365,7 +1365,7 @@ export const veoGenerateFunction = inngest.createFunction(
             throw new Error(`Invalid Replicate output: ${JSON.stringify(rawOutput)}`);
           }
 
-          // Fetch the video buffer to upload to GCS
+          // Fetch the video buffer to upload to R2
           const res = await fetch(finalVideoUrl);
           if (!res.ok) throw new Error(`Failed to download Replicate video: ${res.statusText}`);
           const arrayBuffer = await res.arrayBuffer();
@@ -1444,7 +1444,7 @@ export const veoGenerateFunction = inngest.createFunction(
             await new Promise((resolve) => setTimeout(resolve, 5000));
           }
 
-          // Fetch the video buffer to upload to GCS
+          // Fetch the video buffer to upload to R2
           const videoRes = await fetch(finalVideoUrl!, {
             headers: {
               "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`
@@ -1539,32 +1539,16 @@ export const veoGenerateFunction = inngest.createFunction(
 
         if (!base64VideoData) throw new Error("No video data retrieved");
 
-        console.log(`[Video Pipeline] Pushing Video to GCS natively to bypass node limits...`);
-        const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-        const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-            }
-            : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
-        );
-
-        const bucket = storage.bucket(bucketName);
-        const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
-        const fileFinal = bucket.file(finalOutputName);
+        console.log(`[Video Pipeline] Pushing Video to R2 natively to bypass node limits...`);
+        const { uploadMediaAsset } = await import("@/lib/media-storage");
 
         const bufferFinal = Buffer.from(base64VideoData, 'base64');
-        await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
-
-        const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-        return `${cdnBase}/${finalOutputName}`;
+        const { url } = await uploadMediaAsset({
+          buffer: bufferFinal,
+          key: `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`,
+          contentType: "video/mp4",
+        });
+        return url;
       });
 
       await step.run("update-project-video-url", async () => {

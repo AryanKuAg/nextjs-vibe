@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
 import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
+import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const projectsRouter = createTRPCRouter({
@@ -161,45 +162,23 @@ export const projectsRouter = createTRPCRouter({
       const cost = MODEL_COSTS[input.model || ""] || 25;
       await checkCredits(cost);
 
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
-
       let imageUrl = input.imageUrl;
       let imageBase64 = input.imageBase64;
 
-      // Inngest payload limit is ~1MB. Upload base64 image to GCS first.
+      // Inngest payload limit is ~1MB. Upload base64 image to R2 first.
       if (imageBase64) {
-        const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-              },
-            }
-            : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
-        );
-
-        const bucket = storage.bucket(bucketName);
         const match = imageBase64.match(/^data:(image\/[^;]+);/);
         const mimeType = match ? match[1] : "image/jpeg";
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-
         const ext = mimeType.split("/")[1] || "jpg";
-        const fileName = `frames/${input.projectId}/upload-${Date.now()}.${ext}`;
-        const file = bucket.file(fileName);
 
-        await file.save(buffer, {
-          metadata: { contentType: mimeType },
+        const uploaded = await uploadMediaAsset({
+          buffer,
+          key: `frames/${input.projectId}/upload-${Date.now()}.${ext}`,
+          contentType: mimeType,
         });
-
-        const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
-        imageUrl = `${cdnUrl}/${fileName}`;
+        imageUrl = uploaded.url;
 
         // Remove base64 so it doesn't get sent to Inngest
         imageBase64 = undefined;
@@ -215,7 +194,6 @@ export const projectsRouter = createTRPCRouter({
         data: {
           projectId: input.projectId,
           prompt: input.prompt,
-          outputGcsUri,
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,

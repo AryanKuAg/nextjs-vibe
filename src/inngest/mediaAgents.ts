@@ -1,7 +1,7 @@
 import { inngest } from "./client";
 import { prisma } from "@/lib/db";
-import { Storage } from "@google-cloud/storage";
 import Replicate from "replicate";
+import { uploadMediaAsset } from "@/lib/media-storage";
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
@@ -81,25 +81,14 @@ export const generateFramesFunction = inngest.createFunction(
 
       const arrayBuffer = await imageResponse.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const storage = new Storage(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\\n"),
-            },
-          }
-          : { projectId: process.env.GOOGLE_CLOUD_PROJECT }
-      );
-      const bucket = storage.bucket(bucketName);
-      const fileName = `frames/${projectId}/frame-${Date.now()}.png`;
-      const file = bucket.file(fileName);
 
-      await file.save(imageBuffer, { metadata: { contentType: "image/png" } });
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      return `${cdnBase}/${fileName}`;
+      // Stored in R2, same bucket the built sites deploy to.
+      const { url } = await uploadMediaAsset({
+        buffer: imageBuffer,
+        key: `frames/${projectId}/frame-${Date.now()}.png`,
+        contentType: "image/png",
+      });
+      return url;
     });
 
     await step.run("save-frame", async () => {

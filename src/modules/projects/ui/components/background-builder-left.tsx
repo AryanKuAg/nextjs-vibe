@@ -86,7 +86,8 @@ export const BackgroundBuilderLeft = ({
   onProceed,
   onSkip,
   updateBlock,
-  onApplyTemplate,
+  // onApplyTemplate is still part of Props for callers, but nothing in this panel
+  // can fire it yet — see the TemplatesModal note below.
   projectId,
   blocks,
   isExtracting
@@ -624,15 +625,15 @@ export const BackgroundBuilderLeft = ({
         </div>
       </div>
 
+      {/* NOTE: this is the SITE template gallery (src/lib/templates/registry.ts),
+          not the video-block presets in src/lib/templates.ts that onApplyTemplate
+          expects. It is passed an empty list, so nothing here is selectable today.
+          Wiring block presets up needs its own component — this one now starts a
+          full template remix on select, which is not what this panel wants. */}
       <TemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
         templates={[]}
-        onSelect={(t) => {
-          if (onApplyTemplate) {
-            onApplyTemplate(t.blocks);
-          }
-        }}
       />
     </>
   );

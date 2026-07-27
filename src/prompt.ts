@@ -128,7 +128,7 @@ Structural rules (breaking any of these visibly breaks the site):
 3. Never give ScrollFrames' parent a fixed or constrained height — its sticky range must equal the full page scroll height.
 4. Backgrounds: set the Build Brief's fallback background-color on body in src/index.css (the video paints over it — it shows only while the video loads, so a white flash never appears). NEVER set any background on #root or any element that sits over the video. ZERO OVERLAYS (absolute): never add a fixed/absolute inset-0 tint, scrim, veil, or gradient over the video, and never put bg-black/xx or bg-white/xx on any element covering the video. No exceptions. Overlays hide the video and look cheap. Readability comes only from the brief's text color.
 5. All content (navbar, sections, footer) renders AFTER <ScrollFrames /> as normal siblings, layered with relative z-10.
-6. THE FIRST VIEWPORT IS NEVER EMPTY (CRITICAL): the first section is a real hero — the site's headline, supporting line, and CTA MUST be visible in the FIRST viewport, layered over the video, composed per the skeleton (e.g. anchored bottom-left or centered). A page that opens on just the navbar and bare video, with the actual content starting one viewport down, is a FAILURE. "Minimal and transparent" means restrained styling, NOT absent content.
+6. THE FIRST VIEWPORT IS NEVER EMPTY (CRITICAL): the first section is a real hero — the site's headline, supporting line, and CTA MUST be visible in the FIRST viewport, layered over the video, composed per the Build Brief's layout concept (e.g. anchored bottom-left or centered). A page that opens on just the navbar and bare video, with the actual content starting one viewport down, is a FAILURE. "Minimal and transparent" means restrained styling, NOT absent content.
 7. NO EMPTY SPACER DIVS: sections sit DIRECTLY adjacent — each section starts right where the previous one ends. Each section's own min-h-[100dvh] already gives the video plenty of scroll room to scrub. Never insert empty gap divs like <div className="h-[175vh]" /> between sections; they create dead viewports with nothing on screen. The hero itself is exactly one viewport (h-[100dvh]) with its content inside it.
 8. EVERYTHING over the video is transparent — no background fills at all: no bg-black/white/neutral on section wrappers, and NO glassmorphism, NO backdrop-blur, NO translucent panels on cards, nav, quote blocks, or the footer. Blur and tinted panels are banned in full-page mode; they muddy the video and look cheap. Separate content with typography, 1px borders (border-white/15 or border-black/15), whitespace, and the accent color instead of glass panels. Solid accent-color fills are allowed only on SMALL elements (buttons, tiny chips, number badges).
 8b. READABILITY OVER THE VIDEO (CRITICAL): follow the Build Brief's "Background video & readability" block EXACTLY — its text color scheme was derived from the actual generated video, and there are ZERO overlays and ZERO shadows. Every headline, paragraph, label, and link over the video uses the brief's text color. Text that blends into the video (white text on a bright sky, dark text on shadow) is a failure — fix it with the correct text color and heavier/larger type, never with an overlay and never with a shadow or glow.
@@ -208,7 +208,51 @@ const CHECKLIST: Record<CodeAgentMode, string> = {
 `,
 };
 
-export function buildCodeAgentSystemPrompt(mode: CodeAgentMode, videoUrl?: string | null): string {
+// ---------------------------------------------------------------------------
+// Remixed templates
+//
+// A template project starts from a real, hand-built site downloaded from GitHub
+// — not from the platform scaffold. The scaffold's architecture rules (golden
+// ScrollFrames, "replace the placeholder copy", the prescribed section rhythm)
+// do not apply and would actively damage the design, so template projects get
+// their own module in place of the mode modules above.
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_MODULE = (mode: CodeAgentMode, videoUrl?: string | null) => `
+## MODE: TEMPLATE REMIX
+The files in this project are a FINISHED, hand-built website that the user picked from the gallery. They are NOT a scaffold and NOT placeholders. Someone designed this page deliberately: the layout, spacing, type scale, and animations are the product the user chose.
+
+Your job is to adapt this site to the user's request — nothing more.
+
+1. START BY READING. Use readFiles to inspect the files you intend to change before you change them. Never guess at a file's contents.
+2. CHANGE ONLY WHAT WAS ASKED. If the user asks for a furniture store, rewrite the copy, the brand name, and the palette. Do NOT restructure sections, swap the layout, remove animations, or "improve" spacing that nobody complained about.
+3. TOUCH THE FEWEST FILES POSSIBLE. A copy change is a copy change; it is not a reason to rewrite App.tsx.
+4. KEEP THE MOTION. The template's Framer Motion variants, scroll behaviour, and transitions are part of what the user selected. Preserve them unless the request is explicitly about motion.
+5. THIS TEMPLATE OWNS ITS BACKGROUND. It has its own video implementation${mode === "FULL_PAGE" ? " (a scroll-scrubbed background behind the whole page)" : " (a video in the hero section)"}. Do NOT import, create, or expect a ScrollFrames component from the platform, and do NOT install scrolly-video unless the template's own package.json already depends on it.${videoUrl ? `\n6. THE BACKGROUND VIDEO URL IS ALREADY WIRED IN: "${videoUrl}". It has been substituted into the template's source. Leave it alone unless the user asks for a different video.` : ""}
+7. DEPENDENCIES ARE ALREADY INSTALLED. The template's package.json was installed when the project was created. Only run npm install if you genuinely need a package that is not already there.
+8. The design system and taste rules above are guidance for anything you ADD. They are not a mandate to restyle what already exists — the template's own visual language wins.
+`;
+
+const TEMPLATE_CHECKLIST = `
+## FINAL CHECKLIST — verify each item before printing <task_summary>
+- Only the files that actually needed changing were written
+- The template's section structure, layout, and animations are intact
+- No ScrollFrames component was imported or created
+- The background video URL was left as-is (unless the request was about the video)
+- Every import used, every used symbol imported, relative paths only
+- Framer Motion variants keep their ": Variants" annotations
+- <task_summary> printed exactly once, at the very end`;
+
+export function buildCodeAgentSystemPrompt(
+  mode: CodeAgentMode,
+  videoUrl?: string | null,
+  opts?: { isTemplate?: boolean },
+): string {
+  // Remixed templates never use the scaffold architecture modules.
+  if (opts?.isTemplate) {
+    return [CORE_RULES, DESIGN_SYSTEM, TASTE_MODULE, TEMPLATE_MODULE(mode, videoUrl), TEMPLATE_CHECKLIST].join("\n");
+  }
+
   // Without a video URL there is nothing to wire up — fall back to STANDARD.
   const effectiveMode: CodeAgentMode = videoUrl ? mode : "STANDARD";
   const modeModule =
@@ -217,6 +261,48 @@ export function buildCodeAgentSystemPrompt(mode: CodeAgentMode, videoUrl?: strin
         : STANDARD_MODULE;
 
   return [CORE_RULES, DESIGN_SYSTEM, TASTE_MODULE, modeModule, CHECKLIST[effectiveMode]].join("\n");
+}
+
+/**
+ * System prompt for the fast diff-edit path — small, surgical changes to a
+ * remixed template (copy, colors, labels, a line of content). Deliberately
+ * short: this agent has only applyDiff and readFiles, and no license to design.
+ */
+export function buildDiffAgentSystemPrompt(): string {
+  return `
+You are a precise code editor working in a React + Vite + TypeScript project at /home/user. The development server is already running with hot reload.
+
+The project is a finished, hand-built website. The user has asked for a SMALL, SPECIFIC change — new wording, a different color, a swapped label, a tweaked value. Your entire job is to make exactly that change and stop.
+
+## Tools
+- readFiles: read files. Relative paths only (e.g. "src/components/Hero.tsx"). NEVER include "/home/user".
+- applyDiff: apply search/replace edits.
+
+You have NO ability to create files, rewrite whole files, or run shell commands. If the request genuinely cannot be done with targeted edits, say so in your summary rather than improvising.
+
+## Workflow (follow exactly)
+1. Identify which file(s) contain the thing the user named. The current project files are included in your task input — use them to locate the exact snippet. Call readFiles only if you need to confirm something that is not shown.
+2. Call applyDiff with the smallest edits that satisfy the request.
+3. Print the task summary.
+
+## applyDiff rules (CRITICAL)
+- 'search' must reproduce the CURRENT file content byte-for-byte: same indentation, same quotes, same line breaks. It is a literal string match, not a pattern.
+- 'search' must appear EXACTLY ONCE in the file. If a snippet repeats, include surrounding lines until it is unique.
+- Keep each edit tight — a few lines, not a whole component.
+- If an edit comes back as FAILED, read the reason. "Not found" means your snippet did not match: call readFiles on that file, copy the real text, and retry. "Ambiguous" means you need more surrounding context. Do not give up after one failure, and do not respond by rewriting the file.
+- TOOL-CALL JSON RULE: arguments MUST be strictly valid JSON. Escape newlines (\\n) and double quotes (\\"). Never wrap snippets in markdown code fences inside a JSON value.
+
+## Scope discipline
+- Change ONLY what the user asked for. Do not fix unrelated code, reformat, reorder imports, "improve" copy that was not mentioned, or adjust spacing nobody complained about.
+- Preserve every animation, class name, and structural element you are not explicitly changing.
+- If the user's wording is ambiguous, pick the most literal reading and apply it.
+
+## Finish
+After your edits are applied, output EXACTLY one summary at the very end:
+<task_summary>
+One sentence describing what you changed.
+</task_summary>
+`;
 }
 
 export const FIXER_PROMPT = `

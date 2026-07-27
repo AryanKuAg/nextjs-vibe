@@ -7,6 +7,7 @@ import { inngest } from "@/inngest/client";
 import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { getTemplate } from "@/lib/templates/registry";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -75,6 +76,10 @@ export const projectsRouter = createTRPCRouter({
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
         isAgentMode: z.boolean().default(false),
+        // Set when the project is created by remixing a gallery template. An
+        // unknown id is rejected rather than silently ignored — a project that
+        // claims a template it cannot download would fail mid-build.
+        templateId: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -95,10 +100,18 @@ export const projectsRouter = createTRPCRouter({
         }
       }
 
+      const template = input.templateId ? getTemplate(input.templateId) : null;
+      if (input.templateId && !template) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown template "${input.templateId}".`,
+        });
+      }
+
       const count = await prisma.project.count({
         where: { userId: ctx.auth.userId },
       });
-      const name = `Project ${count + 1}`;
+      const name = template ? `${template.title} Remix` : `Project ${count + 1}`;
 
       const createdProject = await prisma.project.create({
         data: {
@@ -106,6 +119,7 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
+          templateId: template?.id ?? null,
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
         },
       });

@@ -8,40 +8,16 @@ import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
 import { TemplatesModal } from "@/components/templates-modal";
+import { TEMPLATE_REGISTRY } from "@/lib/templates/registry";
 
-/* ─── Site preview cards data ─── */
-const SITES = [
-  {
-    title: "Vaultone",
-    href: "https://vaultoneframerate.netlify.app",
-    imgSrc: "https://assets.framerate.space/templates/stake/template.png",
-  },
-  {
-    title: "Orbis",
-    href: "https://orbisframerate.netlify.app",
-    imgSrc: "https://assets.framerate.space/templates/planet%20robot/template.jpg",
-  },
-  {
-    title: "Theo",
-    href: "https://theoframerate.netlify.app/",
-    imgSrc: "https://assets.framerate.space/templates/Theo/Template.png",
-  },
-  {
-    title: "Strata",
-    href: "https://strataframerate.netlify.app/",
-    imgSrc: "https://assets.framerate.space/templates/stone/template.png",
-  },
-  {
-    title: "Aether",
-    href: "https://spacexmarsmission.netlify.app",
-    imgSrc: "https://assets.framerate.space/mars_template.jpg",
-  },
-  {
-    title: "Obisidian",
-    href: "https://obisidianframerate.netlify.app",
-    imgSrc: "https://assets.framerate.space/templates/turtle/template.png",
-  },
-];
+/* ─── Site preview cards data ───
+   Sourced from the template registry so the gallery, the remix modal, and the
+   build pipeline all agree on which templates exist and what their ids are. */
+const SITES = TEMPLATE_REGISTRY.map((t) => ({
+  title: t.title,
+  href: t.demoUrl,
+  imgSrc: t.imgSrc,
+}));
 
 /* ─── Site Preview Card ─── */
 interface SitePreviewCardProps {
@@ -134,7 +110,7 @@ const LoggedInDashboard = () => {
       <TemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
-        templates={SITES}
+        templates={TEMPLATE_REGISTRY}
       />
     </main>
   );

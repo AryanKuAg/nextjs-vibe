@@ -3,7 +3,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSystemPrompt, type CodeAgentMode } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSystemPrompt, buildDiffAgentSystemPrompt, type CodeAgentMode } from "@/prompt";
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT } from "./types";
@@ -11,6 +11,7 @@ import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from ".
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
+import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_ASIS_PROMPT, type TemplateManifest } from "@/lib/templates/registry";
 
 
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
@@ -64,6 +65,246 @@ export default function App() {
 }
 `;
 
+// Shell-quote a value for safe interpolation into a sandbox command.
+const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * Run a sandbox command WITHOUT throwing on a non-zero exit.
+ *
+ * E2B's commands.run rejects with a CommandExitError when the exit code is not
+ * zero, so any `if (result.exitCode !== 0)` check placed after it is dead code —
+ * the caller gets a bare stack trace instead of a diagnosable message. This
+ * normalises both paths into a plain result so callers can report properly.
+ */
+const runSandboxCommand = async (
+  sandbox: Sandbox,
+  command: string,
+  opts?: { timeoutMs?: number },
+): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
+  try {
+    const r = await sandbox.commands.run(command, opts);
+    return { exitCode: r.exitCode, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+  } catch (e) {
+    // CommandExitError carries the full result; anything else is a real fault
+    // (sandbox gone, timeout) and must keep propagating.
+    const err = e as { exitCode?: unknown; stdout?: unknown; stderr?: unknown };
+    if (typeof err?.exitCode === "number") {
+      return {
+        exitCode: err.exitCode,
+        stdout: typeof err.stdout === "string" ? err.stdout : "",
+        stderr: typeof err.stderr === "string" ? err.stderr : "",
+      };
+    }
+    throw e;
+  }
+};
+
+/** Last N characters of command output, for error messages. */
+const tailOutput = (r: { stdout: string; stderr: string }, n = 900) =>
+  `${r.stderr || r.stdout || "(no output)"}`.slice(-n);
+
+/**
+ * Write a helper script into the sandbox via the shell rather than files.write.
+ *
+ * sandbox.files.write runs as a different user than sandbox.commands.run and is
+ * denied on /tmp ("permission denied"), while the shell can write there freely
+ * (the template tarball is curl'd straight into /tmp). base64 round-tripping
+ * keeps arbitrary script content safe from shell quoting.
+ *
+ * Always use a .cjs path: template repos set "type": "module", and these
+ * scripts use require().
+ */
+const writeSandboxScript = async (sandbox: Sandbox, path: string, contents: string) => {
+  const encoded = Buffer.from(contents, "utf8").toString("base64");
+  const written = await runSandboxCommand(
+    sandbox,
+    `printf '%s' ${shq(encoded)} | base64 -d > ${shq(path)}`,
+    { timeoutMs: 30_000 },
+  );
+  if (written.exitCode !== 0) {
+    throw new Error(`Failed to write ${path} into the sandbox (exit ${written.exitCode}): ${tailOutput(written)}`);
+  }
+};
+
+/**
+ * Download a template repo into the sandbox and overlay it onto /home/user.
+ *
+ * The E2B image ships curl but not git, so this pulls a codeload tarball rather
+ * than cloning. Runs only for projects created by remixing a gallery template.
+ */
+const downloadTemplateIntoSandbox = async (
+  sandbox: Sandbox,
+  template: TemplateManifest,
+  videoUrl: string | null,
+) => {
+  const tarUrl = templateTarballUrl(template);
+  const workDir = "/tmp/framerate-template";
+  const tarPath = "/tmp/framerate-template.tar.gz";
+
+  // Each stage runs as its own command so a failure names the stage that broke.
+  // (Piping curl into tar hides curl's exit code behind tar's.)
+  await runSandboxCommand(sandbox, `rm -rf ${workDir} ${tarPath} && mkdir -p ${workDir}`);
+
+  const fetched = await runSandboxCommand(
+    sandbox,
+    `curl -fsSL --retry 3 --retry-delay 2 -o ${tarPath} ${shq(tarUrl)}`,
+    { timeoutMs: 120_000 },
+  );
+  if (fetched.exitCode !== 0) {
+    throw new Error(
+      `Failed to download template "${template.id}" from ${tarUrl} (curl exit ${fetched.exitCode}). ` +
+      `Check that the repo is public and that the branch "${template.branch}" exists. ` +
+      `Output: ${tailOutput(fetched)}`,
+    );
+  }
+
+  // --strip-components=1 drops GitHub's "<repo>-<branch>/" wrapper directory.
+  const extracted = await runSandboxCommand(
+    sandbox,
+    `tar xzf ${tarPath} -C ${workDir} --strip-components=1`,
+    { timeoutMs: 120_000 },
+  );
+  if (extracted.exitCode !== 0) {
+    throw new Error(
+      `Failed to extract template "${template.id}" (tar exit ${extracted.exitCode}). ` +
+      `Output: ${tailOutput(extracted)}`,
+    );
+  }
+
+  const sourceDir = template.subdir ? `${workDir}/${template.subdir}` : workDir;
+
+  const exists = await runSandboxCommand(
+    sandbox,
+    `test -f ${shq(`${sourceDir}/package.json`)} && echo ok || echo missing`,
+  );
+  if (!exists.stdout.includes("ok")) {
+    const listing = await runSandboxCommand(sandbox, `ls -A ${shq(sourceDir)} 2>&1 | head -40`);
+    throw new Error(
+      `Template "${template.id}" has no package.json at ${sourceDir}` +
+      `${template.subdir ? ` (subdir "${template.subdir}")` : ""}. ` +
+      `Contents: ${listing.stdout.trim() || "(empty)"}. ` +
+      `See src/lib/templates/README.md for the required repo layout.`,
+    );
+  }
+
+  // Replace the scaffold's src/ wholesale — leftover scaffold components would
+  // otherwise sit alongside the template's and confuse the agent.
+  await runSandboxCommand(sandbox, "rm -rf /home/user/src");
+  const copied = await runSandboxCommand(
+    sandbox,
+    `cp -a ${shq(`${sourceDir}/.`)} /home/user/ && rm -rf ${workDir} ${tarPath}`,
+    { timeoutMs: 60_000 },
+  );
+  if (copied.exitCode !== 0) {
+    throw new Error(
+      `Failed to copy template "${template.id}" into the sandbox (exit ${copied.exitCode}). ` +
+      `Output: ${tailOutput(copied)}`,
+    );
+  }
+
+  // The template brings its own package.json, so the image's pre-warmed
+  // node_modules is only a partial match. This is the slow leg of a remix.
+  // --legacy-peer-deps keeps a strict peer conflict in a hand-built template
+  // from hard-failing the whole remix.
+  console.log(`DEBUG: Installing template "${template.id}" dependencies...`);
+  const install = await runSandboxCommand(
+    sandbox,
+    "cd /home/user && npm install --no-audit --no-fund --legacy-peer-deps",
+    { timeoutMs: 300_000 },
+  );
+  if (install.exitCode !== 0) {
+    console.error(`DEBUG: npm install for template "${template.id}" failed:\n${install.stderr || install.stdout}`);
+    throw new Error(
+      `Template "${template.id}" dependency install failed (npm exit ${install.exitCode}). ` +
+      `Output: ${tailOutput(install)}`,
+    );
+  }
+
+  // Wire the generated background video into the template's placeholder.
+  if (videoUrl) {
+    const substitute = [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      `const TOKEN = ${JSON.stringify(TEMPLATE_VIDEO_PLACEHOLDER)};`,
+      `const URL = ${JSON.stringify(videoUrl)};`,
+      "let count = 0;",
+      "function substituteFile(p) {",
+      "  if (!/\\.(tsx?|jsx?|css|html|json)$/.test(p)) return;",
+      "  const before = fs.readFileSync(p, 'utf8');",
+      "  if (!before.includes(TOKEN)) return;",
+      "  fs.writeFileSync(p, before.split(TOKEN).join(URL));",
+      "  count++;",
+      "}",
+      // Accepts a directory OR a single file — index.html is passed directly,
+      // and readdirSync on a file throws ENOTDIR.
+      "function walk(target) {",
+      "  if (!fs.existsSync(target)) return;",
+      "  if (!fs.statSync(target).isDirectory()) { substituteFile(target); return; }",
+      "  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {",
+      "    const p = path.join(target, entry.name);",
+      "    if (entry.isDirectory()) { if (entry.name !== 'node_modules') walk(p); continue; }",
+      "    substituteFile(p);",
+      "  }",
+      "}",
+      "walk('/home/user/src');",
+      "walk('/home/user/index.html');",
+      "process.stdout.write(String(count));",
+    ].join("\n");
+
+    await writeSandboxScript(sandbox, "/tmp/inject-video.cjs", substitute);
+    const injected = await runSandboxCommand(sandbox, "node /tmp/inject-video.cjs", { timeoutMs: 30_000 });
+    if (injected.exitCode !== 0) {
+      throw new Error(
+        `Failed to inject the video URL into template "${template.id}" (exit ${injected.exitCode}). ` +
+        `Output: ${tailOutput(injected)}`,
+      );
+    }
+    const touched = Number(injected.stdout.trim() || "0");
+    if (touched === 0) {
+      console.warn(
+        `DEBUG: Template "${template.id}" contains no ${TEMPLATE_VIDEO_PLACEHOLDER} token — ` +
+        `the generated video will not appear. See src/lib/templates/README.md.`,
+      );
+    } else {
+      console.log(`DEBUG: Injected video URL into ${touched} template file(s).`);
+    }
+  }
+};
+
+/** Read a template project's source tree back out of the sandbox. */
+const readTemplateFilesFromSandbox = async (sandbox: Sandbox): Promise<Record<string, string>> => {
+  const scraper = [
+    "const fs = require('fs');",
+    "const path = require('path');",
+    "const SKIP_EXT = ['.png','.jpg','.jpeg','.gif','.ico','.mp4','.webm','.woff','.woff2','.ttf','.otf','.webp','.avif'];",
+    "const out = {};",
+    "function walk(dir) {",
+    "  if (!fs.existsSync(dir)) return;",
+    "  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {",
+    "    const p = path.join(dir, entry.name);",
+    "    if (entry.isDirectory()) { if (entry.name !== 'node_modules') walk(p); continue; }",
+    "    if (SKIP_EXT.includes(path.extname(entry.name).toLowerCase())) continue;",
+    "    try { out[p.split(path.sep).join('/').replace(/^\\/home\\/user\\//, '')] = fs.readFileSync(p, 'utf8'); } catch (e) {}",
+    "  }",
+    "}",
+    "process.chdir('/home/user');",
+    "walk('/home/user/src');",
+    "walk('/home/user/public');",
+    "for (const f of ['index.html','vite.config.ts','vite.config.js','package.json','tailwind.config.js','postcss.config.js','tsconfig.json','tsconfig.app.json','tsconfig.node.json']) {",
+    "  const p = '/home/user/' + f;",
+    "  if (fs.existsSync(p)) out[f] = fs.readFileSync(p, 'utf8');",
+    "}",
+    "process.stdout.write(JSON.stringify(out));",
+  ].join("\n");
+
+  await writeSandboxScript(sandbox, "/tmp/scrape-template.cjs", scraper);
+  const result = await runSandboxCommand(sandbox, "node /tmp/scrape-template.cjs", { timeoutMs: 60_000 });
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to read template files from the sandbox (exit ${result.exitCode}): ${tailOutput(result)}`);
+  }
+  return JSON.parse(result.stdout.trim());
+};
+
 export const codeAgentFunction = inngest.createFunction(
   {
     id: "code-agent",
@@ -115,6 +356,19 @@ export const codeAgentFunction = inngest.createFunction(
         baseUrl: "https://openrouter.ai/api/v1",
       });
     };
+
+    // --- TEMPLATE PROJECTS ---
+    // A project carries a templateId only when it was started by remixing a
+    // gallery template. Everything gated on `template` below is inert for
+    // prompt-built projects, which keep the existing scaffold behaviour.
+    const template = getTemplate(project?.templateId);
+    if (template) {
+      console.log(`DEBUG: Template project — remixing "${template.id}" (${template.repo}#${template.branch}).`);
+    }
+
+    // DIFF mode applies targeted search/replace edits instead of rewriting whole
+    // files. Only the template follow-up router sets it; anything else stays FULL.
+    const editMode: "FULL" | "DIFF" = event.data.editMode === "DIFF" && template ? "DIFF" : "FULL";
 
     const sandboxId = await step.run("get-sandbox-id", async () => {
       let sandbox;
@@ -179,7 +433,10 @@ export const codeAgentFunction = inngest.createFunction(
         videoUrl = normalizeUrl(urls[urls.length - 1]);
       }
 
-      let experiencePref: string | undefined = event.data.experiencePref;
+      // A template's mode is declared in the registry and is authoritative — a
+      // template repo owns its own background implementation, so the
+      // ScrollFrames-presence heuristic below cannot detect it.
+      let experiencePref: string | undefined = template ? template.mode : event.data.experiencePref;
       if (!experiencePref && latestFragment) {
         // Derive from the built site itself: full-page sites always carry the
         // protected ScrollFrames component; hero sites have a video but no ScrollFrames.
@@ -203,7 +460,23 @@ export const codeAgentFunction = inngest.createFunction(
     const mode = videoContext.mode as CodeAgentMode;
     const isNewBuild = !latestFragment;
 
+    // First build of a template project: pull the repo into the sandbox and use
+    // it as the starting code instead of the generic scaffold. Follow-ups reuse
+    // the persisted fragment files like any other project.
+    const templateSeedFiles = await step.run("download-template", async () => {
+      if (!template || !isNewBuild) return null;
+      const sandbox = await getSandbox(sandboxId);
+      await downloadTemplateIntoSandbox(sandbox, template, videoUrl);
+      const files = await readTemplateFilesFromSandbox(sandbox);
+      console.log(`DEBUG: Template "${template.id}" seeded ${Object.keys(files).length} files.`);
+      return files;
+    });
+
     const initialFiles = await step.run("get-initial-files", async () => {
+      // The template repo is already on disk in the sandbox — its files are the
+      // seed, and none of the scaffold/golden-ScrollFrames logic below applies.
+      if (templateSeedFiles) return templateSeedFiles;
+
       let files: Record<string, string> = {};
       if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
         files = latestFragment.files as Record<string, string>;
@@ -245,10 +518,12 @@ export const codeAgentFunction = inngest.createFunction(
         };
         readDirRecursive(templatesDir);
 
-      } else if (mode === "FULL_PAGE" && videoUrl) {
+      } else if (mode === "FULL_PAGE" && videoUrl && !template) {
         // Existing project: always refresh the platform-owned golden ScrollFrames
         // so template fixes propagate to old projects — the code agent is blocked
         // from editing this file, so this is the only upgrade path.
+        // Skipped for remixed templates: those repos own their own background
+        // component, and overwriting it would break the site.
         const goldenPath = path.join(templatesDir, "components", "ScrollFrames.tsx");
         if (fs.existsSync(goldenPath)) {
           files["src/components/ScrollFrames.tsx"] =
@@ -265,6 +540,13 @@ export const codeAgentFunction = inngest.createFunction(
 
       if (!hasFiles) {
         console.log("DEBUG: Skipping hydration — no previous files to seed into sandbox.");
+        return null;
+      }
+
+      // The template was just extracted straight onto the sandbox filesystem —
+      // writing every file back would only undo the video-URL injection.
+      if (templateSeedFiles) {
+        console.log("DEBUG: Skipping hydration — template files are already on disk.");
         return null;
       }
 
@@ -286,9 +568,10 @@ export const codeAgentFunction = inngest.createFunction(
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
 
         // Even on a hot sandbox, sync the platform-owned golden ScrollFrames so
-        // template fixes reach projects whose sandbox never went cold.
+        // template fixes reach projects whose sandbox never went cold. Remixed
+        // templates own their background component and are left alone.
         const golden = filesObj["src/components/ScrollFrames.tsx"];
-        if (typeof golden === "string" && mode === "FULL_PAGE") {
+        if (typeof golden === "string" && mode === "FULL_PAGE" && !template) {
           try {
             const sandbox = await getSandbox(sandboxId);
             await writeSandboxFile(sandbox, "src/components/ScrollFrames.tsx", golden);
@@ -317,6 +600,22 @@ export const codeAgentFunction = inngest.createFunction(
 
 
       console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
+
+      // A template brings its own package.json. Hydration only restores source
+      // files, so a template project landing on a FRESH sandbox has the repo's
+      // code but the base image's node_modules — any dependency the template
+      // added would be missing and the build would fail on an unresolved import.
+      if (template) {
+        console.log(`DEBUG: Reinstalling template "${template.id}" dependencies on the rehydrated sandbox...`);
+        const install = await runSandboxCommand(
+          sandbox,
+          "cd /home/user && npm install --no-audit --no-fund --legacy-peer-deps",
+          { timeoutMs: 300_000 },
+        );
+        if (install.exitCode !== 0) {
+          console.error(`DEBUG: Dependency reinstall failed (exit ${install.exitCode}): ${tailOutput(install)}`);
+        }
+      }
     });
 
     const previousMessages = await step.run("get-previous-messages", async () => {
@@ -388,8 +687,9 @@ export const codeAgentFunction = inngest.createFunction(
       let terminalCount = 0;
       let readFilesCount = 0;
       let createFilesCount = 0; // <-- Add this counter
+      let applyDiffCount = 0;
 
-      return [
+      const allTools = [
         createTool({
           name: "terminal",
           description: "Execute a terminal command in the sandbox",
@@ -429,7 +729,9 @@ export const codeAgentFunction = inngest.createFunction(
                 const updated: Record<string, string> = {};
                 const sandbox = await getSandbox(sandboxId);
 
-                const PROTECTED_FILES = mode === "FULL_PAGE" ? [
+                // Remixed templates ship their own background component, so the
+                // platform's ScrollFrames contract does not apply to them.
+                const PROTECTED_FILES = (mode === "FULL_PAGE" && !template) ? [
                   "src/components/ScrollFrames.tsx",
                 ] : [];
 
@@ -447,8 +749,9 @@ export const codeAgentFunction = inngest.createFunction(
                     file.content = String(file.content || "");
                   }
 
-                  // Strict enforcement for App.tsx integrity
-                  if (mode === "FULL_PAGE" && file.path === "src/App.tsx") {
+                  // Strict enforcement for App.tsx integrity (scaffold sites only —
+                  // a template repo's App.tsx has no ScrollFrames to preserve).
+                  if (mode === "FULL_PAGE" && !template && file.path === "src/App.tsx") {
                     const c = file.content;
                     if (!c.includes("<ScrollFrames") && !c.includes("ScrollyVideo")) {
                       throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <ScrollFrames /> from App.tsx. You MUST include it as the first child.");
@@ -491,6 +794,93 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
+          name: "applyDiff",
+          description:
+            "Apply targeted search/replace edits to existing files. `search` must reproduce the current file content EXACTLY (whitespace and indentation included) and must appear exactly once in the file. Prefer this over rewriting whole files.",
+          parameters: z.object({
+            edits: z.array(z.object({
+              path: z.string().describe('Relative path, e.g. "src/components/Hero.tsx". Never include /home/user.'),
+              search: z.string().describe("Exact snippet to find. Include enough surrounding lines to be unique."),
+              replace: z.string().describe("Replacement snippet."),
+            })),
+          }),
+          handler: async ({ edits }, { network, step }: Tool.Options<AgentState>) => {
+            applyDiffCount++;
+
+            const outcome = await step?.run(`applyDiff-${prefix}-call-${applyDiffCount}`, async () => {
+              const updated: Record<string, string> = {};
+              const applied: string[] = [];
+              const failures: string[] = [];
+
+              try {
+                const sandbox = await getSandbox(sandboxId);
+
+                for (const edit of edits) {
+                  const relPath = (edit?.path || "").replace(/^\/home\/user\//, "").trim();
+                  if (!relPath) {
+                    failures.push("An edit was skipped because its path was empty.");
+                    continue;
+                  }
+
+                  let current: string;
+                  try {
+                    current = await sandbox.files.read(`/home/user/${relPath}`);
+                  } catch {
+                    failures.push(`${relPath}: file does not exist. Use readFiles to list what is actually there.`);
+                    continue;
+                  }
+
+                  if (typeof edit.search !== "string" || edit.search === "") {
+                    failures.push(`${relPath}: 'search' was empty.`);
+                    continue;
+                  }
+
+                  const occurrences = current.split(edit.search).length - 1;
+                  if (occurrences === 0) {
+                    failures.push(
+                      `${relPath}: the 'search' text was not found. It must match the file byte-for-byte. ` +
+                      `Call readFiles on ${relPath} and copy the exact snippet, then retry.`,
+                    );
+                    continue;
+                  }
+                  if (occurrences > 1) {
+                    failures.push(
+                      `${relPath}: the 'search' text appears ${occurrences} times, so the edit is ambiguous. ` +
+                      `Add surrounding lines to make it unique, then retry.`,
+                    );
+                    continue;
+                  }
+
+                  const next = current.replace(edit.search, () => edit.replace ?? "");
+                  await sandbox.files.write(`/home/user/${relPath}`, next);
+                  await sandbox.commands.run(`touch "/home/user/${relPath}"`); // Forces inotify event
+                  updated[relPath] = next;
+                  applied.push(relPath);
+                }
+              } catch (e) {
+                const err = e as Error;
+                return { updated, applied, failures: [...failures, `Sandbox error: ${err.message || String(err)}`] };
+              }
+
+              return { updated, applied, failures };
+            });
+
+            if (!outcome) return "Diff edit failed to run.";
+
+            if (network && Object.keys(outcome.updated).length > 0) {
+              network.state.data.files = {
+                ...(network.state.data.files || {}),
+                ...outcome.updated,
+              };
+            }
+
+            const parts: string[] = [];
+            if (outcome.applied.length > 0) parts.push(`Applied edits to: ${outcome.applied.join(", ")}.`);
+            if (outcome.failures.length > 0) parts.push(`FAILED:\n- ${outcome.failures.join("\n- ")}`);
+            return parts.join("\n") || "No edits were applied.";
+          },
+        }),
+        createTool({
           name: "readFiles",
           // ... keep existing readFiles code ...
           description: "Read files from the sandbox",
@@ -516,10 +906,22 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
       ];
+
+      // DIFF mode is a narrow, fast path for small template tweaks: no whole-file
+      // rewrites and no shell, so the model cannot restructure the site or spend
+      // a minute regenerating a file to change one word.
+      if (editMode === "DIFF") {
+        return allTools.filter((t) => t.name === "applyDiff" || t.name === "readFiles");
+      }
+      // FULL mode keeps exactly the tools it has always had — applyDiff is not
+      // offered here, so every existing run behaves identically.
+      return allTools.filter((t) => t.name !== "applyDiff");
     };
 
     // The system prompt is assembled per mode — one voice, no conflicting layers.
-    const systemPrompt = buildCodeAgentSystemPrompt(mode, videoUrl);
+    const systemPrompt = editMode === "DIFF"
+      ? buildDiffAgentSystemPrompt()
+      : buildCodeAgentSystemPrompt(mode, videoUrl, { isTemplate: Boolean(template) });
 
     // Factory function: creates an agent with unique name and step IDs per attempt.
     const createCodeAgentForAttempt = (attemptIndex: number, iterIndex: number = 0) => {
@@ -559,8 +961,81 @@ export const codeAgentFunction = inngest.createFunction(
       return out;
     };
 
+    // DIFF mode sends only the files the request plausibly touches. Shipping a
+    // whole template into the prompt would cost more tokens than the full-rewrite
+    // path it exists to replace.
+    const selectRelevantFiles = (files: Record<string, string>, request: string, limit = 5) => {
+      const STOPWORDS = new Set([
+        "the", "and", "for", "with", "this", "that", "change", "make", "please", "into",
+        "from", "should", "would", "could", "have", "text", "color", "colour", "update",
+        "replace", "set", "add", "remove", "site", "page", "website", "instead", "its",
+      ]);
+
+      // Quoted phrases are the strongest signal — the user is naming exact copy.
+      const quoted = [...request.matchAll(/["'“”‘’]([^"'“”‘’]{2,})["'“”‘’]/g)].map((m) => m[1].toLowerCase());
+      const tokens = [...new Set(
+        request.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !STOPWORDS.has(w)),
+      )];
+
+      const scored = Object.entries(files)
+        .filter(([p]) =>
+          !p.includes("node_modules") &&
+          !p.includes("package-lock.json") &&
+          /\.(tsx?|jsx?|css|html)$/.test(p))
+        .map(([path, content]) => {
+          const hay = (content || "").toLowerCase();
+          let score = 0;
+          for (const phrase of quoted) if (hay.includes(phrase)) score += 25;
+          for (const token of tokens) if (hay.includes(token)) score += 1;
+          // Tie-break toward the app shell and styles, which carry global config.
+          if (/src\/(App\.tsx|index\.css)$/.test(path)) score += 0.5;
+          return { path, content, score };
+        })
+        .filter((f) => f.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      // No lexical hit (e.g. "make the buttons rounder") — fall back to the shell
+      // plus the largest components, which is where visual styling usually lives.
+      const chosen = scored.length > 0
+        ? scored
+        : Object.entries(files)
+          .filter(([p]) => /\.(tsx|css)$/.test(p) && !p.includes("node_modules"))
+          .map(([path, content]) => ({ path, content, score: (content || "").length }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, limit);
+
+      const out: Record<string, string> = {};
+      for (const f of chosen) out[f.path] = f.content;
+      return out;
+    };
+
+    // "Remix this template and change nothing" is a real, valid request.
+    const hasSiteChangeRequest =
+      Boolean((event.data.value || "").trim()) &&
+      (event.data.value || "").trim() !== TEMPLATE_ASIS_PROMPT;
+
     let currentPrompt: string;
-    if (isNewBuild) {
+    if (editMode === "DIFF") {
+      const relevant = selectRelevantFiles(initialFiles as Record<string, string>, event.data.value || "");
+      currentPrompt = `=== CHANGE REQUEST ===\n${event.data.value}\n=== END CHANGE REQUEST ===\n\n`;
+      currentPrompt += `=== RELEVANT PROJECT FILES ===\n`;
+      currentPrompt += `These are the files most likely to contain what the user named. Copy 'search' snippets from them EXACTLY.\n`;
+      currentPrompt += `If none of them holds what you need, use readFiles on another path — the full tree is:\n`;
+      currentPrompt += Object.keys(initialFiles as Record<string, string>)
+        .filter((p) => !p.includes("node_modules") && !p.includes("package-lock.json"))
+        .map((p) => `  ${p}`).join("\n") + `\n\n`;
+      currentPrompt += renderFiles(relevant);
+      currentPrompt += `=== END RELEVANT PROJECT FILES ===\n\n`;
+      currentPrompt += `Apply the change request with applyDiff, then print the task summary.`;
+    } else if (isNewBuild && template) {
+      currentPrompt = `${event.data.value}\n\n`;
+      currentPrompt += `=== TEMPLATE SOURCE (current project files) ===\n`;
+      currentPrompt += `This project was created by remixing the "${template.title}" template. The files below are a FINISHED, hand-built website — not a scaffold, and not placeholders.\n`;
+      currentPrompt += `Adapt this existing site to the request above: rewrite the copy, brand name, and palette as needed, and leave the layout, section structure, and animations intact. Do NOT rebuild the page from scratch and do NOT rewrite files you do not need to change.\n\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END TEMPLATE SOURCE ===`;
+    } else if (isNewBuild) {
       currentPrompt = `${event.data.value}\n\n`;
       currentPrompt += `=== STARTER SCAFFOLD (current project files) ===\n`;
       currentPrompt += `This is a BRAND NEW project. The files below are a generic scaffold seeded by the platform — their copy, styling, and section content are PLACEHOLDERS.\n`;
@@ -611,7 +1086,12 @@ export const codeAgentFunction = inngest.createFunction(
     const hasRealChanges = (files: Record<string, string> | undefined) =>
       Object.entries(files || {}).some(([p, c]) => seedFiles[p] !== c);
 
-    if (!hasRealChanges(result.state.data.files)) {
+    // A remixed template is already a complete, working site. "Build it as-is"
+    // legitimately changes nothing, so an untouched template is a valid result —
+    // only nag when the user actually asked for something.
+    const noOpIsAcceptable = Boolean(template) && isNewBuild && !hasSiteChangeRequest;
+
+    if (!hasRealChanges(result.state.data.files) && !noOpIsAcceptable) {
       console.warn("DEBUG: Creator agent made no file changes. Running one corrective attempt...");
       const retryState = createState<AgentState>(
         { summary: "", files: state.data.files },
@@ -631,8 +1111,16 @@ export const codeAgentFunction = inngest.createFunction(
         defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
       });
 
+      const correctiveGoal = !isNewBuild || editMode === "DIFF"
+        ? "requested change MUST be applied"
+        : template
+          ? "template MUST be adapted to the request"
+          : "scaffold placeholders MUST be replaced with the brief's content";
+      const correctiveAction = editMode === "DIFF"
+        ? "Call the applyDiff tool now with an exact search snippet"
+        : "Call the editFiles tool now with the actual file contents";
       const correctivePrompt = currentPrompt +
-        `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${isNewBuild ? "scaffold placeholders MUST be replaced with the brief's content" : "requested change MUST be applied"}. Call the editFiles tool now with the actual file contents, THEN print the task summary.`;
+        `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`;
 
       result = await retryNetwork.run(correctivePrompt, { state: retryState });
       if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };

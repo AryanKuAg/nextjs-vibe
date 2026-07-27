@@ -8,8 +8,7 @@ import { z } from "zod";
 import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import { TASTE_BRIEF_RULES } from "@/lib/taste";
-import fs from "fs/promises";
-import path from "path";
+import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
 
 // 1. Define State
 export const AgentState = Annotation.Root({
@@ -68,7 +67,7 @@ export const AgentState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
-  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template" | "sanitize_prompt" | "followup_router">({
+  next_agent: Annotation<"frame_generation" | "video_generation" | "code_generation" | "reject" | "finish" | "ask_media_intent" | "ask_video_intent" | "ask_wizard_3d" | "ask_wizard_build" | "select_template" | "sanitize_prompt" | "followup_router" | "template_build" | "supervisor">({
     reducer: (x, y) => y ?? x,
     default: () => "finish",
   }),
@@ -108,6 +107,18 @@ export const AgentState = Annotation.Root({
   interactiveMessageId: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
+  }),
+  // Set only for projects started by remixing a gallery template. Everything
+  // keyed off this is inert for prompt-built projects.
+  templateId: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  // DIFF routes a small template tweak through the fast search/replace editor
+  // instead of the full-rewrite code agent. Never set for non-template projects.
+  edit_mode: Annotation<"FULL" | "DIFF">({
+    reducer: (x, y) => y ?? x,
+    default: () => "FULL",
   }),
   buildPref: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
@@ -772,10 +783,20 @@ const BuildBriefSchema = z.object({
   body_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
   accent_color: z.string().describe("ONE accent color as a hex code fitting the brand. Never purple-pink gradient territory unless the user demands it."),
   nav_style: z.string().describe("One sentence: the navigation labels and CTA button wording"),
+  layout_concept: z.string().describe(
+    "3-5 sentences inventing the LAYOUT for THIS specific site, derived from the user's request — not a stock template. " +
+    "Cover: how the hero content is composed over the video (where the headline sits — centered, bottom-left, corner-anchored, split across the viewport — and its scale/typographic treatment), " +
+    "the navigation's shape and placement, how the page's rhythm changes from section to section, and the overall motion character. " +
+    "Make a distinctive compositional choice that suits this brand's industry and tone; two different requests must never yield the same layout."
+  ),
   sections: z.array(z.object({
     id: z.string().describe("kebab-case section id used for anchor links"),
     heading: z.string().describe("The actual heading copy for this section"),
     content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. No images ever — content is typography, numbers, lists, and inline SVG only."),
+    layout: z.string().describe(
+      "1-3 sentences describing how THIS section is structured and animated: the arrangement (asymmetric grid, full-width numbered rows, two-column split with a sticky side, stat strip, vertical list with hover reveals, marquee, etc.), " +
+      "the alignment and density, and its scroll-reveal behaviour. Vary the arrangement between sections so the page has rhythm — never repeat the same card grid."
+    ),
   })).min(3).max(6).describe("4-5 sections in page order; the last one is always the footer"),
   text_scheme: z.enum(["light-text", "dark-text"]).describe("Base text color family over the video, chosen from the scene analysis"),
   must_honor: z.array(z.string()).describe("Verbatim requirements from the user's request that MUST appear in the final site (specific copy, features, section names, colors). Empty array if none."),
@@ -807,11 +828,10 @@ ${sceneLine}
 
 const renderBuildBrief = (
   brief: BuildBrief,
-  skeleton: { id: string; prompt_template: string },
   scene: SceneAnalysis | null,
 ): string => {
   const sections = brief.sections
-    .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}" — ${s.content_outline}`)
+    .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}"\n   Content: ${s.content_outline}\n   Layout: ${s.layout}`)
     .join("\n");
   const mustHonor = brief.must_honor.length > 0
     ? `\nMust honor (verbatim user requirements — these win over everything else in this brief):\n${brief.must_honor.map((m) => `- ${m}`).join("\n")}`
@@ -825,16 +845,15 @@ Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import 
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
 
+Layout concept (composed for THIS site — build exactly this, do not substitute a generic template):
+${brief.layout_concept}
+
 ${renderReadabilityBlock(brief, scene)}
 
 Sections (in this order):
 ${sections}
 ${mustHonor}
-=== END BUILD BRIEF ===
-
-=== LAYOUT SKELETON: ${skeleton.id} (structure & motion guidance — fill it with the brief's content) ===
-${skeleton.prompt_template}
-=== END LAYOUT SKELETON ===`;
+=== END BUILD BRIEF ===`;
 };
 
 const selectTemplateNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -844,41 +863,23 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   // The website request — never the media prompt a user may have typed via
   // the WRITE_PROMPT buttons (which overwrite current_prompt).
   const sitePrompt = state.site_prompt || state.current_prompt;
+
+  // Remixed templates already have a layout, a palette and finished copy — the
+  // whole point is that the user picked that design. Composing a build brief
+  // here would instruct the code agent to invent a page from scratch and throw
+  // the template away, so template projects skip this node's work entirely and
+  // hand the user's request through untouched.
+  const template = getTemplate(state.templateId);
+  if (template) {
+    console.log(`[Select Template] Template project ("${template.id}") — skipping brief composition.`);
+    return { next_agent: "code_generation", current_prompt: sitePrompt };
+  }
+
   const briefMode = state.experiencePref === "HERO_ONLY" ? ("HERO_ONLY" as const) : ("FULL_PAGE" as const);
 
-  const templateFile = state.experiencePref === "HERO_ONLY"
-    ? "hero_templates.json"
-    : "full_page_templates.json";
-
-  const skeleton = await step.run("select-skeleton-llm", async () => {
-    const templatesPath = path.join(process.cwd(), "src/lib/templates", templateFile);
-    const templatesData = await fs.readFile(templatesPath, "utf-8");
-    const templates = JSON.parse(templatesData);
-
-    const sysMsg = new SystemMessage(
-      "You are an expert design selector. Select the layout skeleton whose structure best fits the user's request (vibe, industry, content shape).\n" +
-      "Return the exact ID of the best match.\n\n" +
-      "Available skeletons:\n" +
-      templates.map((t: { id: string; description: string }) => `- ID: ${t.id}\n  Description: ${t.description}`).join("\n\n")
-    );
-
-    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
-    const structuredLlm = routerModel.withStructuredOutput(
-      z.object({
-        template_id: z.string().describe("The ID of the chosen skeleton"),
-      })
-    );
-
-    let result;
-    try {
-      result = await structuredLlm.invoke([sysMsg, new HumanMessage(sitePrompt)]);
-    } catch (e) {
-      console.warn("[Select Template] Output parsing failed, falling back to default skeleton.", e);
-      result = { template_id: templates[0].id };
-    }
-
-    return templates.find((t: { id: string }) => t.id === result.template_id) || templates[0];
-  });
+  // Layout is composed per-request by the brief compiler below — there is no
+  // fixed skeleton library. The JSON files under src/lib/templates/ are no longer
+  // read here; they are reserved for a separate, explicitly-selected template flow.
 
   // Analyze the generated background so the design is matched to THIS video:
   // brightness decides the text color (there are NO overlays), dominant colors steer the accent.
@@ -947,6 +948,11 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "- Sites contain NO images of any kind. Content outlines must never reference photos, screenshots, avatars, or logo images — visuals come from typography, color, thin borders, inline SVG shapes, and motion.\n" +
       "- Aesthetic: minimal, classy, editorial, a little creative. Never generic-template. One accent color only.\n" +
       "- 4-5 sections total, footer last, realistic specific copy directions (no lorem ipsum).\n\n" +
+      "LAYOUT IS YOURS TO INVENT (important): there is no template library and no preset skeleton. " +
+      "Compose the page structure from scratch for THIS request — the hero composition over the video, the nav's shape, " +
+      "the arrangement and rhythm of each section, and the motion character all come from the brand, industry and tone in front of you. " +
+      "Vary the structure between sections so the page has rhythm, and make a compositional choice specific enough that a different " +
+      "request would produce a visibly different page. Fill layout_concept and every section's layout field with that thinking.\n\n" +
       "Extract every specific requirement the user stated (exact copy, features, section names, colors) into must_honor. " +
       "Where the user was vague, make confident, tasteful decisions that fit their idea.\n" +
       TASTE_BRIEF_RULES +
@@ -965,15 +971,81 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   const finalPrompt = brief
-    ? renderBuildBrief(brief, skeleton, sceneAnalysis)
+    ? renderBuildBrief(brief, sceneAnalysis)
     : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
     `${renderReadabilityBlock(
       { text_scheme: sceneAnalysis?.text_scheme ?? "light-text" },
       sceneAnalysis,
     )}\n\n` +
-    `=== LAYOUT SKELETON: ${skeleton.id} ===\n${skeleton.prompt_template}\n=== END LAYOUT SKELETON ===`;
+    `Compose the layout yourself from the user request above — hero composition, section arrangement, and motion. ` +
+    `Make a distinctive choice that suits this brand; do not fall back on a generic card-grid template.`;
 
   return { next_agent: "code_generation", current_prompt: finalPrompt };
+};
+
+// Entry point for a fresh template remix.
+//
+// The user picked a finished site from the gallery, so there is nothing to ask
+// and nothing to invent: no wizard (the template declares its own mode), no
+// scene question, no image generation, no video generation. We take the code
+// from GitHub, build it, and show it. If they later want a different background
+// or different copy, the follow-up router sends that to the right agent.
+const templateBuildNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
+  const step = config.configurable?.step;
+  const template = getTemplate(state.templateId);
+
+  if (!template) {
+    // Unreachable via the graph edge, but a project whose templateId was removed
+    // from the registry must still build rather than dead-end.
+    console.warn(`[Template Build] Unknown template "${state.templateId}" — falling back to the normal pipeline.`);
+    return { next_agent: "supervisor" as const };
+  }
+
+  console.log(`[Template Build] Remixing "${template.id}" — skipping wizard and media generation.`);
+
+  // Record the template's video as the project's current background so follow-up
+  // media edits (and the code agent's video derivation) have something to start
+  // from, exactly as a generated video would.
+  const videoUrl = await step.run("record-template-video", async () => {
+    const project = await prisma.project.findUnique({
+      where: { id: state.projectId },
+      select: { videoUrls: true },
+    });
+    const existing = Array.isArray(project?.videoUrls) ? project.videoUrls : [];
+    const last = existing[existing.length - 1] as { url?: string } | undefined;
+
+    // Skip straight past the scene/video stages in the UI — a remix has none.
+    // A video the user already generated for this project wins over the
+    // template's default, so a rebuild never silently undoes their choice.
+    // status normally flips to "active" in the media pipeline, which a remix
+    // skips — without this the project would stay "draft" forever.
+    if (last?.url) {
+      await prisma.project.update({
+        where: { id: state.projectId },
+        data: { currentStage: "BUILDING_SITE", status: "active" },
+      });
+      return last.url;
+    }
+
+    const fallback = templateVideoUrl(template);
+    await prisma.project.update({
+      where: { id: state.projectId },
+      data: { videoUrls: [{ url: fallback }], currentStage: "BUILDING_SITE", status: "active" },
+    });
+    return fallback;
+  });
+
+  return {
+    next_agent: "code_generation" as const,
+    video_url: videoUrl,
+    experiencePref: template.mode,
+    // The user's words go to the code agent untouched — no build brief, no
+    // sanitizer. TEMPLATE_ASIS_PROMPT means "change nothing", which the code
+    // agent treats as a valid no-op.
+    current_prompt: state.site_prompt || state.current_prompt,
+    isAgentMode: true,
+    media_only_update: false,
+  };
 };
 
 const codeGenerationNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
@@ -996,6 +1068,10 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
     "not a redesign. Do not restyle the site to match the new video."
     : state.current_prompt;
 
+  // A media-only swap is a one-line change even on a template — but the video
+  // URL lives wherever that template put it, so leave it to the full agent.
+  const editMode = state.media_only_update ? "FULL" : state.edit_mode;
+
   await step.invoke("generate-code", {
     function: codeAgentFunction,
     data: {
@@ -1004,7 +1080,8 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       videoUrl: state.video_url || undefined,
       experiencePref: state.experiencePref || undefined,
       model: "google/gemini-3.1-flash-lite",
-      userId: state.userId
+      userId: state.userId,
+      editMode,
     }
   });
 
@@ -1029,6 +1106,15 @@ const FollowUpIntentSchema = z.object({
     "The user's description of what the new background should be, copied VERBATIM from their message with any " +
     "instruction words removed (e.g. from 'change the video to australias coral reef (make it more devil)' return " +
     "'australias coral reef, make it more devil'). Return an empty string if they described nothing."
+  ),
+});
+
+// Applies only to remixed templates: can this change be made by swapping a few
+// existing lines, or does it need new/restructured code?
+const TemplateEditScopeSchema = z.object({
+  scope: z.enum(["SURGICAL", "STRUCTURAL"]).describe(
+    "SURGICAL if the request only swaps existing values in place (copy, a label, a color, a size, a link). " +
+    "STRUCTURAL if it adds, removes, reorders, or rebuilds anything, or rewrites most of the site at once."
   ),
 });
 
@@ -1137,6 +1223,41 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     };
   }
 
+  // CODE on a remixed template: decide whether this is a surgical tweak the fast
+  // diff editor can do, or a structural change that needs the full code agent.
+  // Only template projects are eligible — prompt-built sites always take the
+  // existing full path.
+  let editMode: "FULL" | "DIFF" = "FULL";
+  if (getTemplate(state.templateId)) {
+    editMode = await step.run("classify-template-edit-scope", async () => {
+      const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(TemplateEditScopeSchema);
+      try {
+        const scope = await model.invoke([
+          new SystemMessage(
+            "The user has a finished website and is asking for a change. Decide whether it can be made by " +
+            "editing a few existing lines in place, or whether it needs new or restructured code.\n\n" +
+            "SURGICAL — an existing value is swapped for another: wording and copy, a headline, a button " +
+            "label, a color, a font size, a link, a number, a name. The shape of the page does not change.\n" +
+            "Examples: 'change the headline to Welcome Home', 'make the CTA green', 'rename the brand to " +
+            "Oakline', 'the pricing should say $49', 'make the nav links bigger'.\n\n" +
+            "STRUCTURAL — anything that adds, removes, reorders, or rebuilds: a new section, a deleted " +
+            "block, a different layout, new animations, a rewritten page, a redesign, or a broad rebrand " +
+            "that rewrites most of the site's content at once.\n" +
+            "Examples: 'add a testimonials section', 'remove the pricing block', 'make the hero two-column', " +
+            "'turn this into a furniture store', 'redesign it to feel more playful'.\n\n" +
+            "When genuinely unsure, answer STRUCTURAL — a full rewrite is slower but always capable."
+          ),
+          new HumanMessage(state.current_prompt),
+        ]);
+        console.log(`[Follow-up Router] Template edit scope: ${scope.scope}`);
+        return scope.scope === "SURGICAL" ? ("DIFF" as const) : ("FULL" as const);
+      } catch (e) {
+        console.warn("[Follow-up Router] Edit-scope classification failed, using the full code agent.", e);
+        return "FULL" as const;
+      }
+    });
+  }
+
   // CODE: keep the user's words exactly — the code agent edits from the message.
   return {
     next_agent: "code_generation",
@@ -1144,6 +1265,7 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     video_url: existing.videoUrl,
     experiencePref: existing.experiencePref,
     media_only_update: false,
+    edit_mode: editMode,
   };
 };
 
@@ -1179,12 +1301,29 @@ const workflow = new StateGraph(AgentState)
   .addNode("frame_generation", frameGenerationNode)
   .addNode("video_generation", videoGenerationNode)
   .addNode("select_template", selectTemplateNode)
+  .addNode("template_build", templateBuildNode)
   .addNode("code_generation", codeGenerationNode)
   .addNode("followup_router", followUpRouterNode)
   .addNode("reject", rejectNode)
-  // A project with an existing site skips the wizard entirely.
-  .addConditionalEdges(START, (state) => (state.isFollowUp ? "followup_router" : "supervisor"), {
-    followup_router: "followup_router",
+  // Entry routing:
+  //   existing site      → followup_router (never re-runs the wizard)
+  //   fresh template remix → template_build (no wizard, no media generation)
+  //   everything else    → supervisor (the normal prompt-built pipeline)
+  .addConditionalEdges(
+    START,
+    (state) => {
+      if (state.isFollowUp) return "followup_router";
+      if (state.templateId) return "template_build";
+      return "supervisor";
+    },
+    {
+      followup_router: "followup_router",
+      template_build: "template_build",
+      supervisor: "supervisor",
+    },
+  )
+  .addConditionalEdges("template_build", (state) => state.next_agent, {
+    code_generation: "code_generation",
     supervisor: "supervisor",
   })
   .addConditionalEdges("followup_router", (state) => state.next_agent, {
@@ -1280,9 +1419,20 @@ export const autonomousAgentFunction = inngest.createFunction(
     const { projectId, prompt, userId, buildPref, experiencePref } = event.data;
     const isFollowUp = event.data.isFollowUp ?? false;
 
+    // Read from the project row rather than the event: follow-up events are sent
+    // from several places and would otherwise have to remember to carry it.
+    const templateId = await step.run("get-project-template", async () => {
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { templateId: true },
+      });
+      return project?.templateId ?? null;
+    });
+
     const initialState = {
       projectId,
       userId,
+      templateId,
       current_prompt: prompt,
       site_prompt: event.data.sitePrompt || prompt,
       isFollowUp,

@@ -224,23 +224,34 @@ The files in this project are a FINISHED, hand-built website that the user picke
 
 Your job is to adapt this site to the user's request — nothing more.
 
+## THE TEMPLATE'S CONVENTIONS OVERRIDE EVERY RULE ABOVE (CRITICAL)
+The environment rules above describe the platform's OWN starter scaffold. This project is NOT that scaffold — it is somebody else's finished repository with its own stack, conventions, and history. Where the two disagree, THE TEMPLATE WINS. Specifically:
+- EXPORTS: match each file's existing style exactly. If a component is a default export, import it as a default export. NEVER convert between default and named exports, in either direction, for any reason. Changing \`import Navbar from './components/Navbar'\` into \`import { Navbar } from './components/Navbar'\` breaks the build.
+- TAILWIND VERSION: the template may use Tailwind v3 (\`@tailwind base; @tailwind components; @tailwind utilities;\`) or v4 (\`@import "tailwindcss";\`). Whichever it uses is CORRECT for this project. Never migrate between them, and never assume v4.
+- FONTS: the template already loads its own fonts. Do NOT add \`@import url(...)\` font rules to src/index.css. A CSS \`@import\` placed after other statements is a hard build error, and the ignore-this rule above about importing Google Fonts does not apply here.
+- CSS STRUCTURE: never reorder, reformat, or "modernise" src/index.css. Edit only the specific declarations the request requires.
+- A tailwind.config.js / postcss.config.js may legitimately exist here. Leave them alone.
+If you find yourself "fixing" template code that was not part of the request, stop — that is the single most common way this task fails.
+
+## RULES
 1. START BY READING. Use readFiles to inspect the files you intend to change before you change them. Never guess at a file's contents.
 2. CHANGE ONLY WHAT WAS ASKED. If the user asks for a furniture store, rewrite the copy, the brand name, and the palette. Do NOT restructure sections, swap the layout, remove animations, or "improve" spacing that nobody complained about.
 3. TOUCH THE FEWEST FILES POSSIBLE. A copy change is a copy change; it is not a reason to rewrite App.tsx.
-4. KEEP THE MOTION. The template's Framer Motion variants, scroll behaviour, and transitions are part of what the user selected. Preserve them unless the request is explicitly about motion.
+4. KEEP THE MOTION. The template's animations, scroll behaviour, and transitions are part of what the user selected. Preserve them unless the request is explicitly about motion.
 5. THIS TEMPLATE OWNS ITS BACKGROUND. It has its own video implementation${mode === "FULL_PAGE" ? " (a scroll-scrubbed background behind the whole page)" : " (a video in the hero section)"}. Do NOT import, create, or expect a ScrollFrames component from the platform, and do NOT install scrolly-video unless the template's own package.json already depends on it.${videoUrl ? `\n6. THE BACKGROUND VIDEO URL IS ALREADY WIRED IN: "${videoUrl}". It has been substituted into the template's source. Leave it alone unless the user asks for a different video.` : ""}
 7. DEPENDENCIES ARE ALREADY INSTALLED. The template's package.json was installed when the project was created. Only run npm install if you genuinely need a package that is not already there.
-8. The design system and taste rules above are guidance for anything you ADD. They are not a mandate to restyle what already exists — the template's own visual language wins.
+8. If the request is vague or you cannot identify a concrete change to make, change NOTHING and say so in your summary. An untouched, working template is a correct outcome; a broken one is not.
 `;
 
 const TEMPLATE_CHECKLIST = `
 ## FINAL CHECKLIST — verify each item before printing <task_summary>
 - Only the files that actually needed changing were written
+- No import was converted between default and named form
+- No font @import was added to src/index.css, and its @tailwind / @import "tailwindcss" lines are untouched
 - The template's section structure, layout, and animations are intact
 - No ScrollFrames component was imported or created
 - The background video URL was left as-is (unless the request was about the video)
-- Every import used, every used symbol imported, relative paths only
-- Framer Motion variants keep their ": Variants" annotations
+- Every import resolves against the file it points at
 - <task_summary> printed exactly once, at the very end`;
 
 export function buildCodeAgentSystemPrompt(
@@ -248,9 +259,12 @@ export function buildCodeAgentSystemPrompt(
   videoUrl?: string | null,
   opts?: { isTemplate?: boolean },
 ): string {
-  // Remixed templates never use the scaffold architecture modules.
+  // Remixed templates never use the scaffold architecture modules. DESIGN_SYSTEM
+  // and TASTE_MODULE are deliberately omitted too: they exist to make the agent
+  // INVENT a page in the platform's house style, which is precisely what must
+  // not happen to somebody else's finished, hand-built site.
   if (opts?.isTemplate) {
-    return [CORE_RULES, DESIGN_SYSTEM, TASTE_MODULE, TEMPLATE_MODULE(mode, videoUrl), TEMPLATE_CHECKLIST].join("\n");
+    return [CORE_RULES, TEMPLATE_MODULE(mode, videoUrl), TEMPLATE_CHECKLIST].join("\n");
   }
 
   // Without a video URL there is nothing to wire up — fall back to STANDARD.

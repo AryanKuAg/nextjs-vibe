@@ -290,7 +290,13 @@ const readTemplateFilesFromSandbox = async (sandbox: Sandbox): Promise<Record<st
     "process.chdir('/home/user');",
     "walk('/home/user/src');",
     "walk('/home/user/public');",
-    "for (const f of ['index.html','vite.config.ts','vite.config.js','package.json','tailwind.config.js','postcss.config.js','tsconfig.json','tsconfig.app.json','tsconfig.node.json']) {",
+    // Build-critical root files. A template may use any of these variants, and a
+    // missing tailwind/postcss config silently produces an unstyled site after a
+    // cold-sandbox rehydration rather than an error.
+    "for (const f of ['index.html','vite.config.ts','vite.config.js','vite.config.mjs','package.json'," +
+    "'tailwind.config.js','tailwind.config.ts','tailwind.config.cjs'," +
+    "'postcss.config.js','postcss.config.ts','postcss.config.cjs','postcss.config.mjs'," +
+    "'tsconfig.json','tsconfig.app.json','tsconfig.node.json']) {",
     "  const p = '/home/user/' + f;",
     "  if (fs.existsSync(p)) out[f] = fs.readFileSync(p, 'utf8');",
     "}",
@@ -1058,6 +1064,14 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
     }
 
+    // --- 0. AS-IS TEMPLATE REMIX: no agent runs at all ---
+    // The user picked a finished site and asked for no changes. Handing that to
+    // an LLM can only make it worse: the code agent's environment rules describe
+    // the platform scaffold (Tailwind v4, named exports, Google-Font @imports in
+    // index.css) and it will "correct" a template that legitimately differs,
+    // breaking a repo that built fine a moment earlier. Skip straight to build.
+    const isAsIsTemplateRemix = Boolean(template) && isNewBuild && !hasSiteChangeRequest;
+
     // --- 1. INITIAL GENERATION (The Creator) ---
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialNetwork = createNetwork<AgentState>({
@@ -1074,9 +1088,16 @@ export const codeAgentFunction = inngest.createFunction(
       defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
-    console.log('DEBUG: Running initial Creator agent...');
-    let result = await initialNetwork.run(currentPrompt, { state });
-    if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+    let result: Awaited<ReturnType<typeof initialNetwork.run>> | null = null;
+
+    if (isAsIsTemplateRemix) {
+      console.log(`DEBUG: As-is remix of template "${template!.id}" — skipping the code agent entirely.`);
+      state.data.summary = `<task_summary>\nBuilt the ${template!.title} template as-is.\n</task_summary>`;
+    } else {
+      console.log('DEBUG: Running initial Creator agent...');
+      result = await initialNetwork.run(currentPrompt, { state });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+    }
 
     // --- VERIFICATION: the agent must have actually changed something. ---
     // A lazy model can emit a task summary without a single tool call; the seeded
@@ -1089,9 +1110,7 @@ export const codeAgentFunction = inngest.createFunction(
     // A remixed template is already a complete, working site. "Build it as-is"
     // legitimately changes nothing, so an untouched template is a valid result —
     // only nag when the user actually asked for something.
-    const noOpIsAcceptable = Boolean(template) && isNewBuild && !hasSiteChangeRequest;
-
-    if (!hasRealChanges(result.state.data.files) && !noOpIsAcceptable) {
+    if (result && !hasRealChanges(result.state.data.files) && !isAsIsTemplateRemix) {
       console.warn("DEBUG: Creator agent made no file changes. Running one corrective attempt...");
       const retryState = createState<AgentState>(
         { summary: "", files: state.data.files },
@@ -1127,8 +1146,9 @@ export const codeAgentFunction = inngest.createFunction(
       state.data.files = result.state.data.files;
     }
 
-    finalSummary = result.state.data.summary || "";
-    finalFiles = result.state.data.files;
+    // On an as-is remix no agent ran, so the seeded template files are final.
+    finalSummary = result ? (result.state.data.summary || "") : state.data.summary;
+    finalFiles = result ? result.state.data.files : state.data.files;
 
     if (!finalSummary) {
       console.error("DEBUG: AI returned no summary. Halting.");
@@ -1278,17 +1298,33 @@ function fixPaths(dir) {
 }
 fixPaths(process.argv[2]);
 `;
+          // fix-paths repairs quirks of AI-written SCAFFOLD code — most notably it
+          // rewrites `import Navbar from ...` into a named import, because the
+          // platform scaffold's Navbar is a named export. A template repo that
+          // legitimately uses a default export gets broken by that on EVERY
+          // attempt, so the build fails, the fixer "repairs" it, and the next
+          // attempt breaks it again. Template code is known-good and hand-written:
+          // it needs no normalisation, and its author's choices must survive.
           try {
+            // The script is always written — the post-build pass over dist/ still
+            // needs it to make the bundled output deployable.
             await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
-            await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
+            if (!template) {
+              await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
+            }
           } catch (e) {
             console.error("DEBUG: fix-paths pre-pass failed (continuing)", e);
           }
 
-          try {
-            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
-          } catch {
-            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
+          if (!template) {
+            // Templates ship their own linter config (or none). Running the
+            // platform's eslint with --fix over hand-written source rewrites code
+            // its author never asked us to touch.
+            try {
+              await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
+            } catch {
+              // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
+            }
           }
 
           console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);

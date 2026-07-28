@@ -24,16 +24,21 @@ interface SitePreviewCardProps {
   title: string;
   href: string;
   imgSrc: string;
+  /** Fixed card height in px. Falls back to a 16:9 box when omitted. */
+  height?: number;
 }
 
-const SitePreviewCard = ({ title, href, imgSrc }: SitePreviewCardProps) => (
+const SitePreviewCard = ({ title, href, imgSrc, height }: SitePreviewCardProps) => (
   <a
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block rounded-[8px] font-sans overflow-hidden relative"
+    className="group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid"
   >
-    <div className="relative aspect-[1280/720] w-full bg-grey-bg">
+    <div
+      className={`relative w-full bg-grey-bg ${height ? "" : "aspect-[1280/720]"}`}
+      style={height ? { height } : undefined}
+    >
       <Image
         src={imgSrc}
         alt={`${title} - 3D website template`}
@@ -240,14 +245,24 @@ const LoggedOutView = () => {
         className="flex-1 overflow-y-auto p-3 md:p-4 md:pl-0"
         style={{ scrollBehavior: 'auto' }}
       >
-        <div className="columns-1 md:columns-2 gap-3 md:gap-4 space-y-3 md:space-y-4">
-          {repeatedSites.map((site, idx) => (
-            <SitePreviewCard
-              key={`${site.title}-${idx}`}
-              title={site.title}
-              href={site.href}
-              imgSrc={site.imgSrc}
-            />
+        {/* Two explicit columns fed round-robin rather than a CSS `columns`
+            masonry: the heights alternate tall/short within each column, and
+            the second column starts on the short one so the two stagger. */}
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+          {[0, 1].map((col) => (
+            <div key={col} className="flex-1 min-w-0 flex flex-col gap-3 md:gap-4">
+              {repeatedSites
+                .filter((_, idx) => idx % 2 === col)
+                .map((site, idx) => (
+                  <SitePreviewCard
+                    key={`${site.title}-${col}-${idx}`}
+                    title={site.title}
+                    href={site.href}
+                    imgSrc={site.imgSrc}
+                    height={(idx + col) % 2 === 0 ? 358 : 280}
+                  />
+                ))}
+            </div>
           ))}
         </div>
       </div>

@@ -59,7 +59,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/Beach_House/index.html",
-    imgSrc: "https://assets.framerate.space/templates/planet%20robot/template.jpg",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-Beach_House-index.html.png",
   },
   {
     id: "flower-and-plane",
@@ -68,7 +69,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
-    imgSrc: "https://assets.framerate.space/templates/Theo/Template.png",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
   },
   {
     id: "orange-furry-creature",
@@ -77,7 +79,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/orange-furry-creature/index.html",
-    imgSrc: "https://assets.framerate.space/templates/Theo/Template.png",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orange-furry-creature-index.html%20(1).png",
   },
   {
     id: "rotating-earth",
@@ -86,7 +89,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
-    imgSrc: "https://assets.framerate.space/templates/stone/template.png",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
   },
   {
     id: "australia-beach-road",
@@ -95,7 +99,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
-    imgSrc: "https://assets.framerate.space/mars_template.jpg",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
   },
   {
     id: "beach-resort",
@@ -122,7 +127,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
-    imgSrc: "https://assets.framerate.space/mars_template.jpg",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
   },
   {
     id: "ai-trip-planner",
@@ -131,7 +137,7 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
-    imgSrc: "https://assets.framerate.space/templates/turtle/template.png",
+    imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
   },
   {
     id: "ai-workflow-agents",
@@ -140,7 +146,8 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     branch: "main",
     mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/ai-workflow-agents/index.html",
-    imgSrc: "https://assets.framerate.space/templates/turtle/template.png",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-ai-workflow-agents-index.html.png",
   },
 ];
 

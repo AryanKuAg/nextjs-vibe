@@ -3,13 +3,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useClerk } from "@clerk/nextjs";
-import { toast } from "sonner";
 
-import { useTRPC } from "@/trpc/client";
-import { TEMPLATE_ASIS_PROMPT, type TemplateManifest } from "@/lib/templates/registry";
+import { useTemplateRemix } from "@/hooks/use-template-remix";
+import { type TemplateManifest } from "@/lib/templates/registry";
 
 interface TemplatesModalProps {
   isOpen: boolean;
@@ -19,52 +15,10 @@ interface TemplatesModalProps {
 
 export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [remixPrompt, setRemixPrompt] = useState("");
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const trpc = useTRPC();
-  const router = useRouter();
-  const clerk = useClerk();
-  const queryClient = useQueryClient();
+  const { remix, isPending } = useTemplateRemix();
 
-  const createProject = useMutation(
-    trpc.projects.create.mutationOptions({
-      onSuccess: (data) => {
-        queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}?builderAutoSubmit=true`);
-      },
-      onError: (error) => {
-        setIsRedirecting(false);
-        if (error.data?.code === "UNAUTHORIZED") {
-          clerk.openSignIn();
-          return;
-        }
-        toast.error(error.message, { duration: Infinity });
-      },
-    })
-  );
-
-  const isPending = createProject.isPending || isRedirecting;
-
-  const handleRemix = async () => {
-    if (!selectedTemplate || isPending) return;
-
-    // No description means "give me this template exactly" — a valid request the
-    // code agent recognises and satisfies without rewriting anything.
-    const value = remixPrompt.trim() || TEMPLATE_ASIS_PROMPT;
-
-    setIsRedirecting(true);
-    // The project page reads these on mount and auto-submits the first build.
-    sessionStorage.setItem("pending_builder_prompt", value);
-    sessionStorage.setItem("pending_model", "google/gemini-3.1-flash-lite");
-
-    try {
-      await createProject.mutateAsync({ value, templateId: selectedTemplate });
-    } catch {
-      // Handled in onError.
-    }
-  };
+  const handleRemix = () => remix(selectedTemplate);
 
   return (
     <AnimatePresence>
@@ -125,22 +79,7 @@ export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalPro
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 p-4 border-t-[0.5px] border-white-8 mt-auto shrink-0">
-              <input
-                type="text"
-                value={remixPrompt}
-                onChange={(e) => setRemixPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRemix();
-                }}
-                disabled={!selectedTemplate || isPending}
-                placeholder={
-                  selectedTemplate
-                    ? "Optional — describe your version (e.g. make this for a furniture store)"
-                    : "Click a template to select it"
-                }
-                className="flex-1 min-w-0 h-[28px] px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] leading-[20px] placeholder:text-white-50 focus:outline-none focus:border-white/50 disabled:opacity-50"
-              />
+            <div className="flex items-center justify-end gap-3 p-4 border-t-[0.5px] border-white-8 mt-auto shrink-0">
               <button
                 type="button"
                 onClick={handleRemix}

@@ -8,12 +8,14 @@ import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
 import { TemplatesModal } from "@/components/templates-modal";
+import { useTemplateRemix } from "@/hooks/use-template-remix";
 import { TEMPLATE_REGISTRY } from "@/lib/templates/registry";
 
 /* ─── Site preview cards data ───
    Sourced from the template registry so the gallery, the remix modal, and the
    build pipeline all agree on which templates exist and what their ids are. */
 const SITES = TEMPLATE_REGISTRY.map((t) => ({
+  id: t.id,
   title: t.title,
   href: t.demoUrl,
   imgSrc: t.imgSrc,
@@ -29,9 +31,22 @@ interface SitePreviewCardProps {
   height?: number;
   /** If true, uses a simpler opacity-only hover effect without overlays */
   isLandingPage?: boolean;
+  /** Template id — enables the Remix pill when provided. */
+  templateId?: string;
+  onRemix?: (templateId: string) => void;
+  isRemixPending?: boolean;
 }
 
-const SitePreviewCard = ({ title, href, imgSrc, height, isLandingPage }: SitePreviewCardProps) => (
+const SitePreviewCard = ({
+  title,
+  href,
+  imgSrc,
+  height,
+  isLandingPage,
+  templateId,
+  onRemix,
+  isRemixPending,
+}: SitePreviewCardProps) => (
   <a
     href={href}
     target="_blank"
@@ -48,27 +63,35 @@ const SitePreviewCard = ({ title, href, imgSrc, height, isLandingPage }: SitePre
         src={imgSrc}
         alt={`${title} - 3D website template`}
         fill
-        className={`object-cover ${
-          isLandingPage ? "" : "transition-transform duration-500 group-hover:scale-105"
-        }`}
+        className="object-cover"
       />
 
       {!isLandingPage && (
         <>
+          {/* Top Gradient */}
+          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
 
-      {/* Top Gradient */}
-      <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
-
-      {/* Title */}
-      <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-        <span className="text-white font-medium text-sm">{title}</span>
-      </div>
-
-          {/* Preview pill */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+          {/* Action pills */}
+          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
             <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
               Preview
             </div>
+            {templateId && onRemix && (
+              <button
+                type="button"
+                disabled={isRemixPending}
+                onClick={(e) => {
+                  // The card itself is the "open the demo" link — keep the pill
+                  // from following it.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemix(templateId);
+                }}
+                className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors disabled:opacity-50"
+              >
+                {isRemixPending ? "Starting…" : "Remix"}
+              </button>
+            )}
           </div>
         </>
       )}
@@ -79,6 +102,7 @@ const SitePreviewCard = ({ title, href, imgSrc, height, isLandingPage }: SitePre
 /* ─── Logged In Dashboard ─── */
 const LoggedInDashboard = () => {
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const { remix, isPending: isRemixPending } = useTemplateRemix();
   return (
     <main className="min-h-screen bg-bg font-sans flex flex-col">
       {/* Top Navigation */}
@@ -119,6 +143,9 @@ const LoggedInDashboard = () => {
                 title={site.title}
                 href={site.href}
                 imgSrc={site.imgSrc}
+                templateId={site.id}
+                onRemix={remix}
+                isRemixPending={isRemixPending}
               />
             ))}
           </div>
@@ -195,7 +222,7 @@ const LoggedOutView = () => {
   return (
     <main className="h-screen bg-bg font-sans flex flex-col md:flex-row overflow-hidden">
       {/* ── Left Panel (Fixed) ── */}
-      <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col justify-between p-3 md:h-screen overflow-y-auto overflow-x-hidden">
+      <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col flex-1 md:flex-none justify-between p-3 md:h-screen overflow-y-auto overflow-x-hidden">
         {/* Top: Logo + Content */}
         <div className="flex flex-col p-3">
           {/* Logo */}
@@ -253,7 +280,7 @@ const LoggedOutView = () => {
       {/* ── Right Panel (Scrollable) ── */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-3  md:pl-0"
+        className="hidden md:block flex-1 overflow-y-auto p-3 md:pl-0"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Two explicit columns fed round-robin rather than a CSS `columns`

@@ -58,7 +58,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
         onClick={onClose}
         aria-label="Close"
         className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors bg-[#282828] hover:bg-[#333] leading-none"
-        style={{ fontSize: 20 }}
+        style={{ fontSize: 16 }}
       >
         ✕
       </button>

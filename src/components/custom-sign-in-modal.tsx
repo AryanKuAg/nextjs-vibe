@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useSignIn, useUser } from "@clerk/nextjs";
+// The button's pending spinner is a remixicon glyph, and the font is imported
+// per-component in this codebase rather than globally.
+import "remixicon/fonts/remixicon.css";
 
 interface CustomSignInModalProps {
   isOpen: boolean;
@@ -108,24 +111,16 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isPending}
-              className="bg-white text-black w-fit px-3 py-2.5 flex items-center justify-center gap-2.5 rounded-[8px] transition-colors disabled:opacity-70 h-[36px]"
+              className="px-3 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium  flex items-center gap-1.5 bg-white disabled:opacity-70 hover:opacity-80 transition-all duration-200"
             >
-              {isPending ? (
-                <svg
-                  className="animate-spin h-4 w-4 text-black"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <Image src="/google.svg" alt="Google" width={16} height={16} />
-              )}
-              <span className="text-[15px] font-[500] font-sans">
-                Get started
-              </span>
+              <div className="w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                {isPending ? (
+                  <i className="ri-loader-4-line animate-spin text-[12px] scale-125" />
+                ) : (
+                  <Image src="/google.svg" alt="Google" width={14} height={14} />
+                )}
+              </div>
+              Continue with Google
             </button>
           </div>
 

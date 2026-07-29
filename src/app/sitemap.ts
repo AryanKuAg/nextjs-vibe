@@ -23,10 +23,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
     },
     {
-      url: `${BASE_URL}/pricing`,
-      lastModified,
-    },
-    {
       url: `${BASE_URL}/terms`,
       lastModified,
     },

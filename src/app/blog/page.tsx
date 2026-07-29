@@ -38,7 +38,7 @@ export default function BlogIndex() {
   };
 
   return (
-    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-onest">
+    <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-sans">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

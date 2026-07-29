@@ -86,7 +86,8 @@ export const BackgroundBuilderLeft = ({
   onProceed,
   onSkip,
   updateBlock,
-  onApplyTemplate,
+  // onApplyTemplate is still part of Props for callers, but nothing in this panel
+  // can fire it yet — see the TemplatesModal note below.
   projectId,
   blocks,
   isExtracting
@@ -434,7 +435,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="bg-[#212121] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
           <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b-0 border-[#282825]">
-            <span className="text-white text-sm font-onest">Editing video {activeBlockIndex + 1}</span>
+            <span className="text-white text-sm font-sans">Editing video {activeBlockIndex + 1}</span>
             <span className="text-white/30 text-sm">
               {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
             </span>
@@ -594,7 +595,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="space-y-3 mt-auto">
           <Button
-            className="w-full rounded-[8px] bg-white text-black font-onest text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
+            className="w-full rounded-[8px] bg-white text-black font-sans text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
             disabled={isExtracting || (!blocks.every((block) => !!block.videoUrl) && !blocks.some(block => !!block.builderPrompt))}
           >
@@ -608,14 +609,14 @@ export const BackgroundBuilderLeft = ({
           <div className="flex gap-2">
             <Button
               variant="ghost"
-              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              className="rounded-[8px] flex-1 text-white font-sans h-8 border border-[#212121] hover:bg-[#212121]!"
               onClick={onSkip}
             >
               Skip
             </Button>
             <Button
               variant="ghost"
-              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              className="rounded-[8px] flex-1 text-white font-sans h-8 border border-[#212121] hover:bg-[#212121]!"
               onClick={() => setIsTemplatesModalOpen(true)}
             >
               Templates
@@ -624,14 +625,15 @@ export const BackgroundBuilderLeft = ({
         </div>
       </div>
 
+      {/* NOTE: this is the SITE template gallery (src/lib/templates/registry.ts),
+          not the video-block presets in src/lib/templates.ts that onApplyTemplate
+          expects. It is passed an empty list, so nothing here is selectable today.
+          Wiring block presets up needs its own component — this one now starts a
+          full template remix on select, which is not what this panel wants. */}
       <TemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
-        onSelect={(t) => {
-          if (onApplyTemplate) {
-            onApplyTemplate(t.blocks);
-          }
-        }}
+        templates={[]}
       />
     </>
   );

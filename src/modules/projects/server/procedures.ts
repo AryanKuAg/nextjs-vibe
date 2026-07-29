@@ -4,8 +4,10 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
+import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { getTemplate } from "@/lib/templates/registry";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -74,10 +76,15 @@ export const projectsRouter = createTRPCRouter({
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
         isAgentMode: z.boolean().default(false),
+        // Set when the project is created by remixing a gallery template. An
+        // unknown id is rejected rather than silently ignored — a project that
+        // claims a template it cannot download would fail mid-build.
+        templateId: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        await checkCredits(1);
         await consumeCredits(0); // Project metadata creation is free; generation is charged separately
       } catch (error) {
         if (error instanceof Error) {
@@ -93,10 +100,18 @@ export const projectsRouter = createTRPCRouter({
         }
       }
 
+      const template = input.templateId ? getTemplate(input.templateId) : null;
+      if (input.templateId && !template) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown template "${input.templateId}".`,
+        });
+      }
+
       const count = await prisma.project.count({
         where: { userId: ctx.auth.userId },
       });
-      const name = `Project ${count + 1}`;
+      const name = template ? `${template.title} Remix` : `Project ${count + 1}`;
 
       const createdProject = await prisma.project.create({
         data: {
@@ -104,34 +119,10 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
+          templateId: template?.id ?? null,
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
-          ...(input.value.trim()
-            ? {
-              messages: {
-                create: {
-                  content: input.value,
-                  role: "USER",
-                  type: "RESULT",
-                  stage: "SCENE",
-                },
-              },
-            }
-            : {}),
         },
       });
-
-      if (input.value.trim()) {
-        await inngest.send({
-          name: "autonomous-agent/run",
-          data: {
-            prompt: input.value,
-            projectId: createdProject.id,
-            userId: ctx.auth.userId,
-            model: "deepseek/deepseek-v4-flash", // Default fallback model
-            isAgentMode: input.isAgentMode,
-          },
-        });
-      }
 
       return createdProject;
     }),
@@ -185,45 +176,23 @@ export const projectsRouter = createTRPCRouter({
       const cost = MODEL_COSTS[input.model || ""] || 25;
       await checkCredits(cost);
 
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
-
       let imageUrl = input.imageUrl;
       let imageBase64 = input.imageBase64;
 
-      // Inngest payload limit is ~1MB. Upload base64 image to GCS first.
+      // Inngest payload limit is ~1MB. Upload base64 image to R2 first.
       if (imageBase64) {
-        const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-              },
-            }
-            : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
-        );
-
-        const bucket = storage.bucket(bucketName);
         const match = imageBase64.match(/^data:(image\/[^;]+);/);
         const mimeType = match ? match[1] : "image/jpeg";
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-
         const ext = mimeType.split("/")[1] || "jpg";
-        const fileName = `frames/${input.projectId}/upload-${Date.now()}.${ext}`;
-        const file = bucket.file(fileName);
 
-        await file.save(buffer, {
-          metadata: { contentType: mimeType },
+        const uploaded = await uploadMediaAsset({
+          buffer,
+          key: `frames/${input.projectId}/upload-${Date.now()}.${ext}`,
+          contentType: mimeType,
         });
-
-        const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
-        imageUrl = `${cdnUrl}/${fileName}`;
+        imageUrl = uploaded.url;
 
         // Remove base64 so it doesn't get sent to Inngest
         imageBase64 = undefined;
@@ -239,7 +208,6 @@ export const projectsRouter = createTRPCRouter({
         data: {
           projectId: input.projectId,
           prompt: input.prompt,
-          outputGcsUri,
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,
@@ -271,10 +239,8 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Follow-up prompts cost varies by model.
-      // First-time generation costs 80 credits.
-      const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
-      await checkCredits(cost);
+      // Code generation is charged per user message, not per agent run.
+      await checkCredits(AGENT_COSTS.CODE);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -285,6 +251,8 @@ export const projectsRouter = createTRPCRouter({
           stage: "SITE",
         },
       });
+
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
 
       await inngest.send({
         name: "code-agent/run",
@@ -325,8 +293,25 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Base initialization cost for autonomous mode
-      await checkCredits(10); 
+      // A project that already produced a fragment has a live site — anything after
+      // that is a follow-up edit, which skips the wizard instead of rebuilding.
+      const existingFragment = await prisma.fragment.findFirst({
+        where: { message: { projectId: input.projectId } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      const isFollowUp = Boolean(existingFragment);
+
+      // The original site request, so media agents regenerating a background still
+      // know what the site is about even when the follow-up message is just
+      // "make another video".
+      const firstUserMessage = await prisma.message.findFirst({
+        where: { projectId: input.projectId, role: "USER" },
+        orderBy: { createdAt: "asc" },
+        select: { content: true },
+      });
+
+      await checkCredits(AGENT_COSTS.CODE);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -338,23 +323,32 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
+      // Charged once per user message. The code agent may run several times for this
+      // message (template pass, lenient rebuild, retries) and must not charge again.
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
       await inngest.send({
         name: "autonomous-agent/run",
         data: {
           prompt: input.prompt,
+          sitePrompt: firstUserMessage?.content || input.prompt,
           projectId: input.projectId,
           model: input.model,
           userId: ctx.auth.userId,
           isAgentMode: input.isAgentMode,
+          isFollowUp,
         },
       });
 
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          currentStage: "SCENE",
-        },
-      });
+      // Only a fresh build walks the SCENE -> VIDEO -> SITE pipeline. Resetting the
+      // stage on a follow-up would throw the UI back to the scene step and hide the
+      // site the user is asking us to edit.
+      if (!isFollowUp) {
+        await prisma.project.update({
+          where: { id: input.projectId },
+          data: { currentStage: "SCENE" },
+        });
+      }
 
       return createdMessage;
     }),

@@ -58,13 +58,13 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
         onClick={onClose}
         aria-label="Close"
         className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors bg-[#282828] hover:bg-[#333] leading-none"
-        style={{ fontSize: 20 }}
+        style={{ fontSize: 16 }}
       >
         ✕
       </button>
 
       {showDesktopOnlyMessage ? (
-        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-onest">
+        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-sans">
           <Image
             src="/logo.png"
             alt="Logo"
@@ -95,7 +95,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
 
             {/* Heading */}
             <div className="text-center mb-6">
-              <h2 className="text-white text-[24px] font-light tracking-wide mb-1">
+              <h2 className="text-white text-[24px] font-medium tracking-wide mb-1">
                 Log In or Sign Up
               </h2>
               <p className="text-[#737373] text-[14px]">
@@ -123,25 +123,25 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
               ) : (
                 <Image src="/google.svg" alt="Google" width={16} height={16} />
               )}
-              <span className="text-[15px] font-[500] font-onest">
+              <span className="text-[15px] font-[500] font-sans">
                 Get started
               </span>
             </button>
           </div>
 
           {/* Fine print */}
-          <p className="absolute bottom-6 w-full px-6 text-[#737373] text-[12px] text-center leading-relaxed">
+          <p className="absolute bottom-6 w-full px-6 text-white/50 text-[12px] text-center leading-relaxed">
             By signing up, you agree to our{" "}
             <Link
-              href="/terms"
-              className="text-white transition-colors"
+              href="/legal"
+              className="text-white-85"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
-              href="/privacy"
-              className="text-white transition-colors"
+              href="/legal?tab=privacy"
+              className="text-white-85"
             >
               Privacy Policy
             </Link>

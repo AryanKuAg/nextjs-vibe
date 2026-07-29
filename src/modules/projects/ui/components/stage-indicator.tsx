@@ -48,7 +48,7 @@ export const StageIndicator = ({ activeTab, onStageClick, hasFrames, hasMessages
               disabled={!unlocked}
             >
               <span className="text-xs mb-[4px] text-[#666666] font-dm-mono">{num}</span>
-              <span className="text-sm text-white leading-tight text-center px-1 font-onest">{text}</span>
+              <span className="text-sm text-white leading-tight text-center px-1 font-sans">{text}</span>
             </button>
 
             {idx < STAGES.length - 1 && (

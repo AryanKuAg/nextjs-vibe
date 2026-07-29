@@ -147,12 +147,16 @@ export const FileExplorer = ({
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={30} minSize={30} className="bg-sidebar overflow-y-auto">
-        <TreeView
-          data={treeData}
-          value={selectedFile}
-          onSelect={handleFileSelect}
-        />
+      {/* react-resizable-panels forces inline overflow:hidden on Panel — the
+          scroll container must be a child of the panel, not the panel itself */}
+      <ResizablePanel defaultSize={30} minSize={30} className="bg-sidebar">
+        <div className="h-full overflow-y-auto">
+          <TreeView
+            data={treeData}
+            value={selectedFile}
+            onSelect={handleFileSelect}
+          />
+        </div>
       </ResizablePanel>
       <ResizableHandle className="hover:bg-primary transition-colors" />
       <ResizablePanel defaultSize={70} minSize={50}>
@@ -172,7 +176,7 @@ export const FileExplorer = ({
                 </Button>
               </Hint>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 min-h-0 overflow-auto">
               <CodeView
                 code={files[selectedFile]}
                 lang={getLanguageFromExtension(selectedFile)}

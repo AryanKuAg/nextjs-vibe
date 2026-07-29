@@ -40,7 +40,7 @@ export interface FAQItem {
 /* ─── FAQItem ────────────────────────────────────────────────────────── */
 const FAQItem = ({ q, a, isOpen, onToggle }: FAQItem & { isOpen: boolean; onToggle: () => void }) => {
   return (
-    <div className="rounded-[24px] overflow-hidden font-onest bg-gradient-to-b from-[#282828] to-[#282828]/40">
+    <div className="rounded-[24px] overflow-hidden font-sans bg-gradient-to-b from-[#282828] to-[#282828]/40">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-6 py-5 text-left text-[16px] text-white font-[500] bg-transparent transition-colors"
@@ -77,7 +77,7 @@ export const FAQSection = ({ faqs = faqs_list, title = "Frequently asked questio
         <h2 className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">
           {title}
         </h2>
-        <p className="text-center font-onest text-[#737373] text-sm font-[500]">
+        <p className="text-center font-sans text-[#737373] text-sm font-[500]">
           Got questions? We&apos;ve got answers.
         </p>
       </div>

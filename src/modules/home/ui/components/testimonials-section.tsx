@@ -82,7 +82,7 @@ export const TestimonialsSection = () => {
           <motion.h2 variants={itemVariants} className="mb-4 text-3xl md:text-[40px] font-stack-sans-notch text-center text-white leading-[40px] font-[700]">
             Trusted by builders shipping real work
           </motion.h2>
-          <motion.p variants={itemVariants} className="text-center font-onest text-[#737373] text-sm font-[500]">
+          <motion.p variants={itemVariants} className="text-center font-sans text-[#737373] text-sm font-[500]">
             See what founders, creators, and teams are saying after shipping with us.
           </motion.p>
         </div>
@@ -92,7 +92,7 @@ export const TestimonialsSection = () => {
             <motion.div
               variants={itemVariants}
               key={idx}
-              className="flex flex-col bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] p-6 font-onest"
+              className="flex flex-col bg-gradient-to-b from-[#282828] to-[#282828]/40 rounded-[24px] p-6 font-sans"
             >
             <div className="text-[#737373] text-3xl mb-4 font-space-grotesk leading-none font-bold">
               “

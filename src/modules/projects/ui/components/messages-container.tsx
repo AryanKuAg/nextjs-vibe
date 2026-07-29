@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@prisma/client";
 
+import { Fragment } from "@prisma/client";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { MessageLoading } from "./message-loading";
@@ -13,13 +13,58 @@ const STUCK_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes – site generation can t
 
 interface Props {
   projectId: string;
-  activeFragment: Fragment | null;
-  setActiveFragment: (fragment: Fragment | null) => void;
+  setActiveFragment?: (fragment: Fragment) => void;
 };
+
+function useGenerationTimer(isWorking: boolean, sessionKey: string) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(sessionKey);
+      if (saved) {
+        setElapsedMs(parseInt(saved, 10));
+      }
+    }
+  }, [sessionKey]);
+
+  useEffect(() => {
+    if (!isWorking) {
+      sessionStorage.removeItem(sessionKey + "_last_tick");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const lastTickStr = sessionStorage.getItem(sessionKey + "_last_tick");
+      const lastTick = lastTickStr ? parseInt(lastTickStr, 10) : now;
+      const delta = now - lastTick;
+      
+      setElapsedMs(prev => {
+        const next = prev + delta;
+        sessionStorage.setItem(sessionKey, next.toString());
+        return next;
+      });
+      sessionStorage.setItem(sessionKey + "_last_tick", now.toString());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isWorking, sessionKey]);
+
+  const reset = useCallback(() => {
+    sessionStorage.setItem(sessionKey, "0");
+    sessionStorage.removeItem(sessionKey + "_last_tick");
+    setElapsedMs(0);
+  }, [sessionKey]);
+
+  return {
+    elapsedMs,
+    reset
+  };
+}
 
 export const MessagesContainer = ({
   projectId,
-  activeFragment,
   setActiveFragment,
   stage = "SITE",
   extractedZipUrl,
@@ -32,11 +77,12 @@ export const MessagesContainer = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastAssistantMessageIdRef = useRef<string | null>(null);
 
+
   // Track when the last user message was sent to detect stuck state
   const lastUserMessageTimestampRef = useRef<number | null>(null);
   const [isStuck, setIsStuck] = useState(false);
   const [pendingInteractiveAction, setPendingInteractiveAction] = useState<string | null>(null);
-  const [isInteractiveSubmitted, setIsInteractiveSubmitted] = useState(false);
+  const [interactiveSubmittedAt, setInteractiveSubmittedAt] = useState<Date | null>(null);
 
 
   const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
@@ -46,14 +92,18 @@ export const MessagesContainer = ({
     refetchInterval: 2000,
   }));
 
-  const { data: projectData } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
+  useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
+  const isLastMessageEmptyResult = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "RESULT" && lastMessage?.content === "";
+  const isGenerating = (isLastMessageUser && !isStuck) || isLastMessageEmptyResult;
+  const isWorking = (isLastMessageUser && !isStuck) || isLastMessageEmptyResult || interactiveSubmittedAt !== null;
+  const generationTimer = useGenerationTimer(isWorking, `vibe_timer_${projectId}_${stage}`);
 
   // Reset interactive submitted state when new messages arrive or content changes
   useEffect(() => {
-    setIsInteractiveSubmitted(false);
+    setInteractiveSubmittedAt(null);
   }, [lastMessage?.id, lastMessage?.content]);
 
   // Track when user message arrived; detect if stuck after timeout
@@ -61,6 +111,7 @@ export const MessagesContainer = ({
     if (isLastMessageUser) {
       if (lastUserMessageTimestampRef.current === null) {
         lastUserMessageTimestampRef.current = Date.now();
+        generationTimer.reset();
       }
 
       const timer = setTimeout(() => {
@@ -74,6 +125,7 @@ export const MessagesContainer = ({
       lastUserMessageTimestampRef.current = null;
       setIsStuck(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLastMessageUser, lastMessage?.id]);
 
   // Reset stuck flag whenever the message list changes (new assistant reply)
@@ -112,7 +164,9 @@ export const MessagesContainer = ({
       lastAssistantMessage?.fragment &&
       lastAssistantMessage.id !== lastAssistantMessageIdRef.current
     ) {
-      setActiveFragment(lastAssistantMessage.fragment);
+      if (setActiveFragment) {
+        setActiveFragment(lastAssistantMessage.fragment);
+      }
       lastAssistantMessageIdRef.current = lastAssistantMessage.id;
     }
   }, [messages, setActiveFragment]);
@@ -125,26 +179,35 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="pt-2 pr-1">
-          {messages.map((message, index) => (
-            <MessageCard
-              key={message.id}
-              content={message.content}
-              role={message.role}
-              fragment={message.fragment}
-              createdAt={message.createdAt}
-              isActiveFragment={activeFragment?.id === message.fragment?.id}
-              onFragmentClick={() => setActiveFragment(message.fragment)}
-              type={message.type}
-              projectId={projectId}
-              pendingInteractiveAction={pendingInteractiveAction}
-              setPendingInteractiveAction={setPendingInteractiveAction}
-              isLastMessage={index === messages.length - 1}
-              isInteractiveSubmitted={isInteractiveSubmitted}
-              currentStage={projectData?.currentStage}
-            />
-          ))}
+          {messages.map((message, index) => {
+            let startedAt = message.createdAt;
+            for (let i = index; i >= 0; i--) {
+              if (messages[i].role === "USER") {
+                startedAt = messages[i].createdAt;
+                break;
+              }
+            }
 
-          {isLastMessageUser && !isStuck && <MessageLoading />}
+            return (
+              <MessageCard
+                key={message.id}
+                content={message.content}
+                role={message.role}
+                createdAt={message.createdAt}
+                startedAt={startedAt}
+                type={message.type}
+                projectId={projectId}
+                pendingInteractiveAction={pendingInteractiveAction}
+                setPendingInteractiveAction={setPendingInteractiveAction}
+                isLastMessage={index === messages.length - 1}
+                messageId={message.id}
+                globalElapsedMs={generationTimer.elapsedMs}
+                onActionSubmit={() => setInteractiveSubmittedAt(new Date())}
+              />
+            );
+          })}
+
+          {isLastMessageUser && !isStuck && <MessageLoading globalElapsedMs={generationTimer.elapsedMs} />}
           {isLastMessageUser && isStuck && (
             <div className="px-2 pb-4 flex items-start gap-2.5">
               <div className="flex flex-col gap-1.5">
@@ -178,17 +241,17 @@ export const MessagesContainer = ({
           stage={stage}
           extractedZipUrl={extractedZipUrl}
           extractedFrameCount={extractedFrameCount}
-          isGenerating={isLastMessageUser && !isStuck}
+          isGenerating={isGenerating}
           initialPrompt={initialPrompt}
           pendingInteractiveAction={pendingInteractiveAction}
           setPendingInteractiveAction={setPendingInteractiveAction}
-          setIsInteractiveSubmitted={setIsInteractiveSubmitted}
+          setInteractiveSubmittedAt={setInteractiveSubmittedAt}
         />
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-onest text-sm hover:bg-[#282828]! font-[400] h-[32px]"
+            className="mt-2 w-full rounded-[8px] bg-background! border-[1px] border-[#2c2c2c] text-white font-sans text-sm hover:bg-[#282828]! font-[400] h-[32px]"
           >
             Back
           </button>

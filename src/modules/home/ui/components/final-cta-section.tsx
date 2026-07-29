@@ -85,7 +85,7 @@ export const FinalCTASection = () => {
             <h2 className="text-3xl sm:text-[40px] leading-[1.1] text-white mb-4 font-stack-sans-notch font-[700] tracking-tight">
                 Ready to build your<br className="hidden sm:block" /> first 3D site?
             </h2>
-            <p className="text-sm text-[#737373] mb-10 font-onest font-[500] max-w-[500px]">
+            <p className="text-sm text-[#737373] mb-10 font-sans font-[500] max-w-[500px]">
                 Just describe your vision and watch it turn into a live, interactive experience in few minutes.
             </p>
             <div className="flex gap-2 min-h-[52px]">

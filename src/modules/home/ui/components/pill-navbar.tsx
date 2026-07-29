@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { SignedIn, SignedOut, useUser, useClerk, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import {
@@ -77,7 +78,7 @@ const UserAvatarButton = ({ mobile = false }: { mobile?: boolean }) => {
     <DropdownMenuContent
       align="end"
       sideOffset={8}
-      className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-onest rounded-xl shadow-xl z-50"
+      className="w-[300px] p-2 bg-[#272725] border-[#3B3B3B] text-white font-sans rounded-xl shadow-xl z-50"
     >
       <div className="flex items-center gap-3 p-2 mb-2">
         <Avatar className="h-10 w-10 rounded-md">
@@ -175,6 +176,7 @@ export const PillNavbar = () => {
   const { user } = useUser();
   const router = useRouter();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const trpc = useTRPC();
@@ -224,9 +226,15 @@ export const PillNavbar = () => {
         onClose={() => setShowSignInModal(false)}
       />
 
+      {/* Pricing lives in this modal — there is no standalone /pricing page. */}
+      <CustomOutOfCreditsModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+      />
+
       <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-20 w-full md:w-max px-4">
         <div className="flex flex-col gap-2 relative w-full">
-          <div className="flex items-center justify-between md:justify-normal gap-20 h-[68px] px-2 bg-black rounded-[20px] font-onest" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
+          <div className="flex items-center justify-between md:justify-normal gap-20 h-[68px] px-2 bg-black rounded-[20px] font-sans" style={{ boxShadow: "0 0 8px 0 rgba(0,0,0,0.25)" }}>
             {/* Left side: Logo */}
             <Link href="/" className="flex items-center gap-2 pl-2">
               <Image src="/logo.png" alt="framerate" width={32} height={32} />
@@ -237,7 +245,7 @@ export const PillNavbar = () => {
             <div className="hidden md:flex items-center gap-4 text-white text-sm font-[500]">
               <Link href="/blog" className="">Blog</Link>
               <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="">Templates</Link>
-              <Link href="/pricing" className="">Pricing</Link>
+              <button type="button" onClick={() => setShowPricingModal(true)} className="cursor-pointer">Pricing</button>
               <Link href="mailto:teamframerate@gmail.com" className="">Contact</Link>
             </div>
 
@@ -285,7 +293,7 @@ export const PillNavbar = () => {
 
           {/* Mobile Dropdown Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden w-full bg-[#000] rounded-[20px] p-3 flex flex-col font-onest border border-[#2A2A2A] font-[500]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
+            <div className="md:hidden w-full bg-[#000] rounded-[20px] p-3 flex flex-col font-sans border border-[#2A2A2A] font-[500]" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5)" }}>
               <div className="flex flex-col text-[#E0E0E0] text-[15px]">
                 <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Blog
@@ -293,9 +301,16 @@ export const PillNavbar = () => {
                 <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Templates
                 </Link>
-                <Link href="/pricing" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setShowPricingModal(true);
+                  }}
+                  className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors"
+                >
                   Pricing
-                </Link>
+                </button>
                 <Link href="mailto:teamframerate@gmail.com" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors mb-2">
                   Contact
                 </Link>

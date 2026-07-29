@@ -15,7 +15,7 @@ import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-moda
 import { cn } from "@/lib/utils";
 
 type ModelId =
-  | "deepseek/deepseek-v4-flash";
+  | "google/gemini-3.1-flash-lite";
 
 interface Props {
   projectId: string;
@@ -26,7 +26,7 @@ interface Props {
   initialPrompt?: string;
   pendingInteractiveAction?: string | null;
   setPendingInteractiveAction?: (action: string | null) => void;
-  setIsInteractiveSubmitted?: (v: boolean) => void;
+  setInteractiveSubmittedAt?: (v: Date | null) => void;
 };
 
 const formSchema = z.object({
@@ -68,19 +68,15 @@ const processImageFile = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-const TEMPLATES = [
-  { icon: "ri-macbook-line", label: "Portfolio website" },
-  { icon: "ri-box-3-line", label: "3D product showcase" },
-  { icon: "ri-layout-masonry-line", label: "Creative agency website" },
-];
 
-export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setIsInteractiveSubmitted }: Props) => {
+export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setInteractiveSubmittedAt }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const selectedModel: ModelId = "deepseek/deepseek-v4-flash";
+  const [isFocused, setIsFocused] = useState(false);
+  const selectedModel: ModelId = "google/gemini-3.1-flash-lite";
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isInteractiveSubmitting, setIsInteractiveSubmitting] = useState(false);
@@ -98,7 +94,8 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
     staleTime: 30_000,
   });
   const isFollowUp = stage === "SITE" && (existingMessages?.length ?? 0) > 0;
-  
+  const hasBuiltWebsite = existingMessages?.some((m: { type: string }) => m.type === "RESULT") ?? false;
+
   const lastMessage = existingMessages?.[(existingMessages?.length ?? 0) - 1];
   const isWaitingForInteractive = lastMessage?.role === "ASSISTANT" && lastMessage?.type === "INTERACTIVE";
 
@@ -108,24 +105,49 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
-      if (pendingPrompt && !form.getValues().value && !isFollowUp) {
-        form.setValue("value", pendingPrompt, { shouldValidate: true });
-        sessionStorage.removeItem("pending_builder_prompt");
-      } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
-        form.setValue("value", initialPrompt, { shouldValidate: true });
-      }
+    if (typeof window === "undefined") return;
 
-      const pendingImage = sessionStorage.getItem("pending_image_base64");
-      if (pendingImage) {
-        setUploadedDataUrl(pendingImage);
-        sessionStorage.removeItem("pending_image_base64");
-        sessionStorage.removeItem("pending_image_name");
-        sessionStorage.removeItem("pending_image_type");
-      }
+    const pendingImage = sessionStorage.getItem("pending_image_base64");
+    if (pendingImage) {
+      setUploadedDataUrl(pendingImage);
+      sessionStorage.removeItem("pending_image_base64");
+      sessionStorage.removeItem("pending_image_name");
+      sessionStorage.removeItem("pending_image_type");
     }
-  }, [initialPrompt, form, isFollowUp]);
+
+    const pendingPrompt = sessionStorage.getItem("pending_builder_prompt");
+    if (pendingPrompt && !isFollowUp) {
+      // Consume immediately so a StrictMode double-mount can't fire twice.
+      sessionStorage.removeItem("pending_builder_prompt");
+
+      // Optimistically show the user's message right now — no textarea
+      // populate flash, no waiting for the server round-trip. The mutation's
+      // onSuccess invalidation reconciles this with the real message.
+      const queryKey = trpc.messages.getMany.queryOptions({ projectId, stage }).queryKey;
+      queryClient.setQueryData(queryKey, (old) => {
+        const optimistic = {
+          id: `optimistic-${Date.now()}`,
+          content: pendingPrompt,
+          role: "USER",
+          type: "RESULT",
+          stage,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          projectId,
+          fragment: null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return Array.isArray(old) ? [...(old as any[]), optimistic] : [optimistic];
+      });
+
+      // Fire the generation directly — no visible form population, no delay.
+      startAutonomousGeneration.mutate({ prompt: pendingPrompt, projectId, model: selectedModel });
+    } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
+      form.setValue("value", initialPrompt, { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cancelGeneration = useMutation(trpc.projects.cancelGeneration.mutationOptions({
     onSuccess: () => {
@@ -194,7 +216,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         });
         form.setValue("value", "");
         setPendingInteractiveAction?.(null);
-        setIsInteractiveSubmitted?.(true);
+        setInteractiveSubmittedAt?.(new Date());
       } catch (error) {
         console.error(error);
         toast.error("Failed to send response");
@@ -234,37 +256,21 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         onChange={handleImageSelect}
       />
 
-      {!isFollowUp && (
-        <div className="flex flex-col gap-2 mb-4 px-1">
-          {TEMPLATES.map((t, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => form.setValue("value", t.label, { shouldValidate: true })}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#222] hover:bg-white/5 transition-colors self-start text-sm text-white bg-transparent"
-            >
-              <i className={`${t.icon} text-[#888]`} />
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`bg-[#1c1c1c] rounded-[16px] p-3 pt-4 space-y-3 relative transition-all duration-300 ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction ? "ring-1 ring-[#5b36ff] shadow-[0_0_15px_rgba(91,54,255,0.15)]" : ""}`}
+          className={`bg-gray-bg rounded-[12px] p-3 space-y-3 relative border ${isDragOver ? "ring-1 ring-white/30 bg-white/5" : ""} ${pendingInteractiveAction || isFocused ? "border-purple shadow-[0_0_15px_rgba(91,54,255,0.15)]" : "border-white-8"}`}
         >
           {uploadedDataUrl && (
-            <div className="relative w-fit">
+            <div className="relative w-fit mb-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={uploadedDataUrl}
                 alt="Attached image"
-                className="w-16 h-16 rounded-[4px] object-cover"
+                className="w-12 h-12 rounded-[4px] object-cover"
               />
               <button
                 type="button"
@@ -289,8 +295,10 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                 disabled={isPending || isInteractiveSubmitting}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-[15px] text-white outline-none resize-none min-h-[24px] placeholder:text-[#737373]"
-                placeholder={pendingInteractiveAction ? "Enter your prompt..." : "Describe your website..."}
+                className="w-full bg-transparent text-[14px] placeholder:text-[14px] text-white outline-none resize-none min-h-[24px] placeholder:text-white/50 mb-0 ring-0"
+                placeholder={pendingInteractiveAction ? "Enter your prompt..." : hasBuiltWebsite ? "Ask your changes..." : "Describe your website..."}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -306,7 +314,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
               type="button"
               onClick={() => imageInputRef.current?.click()}
               disabled={isPending}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
+              className="w-7 h-7 flex items-center justify-center rounded-[8px] border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
               title="Attach image"
             >
               <i className="ri-add-line" />
@@ -319,19 +327,23 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-[#fefefe] transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-full border border-white-8 hover:bg-white-8 text-white "
                 >
-                  <i className={cancelGeneration.isPending ? "ri-loader-4-line animate-spin" : "ri-stop-fill"} />
+                  {cancelGeneration.isPending ? (
+                    <i className="ri-loader-4-line animate-spin" />
+                  ) : (
+                    <div className="w-[10px] h-[10px] bg-current rounded-[2px]" />
+                  )}
                 </button>
               ) : isButtonDisabled ? (
                 <button
                   type="submit"
                   disabled
                   className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
-                      ? "bg-[#5b36ff] opacity-50 text-white"
-                      : "bg-[#333] text-[#777]"
+                      ? "bg-purple opacity-50 text-white"
+                      : "bg-purple/50 text-[#777]"
                   )}
                 >
                   <i className="ri-arrow-up-line font-bold" />
@@ -340,10 +352,10 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                 <button
                   type="submit"
                   className={cn(
-                    "w-8 h-8 flex items-center justify-center rounded-full transition-all",
+                    "w-7 h-7 flex items-center justify-center rounded-full ",
                     pendingInteractiveAction
-                      ? "bg-[#5b36ff] text-white hover:bg-[#4a2ce6]"
-                      : "bg-white text-black hover:bg-[#ddd]"
+                      ? "bg-purple text-white hover:bg-purple/60"
+                      : "bg-purple text-white hover:bg-purple/80 "
                   )}
                 >
                   {isPending ? (
@@ -357,6 +369,6 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
           </div>
         </form>
       </Form>
-    </div>
+    </div >
   );
 };

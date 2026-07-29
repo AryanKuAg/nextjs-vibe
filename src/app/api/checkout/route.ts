@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import DodoPayments from "dodopayments";
 
+import { dodoEnvironment } from "@/lib/dodo-env";
+
 // Fallback logic in case the SDK format differs due to versioning
 // Dodo Payments currently uses standard `payment_links` endpoint
 export async function POST(req: NextRequest) {
@@ -43,10 +45,25 @@ export async function POST(req: NextRequest) {
     // Initialize DodoPayments client
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.NODE_ENV === "development" ? "test_mode" : "live_mode",
+      environment: dodoEnvironment(),
     });
 
 
+
+    // Dodo redirects the customer back before its webhook has necessarily landed,
+    // so flag the return trip — the app polls for the new plan instead of showing
+    // stale credits.
+    const baseReturn =
+      returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/`;
+    const returnWithFlag = (() => {
+      try {
+        const url = new URL(baseReturn);
+        url.searchParams.set("checkout", "success");
+        return url.toString();
+      } catch {
+        return baseReturn;
+      }
+    })();
 
     // Create a payment session/link
     const session = await dodo.checkoutSessions.create({
@@ -62,7 +79,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         }
       ],
-      return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`,
+      return_url: returnWithFlag,
       metadata: {
         userId,
         plan,

@@ -7,6 +7,51 @@ function getEventType(payload: Record<string, unknown>): string {
   return String(payload.type || payload.event || "");
 }
 
+/**
+ * Resolves plan + billing period from the Dodo product id.
+ *
+ * Preferred over `metadata.plan`, because metadata is frozen at checkout time:
+ * when a customer upgrades or downgrades through the billing portal the
+ * subscription keeps its original metadata but gets a new product_id. Trusting
+ * metadata alone would keep granting the old plan's credits forever.
+ */
+function resolvePlanFromProduct(productId?: string): {
+  plan?: string;
+  billing?: "monthly" | "yearly";
+} {
+  if (!productId) return {};
+
+  const products: Array<[string | undefined, string, "monthly" | "yearly"]> = [
+    [process.env.DODO_PRODUCT_PLUS, "plus", "monthly"],
+    [process.env.DODO_PRODUCT_PRO, "pro", "monthly"],
+    [process.env.DODO_PRODUCT_MAX, "max", "monthly"],
+    [process.env.DODO_PRODUCT_PLUS_YEARLY, "plus", "yearly"],
+    [process.env.DODO_PRODUCT_PRO_YEARLY, "pro", "yearly"],
+    [process.env.DODO_PRODUCT_MAX_YEARLY, "max", "yearly"],
+  ];
+
+  const match = products.find(([envId]) => envId && envId === productId);
+  return match ? { plan: match[1], billing: match[2] } : {};
+}
+
+/**
+ * Dodo sends several events for one paid period (`payment.succeeded` plus
+ * `subscription.active`/`renewed`) and retries anything it can't confirm, so the
+ * same period can arrive many times. Re-granting on each one would refill a user
+ * who had already spent their credits. A grant is therefore only allowed when
+ * the plan actually changed or the last grant is old enough to be a new period.
+ */
+const GRANT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function shouldGrantCredits(
+  existing: { plan: string; lastCreditResetAt: Date } | null,
+  plan: string
+): boolean {
+  if (!existing) return true;
+  if (existing.plan !== plan) return true;
+  return Date.now() - existing.lastCreditResetAt.getTime() > GRANT_COOLDOWN_MS;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -38,9 +83,14 @@ export async function POST(req: NextRequest) {
     const metadata = data.payment_link_metadata || data.metadata || {};
 
     const userId: string | undefined = metadata.userId;
-    const plan: string | undefined = metadata.plan?.toLowerCase();
+
+    // product_id is authoritative; metadata is the fallback for payloads that
+    // don't carry one (e.g. plain payment events).
+    const fromProduct = resolvePlanFromProduct(data.product_id);
+    const plan: string | undefined = fromProduct.plan ?? metadata.plan?.toLowerCase();
     const billing: string | undefined =
-      metadata.billing === "yearly" ? "yearly" : metadata.billing === "monthly" ? "monthly" : undefined;
+      fromProduct.billing ??
+      (metadata.billing === "yearly" ? "yearly" : metadata.billing === "monthly" ? "monthly" : undefined);
     const subscriptionId: string | undefined = data.subscription_id || data.id;
     const nextBillingDate: Date | undefined = data.next_billing_date
       ? new Date(data.next_billing_date)
@@ -55,25 +105,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // 2. Successful payment / activation / renewal → (re)grant plan credits.
+    // 2. Successful payment / activation / renewal / plan change → (re)grant
+    //    plan credits. `plan_changed` and `updated` are included so an upgrade or
+    //    downgrade made in the billing portal takes effect immediately instead of
+    //    leaving the user on their old plan's credit allowance.
     const isSuccessEvent =
       eventType === "payment.succeeded" ||
       eventType === "subscription.active" ||
-      eventType === "subscription.renewed";
+      eventType === "subscription.renewed" ||
+      eventType === "subscription.plan_changed" ||
+      eventType === "subscription.updated";
 
     if (isSuccessEvent) {
       if (!plan) {
-        console.error("[Webhook] Success event without plan in metadata", metadata);
+        console.error("[Webhook] Success event without a resolvable plan", metadata);
         return NextResponse.json({ received: true });
       }
 
-      const { syncCredits } = await import("@/lib/usage");
-      // Sets credits + plan + lastCreditResetAt = now (upserts the row).
-      await syncCredits(userId, plan);
+      // `subscription.updated` fires for non-billing changes too — only act on it
+      // when the subscription is actually active.
+      if (eventType === "subscription.updated" && data.status && data.status !== "active") {
+        return NextResponse.json({ received: true });
+      }
 
-      await prisma.usage.update({
+      const existing = await prisma.usage.findUnique({ where: { key: userId } });
+
+      if (shouldGrantCredits(existing, plan)) {
+        const { syncCredits } = await import("@/lib/usage");
+        // Sets credits + plan + lastCreditResetAt = now (upserts the row).
+        await syncCredits(userId, plan);
+      } else {
+        console.log(`[Webhook] Duplicate grant for ${userId} (${plan}) — metadata only.`);
+      }
+
+      await prisma.usage.upsert({
         where: { key: userId },
-        data: {
+        create: {
+          key: userId,
+          plan,
+          credits: 0,
+          subscriptionId,
+          subscriptionStatus: "active",
+          ...(billing ? { billing } : {}),
+          ...(nextBillingDate ? { expire: nextBillingDate } : {}),
+        },
+        update: {
           subscriptionId,
           subscriptionStatus: "active",
           ...(billing ? { billing } : {}),

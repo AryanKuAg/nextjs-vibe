@@ -9,6 +9,7 @@ import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
 import { TemplatesModal } from "@/components/templates-modal";
 import { useTemplateRemix } from "@/hooks/use-template-remix";
+import { useCheckoutReturn } from "@/hooks/use-checkout-return";
 import { TEMPLATE_REGISTRY } from "@/lib/templates/registry";
 
 /* ─── Site preview cards data ───
@@ -103,6 +104,7 @@ const SitePreviewCard = ({
 const LoggedInDashboard = () => {
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
   const { remix, isPending: isRemixPending } = useTemplateRemix();
+  useCheckoutReturn();
   return (
     <main className="min-h-screen bg-bg font-sans flex flex-col">
       {/* Top Navigation */}

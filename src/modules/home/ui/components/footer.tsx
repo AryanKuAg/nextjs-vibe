@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 
@@ -14,6 +15,7 @@ export const Footer = () => {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -57,6 +59,11 @@ export const Footer = () => {
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
       />
+      {/* Pricing lives in this modal — there is no standalone /pricing page. */}
+      <CustomOutOfCreditsModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+      />
       <footer className="px-5 py-6  md:py-20 md:px-6 max-w-7xl mx-auto w-full font-sans font-[500]">
         {/* Rounded card container */}
         <div className="rounded-[24px] px-5 py-6 md:px-10 md:pt-[40px] md:pb-8  bg-gradient-to-b from-[#282828] to-[#282828]/40">
@@ -85,7 +92,13 @@ export const Footer = () => {
                   >
                     Dashboard
                   </button>
-                  <Link href="/pricing" className="text-sm text-white hover:text-[#CCCCCC] transition-colors">Pricing</Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowPricingModal(true)}
+                    className="text-sm text-white hover:text-[#CCCCCC] transition-colors text-left cursor-pointer"
+                  >
+                    Pricing
+                  </button>
                 </div>
               </div>
 

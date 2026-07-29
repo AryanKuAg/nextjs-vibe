@@ -25,11 +25,14 @@ export const ShimmerMessages = ({ text = "Working", showTimer = false, globalEla
   );
 };
 
-export const MessageLoading = ({ globalElapsedMs = 0 }: { globalElapsedMs?: number }) => {
+export const MessageLoading = ({
+  globalElapsedMs = 0,
+  text,
+}: { globalElapsedMs?: number; text?: string }) => {
   return (
     <div className="flex group pb-4 px-3 items-start">
       <div className="flex flex-col gap-y-4 pt-0.5 w-full">
-        <ShimmerMessages showTimer={true} globalElapsedMs={globalElapsedMs} />
+        <ShimmerMessages text={text} showTimer={true} globalElapsedMs={globalElapsedMs} />
       </div>
     </div>
   );

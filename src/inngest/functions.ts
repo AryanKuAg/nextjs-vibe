@@ -17,6 +17,7 @@ import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_A
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
 import { refundChargedCredits } from "./refund";
+import { PROJECT_STAGE } from "@/lib/project-stage";
 
 // Constants moved to usage.ts
 
@@ -403,6 +404,18 @@ export const codeAgentFunction = inngest.createFunction(
       }
 
       return sandbox.sandboxId;
+    });
+
+    // Announce the step so the status line can name it. The autonomous agent
+    // already sets this before invoking us, but a direct build (buildSite, or a
+    // follow-up edit) has nothing else that would.
+    await step.run("mark-stage-building", async () => {
+      await prisma.project
+        .update({
+          where: { id: event.data.projectId },
+          data: { currentStage: PROJECT_STAGE.BUILDING_SITE },
+        })
+        .catch(() => { });
     });
 
     const latestFragment = await step.run("get-latest-fragment", async () => {
@@ -1758,6 +1771,17 @@ fixPaths(process.argv[2]);
         console.error('DEBUG: Failed to extract full file tree from sandbox:', e);
         return null;
       }
+    });
+
+    // Back to a resting stage — leaving it on BUILDING_SITE would make the next
+    // turn open on "Building website" before anything has started.
+    await step.run("mark-stage-site", async () => {
+      await prisma.project
+        .update({
+          where: { id: event.data.projectId },
+          data: { currentStage: PROJECT_STAGE.SITE },
+        })
+        .catch(() => { });
     });
 
     await step.run("save-result", async () => {

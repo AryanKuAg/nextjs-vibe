@@ -8,6 +8,7 @@ import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/us
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
+import { PROJECT_STAGE } from "@/lib/project-stage";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -273,7 +274,10 @@ export const projectsRouter = createTRPCRouter({
       await prisma.project.update({
         where: { id: input.projectId },
         data: {
-          currentStage: "SITE",
+          // The code agent flips this to BUILDING_SITE once it starts and back to
+          // SITE when it lands. Marking it THINKING here stops the previous turn's
+          // stage being read as this turn's status while the sandbox boots.
+          currentStage: PROJECT_STAGE.THINKING,
         },
       });
 
@@ -345,15 +349,15 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
-      // Only a fresh build walks the SCENE -> VIDEO -> SITE pipeline. Resetting the
-      // stage on a follow-up would throw the UI back to the scene step and hide the
-      // site the user is asking us to edit.
-      if (!isFollowUp) {
-        await prisma.project.update({
-          where: { id: input.projectId },
-          data: { currentStage: "SCENE" },
-        });
-      }
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          // A fresh build starts at the background step. A follow-up has no known
+          // step until an agent announces one — and it must not keep reporting the
+          // previous turn's stage, which is what made the status line look stuck.
+          currentStage: isFollowUp ? PROJECT_STAGE.THINKING : PROJECT_STAGE.SCENE,
+        },
+      });
 
       return createdMessage;
     }),

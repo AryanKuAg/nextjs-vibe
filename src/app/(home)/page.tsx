@@ -17,6 +17,7 @@ const SITES = TEMPLATE_REGISTRY.map((t) => ({
   title: t.title,
   href: t.demoUrl,
   imgSrc: t.imgSrc,
+  isTall: t.isTall,
 }));
 
 /* ─── Site Preview Card ─── */
@@ -26,14 +27,18 @@ interface SitePreviewCardProps {
   imgSrc: string;
   /** Fixed card height in px. Falls back to a 16:9 box when omitted. */
   height?: number;
+  /** If true, uses a simpler opacity-only hover effect without overlays */
+  isLandingPage?: boolean;
 }
 
-const SitePreviewCard = ({ title, href, imgSrc, height }: SitePreviewCardProps) => (
+const SitePreviewCard = ({ title, href, imgSrc, height, isLandingPage }: SitePreviewCardProps) => (
   <a
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid"
+    className={`group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid ${
+      isLandingPage ? "opacity-80 hover:opacity-100 transition-opacity duration-300" : ""
+    }`}
   >
     <div
       className={`relative w-full bg-grey-bg ${height ? "" : "aspect-[1280/720]"}`}
@@ -43,8 +48,13 @@ const SitePreviewCard = ({ title, href, imgSrc, height }: SitePreviewCardProps) 
         src={imgSrc}
         alt={`${title} - 3D website template`}
         fill
-        className="object-cover transition-transform duration-500 group-hover:scale-105"
+        className={`object-cover ${
+          isLandingPage ? "" : "transition-transform duration-500 group-hover:scale-105"
+        }`}
       />
+
+      {!isLandingPage && (
+        <>
 
       {/* Top Gradient */}
       <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
@@ -54,12 +64,14 @@ const SitePreviewCard = ({ title, href, imgSrc, height }: SitePreviewCardProps) 
         <span className="text-white font-medium text-sm">{title}</span>
       </div>
 
-      {/* Preview pill */}
-      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-        <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
-          Preview
-        </div>
-      </div>
+          {/* Preview pill */}
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+            <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
+              Preview
+            </div>
+          </div>
+        </>
+      )}
     </div>
   </a>
 );
@@ -179,7 +191,6 @@ const LoggedOutView = () => {
     };
   }, []);
 
-  const repeatedSites = Array.from({ length: 10 }).flatMap(() => SITES);
 
   return (
     <main className="h-screen bg-bg font-sans flex flex-col md:flex-row overflow-hidden">
@@ -242,16 +253,16 @@ const LoggedOutView = () => {
       {/* ── Right Panel (Scrollable) ── */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-3 md:p-4 md:pl-0"
+        className="flex-1 overflow-y-auto p-3  md:pl-0"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Two explicit columns fed round-robin rather than a CSS `columns`
             masonry: the heights alternate tall/short within each column, and
             the second column starts on the short one so the two stagger. */}
-        <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+        <div className="flex flex-col md:flex-row gap-3">
           {[0, 1].map((col) => (
-            <div key={col} className="flex-1 min-w-0 flex flex-col gap-3 md:gap-4">
-              {repeatedSites
+            <div key={col} className="flex-1 min-w-0 flex flex-col gap-3">
+              {SITES
                 .filter((_, idx) => idx % 2 === col)
                 .map((site, idx) => (
                   <SitePreviewCard
@@ -259,7 +270,8 @@ const LoggedOutView = () => {
                     title={site.title}
                     href={site.href}
                     imgSrc={site.imgSrc}
-                    height={(idx + col) % 2 === 0 ? 358 : 280}
+                    height={site.isTall ? 358 : 280}
+                    isLandingPage
                   />
                 ))}
             </div>

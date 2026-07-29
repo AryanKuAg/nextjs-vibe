@@ -95,7 +95,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
 
             {/* Heading */}
             <div className="text-center mb-6">
-              <h2 className="text-white text-[24px] font-light tracking-wide mb-1">
+              <h2 className="text-white text-[24px] font-medium tracking-wide mb-1">
                 Log In or Sign Up
               </h2>
               <p className="text-[#737373] text-[14px]">
@@ -130,18 +130,18 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
           </div>
 
           {/* Fine print */}
-          <p className="absolute bottom-6 w-full px-6 text-[#737373] text-[12px] text-center leading-relaxed">
+          <p className="absolute bottom-6 w-full px-6 text-white/50 text-[12px] text-center leading-relaxed">
             By signing up, you agree to our{" "}
             <Link
-              href="/terms"
-              className="text-white transition-colors"
+              href="/legal"
+              className="text-white-85"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
-              href="/privacy"
-              className="text-white transition-colors"
+              href="/legal?tab=privacy"
+              className="text-white-85"
             >
               Privacy Policy
             </Link>

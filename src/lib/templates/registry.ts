@@ -43,6 +43,8 @@ export interface TemplateManifest {
   demoUrl: string;
   /** Cover image for the gallery card. */
   imgSrc: string;
+  /** Whether the card is rendered with a taller height in the masonry grid */
+  isTall?: boolean;
 }
 
 /** Used when a template does not declare its own defaultVideoUrl. */
@@ -61,16 +63,17 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     demoUrl: "https://sites.framerate.space/template-sites/Beach_House/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-Beach_House-index.html.png",
+    isTall: true,
   },
   {
-    id: "flower-and-plane",
-    title: "Flower and Plane",
-    repo: "AryanKuAg/flower-and-plane",
+    id: "ai-trip-planner",
+    title: "AI Trip Planner",
+    repo: "AryanKuAg/ai-trip-planner",
     branch: "main",
     mode: "HERO_ONLY",
-    demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
+    imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
+    isTall: false,
   },
   {
     id: "orange-furry-creature",
@@ -81,63 +84,18 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     demoUrl: "https://sites.framerate.space/template-sites/orange-furry-creature/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orange-furry-creature-index.html%20(1).png",
+    isTall: true,
   },
   {
-    id: "rotating-earth",
-    title: "Rotating Earth",
-    repo: "AryanKuAg/rotating-earth",
-    branch: "main",
-    mode: "FULL_PAGE",
-    demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
-  },
-  {
-    id: "australia-beach-road",
-    title: "Australia Beach Road",
-    repo: "AryanKuAg/australia-beach-road",
+    id: "flower-and-plane",
+    title: "Flower and Plane",
+    repo: "AryanKuAg/flower-and-plane",
     branch: "main",
     mode: "HERO_ONLY",
-    demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
+    demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
     imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
-  },
-  {
-    id: "beach-resort",
-    title: "Beach Resort",
-    repo: "AryanKuAg/beach-resort",
-    branch: "main",
-    mode: "FULL_PAGE",
-    demoUrl: "https://sites.framerate.space/template-sites/beach_resort/index.html",
-    imgSrc: "https://assets.framerate.space/templates/turtle/template.png",
-  },
-  {
-    id: "green-bridge-mountain",
-    title: "Green Bridge Mountain",
-    repo: "AryanKuAg/green-bridge-mountain",
-    branch: "main",
-    mode: "FULL_PAGE",
-    demoUrl: "https://sites.framerate.space/template-sites/green-bridge-mountain/index.html",
-    imgSrc: "https://assets.framerate.space/templates/stone/template.png",
-  },
-  {
-    id: "haunted-house",
-    title: "Haunted House",
-    repo: "AryanKuAg/haunted-house",
-    branch: "main",
-    mode: "FULL_PAGE",
-    demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
-  },
-  {
-    id: "ai-trip-planner",
-    title: "AI Trip Planner",
-    repo: "AryanKuAg/ai-trip-planner",
-    branch: "main",
-    mode: "HERO_ONLY",
-    demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
-    imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
+    isTall: true,
   },
   {
     id: "ai-workflow-agents",
@@ -148,7 +106,44 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     demoUrl: "https://sites.framerate.space/template-sites/ai-workflow-agents/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-ai-workflow-agents-index.html.png",
+    isTall: false,
   },
+  {
+    id: "australia-beach-road",
+    title: "Australia Beach Road",
+    repo: "AryanKuAg/australia-beach-road",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "rotating-earth",
+    title: "Rotating Earth",
+    repo: "AryanKuAg/rotating-earth",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
+    isTall: false,
+  },
+
+  {
+    id: "haunted-house",
+    title: "Haunted House",
+    repo: "AryanKuAg/haunted-house",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
+    isTall: true,
+  },
+
+
 ];
 
 /** The token a template repo uses wherever the background video URL belongs. */

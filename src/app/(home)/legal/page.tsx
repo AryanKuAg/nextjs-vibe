@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 const LegalFooter = () => (
   <footer className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-sans gap-4">
@@ -16,8 +17,18 @@ const LegalFooter = () => (
   </footer>
 );
 
-export default function LegalPage() {
+function LegalContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<"terms" | "privacy">("terms");
+
+  useEffect(() => {
+    if (tabParam === "privacy") {
+      setActiveTab("privacy");
+    } else if (tabParam === "terms") {
+      setActiveTab("terms");
+    }
+  }, [tabParam]);
 
   return (
     <main className="min-h-screen bg-background font-sans">
@@ -281,5 +292,13 @@ export default function LegalPage() {
         <LegalFooter />
       </div>
     </main>
+  );
+}
+
+export default function LegalPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LegalContent />
+    </Suspense>
   );
 }

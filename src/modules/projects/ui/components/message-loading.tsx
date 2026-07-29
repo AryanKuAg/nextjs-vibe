@@ -7,7 +7,7 @@ function formatTimer(seconds: number) {
   return `${m}m ${s}s`;
 }
 
-export const ShimmerMessages = ({ text = "Working...", showTimer = false, globalElapsedMs = 0 }: { text?: string, showTimer?: boolean, globalElapsedMs?: number }) => {
+export const ShimmerMessages = ({ text = "Working", showTimer = false, globalElapsedMs = 0 }: { text?: string, showTimer?: boolean, globalElapsedMs?: number }) => {
   const timeString = formatTimer(Math.floor(globalElapsedMs / 1000));
 
   return (

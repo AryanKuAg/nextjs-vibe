@@ -7,6 +7,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
+import { refundChargedCredits } from "./refund";
 import { TASTE_BRIEF_RULES } from "@/lib/taste";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
 
@@ -1392,6 +1393,11 @@ export const autonomousAgentFunction = inngest.createFunction(
     timeouts: { finish: "15m" },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
+
+      // Refund the up-front code charge. Image and video bill themselves only on
+      // success, so anything already delivered stays paid for.
+      await refundChargedCredits(event, step);
+
       await step.run("unjam-ui", async () => {
         if (error.message !== "Generation was manually stopped.") {
           await prisma.message.create({

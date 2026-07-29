@@ -15,6 +15,8 @@ import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_A
 
 
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
+import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
+import { refundChargedCredits } from "./refund";
 
 // Constants moved to usage.ts
 
@@ -317,6 +319,10 @@ export const codeAgentFunction = inngest.createFunction(
     timeouts: { finish: "15m" },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
+
+      // The user paid for this message up front — give it back before telling
+      // them to try again, otherwise the retry bills them a second time.
+      await refundChargedCredits(event, step);
 
       // Guarantee the UI un-jams by writing a fallback Assistant message
       await step.run("unjam-ui", async () => {
@@ -1844,10 +1850,15 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // Use predictions.create + poll to avoid non-serializable FileRef objects
           // replicate.run() may return FileRef objects that crash Inngest's JSON step serialization
-          const prediction = await replicate.predictions.create({
-            model: targetModel,
-            input,
-          });
+          //
+          // This function runs with retries: 0, so a transient 429 would otherwise
+          // kill the whole generation. The retry is inline (rather than an Inngest
+          // step retry) because re-running the step would create a second, billable
+          // prediction — here we only re-attempt calls that never got created.
+          const prediction = await withReplicateRateLimitRetry(
+            "predictions.create",
+            () => replicate.predictions.create({ model: targetModel, input })
+          );
 
           console.log(`[Video Pipeline] Prediction created: ${prediction.id}, polling...`);
 
@@ -1864,7 +1875,12 @@ export const veoGenerateFunction = inngest.createFunction(
               throw new Error(`Replicate prediction ${prediction.id} timed out after 5 minutes`);
             }
             await new Promise((r) => setTimeout(r, 5000));
-            completedPrediction = await replicate.predictions.get(prediction.id);
+            // Polling counts against the same rate limit, so a throttled poll must
+            // not discard a prediction that is already running (and already paid for).
+            completedPrediction = await withReplicateRateLimitRetry(
+              `predictions.get(${prediction.id})`,
+              () => replicate.predictions.get(prediction.id)
+            );
             console.log(`[Video Pipeline] Prediction status: ${completedPrediction.status}`);
           }
 

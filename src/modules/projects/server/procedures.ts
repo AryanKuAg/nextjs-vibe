@@ -265,6 +265,8 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.auth.userId,
           imageDataUrl: input.imageDataUrl,
           isAgentMode: input.isAgentMode,
+          // Returned by the agent's onFailure handler if the run never completes.
+          refundOnFailure: AGENT_COSTS.CODE,
         },
       });
 
@@ -337,6 +339,9 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.auth.userId,
           isAgentMode: input.isAgentMode,
           isFollowUp,
+          // Returned by the agent's onFailure handler if the run never completes.
+          // Only the code charge — image and video bill themselves on success.
+          refundOnFailure: AGENT_COSTS.CODE,
         },
       });
 

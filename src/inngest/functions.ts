@@ -739,6 +739,7 @@ export const codeAgentFunction = inngest.createFunction(
             const updatedFiles = await step?.run(`createFiles-${prefix}-call-${createFilesCount}`, async () => {
               try {
                 const updated: Record<string, string> = {};
+                const refused: string[] = [];
                 const sandbox = await getSandbox(sandboxId);
 
                 // Remixed templates ship their own background component, so the
@@ -754,8 +755,22 @@ export const codeAgentFunction = inngest.createFunction(
                   }
 
                   if (PROTECTED_FILES.includes(file.path)) {
-                    console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
-                    continue;
+                    // Protection guards the golden file from being *overwritten*.
+                    // Applying it to a file that is missing would be fatal: App.tsx
+                    // is required to import ScrollFrames, so refusing to create it
+                    // leaves a build that can never resolve the import, and the
+                    // fixer loops on the identical error until it gives up.
+                    const exists = await sandbox.files
+                      .exists(`/home/user/${file.path}`)
+                      .catch(() => false);
+
+                    if (exists) {
+                      console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
+                      refused.push(file.path);
+                      continue;
+                    }
+
+                    console.log(`DEBUG: Protected file ${file.path} is missing — allowing recreation.`);
                   }
                   if (typeof file.content !== "string") {
                     file.content = String(file.content || "");
@@ -784,7 +799,7 @@ export const codeAgentFunction = inngest.createFunction(
                   await sandbox.commands.run(`touch "/home/user/${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
-                return { updated };
+                return { updated, refused };
               } catch (e) {
                 const err = e as Error;
                 return { error: `File write failed: ${err.message || String(err)}` };
@@ -802,6 +817,22 @@ export const codeAgentFunction = inngest.createFunction(
                 ...updatedFiles.updated,
               };
             }
+
+            // A silently dropped write is worse than a rejected one: the agent
+            // reports success, stops trying, and the build fails on the same
+            // error forever. Always tell it what did not land.
+            const refusedPaths = (updatedFiles && 'refused' in updatedFiles ? updatedFiles.refused : []) ?? [];
+            if (refusedPaths.length > 0) {
+              const wrote = Object.keys(updatedFiles && 'updated' in updatedFiles ? updatedFiles.updated : {});
+              return (
+                `WRITE REJECTED for: ${refusedPaths.join(", ")}. ` +
+                `${refusedPaths.length === 1 ? "This file is" : "These files are"} platform-owned and already correct — ` +
+                `do NOT try to write ${refusedPaths.length === 1 ? "it" : "them"} again, and do not claim to have changed ` +
+                `${refusedPaths.length === 1 ? "it" : "them"}. Fix the problem in the files that import it instead.` +
+                (wrote.length > 0 ? ` Successfully wrote: ${wrote.join(", ")}.` : "")
+              );
+            }
+
             return `Successfully updated files`;
           },
         }),
@@ -1165,11 +1196,16 @@ export const codeAgentFunction = inngest.createFunction(
     let isBuildSuccessful = false;
     const maxRetries = 5;
     let attempt = 1;
+    // Bumped when a deterministic repair re-runs the gate without consuming a
+    // fixer attempt. It has to reach the step id, or Inngest replays the
+    // memoised failure from before the repair and the repair looks like a no-op.
+    let repairPass = 0;
 
     while (!isBuildSuccessful && attempt <= maxRetries) {
       if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
       // Step A: Check the build
-      const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
+      const buildStepId = `verify-build-run-${runId}-attempt-${attempt}` + (repairPass > 0 ? `-repair-${repairPass}` : "");
+      const buildCheck = await step.run(buildStepId, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
           try {
@@ -1371,7 +1407,48 @@ fixPaths(process.argv[2]);
         break; // Exit the loop!
       }
 
-      // Step C: The Fixer Agent takes over
+      // Step B2: Self-heal the platform-owned background component.
+      //
+      // ScrollFrames is write-protected, so if it ever goes missing (a stray
+      // terminal `rm`, a botched refactor) the fixer cannot put it back and every
+      // subsequent attempt dies on the same unresolved import. The golden copy
+      // lives on the server with the video URL baked in, so restore it here
+      // instead of asking a model to reinvent a file it is forbidden to write.
+      if (mode === "FULL_PAGE" && !template && buildCheck.error.includes("ScrollFrames")) {
+        const restored = await step.run(`restore-scrollframes-run-${runId}-attempt-${attempt}-${repairPass}`, async () => {
+          const sandbox = await getSandbox(sandboxId);
+          const target = "/home/user/src/components/ScrollFrames.tsx";
+
+          if (await sandbox.files.exists(target).catch(() => false)) return null;
+
+          const fs = await import("fs");
+          const path = await import("path");
+          const goldenPath = path.join(process.cwd(), "src", "templates", "components", "ScrollFrames.tsx");
+          if (!fs.existsSync(goldenPath)) return null;
+
+          const content = fs
+            .readFileSync(goldenPath, "utf-8")
+            .replaceAll("VIDEO_URL_HERE", videoUrl || "");
+
+          await sandbox.commands.run(`mkdir -p "/home/user/src/components"`);
+          await sandbox.files.write(target, content);
+          console.log("DEBUG: Restored missing golden ScrollFrames.tsx before running the fixer.");
+          return { content };
+        });
+
+        if (restored) {
+          state.data.files = {
+            ...(state.data.files || {}),
+            "src/components/ScrollFrames.tsx": restored.content,
+          };
+          finalFiles = state.data.files;
+          // Re-run the build gate rather than burning a fixer attempt: the
+          // restore alone often clears the failure.
+          repairPass++;
+          continue;
+        }
+      }
+
       // Step C: The Fixer Agent takes over
       console.log(`DEBUG: Build failed. Spinning up Fixer Agent (Attempt ${attempt})...`);
 
@@ -1440,6 +1517,14 @@ fixPaths(process.argv[2]);
 
       if (attempt >= 3) {
         fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
+
+        // Without this carve-out the two instructions contradict each other:
+        // "delete whatever is breaking the build" versus a hard block on removing
+        // ScrollFrames from App.tsx. The agent then burns every remaining attempt
+        // trying an edit that is rejected on arrival.
+        if (mode === "FULL_PAGE" && !template) {
+          fixPrompt += `EXCEPTION: <ScrollFrames /> and its import in App.tsx are the one thing you may NOT delete, and you cannot write src/components/ScrollFrames.tsx (the platform owns it and has already restored it if it was missing). If the error involves ScrollFrames, fix the surrounding code instead — never remove the component.\n\n`;
+        }
       }
 
       fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;

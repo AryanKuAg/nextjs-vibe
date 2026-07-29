@@ -51,7 +51,7 @@ const UserMessage = ({ content }: UserMessageProps) => {
   return (
     <div className="flex justify-end pb-4 pr-2 pl-10">
       <div className="flex flex-col max-w-[80%] w-fit">
-        <Card className="rounded-[10px] bg-white-8 px-3 py-2 shadow-none border-none break-words text-sm leading-relaxed text-white relative overflow-hidden">
+        <Card className="rounded-[10px] bg-white-8 px-3 py-2 shadow-none border-none break-words text-sm leading-[20px] text-white relative overflow-hidden">
           <div
             ref={contentRef}
             className={cn(

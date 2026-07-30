@@ -31,7 +31,7 @@ const MODELS = [
   { id: "google/gemini-3.1-flash-lite", label: "Fable 5", emoji: "" },
   { id: "google/gemini-3.1-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
   { id: "google/gemini-3.1-flash-lite", label: "Kimi K3", emoji: "" },
-  { id: "google/gemini-3.1-flash-lite", label: "Opus 4.8", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Opus 5", emoji: "" },
   { id: "google/gemini-3.1-flash-lite", label: "Sonnet 5", emoji: "" },
 ];
 

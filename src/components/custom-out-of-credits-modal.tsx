@@ -50,7 +50,7 @@ const MODAL_PLANS = [
     title: "Max",
     desc: "Made for teams and studios",
     monthlyPrice: "40",
-    yearlyPrice: "33",
+    yearlyPrice: "32",
     features: [
       "1,500 credits",
       "Frontier AI models",

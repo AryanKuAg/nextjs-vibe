@@ -12,7 +12,7 @@ export const ShimmerMessages = ({ text = "Working", showTimer = false, globalEla
 
   return (
     <div className="flex items-center gap-2 mb-0.5">
-      <span className="font-medium text-[15px] bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+      <span className="text-sm bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent leading-[20px]">
         {text}
       </span>
       {showTimer && (

@@ -10,6 +10,7 @@ import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import { refundChargedCredits } from "./refund";
 import { TASTE_BRIEF_RULES } from "@/lib/taste";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
+import type { SceneLuminance } from "@/lib/scene-luminance";
 
 // 1. Define State
 export const AgentState = Annotation.Root({
@@ -821,6 +822,7 @@ type BuildBrief = z.infer<typeof BuildBriefSchema>;
 const renderReadabilityBlock = (
   brief: Pick<BuildBrief, "text_scheme">,
   scene: SceneAnalysis | null,
+  luminance: SceneLuminance | null,
 ): string => {
   const darkText = brief.text_scheme === "dark-text";
 
@@ -828,12 +830,31 @@ const renderReadabilityBlock = (
     ? `- Scene: ${scene.description} (brightness: ${scene.brightness}; dominant colors: ${scene.dominant_colors.join(", ")})`
     : `- Scene: not analyzed — assume a MIXED-brightness video and keep every contrast safeguard below.`;
 
+  // Where the hero copy has to sit for the chosen colour to actually survive.
+  const safeArea = luminance
+    ? (brief.text_scheme === "light-text" ? luminance.darkestRegion : luminance.brightestRegion)
+    : null;
+
+  const measuredLines = luminance
+    ? [
+      `- Measured from the real frame: mean brightness ${Math.round(luminance.overall * 100)}%, ` +
+      `white text worst-case contrast ${luminance.whiteTextWorstContrast.toFixed(1)}:1, ` +
+      `near-black ${luminance.darkTextWorstContrast.toFixed(1)}:1. The text colour below was chosen by this measurement — never substitute it.`,
+      luminance.confident
+        ? `- The chosen colour clears 3:1 over every region of this frame, so normal placement is safe.`
+        : `- CONTRAST WARNING: this frame is hostile to text — the chosen colour does NOT clear 3:1 everywhere. ` +
+        `Anchor the hero headline and subtext over the ${safeArea} region, keep the line count low, and use the heaviest display weight. ` +
+        `Do NOT spread hero copy across the full width of the frame.`,
+    ].join("\n")
+    : `- Frame could not be measured — treat the video as mixed brightness and keep every safeguard below.`;
+
   return `Background video & readability (derived from the actual generated video — follow exactly):
 ${sceneLine}
+${measuredLines}
 - ZERO OVERLAYS (absolute, non-negotiable): NEVER place any tint, scrim, veil, gradient, or blurred panel between the video and the content — no fixed inset-0 dark/light div, no bg-black/xx or bg-white/xx over the video, no backdrop-blur on anything sitting over the video (nav, cards, footer included). Overlays and blur hide the video and look cheap.
 - ZERO SHADOWS (absolute, non-negotiable): NO text-shadow, NO drop-shadow, NO box-shadow, NO glow — anywhere on the site, on any element, over the video or not. Never use shadow-*, drop-shadow-*, or any [text-shadow:...] arbitrary value. Shadows look cheap and dated. Readability comes from text COLOR and WEIGHT alone, exactly as specified below.
-- Base text color over the video: ${darkText ? "near-black (text-zinc-900; secondary text-zinc-800)" : "white / off-white (text-white; secondary text-white/85)"} — applies to ALL text and UI that sits over the video. The scene analysis picked this so plain text stays legible with no overlay and no shadow.
-- Because there is nothing to lean on but contrast, type must carry itself: display headlines are heavy (font-bold/font-black) and large; body copy over the video stays at a comfortable size with medium weight (never thin/light, never a faint tint like text-white/50). Keep text over the calmest region of the frame.
+- Base text color over the video: ${darkText ? "near-black (text-zinc-900; secondary text-zinc-800)" : "white / off-white (text-white; secondary text-white/85)"} — applies to ALL text and UI that sits over the video. This was measured from the frame, not guessed, so plain text stays legible with no overlay and no shadow. Do not substitute a different text color anywhere.
+- Because there is nothing to lean on but contrast, type must carry itself through WEIGHT, not size: display headlines are heavy (font-bold/font-black); body copy over the video stays at a comfortable size with medium weight (never thin/light, never a faint tint like text-white/50). Respect the hero type-scale caps in the design system — a headline that fills the viewport is a failure even when it is readable. Keep text over the calmest region of the frame.
 - Navbar: transparent background, NO glass, NO blur, NO pill fill, NO shadow. Just ${darkText ? "near-black" : "white"} text links at medium weight. The primary CTA may use a SOLID accent-color fill (it is a small button, not an overlay) with contrasting label text — a flat fill with no shadow.
 - Accent color usage over the video: solid accent fills are fine on small elements (buttons, tiny chips, number labels, 1px rules). Never a large translucent accent panel.
 - Page fallback background (behind the video, shows only during load — never an overlay): add \`body { background-color: ${darkText ? "#f2f2f0" : "#0b0b0c"}; }\` in src/index.css. This is the only background allowed on body; no background on #root or any section wrapper.
@@ -843,6 +864,7 @@ ${sceneLine}
 const renderBuildBrief = (
   brief: BuildBrief,
   scene: SceneAnalysis | null,
+  luminance: SceneLuminance | null,
 ): string => {
   const sections = brief.sections
     .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}"\n   Content: ${s.content_outline}\n   Layout: ${s.layout}`)
@@ -862,7 +884,7 @@ Navigation: ${brief.nav_style}
 Layout concept (composed for THIS site — build exactly this, do not substitute a generic template):
 ${brief.layout_concept}
 
-${renderReadabilityBlock(brief, scene)}
+${renderReadabilityBlock(brief, scene, luminance)}
 
 Sections (in this order):
 ${sections}
@@ -897,6 +919,27 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
 
   // Analyze the generated background so the design is matched to THIS video:
   // brightness decides the text color (there are NO overlays), dominant colors steer the accent.
+  // Contrast is arithmetic, so measure it rather than asking a model to judge it.
+  // A frame with a blown-out centre and dark edges reads as "bright" to a vision
+  // model, which then picks near-black text — and the headline, sitting over a
+  // dark edge, becomes unreadable. The measurement is ground truth; the model is
+  // left to do the subjective work (mood, palette, accent).
+  const luminance = state.start_frame_url
+    ? await step.run("measure-scene-luminance", async () => {
+      const { measureSceneLuminance } = await import("@/lib/scene-luminance");
+      return await measureSceneLuminance(state.start_frame_url!);
+    })
+    : null;
+
+  if (luminance) {
+    console.log(
+      `[Scene Luminance] mean=${(luminance.overall * 100).toFixed(0)}% ` +
+      `white=${luminance.whiteTextWorstContrast.toFixed(1)}:1 ` +
+      `dark=${luminance.darkTextWorstContrast.toFixed(1)}:1 ` +
+      `-> ${luminance.recommendedScheme} (confident=${luminance.confident})`
+    );
+  }
+
   const sceneAnalysis: SceneAnalysis | null = await step.run("analyze-scene", async () => {
     const sysMsg = new SystemMessage(
       "You analyze the background scene of a website (a video generated from the given frame/prompt). " +
@@ -914,7 +957,14 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
 
     const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(SceneAnalysisSchema);
     const scenePrompt = state.media_prompt || state.current_prompt;
-    const promptText = `Scene prompt used for generation: ${scenePrompt}\n\nWebsite request (for mood context only — it does NOT describe the scene): ${sitePrompt.slice(0, 600)}`;
+
+    const { describeSceneLuminance } = await import("@/lib/scene-luminance");
+    const measured = luminance
+      ? `\n\n${describeSceneLuminance(luminance)}\n` +
+      `Set text_scheme to exactly "${luminance.recommendedScheme}" — the pixel measurement decides it, not your impression of the image.`
+      : "";
+
+    const promptText = `Scene prompt used for generation: ${scenePrompt}\n\nWebsite request (for mood context only — it does NOT describe the scene): ${sitePrompt.slice(0, 600)}${measured}`;
 
     // Try with the actual frame image first (vision), fall back to text-only.
     if (state.start_frame_url) {
@@ -984,12 +1034,33 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     }
   });
 
+  // Both models above were *told* which text colour the measurement requires, but
+  // neither is trusted to comply — an unreadable site is the one failure mode a
+  // user cannot work around, so the measured value is stamped over the top.
+  if (luminance) {
+    if (sceneAnalysis && sceneAnalysis.text_scheme !== luminance.recommendedScheme) {
+      console.warn(
+        `[Scene Luminance] Overriding scene analysis text_scheme ` +
+        `"${sceneAnalysis.text_scheme}" with measured "${luminance.recommendedScheme}".`
+      );
+      sceneAnalysis.text_scheme = luminance.recommendedScheme;
+    }
+    if (brief && brief.text_scheme !== luminance.recommendedScheme) {
+      console.warn(
+        `[Scene Luminance] Overriding brief text_scheme ` +
+        `"${brief.text_scheme}" with measured "${luminance.recommendedScheme}".`
+      );
+      brief.text_scheme = luminance.recommendedScheme;
+    }
+  }
+
   const finalPrompt = brief
-    ? renderBuildBrief(brief, sceneAnalysis)
+    ? renderBuildBrief(brief, sceneAnalysis, luminance)
     : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
     `${renderReadabilityBlock(
-      { text_scheme: sceneAnalysis?.text_scheme ?? "light-text" },
+      { text_scheme: luminance?.recommendedScheme ?? sceneAnalysis?.text_scheme ?? "light-text" },
       sceneAnalysis,
+      luminance,
     )}\n\n` +
     `Compose the layout yourself from the user request above — hero composition, section arrangement, and motion. ` +
     `Make a distinctive choice that suits this brand; do not fall back on a generic card-grid template.`;

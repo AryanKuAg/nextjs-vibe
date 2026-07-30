@@ -277,6 +277,59 @@ export const getVideoPromptSuffix = (mode?: string | null): string =>
   isHeroMode(mode) ? HERO_VIDEO_PROMPT_SUFFIX : VIDEO_PROMPT_SUFFIX;
 
 /**
+ * Builds the user-side message for the image refiner.
+ *
+ * The refiner used to receive a single bare string. That is fine for a first
+ * build, where the string is the whole website request — but on a follow-up the
+ * string is whatever the user just typed ("make it more blue", "try another
+ * one"). With no subject and no idea what is currently on the site, the refiner
+ * had nothing to work from and invented an unrelated scene. So the site request,
+ * the scene already on the site, and this turn's ask are passed as three
+ * separate, labelled things.
+ */
+export function buildImageRefinerInput(
+  sitePrompt: string,
+  userRequest?: string | null,
+  previousImagePrompt?: string | null,
+): string {
+  const site = sitePrompt.trim();
+  const request = userRequest?.trim();
+  const previous = previousImagePrompt?.trim();
+
+  // A request equal to the site prompt carries no extra instruction — it is the
+  // caller passing the site request through as the media prompt.
+  const hasOwnRequest = Boolean(request && request !== site);
+
+  const parts = [`THE WEBSITE THIS BACKGROUND IS FOR: ${site}`];
+
+  if (previous) {
+    parts.push(`THE BACKGROUND CURRENTLY ON THE SITE: ${previous}`);
+  }
+
+  if (hasOwnRequest && previous) {
+    parts.push(
+      `WHAT THE USER WANTS CHANGED: ${request}\n\n` +
+      `Apply that change to the scene above. Keep every element the user did not ` +
+      `ask to change — same subject, same place, same industry. This is a revision ` +
+      `of an existing background, not a new idea.`
+    );
+  } else if (hasOwnRequest) {
+    parts.push(
+      `WHAT THE USER ASKED FOR: ${request}\n\n` +
+      `Build the scene around that, and keep it recognisably tied to the website above.`
+    );
+  } else if (previous) {
+    parts.push(
+      `The user wants a different take for the same website. Design a genuinely ` +
+      `different scene — new setting, light and palette — that still suits the ` +
+      `website above. Do not repeat the scene already on the site.`
+    );
+  }
+
+  return parts.join("\n\n");
+}
+
+/**
  * Builds the user-side message for the video refiner. The image prompt is the
  * best description we have of frame one, so it is the primary anchor; the site
  * request keeps the move tied to what the user actually asked for.

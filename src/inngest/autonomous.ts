@@ -473,7 +473,12 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         userId: state.userId,
         isAgentMode: state.isAgentMode,
         isDirectPrompt: state.isDirectPrompt,
-        experiencePref: state.experiencePref || undefined
+        experiencePref: state.experiencePref || undefined,
+        // The site subject and the scene already on the site. current_prompt on a
+        // follow-up is only the user's edit ("make it warmer"), which on its own
+        // tells the refiner nothing about what site it is designing for.
+        sitePrompt: state.site_prompt || undefined,
+        previousImagePrompt: state.image_prompt || undefined,
       }
     });
     frameUrl = result.frameUrl;
@@ -521,14 +526,22 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
       if (action === "REGENERATE" || action === "AI_CREATE") {
         // "Let AI Recreate" hands authorship back to the agent — clear the flag so
         // the refiner runs again instead of replaying the user's earlier prompt.
-        return { next_agent: "frame_generation", iteration: currentIteration + 1, isDirectPrompt: false };
+        // Carrying the rejected scene forward is what makes the next attempt a
+        // genuinely different one rather than a re-roll of the same idea.
+        return {
+          next_agent: "frame_generation",
+          iteration: currentIteration + 1,
+          isDirectPrompt: false,
+          image_prompt: imagePrompt,
+        };
       }
       if (action === "WRITE_PROMPT") {
         return {
           next_agent: "frame_generation",
           iteration: currentIteration + 1,
           current_prompt: payload || state.current_prompt,
-          isDirectPrompt: true
+          isDirectPrompt: true,
+          image_prompt: imagePrompt,
         };
       }
       if (action === "CANCEL") {
@@ -1163,7 +1176,7 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     });
     const scenes = Array.isArray(project?.sceneImageUrls) ? project.sceneImageUrls : [];
     const videos = Array.isArray(project?.videoUrls) ? project.videoUrls : [];
-    const lastScene = scenes[scenes.length - 1] as { url?: string } | undefined;
+    const lastScene = scenes[scenes.length - 1] as { url?: string; prompt?: string } | undefined;
     const lastVideo = videos[videos.length - 1] as { url?: string } | undefined;
 
     // experiencePref lives only in graph state, so a follow-up starts without it
@@ -1183,6 +1196,10 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
 
     return {
       frameUrl: lastScene?.url ?? null,
+      // Written by the frame agent when it generated this scene. Absent on scenes
+      // made before that was recorded, and on images produced by the manual
+      // background builder — the refiner simply gets no "current scene" context.
+      framePrompt: lastScene?.prompt ?? null,
       videoUrl: lastVideo?.url ?? null,
       experiencePref,
     };
@@ -1205,6 +1222,10 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
       isDirectPrompt: false,
       // Drop the old frame so frame_generation starts clean.
       start_frame_url: null,
+      // ...but keep its description. The frame is dropped because the video model
+      // would otherwise replay the old scene; the refiner still needs to know what
+      // it is revising, or "make it warmer" becomes an unrelated image.
+      image_prompt: existing.framePrompt || "",
       video_url: existing.videoUrl,
       experiencePref: existing.experiencePref,
       media_only_update: true,

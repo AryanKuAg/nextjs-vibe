@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static", "inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   outputFileTracingIncludes: {
     "/api/extract-frames": ["./node_modules/ffmpeg-static/**/*"],
+    // The code agent seeds every new sandbox from src/templates, reading it at
+    // runtime with fs via a path built from process.cwd(). Next cannot trace a
+    // dynamic read like that, so without this the standalone output ships without
+    // the scaffold: hydration silently writes nothing, the base image's App.tsx
+    // is left importing a ScrollFrames component that was never created, and the
+    // Vite build fails with "Could not resolve ./components/ScrollFrames".
+    "/api/inngest": ["./src/templates/**/*"],
   },
   images: {
     remotePatterns: [

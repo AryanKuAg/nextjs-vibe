@@ -66,6 +66,12 @@ COPY --from=builder /app/node_modules/ffmpeg-static ./node_modules/ffmpeg-static
 # ffprobe-static binary
 COPY --from=builder /app/node_modules/ffprobe-static ./node_modules/ffprobe-static
 
+# The golden scaffold the code agent seeds new sandboxes from. next.config.ts also
+# traces it into the standalone output; this copy is the guarantee, because if it
+# is missing every generated site fails to build on an unresolved ScrollFrames
+# import. Cheap to copy and never worth debugging again.
+COPY --from=builder /app/src/templates ./src/templates
+
 # Fix EACCES permissions for Next.js cache
 RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next
 

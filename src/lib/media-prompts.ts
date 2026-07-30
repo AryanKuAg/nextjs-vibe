@@ -70,6 +70,22 @@ Compose for flight:
   split-screen, inset, mockup, border or framed picture — a divided image is the
   single biggest cause of the video model cutting between shots.
 
+Legibility (this frame is a BACKGROUND — a headline will sit on top of it):
+- The site's text goes over this image with no tint, scrim or shadow to help it,
+  so the frame must be tonally coherent: either predominantly dark OR
+  predominantly light, never both at once.
+- The most common failure is a crushed-black foreground at the edges against a
+  blown-out opening in the centre. That frame has no text colour that works —
+  white disappears into the bright middle, near-black disappears into the dark
+  edges. Keep the foreground edges and the opening within a few stops of each
+  other: silhouetted edges must stay readable rather than going pure black, and a
+  bright opening must stay detailed rather than clipping to white.
+- Keep one calm, low-detail area toward the lower-left or lower-third of the
+  frame — even tonality, no busy texture or high-frequency detail. That is where
+  the headline will sit.
+- Atmosphere and haze help here: they compress the tonal range and make text
+  land. Extreme backlighting and hard specular hotspots hurt it.
+
 Content:
 - Translate the user's request into a real place with a real mood. A coffee brand
   becomes a sunlit roastery interior; a fintech app becomes a canyon of glass
@@ -109,6 +125,12 @@ Compose for a loop:
   — open sky, still water, a plain wall, soft gradient light. The site's headline
   sits there, so it must be visually quiet and even in tone, with no busy detail
   and no high-contrast edges running through it.
+- Keep the whole frame tonally coherent: either predominantly dark OR
+  predominantly light, never both. The headline sits on top with no tint, scrim or
+  shadow to help it, so a frame that pairs a crushed-black foreground with a
+  blown-out highlight leaves no text colour that works anywhere. Silhouettes stay
+  readable rather than going pure black; bright areas stay detailed rather than
+  clipping to white.
 - Include elements that move on their own in a natural cycle: drifting clouds,
   rippling water, swaying grass or leaves, rising steam, falling snow, floating
   dust, a slow flicker of light, gentle fabric movement. These carry the loop.

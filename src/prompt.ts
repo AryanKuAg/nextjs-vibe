@@ -104,7 +104,13 @@ Print it once, at the very end, with nothing after it and no backticks around it
 const DESIGN_SYSTEM = `
 ## DESIGN SYSTEM (applies to EVERY site, every mode — this is the product's identity)
 - Aesthetic: minimal, restrained, editorial, classy. The result should look like a boutique design studio made it, never like a generic template.
-- Typography carries the design: use the font pairing from the brief, oversized expressive headings (use clamp() sizes), tight leading and letter-spacing on display text.
+- Typography carries the design: use the font pairing from the brief, expressive headings sized with clamp(), tight leading and letter-spacing on display text.
+- TYPE SCALE — HARD CAPS (the hero headline is the most common failure; respect these exactly):
+  - Hero headline: \`clamp(2.25rem, 5.5vw, 5rem)\` with \`line-height: 0.95\`. NEVER exceed 5rem (80px) at the top of the clamp, and never use a vw middle term above 6vw. A headline whose middle term is 10vw+ renders 200px+ on a desktop monitor, wraps to four lines, and swallows the viewport — that is a failure.
+  - Section headings: \`clamp(1.75rem, 3.5vw, 3rem)\`. Body copy: 1rem–1.125rem. Small print: 0.875rem.
+  - The hero headline is at most 3 lines at 1440x900 — write copy short enough to fit (roughly 6 words). If it needs a fourth line, shorten the copy, do not shrink below the scale above.
+  - The whole hero block (headline + supporting line + CTA) occupies at most ~70% of the viewport height and leaves visible breathing room above and below. The supporting line and CTA must be fully visible in the first viewport, never pushed off-screen by the headline.
+  - Never set a font-size in raw vw alone (e.g. \`text-[12vw]\`) — it has no upper bound and explodes on wide monitors. Always clamp().
 - Whitespace is a feature: generous vertical rhythm (py-24 and up), never dense walls of cards.
 - Exactly ONE accent color (from the brief), used sparingly — everything else stays neutral.
 - Be a little creative: at least one distinctive editorial move per site — asymmetric section layouts, oversized type crossing sections, thin 1px dividers (e.g. border-white/10), a subtle marquee strip, or staggered reveal motion. Tasteful, not busy.
@@ -190,6 +196,8 @@ const CHECKLIST: Record<CodeAgentMode, string> = {
 - body carries the brief's fallback background-color; no background on #root or anything over the video; ZERO overlays/scrims/tints/gradients over the video anywhere
 - NO glassmorphism, NO backdrop-blur, NO translucent panels over the video (nav, cards, quotes, footer all transparent) — separate content with borders/whitespace, not glass
 - Text is readable over the video everywhere via the brief's text color on ALL text over the video (headlines, body, labels, links), never via an overlay and never via a shadow
+- The hero headline uses clamp() with a maximum of 5rem and a vw term of 5.5vw or less — no raw vw sizes, nothing that renders past ~80px on a desktop monitor
+- The hero headline wraps to at most 3 lines, and the supporting line and CTA are both fully visible in the first viewport below it
 - ZERO shadows anywhere in the output: no shadow-*, no drop-shadow-*, no text-shadow, no box-shadow, no glow — on any element
 - 4-5 sections, each min-h-[100dvh], footer last${CHECKLIST_SHARED}
 `,
@@ -198,6 +206,7 @@ const CHECKLIST: Record<CodeAgentMode, string> = {
 - Hero <video> uses the exact provided URL with autoPlay loop muted playsInline + object-cover
 - The headline, subtext, and CTA render INSIDE the hero section, overlaid on the video (relative z-10) — the hero is NEVER a bare video with the text starting below it
 - ZERO overlays over the hero video: no gradient/tint/scrim/blur layer; hero text readable via the brief's text color only
+- The hero headline uses clamp() capped at 5rem (5.5vw or less), wraps to at most 3 lines, and leaves the supporting line and CTA visible in the first viewport
 - ZERO shadows anywhere in the output: no shadow-*, no drop-shadow-*, no text-shadow, no box-shadow, no glow — on any element
 - No scrolly-video / ScrollFrames anywhere; no extra packages installed for the video
 - Sections below the hero use solid backgrounds and follow the design system${CHECKLIST_SHARED}

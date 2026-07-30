@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { MessageRole, MessageType } from "@prisma/client";
+import { AGENT_STATUS, resolveAgentStatus } from "./agent-status";
 
 const InteractiveMessageHeader = ({ text = "Awaiting user input", showTimer = true, displayTime = 0, isCompleted = false }: { text?: string, showTimer?: boolean, displayTime?: number, isCompleted?: boolean }) => {
   const seconds = Math.floor(displayTime / 1000);
@@ -197,34 +198,17 @@ const AssistantMessage = ({
     }
   };
 
-  const getLoadingText = () => {
-    // 1. Optimistic fallbacks based on the action the user just took.
-    // AI_CREATE / WRITE_PROMPT are reused by BOTH the scene (image) and video
-    // steps, so we disambiguate using the interactive card they were clicked on:
-    // - image approval cards carry an ANIMATE_VIDEO button → next step is the image agent
-    // - video approval cards carry a USE_VIDEO button → next step is the video agent
-    // - intent questions mention "background scene" vs "background video"
-    if (lastAction === "USE_VIDEO" || lastAction === "FULL_PAGE" || lastAction === "HERO_ONLY") {
-      return "Building website";
-    }
-    if (lastAction === "ANIMATE_VIDEO") {
-      return "Generating video";
-    }
-    if (lastAction === "AI_CREATE" || lastAction === "WRITE_PROMPT" || lastAction === "REGENERATE") {
-      const buttonActions = interactiveContent?.buttons?.map((b) => b.action) ?? [];
-      const isVideoStep =
-        buttonActions.includes("USE_VIDEO") ||
-        interactiveContent?.text?.toLowerCase().includes("background video");
-      return isVideoStep ? "Generating video" : "Generating scene";
-    }
-
-    // 2. Fallback to the database's currentStage as the primary source of truth
-    if (currentStage === "GENERATING_SCENE") return "Generating scene";
-    if (currentStage === "GENERATING_VIDEO") return "Generating video";
-    if (currentStage === "BUILDING_SITE") return "Building website";
-
-    return "Thinking";
-  };
+  // An assistant card only renders a status while the agent is mid-run, which by
+  // definition means it has already responded — so this is never the opening
+  // "Working" state, that belongs to the standalone row under the thread.
+  const getLoadingText = () =>
+    resolveAgentStatus({
+      currentStage,
+      lastAction,
+      interactiveButtonActions: interactiveContent?.buttons?.map((b) => b.action) ?? [],
+      interactiveText: interactiveContent?.text,
+      awaitingFirstResponse: false,
+    });
 
   if (type === "INTERACTIVE" && interactiveContent && !isLastMessage) {
     return null;
@@ -311,7 +295,7 @@ const AssistantMessage = ({
             type === "RESULT" && content ? (
               <div className="flex flex-col gap-3">
                 <InteractiveMessageHeader
-                  text="Completed"
+                  text={AGENT_STATUS.COMPLETED}
                   showTimer={true}
                   displayTime={displayTime}
                   isCompleted={true}

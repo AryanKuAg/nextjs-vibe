@@ -5,7 +5,7 @@ import { uploadMediaAsset } from "@/lib/media-storage";
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { getImageSystemPrompt, stripMachineWords } from "@/lib/media-prompts";
+import { buildImageRefinerInput, getImageSystemPrompt, stripMachineWords } from "@/lib/media-prompts";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
@@ -20,7 +20,18 @@ export const generateFramesFunction = inngest.createFunction(
     ]
   },
   async ({ event, step }) => {
-    const { projectId, prompt, userId, isDirectPrompt, experiencePref } = event.data;
+    const {
+      projectId,
+      prompt,
+      userId,
+      isDirectPrompt,
+      experiencePref,
+      // What the site is about, and what the background currently shows. Without
+      // these a follow-up like "make it warmer" reaches the refiner as its entire
+      // context and produces something unrelated to the site.
+      sitePrompt,
+      previousImagePrompt,
+    } = event.data;
 
     await step.run("update-stage", async () => {
       // While the image is being generated the stage must read GENERATING_SCENE —
@@ -46,7 +57,18 @@ export const generateFramesFunction = inngest.createFunction(
       // FULL_PAGE is flown through (depth layers, an opening, deep focus).
       const sysMsg = new SystemMessage(getImageSystemPrompt(experiencePref));
 
-      const response = await routerModel.invoke([sysMsg, new HumanMessage(prompt)]);
+      // `prompt` is this turn's ask; `sitePrompt` is what the site is about. On a
+      // first build they are the same string and this collapses to the old
+      // behaviour. On a follow-up they differ, and that difference is the whole
+      // point — see buildImageRefinerInput.
+      const refinerInput = buildImageRefinerInput(
+        sitePrompt || prompt,
+        prompt,
+        previousImagePrompt
+      );
+      console.log(`[Frame Agent] Refining with${previousImagePrompt ? "" : "out"} a previous scene; site context ${sitePrompt ? "present" : "missing"}.`);
+
+      const response = await routerModel.invoke([sysMsg, new HumanMessage(refinerInput)]);
       // A named machine gets drawn — strip it before the image model ever sees it.
       return stripMachineWords((response.content as string).trim());
     });
@@ -99,7 +121,13 @@ export const generateFramesFunction = inngest.createFunction(
       await (prisma.project as any).update({
         where: { id: projectId },
         data: {
-          sceneImageUrls: [...existingUrls, { url: frameUrl, type: "START", blockIndex: 0 }],
+          // `prompt` is what lets a later follow-up ("make it warmer") know what
+          // it is modifying — graph state does not survive between runs. Extra
+          // key on an existing Json array, so older rows stay readable.
+          sceneImageUrls: [
+            ...existingUrls,
+            { url: frameUrl, type: "START", blockIndex: 0, prompt: refinedPrompt },
+          ],
           status: "active",
         },
       });

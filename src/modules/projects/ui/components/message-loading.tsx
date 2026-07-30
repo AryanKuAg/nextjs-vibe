@@ -7,7 +7,7 @@ function formatTimer(seconds: number) {
   return `${m}m ${s}s`;
 }
 
-export const ShimmerMessages = ({ text = "Working...", showTimer = false, globalElapsedMs = 0 }: { text?: string, showTimer?: boolean, globalElapsedMs?: number }) => {
+export const ShimmerMessages = ({ text = "Working", showTimer = false, globalElapsedMs = 0 }: { text?: string, showTimer?: boolean, globalElapsedMs?: number }) => {
   const timeString = formatTimer(Math.floor(globalElapsedMs / 1000));
 
   return (
@@ -25,11 +25,14 @@ export const ShimmerMessages = ({ text = "Working...", showTimer = false, global
   );
 };
 
-export const MessageLoading = ({ globalElapsedMs = 0 }: { globalElapsedMs?: number }) => {
+export const MessageLoading = ({
+  globalElapsedMs = 0,
+  text,
+}: { globalElapsedMs?: number; text?: string }) => {
   return (
     <div className="flex group pb-4 px-3 items-start">
       <div className="flex flex-col gap-y-4 pt-0.5 w-full">
-        <ShimmerMessages showTimer={true} globalElapsedMs={globalElapsedMs} />
+        <ShimmerMessages text={text} showTimer={true} globalElapsedMs={globalElapsedMs} />
       </div>
     </div>
   );

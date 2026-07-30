@@ -7,6 +7,7 @@ import { Fragment } from "@prisma/client";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { MessageLoading } from "./message-loading";
+import { resolveAgentStatus } from "./agent-status";
 
 // If the last message has been from a USER for longer than this, show a recovery UI
 const STUCK_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes – site generation can take a long time
@@ -92,7 +93,11 @@ export const MessagesContainer = ({
     refetchInterval: 2000,
   }));
 
-  useQuery(trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 }));
+  // Already polled for freshness; its currentStage is what drives the status line.
+  const { data: project } = useQuery(
+    trpc.projects.getOne.queryOptions({ id: projectId }, { refetchInterval: 2000 })
+  );
+  const currentStage = project?.currentStage;
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
@@ -201,13 +206,21 @@ export const MessagesContainer = ({
                 setPendingInteractiveAction={setPendingInteractiveAction}
                 isLastMessage={index === messages.length - 1}
                 messageId={message.id}
+                currentStage={currentStage}
                 globalElapsedMs={generationTimer.elapsedMs}
                 onActionSubmit={() => setInteractiveSubmittedAt(new Date())}
               />
             );
           })}
 
-          {isLastMessageUser && !isStuck && <MessageLoading globalElapsedMs={generationTimer.elapsedMs} />}
+          {isLastMessageUser && !isStuck && (
+            <MessageLoading
+              globalElapsedMs={generationTimer.elapsedMs}
+              // The agent hasn't replied yet, so this reads "Working" until the
+              // backend names a stage — then it tracks the real step.
+              text={resolveAgentStatus({ currentStage, awaitingFirstResponse: true })}
+            />
+          )}
           {isLastMessageUser && isStuck && (
             <div className="px-2 pb-4 flex items-start gap-2.5">
               <div className="flex flex-col gap-1.5">

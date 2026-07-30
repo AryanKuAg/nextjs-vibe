@@ -6,6 +6,13 @@ import { inngest } from "@/inngest/client";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { consumeCredits } from "@/lib/usage";
 
+/**
+ * What this legacy chat route charges. Named so the charge and the
+ * refund-on-failure amount can't drift apart. Note this is higher than the
+ * AGENT_COSTS.CODE that projects.buildSite charges for the same code-agent run.
+ */
+const LEGACY_MESSAGE_COST = 10;
+
 export const messagesRouter = createTRPCRouter({
   getMany: protectedProcedure
   .input(
@@ -61,7 +68,7 @@ export const messagesRouter = createTRPCRouter({
 
       if (!isSyntheticMessage) {
         try {
-          await consumeCredits(10);
+          await consumeCredits(LEGACY_MESSAGE_COST);
         } catch (error) {
           if (error instanceof Error) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
@@ -111,6 +118,8 @@ export const messagesRouter = createTRPCRouter({
             isFollowUp: true,
             model: input.model,
             userId: ctx.auth.userId,
+            // Returned by the agent's onFailure handler if the run never completes.
+            refundOnFailure: LEGACY_MESSAGE_COST,
           },
         });
       }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import DodoPayments from "dodopayments";
 
+import { dodoEnvironment } from "@/lib/dodo-env";
+
 // Fallback logic in case the SDK format differs due to versioning
 // Dodo Payments currently uses standard `payment_links` endpoint
 export async function POST(req: NextRequest) {
@@ -15,13 +17,19 @@ export async function POST(req: NextRequest) {
     const email = user.emailAddresses[0]?.emailAddress;
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
-    const { plan, returnUrl } = await req.json();
+    const { plan, billing, returnUrl } = await req.json();
 
-    const planToProduct: Record<string, string | undefined> = {
-      basic: process.env.DODO_PRODUCT_BASIC,
-      plus: process.env.DODO_PRODUCT_PLUS,
-      pro: process.env.DODO_PRODUCT_PRO,
-    };
+    const planToProduct: Record<string, string | undefined> = billing === "yearly"
+      ? {
+        plus: process.env.DODO_PRODUCT_PLUS_YEARLY,
+        pro: process.env.DODO_PRODUCT_PRO_YEARLY,
+        max: process.env.DODO_PRODUCT_MAX_YEARLY,
+      }
+      : {
+        plus: process.env.DODO_PRODUCT_PLUS,
+        pro: process.env.DODO_PRODUCT_PRO,
+        max: process.env.DODO_PRODUCT_MAX,
+      };
 
     const productId = planToProduct[plan.toLowerCase()];
 
@@ -37,15 +45,25 @@ export async function POST(req: NextRequest) {
     // Initialize DodoPayments client
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.NODE_ENV === "development" ? "test_mode" : "live_mode",
+      environment: dodoEnvironment(),
     });
 
-    // Handle local development webhook limitations
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[Local Dev] Auto-syncing credits for ${plan} plan since webhooks cannot reach localhost without Ngrok.`);
-      const { syncCredits } = await import("@/lib/usage");
-      await syncCredits(userId, plan.toLowerCase());
-    }
+
+
+    // Dodo redirects the customer back before its webhook has necessarily landed,
+    // so flag the return trip — the app polls for the new plan instead of showing
+    // stale credits.
+    const baseReturn =
+      returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/`;
+    const returnWithFlag = (() => {
+      try {
+        const url = new URL(baseReturn);
+        url.searchParams.set("checkout", "success");
+        return url.toString();
+      } catch {
+        return baseReturn;
+      }
+    })();
 
     // Create a payment session/link
     const session = await dodo.checkoutSessions.create({
@@ -61,10 +79,11 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         }
       ],
-      return_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/`,
+      return_url: returnWithFlag,
       metadata: {
         userId,
-        plan
+        plan,
+        billing: billing === "yearly" ? "yearly" : "monthly"
       }
     });
 

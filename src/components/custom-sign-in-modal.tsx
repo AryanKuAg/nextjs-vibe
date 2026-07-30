@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useSignIn, useUser } from "@clerk/nextjs";
+// The button's pending spinner is a remixicon glyph, and the font is imported
+// per-component in this codebase rather than globally.
+import "remixicon/fonts/remixicon.css";
 
 interface CustomSignInModalProps {
   isOpen: boolean;
@@ -58,13 +61,13 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
         onClick={onClose}
         aria-label="Close"
         className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors bg-[#282828] hover:bg-[#333] leading-none"
-        style={{ fontSize: 20 }}
+        style={{ fontSize: 16 }}
       >
         ✕
       </button>
 
       {showDesktopOnlyMessage ? (
-        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-onest">
+        <div className="flex flex-col items-center gap-4 px-8 w-full max-w-[420px] text-center font-sans">
           <Image
             src="/logo.png"
             alt="Logo"
@@ -95,7 +98,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
 
             {/* Heading */}
             <div className="text-center mb-6">
-              <h2 className="text-white text-[24px] font-light tracking-wide mb-1">
+              <h2 className="text-white text-[24px] font-medium tracking-wide mb-1">
                 Log In or Sign Up
               </h2>
               <p className="text-[#737373] text-[14px]">
@@ -108,40 +111,32 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isPending}
-              className="bg-white text-black w-fit px-3 py-2.5 flex items-center justify-center gap-2.5 rounded-[8px] transition-colors disabled:opacity-70 h-[36px]"
+              className="px-3 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium  flex items-center gap-1.5 bg-white disabled:opacity-70 hover:opacity-80 transition-all duration-200"
             >
-              {isPending ? (
-                <svg
-                  className="animate-spin h-4 w-4 text-black"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <Image src="/google.svg" alt="Google" width={16} height={16} />
-              )}
-              <span className="text-[15px] font-[500] font-onest">
-                Get started
-              </span>
+              <div className="w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                {isPending ? (
+                  <i className="ri-loader-4-line animate-spin text-[12px] scale-125" />
+                ) : (
+                  <Image src="/google.svg" alt="Google" width={14} height={14} />
+                )}
+              </div>
+              Continue with Google
             </button>
           </div>
 
           {/* Fine print */}
-          <p className="absolute bottom-6 w-full px-6 text-[#737373] text-[12px] text-center leading-relaxed">
+          <p className="absolute bottom-6 w-full px-6 text-white/50 text-[12px] text-center leading-relaxed">
             By signing up, you agree to our{" "}
             <Link
-              href="/terms"
-              className="text-white transition-colors"
+              href="/legal"
+              className="text-white-85"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
-              href="/privacy"
-              className="text-white transition-colors"
+              href="/legal?tab=privacy"
+              className="text-white-85"
             >
               Privacy Policy
             </Link>

@@ -3,17 +3,21 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { createAgent, createTool, createNetwork, type Tool, type Message, createState, openai } from "@inngest/agent-kit";
 //
 import { prisma } from "@/lib/db";
-import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
+import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSystemPrompt, buildDiffAgentSystemPrompt, type CodeAgentMode } from "@/prompt";
 
 import { inngest } from "./client";
-import { NonRetriableError } from "inngest";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
-import { Storage } from "@google-cloud/storage";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
+import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_ASIS_PROMPT, type TemplateManifest } from "@/lib/templates/registry";
 
 
-import { consumeCredits, MODEL_COSTS } from "@/lib/usage";
+import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
+import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
+import { refundChargedCredits } from "./refund";
+import { PROJECT_STAGE } from "@/lib/project-stage";
 
 // Constants moved to usage.ts
 
@@ -25,8 +29,9 @@ const checkCancellation = async (projectId: string) => {
     select: { messages: { orderBy: { createdAt: "desc" }, take: 1 } }
   });
   if (pCheck?.messages?.[0]?.content === "Generation was manually stopped.") {
-    throw new NonRetriableError("Generation was manually stopped.");
+    return true;
   }
+  return false;
 };
 
 
@@ -36,12 +41,289 @@ interface AgentState {
   files: { [path: string]: string };
 };
 
+// Scaffold App.tsx used when the site has NO full-page scroll video (hero-only
+// and standard modes). The default template App.tsx imports ScrollFrames, which
+// is deliberately not seeded in these modes — seeding it would not compile.
+const NON_FULL_PAGE_APP_SEED = `// @ts-nocheck
+import { Navbar } from "./components/Navbar";
+
+import { Hero } from "./components/sections/Hero";
+import { Features } from "./components/sections/Features";
+import { Details } from "./components/sections/Details";
+import { Footer } from "./components/sections/Footer";
+
+export default function App() {
+  return (
+    <>
+      <Navbar />
+
+      <main className="w-full relative z-10 flex flex-col">
+        <Hero />
+        <Features />
+        <Details />
+        <Footer />
+      </main>
+    </>
+  );
+}
+`;
+
+// Shell-quote a value for safe interpolation into a sandbox command.
+const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * Run a sandbox command WITHOUT throwing on a non-zero exit.
+ *
+ * E2B's commands.run rejects with a CommandExitError when the exit code is not
+ * zero, so any `if (result.exitCode !== 0)` check placed after it is dead code —
+ * the caller gets a bare stack trace instead of a diagnosable message. This
+ * normalises both paths into a plain result so callers can report properly.
+ */
+const runSandboxCommand = async (
+  sandbox: Sandbox,
+  command: string,
+  opts?: { timeoutMs?: number },
+): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
+  try {
+    const r = await sandbox.commands.run(command, opts);
+    return { exitCode: r.exitCode, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+  } catch (e) {
+    // CommandExitError carries the full result; anything else is a real fault
+    // (sandbox gone, timeout) and must keep propagating.
+    const err = e as { exitCode?: unknown; stdout?: unknown; stderr?: unknown };
+    if (typeof err?.exitCode === "number") {
+      return {
+        exitCode: err.exitCode,
+        stdout: typeof err.stdout === "string" ? err.stdout : "",
+        stderr: typeof err.stderr === "string" ? err.stderr : "",
+      };
+    }
+    throw e;
+  }
+};
+
+/** Last N characters of command output, for error messages. */
+const tailOutput = (r: { stdout: string; stderr: string }, n = 900) =>
+  `${r.stderr || r.stdout || "(no output)"}`.slice(-n);
+
+/**
+ * Write a helper script into the sandbox via the shell rather than files.write.
+ *
+ * sandbox.files.write runs as a different user than sandbox.commands.run and is
+ * denied on /tmp ("permission denied"), while the shell can write there freely
+ * (the template tarball is curl'd straight into /tmp). base64 round-tripping
+ * keeps arbitrary script content safe from shell quoting.
+ *
+ * Always use a .cjs path: template repos set "type": "module", and these
+ * scripts use require().
+ */
+const writeSandboxScript = async (sandbox: Sandbox, path: string, contents: string) => {
+  const encoded = Buffer.from(contents, "utf8").toString("base64");
+  const written = await runSandboxCommand(
+    sandbox,
+    `printf '%s' ${shq(encoded)} | base64 -d > ${shq(path)}`,
+    { timeoutMs: 30_000 },
+  );
+  if (written.exitCode !== 0) {
+    throw new Error(`Failed to write ${path} into the sandbox (exit ${written.exitCode}): ${tailOutput(written)}`);
+  }
+};
+
+/**
+ * Download a template repo into the sandbox and overlay it onto /home/user.
+ *
+ * The E2B image ships curl but not git, so this pulls a codeload tarball rather
+ * than cloning. Runs only for projects created by remixing a gallery template.
+ */
+const downloadTemplateIntoSandbox = async (
+  sandbox: Sandbox,
+  template: TemplateManifest,
+  videoUrl: string | null,
+) => {
+  const tarUrl = templateTarballUrl(template);
+  const workDir = "/tmp/framerate-template";
+  const tarPath = "/tmp/framerate-template.tar.gz";
+
+  // Each stage runs as its own command so a failure names the stage that broke.
+  // (Piping curl into tar hides curl's exit code behind tar's.)
+  await runSandboxCommand(sandbox, `rm -rf ${workDir} ${tarPath} && mkdir -p ${workDir}`);
+
+  const fetched = await runSandboxCommand(
+    sandbox,
+    `curl -fsSL --retry 3 --retry-delay 2 -o ${tarPath} ${shq(tarUrl)}`,
+    { timeoutMs: 120_000 },
+  );
+  if (fetched.exitCode !== 0) {
+    throw new Error(
+      `Failed to download template "${template.id}" from ${tarUrl} (curl exit ${fetched.exitCode}). ` +
+      `Check that the repo is public and that the branch "${template.branch}" exists. ` +
+      `Output: ${tailOutput(fetched)}`,
+    );
+  }
+
+  // --strip-components=1 drops GitHub's "<repo>-<branch>/" wrapper directory.
+  const extracted = await runSandboxCommand(
+    sandbox,
+    `tar xzf ${tarPath} -C ${workDir} --strip-components=1`,
+    { timeoutMs: 120_000 },
+  );
+  if (extracted.exitCode !== 0) {
+    throw new Error(
+      `Failed to extract template "${template.id}" (tar exit ${extracted.exitCode}). ` +
+      `Output: ${tailOutput(extracted)}`,
+    );
+  }
+
+  const sourceDir = template.subdir ? `${workDir}/${template.subdir}` : workDir;
+
+  const exists = await runSandboxCommand(
+    sandbox,
+    `test -f ${shq(`${sourceDir}/package.json`)} && echo ok || echo missing`,
+  );
+  if (!exists.stdout.includes("ok")) {
+    const listing = await runSandboxCommand(sandbox, `ls -A ${shq(sourceDir)} 2>&1 | head -40`);
+    throw new Error(
+      `Template "${template.id}" has no package.json at ${sourceDir}` +
+      `${template.subdir ? ` (subdir "${template.subdir}")` : ""}. ` +
+      `Contents: ${listing.stdout.trim() || "(empty)"}. ` +
+      `See src/lib/templates/README.md for the required repo layout.`,
+    );
+  }
+
+  // Replace the scaffold's src/ wholesale — leftover scaffold components would
+  // otherwise sit alongside the template's and confuse the agent.
+  await runSandboxCommand(sandbox, "rm -rf /home/user/src");
+  const copied = await runSandboxCommand(
+    sandbox,
+    `cp -a ${shq(`${sourceDir}/.`)} /home/user/ && rm -rf ${workDir} ${tarPath}`,
+    { timeoutMs: 60_000 },
+  );
+  if (copied.exitCode !== 0) {
+    throw new Error(
+      `Failed to copy template "${template.id}" into the sandbox (exit ${copied.exitCode}). ` +
+      `Output: ${tailOutput(copied)}`,
+    );
+  }
+
+  // The template brings its own package.json, so the image's pre-warmed
+  // node_modules is only a partial match. This is the slow leg of a remix.
+  // --legacy-peer-deps keeps a strict peer conflict in a hand-built template
+  // from hard-failing the whole remix.
+  console.log(`DEBUG: Installing template "${template.id}" dependencies...`);
+  const install = await runSandboxCommand(
+    sandbox,
+    "cd /home/user && npm install --no-audit --no-fund --legacy-peer-deps",
+    { timeoutMs: 300_000 },
+  );
+  if (install.exitCode !== 0) {
+    console.error(`DEBUG: npm install for template "${template.id}" failed:\n${install.stderr || install.stdout}`);
+    throw new Error(
+      `Template "${template.id}" dependency install failed (npm exit ${install.exitCode}). ` +
+      `Output: ${tailOutput(install)}`,
+    );
+  }
+
+  // Wire the generated background video into the template's placeholder.
+  if (videoUrl) {
+    const substitute = [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      `const TOKEN = ${JSON.stringify(TEMPLATE_VIDEO_PLACEHOLDER)};`,
+      `const URL = ${JSON.stringify(videoUrl)};`,
+      "let count = 0;",
+      "function substituteFile(p) {",
+      "  if (!/\\.(tsx?|jsx?|css|html|json)$/.test(p)) return;",
+      "  const before = fs.readFileSync(p, 'utf8');",
+      "  if (!before.includes(TOKEN)) return;",
+      "  fs.writeFileSync(p, before.split(TOKEN).join(URL));",
+      "  count++;",
+      "}",
+      // Accepts a directory OR a single file — index.html is passed directly,
+      // and readdirSync on a file throws ENOTDIR.
+      "function walk(target) {",
+      "  if (!fs.existsSync(target)) return;",
+      "  if (!fs.statSync(target).isDirectory()) { substituteFile(target); return; }",
+      "  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {",
+      "    const p = path.join(target, entry.name);",
+      "    if (entry.isDirectory()) { if (entry.name !== 'node_modules') walk(p); continue; }",
+      "    substituteFile(p);",
+      "  }",
+      "}",
+      "walk('/home/user/src');",
+      "walk('/home/user/index.html');",
+      "process.stdout.write(String(count));",
+    ].join("\n");
+
+    await writeSandboxScript(sandbox, "/tmp/inject-video.cjs", substitute);
+    const injected = await runSandboxCommand(sandbox, "node /tmp/inject-video.cjs", { timeoutMs: 30_000 });
+    if (injected.exitCode !== 0) {
+      throw new Error(
+        `Failed to inject the video URL into template "${template.id}" (exit ${injected.exitCode}). ` +
+        `Output: ${tailOutput(injected)}`,
+      );
+    }
+    const touched = Number(injected.stdout.trim() || "0");
+    if (touched === 0) {
+      console.warn(
+        `DEBUG: Template "${template.id}" contains no ${TEMPLATE_VIDEO_PLACEHOLDER} token — ` +
+        `the generated video will not appear. See src/lib/templates/README.md.`,
+      );
+    } else {
+      console.log(`DEBUG: Injected video URL into ${touched} template file(s).`);
+    }
+  }
+};
+
+/** Read a template project's source tree back out of the sandbox. */
+const readTemplateFilesFromSandbox = async (sandbox: Sandbox): Promise<Record<string, string>> => {
+  const scraper = [
+    "const fs = require('fs');",
+    "const path = require('path');",
+    "const SKIP_EXT = ['.png','.jpg','.jpeg','.gif','.ico','.mp4','.webm','.woff','.woff2','.ttf','.otf','.webp','.avif'];",
+    "const out = {};",
+    "function walk(dir) {",
+    "  if (!fs.existsSync(dir)) return;",
+    "  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {",
+    "    const p = path.join(dir, entry.name);",
+    "    if (entry.isDirectory()) { if (entry.name !== 'node_modules') walk(p); continue; }",
+    "    if (SKIP_EXT.includes(path.extname(entry.name).toLowerCase())) continue;",
+    "    try { out[p.split(path.sep).join('/').replace(/^\\/home\\/user\\//, '')] = fs.readFileSync(p, 'utf8'); } catch (e) {}",
+    "  }",
+    "}",
+    "process.chdir('/home/user');",
+    "walk('/home/user/src');",
+    "walk('/home/user/public');",
+    // Build-critical root files. A template may use any of these variants, and a
+    // missing tailwind/postcss config silently produces an unstyled site after a
+    // cold-sandbox rehydration rather than an error.
+    "for (const f of ['index.html','vite.config.ts','vite.config.js','vite.config.mjs','package.json'," +
+    "'tailwind.config.js','tailwind.config.ts','tailwind.config.cjs'," +
+    "'postcss.config.js','postcss.config.ts','postcss.config.cjs','postcss.config.mjs'," +
+    "'tsconfig.json','tsconfig.app.json','tsconfig.node.json']) {",
+    "  const p = '/home/user/' + f;",
+    "  if (fs.existsSync(p)) out[f] = fs.readFileSync(p, 'utf8');",
+    "}",
+    "process.stdout.write(JSON.stringify(out));",
+  ].join("\n");
+
+  await writeSandboxScript(sandbox, "/tmp/scrape-template.cjs", scraper);
+  const result = await runSandboxCommand(sandbox, "node /tmp/scrape-template.cjs", { timeoutMs: 60_000 });
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to read template files from the sandbox (exit ${result.exitCode}): ${tailOutput(result)}`);
+  }
+  return JSON.parse(result.stdout.trim());
+};
+
 export const codeAgentFunction = inngest.createFunction(
   {
     id: "code-agent",
     timeouts: { finish: "15m" },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
+
+      // The user paid for this message up front — give it back before telling
+      // them to try again, otherwise the retry bills them a second time.
+      await refundChargedCredits(event, step);
 
       // Guarantee the UI un-jams by writing a fallback Assistant message
       await step.run("unjam-ui", async () => {
@@ -79,14 +361,6 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-    let videoUrl = event.data.videoUrl;
-    if (!videoUrl && event.data.frameCount) {
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      videoUrl = `${cdnBase}/frames/${event.data.projectId}/frames.zip`;
-      console.log(`DEBUG: Reconstructed deterministic videoUrl from project ID: ${videoUrl}`);
-    }
-
     const getModel = (modelName: string) => {
       // Fallback if OpenRouter models are passed
       return openai({
@@ -95,6 +369,19 @@ export const codeAgentFunction = inngest.createFunction(
         baseUrl: "https://openrouter.ai/api/v1",
       });
     };
+
+    // --- TEMPLATE PROJECTS ---
+    // A project carries a templateId only when it was started by remixing a
+    // gallery template. Everything gated on `template` below is inert for
+    // prompt-built projects, which keep the existing scaffold behaviour.
+    const template = getTemplate(project?.templateId);
+    if (template) {
+      console.log(`DEBUG: Template project — remixing "${template.id}" (${template.repo}#${template.branch}).`);
+    }
+
+    // DIFF mode applies targeted search/replace edits instead of rewriting whole
+    // files. Only the template follow-up router sets it; anything else stays FULL.
+    const editMode: "FULL" | "DIFF" = event.data.editMode === "DIFF" && template ? "DIFF" : "FULL";
 
     const sandboxId = await step.run("get-sandbox-id", async () => {
       let sandbox;
@@ -119,6 +406,18 @@ export const codeAgentFunction = inngest.createFunction(
       return sandbox.sandboxId;
     });
 
+    // Announce the step so the status line can name it. The autonomous agent
+    // already sets this before invoking us, but a direct build (buildSite, or a
+    // follow-up edit) has nothing else that would.
+    await step.run("mark-stage-building", async () => {
+      await prisma.project
+        .update({
+          where: { id: event.data.projectId },
+          data: { currentStage: PROJECT_STAGE.BUILDING_SITE },
+        })
+        .catch(() => { });
+    });
+
     const latestFragment = await step.run("get-latest-fragment", async () => {
       const messageWithFragment = await prisma.message.findFirst({
         where: {
@@ -137,7 +436,72 @@ export const codeAgentFunction = inngest.createFunction(
       return messageWithFragment.fragment;
     });
 
+    // --- VIDEO & MODE DERIVATION ---
+    // The event payload is not trusted as the only source: follow-up events may
+    // arrive without videoUrl/experiencePref (or with videoUrls entries that are
+    // {url, blockIndex} objects). We derive the durable truth from the project
+    // row and the latest fragment so iterations never lose the video wiring.
+    const videoContext = await step.run("derive-video-context", async () => {
+      const normalizeUrl = (v: unknown): string | undefined => {
+        if (typeof v === "string" && v.trim() !== "") return v;
+        if (v && typeof v === "object" && "url" in v && typeof (v as { url: unknown }).url === "string") {
+          return (v as { url: string }).url;
+        }
+        return undefined;
+      };
+
+      let videoUrl = normalizeUrl(event.data.videoUrl);
+      if (!videoUrl) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stored = (project as any)?.videoUrls;
+        const urls = Array.isArray(stored) ? stored : [];
+        videoUrl = normalizeUrl(urls[urls.length - 1]);
+      }
+
+      // A template's mode is declared in the registry and is authoritative — a
+      // template repo owns its own background implementation, so the
+      // ScrollFrames-presence heuristic below cannot detect it.
+      let experiencePref: string | undefined = template ? template.mode : event.data.experiencePref;
+      if (!experiencePref && latestFragment) {
+        // Derive from the built site itself: full-page sites always carry the
+        // protected ScrollFrames component; hero sites have a video but no ScrollFrames.
+        const files = (latestFragment.files || {}) as Record<string, string>;
+        if (files["src/components/ScrollFrames.tsx"]) {
+          experiencePref = "FULL_PAGE";
+        } else if (videoUrl) {
+          experiencePref = "HERO_ONLY";
+        }
+      }
+
+      const mode: CodeAgentMode = !videoUrl
+        ? "STANDARD"
+        : experiencePref === "HERO_ONLY" ? "HERO_ONLY" : "FULL_PAGE";
+
+      console.log(`DEBUG: Derived video context — mode: ${mode}, videoUrl: ${videoUrl ? "present" : "none"}`);
+      return { videoUrl: videoUrl ?? null, mode };
+    });
+
+    const videoUrl = videoContext.videoUrl;
+    const mode = videoContext.mode as CodeAgentMode;
+    const isNewBuild = !latestFragment;
+
+    // First build of a template project: pull the repo into the sandbox and use
+    // it as the starting code instead of the generic scaffold. Follow-ups reuse
+    // the persisted fragment files like any other project.
+    const templateSeedFiles = await step.run("download-template", async () => {
+      if (!template || !isNewBuild) return null;
+      const sandbox = await getSandbox(sandboxId);
+      await downloadTemplateIntoSandbox(sandbox, template, videoUrl);
+      const files = await readTemplateFilesFromSandbox(sandbox);
+      console.log(`DEBUG: Template "${template.id}" seeded ${Object.keys(files).length} files.`);
+      return files;
+    });
+
     const initialFiles = await step.run("get-initial-files", async () => {
+      // The template repo is already on disk in the sandbox — its files are the
+      // seed, and none of the scaffold/golden-ScrollFrames logic below applies.
+      if (templateSeedFiles) return templateSeedFiles;
+
       let files: Record<string, string> = {};
       if (latestFragment && latestFragment.files && typeof latestFragment.files === "object") {
         files = latestFragment.files as Record<string, string>;
@@ -147,6 +511,18 @@ export const codeAgentFunction = inngest.createFunction(
       const fs = await import("fs");
       const path = await import("path");
       const templatesDir = path.join(process.cwd(), "src", "templates");
+
+      // A missing scaffold used to fail silently: hydration wrote nothing, the base
+      // image's App.tsx kept importing a ScrollFrames that never arrived, and the
+      // run burned every fixer attempt on an unresolvable import before shipping a
+      // broken site. It is a deployment fault, so say so and stop.
+      if (!fs.existsSync(templatesDir)) {
+        throw new Error(
+          `Golden scaffold missing at ${templatesDir}. It is read at runtime, so it must be ` +
+          `present in the deployed image — see outputFileTracingIncludes in next.config.ts ` +
+          `and the src/templates COPY in the Dockerfile.`
+        );
+      }
 
       if (Object.keys(files).length === 0) {
         const readDirRecursive = (dir: string) => {
@@ -158,56 +534,51 @@ export const codeAgentFunction = inngest.createFunction(
               readDirRecursive(fullPath);
             } else {
               const relativePath = path.relative(templatesDir, fullPath);
-              files[`src/${relativePath}`] = fs.readFileSync(fullPath, "utf-8");
+              // ScrollFrames only exists in full-page mode — hero uses a plain
+              // <video>, standard has no video, and an unseeded video URL
+              // placeholder would render a broken player.
+              if (relativePath === "components/ScrollFrames.tsx" && mode !== "FULL_PAGE") {
+                continue;
+              }
+              let content = fs.readFileSync(fullPath, "utf-8");
+              if (relativePath === "components/ScrollFrames.tsx" && videoUrl) {
+                content = content.replaceAll("VIDEO_URL_HERE", videoUrl);
+              }
+              // Without ScrollFrames, the default App.tsx would not compile —
+              // seed a variant that skips the import.
+              if (relativePath === "App.tsx" && mode !== "FULL_PAGE") {
+                content = NON_FULL_PAGE_APP_SEED;
+              }
+              files[`src/${relativePath}`] = content;
             }
           }
         };
         readDirRecursive(templatesDir);
 
-        if (!videoUrl) {
-          const PROTECTED_FILES = [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ];
-          for (const file of PROTECTED_FILES) {
-            delete files[file];
-          }
-          files["src/App.tsx"] = `export default function App() {\n  return (\n    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-8">\n      <h1 className="text-4xl font-bold mb-4">Hello World</h1>\n      <p className="text-lg text-muted-foreground">Start building your application here.</p>\n    </div>\n  );\n}\n`;
-        }
-      } else {
-        // Enforce golden templates on follow-ups to keep them synced and prevent dummy components
-        if (videoUrl) {
-          const PROTECTED_FILES = [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ];
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(templatesDir, file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              files[file] = fs.readFileSync(templatePath, "utf-8");
-            }
-          }
-        }
-      }
-
-      // ALWAYS dynamically replace frame count, even on follow-up prompts
-      if (event.data.frameCount) {
-        const frameContent = files["src/constants/frames.ts"];
-        if (frameContent) {
-          files["src/constants/frames.ts"] = frameContent.replace(
-            /export const TOTAL_FRAMES = \d+;?/,
-            `export const TOTAL_FRAMES = ${event.data.frameCount};`
+        // The directory existed but yielded nothing usable — same broken outcome as
+        // it being absent, so fail here rather than three minutes later.
+        if (Object.keys(files).length === 0) {
+          throw new Error(
+            `Golden scaffold at ${templatesDir} produced no files. A new sandbox cannot be seeded.`
           );
+        }
+        if (mode === "FULL_PAGE" && !files["src/components/ScrollFrames.tsx"]) {
+          throw new Error(
+            `Golden scaffold is missing components/ScrollFrames.tsx, which App.tsx imports in ` +
+            `FULL_PAGE mode. Seeding would produce a site that cannot build.`
+          );
+        }
+
+      } else if (mode === "FULL_PAGE" && videoUrl && !template) {
+        // Existing project: always refresh the platform-owned golden ScrollFrames
+        // so template fixes propagate to old projects — the code agent is blocked
+        // from editing this file, so this is the only upgrade path.
+        // Skipped for remixed templates: those repos own their own background
+        // component, and overwriting it would break the site.
+        const goldenPath = path.join(templatesDir, "components", "ScrollFrames.tsx");
+        if (fs.existsSync(goldenPath)) {
+          files["src/components/ScrollFrames.tsx"] =
+            fs.readFileSync(goldenPath, "utf-8").replaceAll("VIDEO_URL_HERE", videoUrl);
         }
       }
 
@@ -223,15 +594,13 @@ export const codeAgentFunction = inngest.createFunction(
         return null;
       }
 
-      const PROTECTED_FILES = videoUrl ? [
-        "src/components/CanvasScroll.tsx",
-        "src/components/Preloader.tsx",
-        "src/store/useStore.ts",
-        "src/constants/frames.ts",
-        "src/components/headers/DotNav.tsx",
-        "src/components/headers/FullWidthNav.tsx",
-        "src/components/headers/PillNav.tsx",
-      ] : [];
+      // The template was just extracted straight onto the sandbox filesystem —
+      // writing every file back would only undo the video-URL injection.
+      if (templateSeedFiles) {
+        console.log("DEBUG: Skipping hydration — template files are already on disk.");
+        return null;
+      }
+
 
       // Helper function to write a file absolute to /home/user and ensure directory exists
       const writeSandboxFile = async (sandbox: Sandbox, filePath: string, content: string) => {
@@ -244,34 +613,22 @@ export const codeAgentFunction = inngest.createFunction(
         await sandbox.files.write(absolutePath, content);
       };
 
-      // If the returned sandboxId exactly matches the one previously saved in the DB, 
+      // If the returned sandboxId exactly matches the one previously saved in the DB,
       // it means we successfully re-connected to the HOT instance and DO NOT need to hydrate!
       if (sandboxId === project?.sandboxId) {
         console.log("DEBUG: Sandbox is HOT 🔥! Skipping 2-minute file hydration.");
 
-        try {
-          const sandbox = await getSandbox(sandboxId);
-          const fs = await import("fs");
-          const path = await import("path");
-
-          // Ensure all protected template files are present and correct in the hot sandbox
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              const content = fs.readFileSync(templatePath, "utf-8");
-              await writeSandboxFile(sandbox, file, content);
-              console.log(`DEBUG: Force-wrote template file ${file} to hot sandbox`);
-            }
+        // Even on a hot sandbox, sync the platform-owned golden ScrollFrames so
+        // template fixes reach projects whose sandbox never went cold. Remixed
+        // templates own their background component and are left alone.
+        const golden = filesObj["src/components/ScrollFrames.tsx"];
+        if (typeof golden === "string" && mode === "FULL_PAGE" && !template) {
+          try {
+            const sandbox = await getSandbox(sandboxId);
+            await writeSandboxFile(sandbox, "src/components/ScrollFrames.tsx", golden);
+          } catch (e) {
+            console.error("DEBUG: Failed to refresh ScrollFrames on hot sandbox", e);
           }
-
-          // We MUST still update the frames.ts file in case the user extracted new frames
-          // between prompts, otherwise the hot sandbox will retain the old frame count.
-          if (event.data.frameCount && filesObj["src/constants/frames.ts"]) {
-            await writeSandboxFile(sandbox, "src/constants/frames.ts", filesObj["src/constants/frames.ts"]);
-            console.log(`DEBUG: Updated src/constants/frames.ts in HOT sandbox to ${event.data.frameCount} frames.`);
-          }
-        } catch (e) {
-          console.error("Failed to ensure template files in hot sandbox", e);
         }
 
         return null;
@@ -292,68 +649,83 @@ export const codeAgentFunction = inngest.createFunction(
         }
       }
 
-      // Also force-write the templates just to be safe on fresh sandbox
-      try {
-        const fs = await import("fs");
-        const path = await import("path");
-        for (const file of PROTECTED_FILES) {
-          const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-          if (fs.existsSync(templatePath)) {
-            const content = fs.readFileSync(templatePath, "utf-8");
-            await writeSandboxFile(sandbox, file, content);
-            console.log(`DEBUG: Force-wrote template file ${file} to new sandbox`);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to ensure template files on new sandbox hydration", e);
-      }
 
       console.log(`DEBUG: Hydrated ${written} files into sandbox.`);
+
+      // A template brings its own package.json. Hydration only restores source
+      // files, so a template project landing on a FRESH sandbox has the repo's
+      // code but the base image's node_modules — any dependency the template
+      // added would be missing and the build would fail on an unresolved import.
+      if (template) {
+        console.log(`DEBUG: Reinstalling template "${template.id}" dependencies on the rehydrated sandbox...`);
+        const install = await runSandboxCommand(
+          sandbox,
+          "cd /home/user && npm install --no-audit --no-fund --legacy-peer-deps",
+          { timeoutMs: 300_000 },
+        );
+        if (install.exitCode !== 0) {
+          console.error(`DEBUG: Dependency reinstall failed (exit ${install.exitCode}): ${tailOutput(install)}`);
+        }
+      }
     });
 
     const previousMessages = await step.run("get-previous-messages", async () => {
-      const formattedMessages: Message[] = [];
-
+      // History hygiene: only real conversational turns reach the model.
+      // Interactive button payloads, empty progress markers, infra errors, and
+      // the duplicated current prompt would derail a lightweight model.
       const messages = await prisma.message.findMany({
         where: {
           projectId: event.data.projectId,
+          type: "RESULT",
+          content: { not: "" },
         },
         orderBy: {
           createdAt: "desc",
         },
-        take: 5,
+        take: 10,
       });
 
+      const isNoise = (content: string) =>
+        content.startsWith("The code agent encountered a critical infrastructure error") ||
+        content.startsWith("Autonomous agent encountered an error") ||
+        content === "Generation was manually stopped.";
+
+      const formattedMessages: Message[] = [];
+      let skippedCurrentPrompt = false;
+
       for (const message of messages) {
+        let content = message.content.trim();
+        if (!content || isNoise(content)) continue;
+
+        // The newest USER message is the prompt currently being processed — it
+        // is already in the task input; including it twice confuses the model.
+        if (!skippedCurrentPrompt && message.role === "USER" && content === event.data.value?.trim()) {
+          skippedCurrentPrompt = true;
+          continue;
+        }
+
+        content = content.replace(/<\/?task_summary>/g, "").trim();
+        if (content.length > 1500) content = content.slice(0, 1500) + " …[truncated]";
+
         formattedMessages.push({
           type: "text",
           role: message.role === "ASSISTANT" ? "assistant" : "user",
-          content: message.content,
-        })
+          content,
+        });
+
+        if (formattedMessages.length >= 4) break;
       }
 
       return formattedMessages.reverse();
     });
 
-    const previousFiles = await step.run("get-previous-files", async () => {
-      if (!event.data.isFollowUp) return null;
-
-      const latestMessage = await prisma.message.findFirst({
-        where: { projectId: event.data.projectId, role: "ASSISTANT", type: "RESULT" },
-        orderBy: { createdAt: "desc" },
-        include: { fragment: true }
-      });
-
-      return (latestMessage?.fragment?.files as Record<string, string>) || null;
-    });
-
     const state = createState<AgentState>(
       {
         summary: "",
-        files: previousFiles || (initialFiles as Record<string, string>),
+        files: initialFiles as Record<string, string>,
       },
       {
-        messages: previousMessages,
+        messages: previousMessages as Message[],
       },
     );
 
@@ -366,8 +738,9 @@ export const codeAgentFunction = inngest.createFunction(
       let terminalCount = 0;
       let readFilesCount = 0;
       let createFilesCount = 0; // <-- Add this counter
+      let applyDiffCount = 0;
 
-      return [
+      const allTools = [
         createTool({
           name: "terminal",
           description: "Execute a terminal command in the sandbox",
@@ -393,7 +766,7 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
         createTool({
-          name: "createOrUpdateFiles",
+          name: "editFiles",
           description: "Create or update files in the sandbox",
           parameters: z.object({
             files: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -405,16 +778,13 @@ export const codeAgentFunction = inngest.createFunction(
             const updatedFiles = await step?.run(`createFiles-${prefix}-call-${createFilesCount}`, async () => {
               try {
                 const updated: Record<string, string> = {};
+                const refused: string[] = [];
                 const sandbox = await getSandbox(sandboxId);
 
-                const PROTECTED_FILES = videoUrl ? [
-                  "src/components/CanvasScroll.tsx",
-                  "src/components/Preloader.tsx",
-                  "src/store/useStore.ts",
-                  "src/constants/frames.ts",
-                  "src/components/headers/DotNav.tsx",
-                  "src/components/headers/FullWidthNav.tsx",
-                  "src/components/headers/PillNav.tsx",
+                // Remixed templates ship their own background component, so the
+                // platform's ScrollFrames contract does not apply to them.
+                const PROTECTED_FILES = (mode === "FULL_PAGE" && !template) ? [
+                  "src/components/ScrollFrames.tsx",
                 ] : [];
 
                 for (const file of files) {
@@ -424,24 +794,36 @@ export const codeAgentFunction = inngest.createFunction(
                   }
 
                   if (PROTECTED_FILES.includes(file.path)) {
-                    console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
-                    continue;
+                    // Protection guards the golden file from being *overwritten*.
+                    // Applying it to a file that is missing would be fatal: App.tsx
+                    // is required to import ScrollFrames, so refusing to create it
+                    // leaves a build that can never resolve the import, and the
+                    // fixer loops on the identical error until it gives up.
+                    const exists = await sandbox.files
+                      .exists(`/home/user/${file.path}`)
+                      .catch(() => false);
+
+                    if (exists) {
+                      console.log(`DEBUG: Blocking AI from modifying protected core file: ${file.path}`);
+                      refused.push(file.path);
+                      continue;
+                    }
+
+                    console.log(`DEBUG: Protected file ${file.path} is missing — allowing recreation.`);
                   }
                   if (typeof file.content !== "string") {
                     file.content = String(file.content || "");
                   }
 
-                  // Strict enforcement for App.tsx integrity
-                  if (videoUrl && file.path === "src/App.tsx") {
+                  // Strict enforcement for App.tsx integrity (scaffold sites only —
+                  // a template repo's App.tsx has no ScrollFrames to preserve).
+                  if (mode === "FULL_PAGE" && !template && file.path === "src/App.tsx") {
                     const c = file.content;
-                    if (!c.includes("<CanvasScroll") || !c.includes("<Preloader")) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <CanvasScroll /> or <Preloader /> from App.tsx. You MUST include them.");
+                    if (!c.includes("<ScrollFrames") && !c.includes("ScrollyVideo")) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You removed <ScrollFrames /> from App.tsx. You MUST include it as the first child.");
                     }
-                    if (/\{\/\*\s*<CanvasScroll/i.test(c) || /\/\/\s*import.*CanvasScroll/i.test(c)) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out CanvasScroll in App.tsx. Do NOT comment it out.");
-                    }
-                    if (/\{\/\*\s*<Preloader/i.test(c) || /\/\/\s*import.*Preloader/i.test(c)) {
-                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out Preloader in App.tsx. Do NOT comment it out.");
+                    if (/\{\/\*\s*<ScrollFrames/i.test(c) || /\/\/\s*import.*ScrollFrames/i.test(c)) {
+                      throw new Error("CRITICAL ARCHITECTURE ERROR: You commented out ScrollFrames in App.tsx. Do NOT comment it out.");
                     }
                   }
 
@@ -456,7 +838,7 @@ export const codeAgentFunction = inngest.createFunction(
                   await sandbox.commands.run(`touch "/home/user/${file.path}"`); // Forces inotify event
                   updated[file.path] = file.content;
                 }
-                return { updated };
+                return { updated, refused };
               } catch (e) {
                 const err = e as Error;
                 return { error: `File write failed: ${err.message || String(err)}` };
@@ -474,7 +856,110 @@ export const codeAgentFunction = inngest.createFunction(
                 ...updatedFiles.updated,
               };
             }
+
+            // A silently dropped write is worse than a rejected one: the agent
+            // reports success, stops trying, and the build fails on the same
+            // error forever. Always tell it what did not land.
+            const refusedPaths = (updatedFiles && 'refused' in updatedFiles ? updatedFiles.refused : []) ?? [];
+            if (refusedPaths.length > 0) {
+              const wrote = Object.keys(updatedFiles && 'updated' in updatedFiles ? updatedFiles.updated : {});
+              return (
+                `WRITE REJECTED for: ${refusedPaths.join(", ")}. ` +
+                `${refusedPaths.length === 1 ? "This file is" : "These files are"} platform-owned and already correct — ` +
+                `do NOT try to write ${refusedPaths.length === 1 ? "it" : "them"} again, and do not claim to have changed ` +
+                `${refusedPaths.length === 1 ? "it" : "them"}. Fix the problem in the files that import it instead.` +
+                (wrote.length > 0 ? ` Successfully wrote: ${wrote.join(", ")}.` : "")
+              );
+            }
+
             return `Successfully updated files`;
+          },
+        }),
+        createTool({
+          name: "applyDiff",
+          description:
+            "Apply targeted search/replace edits to existing files. `search` must reproduce the current file content EXACTLY (whitespace and indentation included) and must appear exactly once in the file. Prefer this over rewriting whole files.",
+          parameters: z.object({
+            edits: z.array(z.object({
+              path: z.string().describe('Relative path, e.g. "src/components/Hero.tsx". Never include /home/user.'),
+              search: z.string().describe("Exact snippet to find. Include enough surrounding lines to be unique."),
+              replace: z.string().describe("Replacement snippet."),
+            })),
+          }),
+          handler: async ({ edits }, { network, step }: Tool.Options<AgentState>) => {
+            applyDiffCount++;
+
+            const outcome = await step?.run(`applyDiff-${prefix}-call-${applyDiffCount}`, async () => {
+              const updated: Record<string, string> = {};
+              const applied: string[] = [];
+              const failures: string[] = [];
+
+              try {
+                const sandbox = await getSandbox(sandboxId);
+
+                for (const edit of edits) {
+                  const relPath = (edit?.path || "").replace(/^\/home\/user\//, "").trim();
+                  if (!relPath) {
+                    failures.push("An edit was skipped because its path was empty.");
+                    continue;
+                  }
+
+                  let current: string;
+                  try {
+                    current = await sandbox.files.read(`/home/user/${relPath}`);
+                  } catch {
+                    failures.push(`${relPath}: file does not exist. Use readFiles to list what is actually there.`);
+                    continue;
+                  }
+
+                  if (typeof edit.search !== "string" || edit.search === "") {
+                    failures.push(`${relPath}: 'search' was empty.`);
+                    continue;
+                  }
+
+                  const occurrences = current.split(edit.search).length - 1;
+                  if (occurrences === 0) {
+                    failures.push(
+                      `${relPath}: the 'search' text was not found. It must match the file byte-for-byte. ` +
+                      `Call readFiles on ${relPath} and copy the exact snippet, then retry.`,
+                    );
+                    continue;
+                  }
+                  if (occurrences > 1) {
+                    failures.push(
+                      `${relPath}: the 'search' text appears ${occurrences} times, so the edit is ambiguous. ` +
+                      `Add surrounding lines to make it unique, then retry.`,
+                    );
+                    continue;
+                  }
+
+                  const next = current.replace(edit.search, () => edit.replace ?? "");
+                  await sandbox.files.write(`/home/user/${relPath}`, next);
+                  await sandbox.commands.run(`touch "/home/user/${relPath}"`); // Forces inotify event
+                  updated[relPath] = next;
+                  applied.push(relPath);
+                }
+              } catch (e) {
+                const err = e as Error;
+                return { updated, applied, failures: [...failures, `Sandbox error: ${err.message || String(err)}`] };
+              }
+
+              return { updated, applied, failures };
+            });
+
+            if (!outcome) return "Diff edit failed to run.";
+
+            if (network && Object.keys(outcome.updated).length > 0) {
+              network.state.data.files = {
+                ...(network.state.data.files || {}),
+                ...outcome.updated,
+              };
+            }
+
+            const parts: string[] = [];
+            if (outcome.applied.length > 0) parts.push(`Applied edits to: ${outcome.applied.join(", ")}.`);
+            if (outcome.failures.length > 0) parts.push(`FAILED:\n- ${outcome.failures.join("\n- ")}`);
+            return parts.join("\n") || "No edits were applied.";
           },
         }),
         createTool({
@@ -503,17 +988,30 @@ export const codeAgentFunction = inngest.createFunction(
           },
         }),
       ];
+
+      // DIFF mode is a narrow, fast path for small template tweaks: no whole-file
+      // rewrites and no shell, so the model cannot restructure the site or spend
+      // a minute regenerating a file to change one word.
+      if (editMode === "DIFF") {
+        return allTools.filter((t) => t.name === "applyDiff" || t.name === "readFiles");
+      }
+      // FULL mode keeps exactly the tools it has always had — applyDiff is not
+      // offered here, so every existing run behaves identically.
+      return allTools.filter((t) => t.name !== "applyDiff");
     };
+
+    // The system prompt is assembled per mode — one voice, no conflicting layers.
+    const systemPrompt = editMode === "DIFF"
+      ? buildDiffAgentSystemPrompt()
+      : buildCodeAgentSystemPrompt(mode, videoUrl, { isTemplate: Boolean(template) });
 
     // Factory function: creates an agent with unique name and step IDs per attempt.
     const createCodeAgentForAttempt = (attemptIndex: number, iterIndex: number = 0) => {
       return createAgent<AgentState>({
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
-        system: PROMPT,
-        // Using 1.5-pro-002 for the highest reliability in tool-calling.
-        // gemini-2.5-flash-lite often produces MALFORMED_FUNCTION_CALL.
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        system: systemPrompt,
+        model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -529,107 +1027,204 @@ export const codeAgentFunction = inngest.createFunction(
       });
     };
 
-    let currentPrompt = event.data.value; // Starts with the user's initial prompt
     let finalSummary = "";
     let finalFiles = state.data.files;
 
-    // --- CONTEXT INJECTION FOR ITERATIONS ---
-    const hasExistingFiles = Object.keys(initialFiles).length > 0;
-    if (hasExistingFiles) {
-      currentPrompt += `\n\n=== CURRENT PROJECT STATE ===\n`;
-      currentPrompt += `You are modifying an existing project. Here are the current files:\n\n`;
-
-      for (const [path, content] of Object.entries(initialFiles)) {
-        // Skip injecting lockfiles or assets to save tokens and prevent confusion
+    // --- TASK INPUT ASSEMBLY ---
+    // The mode-specific rules live in the system prompt. The task input is just:
+    // the Build Brief (new builds) or the change request (iterations), plus the
+    // current file contents — clearly framed for each case.
+    const renderFiles = (files: Record<string, string>) => {
+      let out = "";
+      for (const [path, content] of Object.entries(files)) {
         if (path.includes('package-lock.json') || path.includes('node_modules')) continue;
-
-        currentPrompt += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
+        out += `--- ${path} ---\n\`\`\`\n${content}\n\`\`\`\n\n`;
       }
+      return out;
+    };
 
-      currentPrompt += `=== END PROJECT STATE ===\n\n`;
-      currentPrompt += `CRITICAL INSTRUCTION: You are updating the existing project above based on the user's new request. ONLY use the \`createOrUpdateFiles\` tool to modify the specific files that require changes. Do NOT rewrite the entire application. Keep the existing design, components, and structure completely intact unless explicitly asked to change them.`;
-    }
+    // DIFF mode sends only the files the request plausibly touches. Shipping a
+    // whole template into the prompt would cost more tokens than the full-rewrite
+    // path it exists to replace.
+    const selectRelevantFiles = (files: Record<string, string>, request: string, limit = 5) => {
+      const STOPWORDS = new Set([
+        "the", "and", "for", "with", "this", "that", "change", "make", "please", "into",
+        "from", "should", "would", "could", "have", "text", "color", "colour", "update",
+        "replace", "set", "add", "remove", "site", "page", "website", "instead", "its",
+      ]);
 
-    if (videoUrl) {
-      currentPrompt = `=== TEMPLATE ARCHITECTURE INSTRUCTION (CRITICAL) ===
-The sandbox has already been pre-populated with a production-ready Apple-style scroll-scrub architecture.
-You DO NOT need to build the canvas logic or the preloader. They are already provided and wired up in \`src/App.tsx\`.
+      // Quoted phrases are the strongest signal — the user is naming exact copy.
+      const quoted = [...request.matchAll(/["'“”‘’]([^"'“”‘’]{2,})["'“”‘’]/g)].map((m) => m[1].toLowerCase());
+      const tokens = [...new Set(
+        request.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !STOPWORDS.has(w)),
+      )];
 
-Specifically, you ALREADY HAVE:
-1. \`src/components/CanvasScroll.tsx\` - Handles the high-performance background frame rendering.
-2. \`src/components/Preloader.tsx\` - A full-screen aura loading state.
-3. \`src/components/Navbar.tsx\` - A default pill-shaped navigation bar.
-4. \`src/components/headers/\` - A directory containing alternative header templates (\`DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`).
-5. \`src/store/useStore.ts\` - Global state management for frames.
-6. \`src/App.tsx\` - The layout wrapper that combines these components.
+      const scored = Object.entries(files)
+        .filter(([p]) =>
+          !p.includes("node_modules") &&
+          !p.includes("package-lock.json") &&
+          /\.(tsx?|jsx?|css|html)$/.test(p))
+        .map(([path, content]) => {
+          const hay = (content || "").toLowerCase();
+          let score = 0;
+          for (const phrase of quoted) if (hay.includes(phrase)) score += 25;
+          for (const token of tokens) if (hay.includes(token)) score += 1;
+          // Tie-break toward the app shell and styles, which carry global config.
+          if (/src\/(App\.tsx|index\.css)$/.test(path)) score += 0.5;
+          return { path, content, score };
+        })
+        .filter((f) => f.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
 
-YOUR ONLY JOB:
-1. Create stunning, modern page sections (like Hero, Features, Pricing, Footer, etc.) inside \`src/components/sections/\`.
-2. Import and inject these sections into the \`<main>\` element inside the provided \`src/App.tsx\`. Let the natural height of these sections dictate the total scroll length of the page.
-3. CREATE HIGHLY UNIQUE DESIGNS: You are highly encouraged to invent entirely NEW layouts, typography choices, color palettes, and unconventional structures. DO NOT default to the provided pill-shaped Navbar. You MUST redesign the navigation or use one of the alternative headers to match the specific vibe of the user's prompt. DO NOT build the exact same centered-text hero section every time. Introduce grids, side-panels, bento boxes, etc.
-4. **ANIMATION RULE (CRITICAL)**: Do NOT use complex \`useScroll\` mappings or global \`scrollYProgress\` with hardcoded arrays (e.g. \`[0, 0.2, 0.5]\`). You will get the math wrong and cause sections to disappear! Instead, simply use Framer Motion's \`whileInView={{ opacity: 1, y: 0 }}\` and \`initial={{ opacity: 0, y: 50 }}\` on your components. Let standard CSS document flow handle the scroll position!
-5. **LAYOUT & SPACING (CRITICAL)**: Do NOT build massive centered cards or huge solid blocks that obscure the background! The background video canvas is the star of the show. Mostly create edge-aligned, minimalist typographic content (e.g., text aligned to the left/right edges, bottom corners). 
-6. **SECTION COUNT**: Generate exactly 4 to 5 sections (Hero, Features, Details, Footer). Make sure each section has a generous \`min-h-[100vh]\` to give the user a long, satisfying scroll experience to scrub through the background video. The footer MUST be the final section so it sits at the absolute bottom of the scroll.
-7. **CRITICAL FOREGROUND RULE**: ALL normal sections (Hero, Features, Pricing, Footer) MUST HAVE COMPLETELY TRANSPARENT BACKGROUNDS! Do NOT use \`bg-black\`, \`bg-white\`, or \`bg-background\` on any of your main page wrappers. Use glassmorphism (e.g. \`bg-black/40 backdrop-blur-md\`) ONLY if you strictly need readable contrast for text.
-8. **OVERLAY & BODY PROHIBITION (CRITICAL)**: NEVER set a background color on \`html\`, \`body\`, or \`#root\` in your CSS or HTML. NEVER add any \`<div>\` or \`<section>\` with a solid or semi-opaque background color (\`bg-black\`, \`bg-black/80\`, \`bg-gray-900\`, \`background: rgba(0,0,0,X)\`, etc.) that spans full-width or full-height and sits on top of the canvas. The canvas images MUST ALWAYS be fully visible.
-9. **BRANDING**: You MUST update \`index.html\` to have a \`<title>\` that matches the generated site's name (not "Vite + React + TS"). You MUST also replace the default Vite favicon with a relevant emoji encoded as an SVG data URI in the \`<link rel="icon">\` tag.
-10. **CRITICAL IMPORT RULE**: You MUST use relative imports based on the file's location. For example, inside \`src/App.tsx\` use \`./components/Navbar.tsx\` or \`./components/headers/FullWidthNav\`. Inside \`src/components/sections/Hero.tsx\` use \`../Navbar.tsx\`. NEVER use \`@/\` alias imports! The build system does NOT have \`@/\` configured and it will fail to compile. Also, ensure you use the terminal tool to run \`npm install zustand framer-motion lucide-react\` so the provided templates work!
-11. **STRICT REACT RULES (CRITICAL)**: To prevent Minified React Error #321, NEVER define a component function inside another component function. NEVER call hooks conditionally or inside loops. Ensure all components are standard React functions.
-12. **MINIMAL, TRANSPARENT UI (CRITICAL)**: You must generate a very minimal website. Keep UI elements small, sleek, and highly transparent. DO NOT use large glassmorphic cards or heavy blur overlays. The background video canvas MUST shine through clearly.
-13. **NO IMAGES ALLOWED (CRITICAL)**: You MUST NEVER use \`<img>\` tags or any other image elements anywhere in the application. We do not have any images to load, so using \`<img>\` tags will result in broken images. If you need to represent an image placeholder, use a simple empty \`<div>\` with a border or minimal styling.
-14. **TRANSPARENCY REITERATION**: The background canvas is the primary visual! Ensure that \`src/App.tsx\` and ALL your sections use transparent backgrounds. Any solid background color or heavy backdrop-blur will hide the animation and result in failure!
-15. **LOCKED FILES (CRITICAL)**: The following files are strictly locked and your modifications to them will be automatically REJECTED by the system:
-    - \`src/components/CanvasScroll.tsx\`
-    - \`src/components/Preloader.tsx\`
-    - \`src/store/useStore.ts\`
-    - \`src/constants/frames.ts\`
-    - \`src/components/headers/DotNav.tsx\`, \`FullWidthNav.tsx\`, \`PillNav.tsx\`
-    DO NOT attempt to modify these files. DO NOT recreate them.
+      // No lexical hit (e.g. "make the buttons rounder") — fall back to the shell
+      // plus the largest components, which is where visual styling usually lives.
+      const chosen = scored.length > 0
+        ? scored
+        : Object.entries(files)
+          .filter(([p]) => /\.(tsx|css)$/.test(p) && !p.includes("node_modules"))
+          .map(([path, content]) => ({ path, content, score: (content || "").length }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, limit);
 
-When modifying \`src/App.tsx\`, you MUST PRESERVE the \`<Preloader />\` and \`<CanvasScroll />\` components exactly as they were provided. Do NOT remove them from the layout! Just focus on injecting your sections into the \`<main>\` tag!
-=== END TEMPLATE ARCHITECTURE INSTRUCTION ===
+      const out: Record<string, string> = {};
+      for (const f of chosen) out[f.path] = f.content;
+      return out;
+    };
 
-` + currentPrompt;
+    // "Remix this template and change nothing" is a real, valid request.
+    const hasSiteChangeRequest =
+      Boolean((event.data.value || "").trim()) &&
+      (event.data.value || "").trim() !== TEMPLATE_ASIS_PROMPT;
+
+    let currentPrompt: string;
+    if (editMode === "DIFF") {
+      const relevant = selectRelevantFiles(initialFiles as Record<string, string>, event.data.value || "");
+      currentPrompt = `=== CHANGE REQUEST ===\n${event.data.value}\n=== END CHANGE REQUEST ===\n\n`;
+      currentPrompt += `=== RELEVANT PROJECT FILES ===\n`;
+      currentPrompt += `These are the files most likely to contain what the user named. Copy 'search' snippets from them EXACTLY.\n`;
+      currentPrompt += `If none of them holds what you need, use readFiles on another path — the full tree is:\n`;
+      currentPrompt += Object.keys(initialFiles as Record<string, string>)
+        .filter((p) => !p.includes("node_modules") && !p.includes("package-lock.json"))
+        .map((p) => `  ${p}`).join("\n") + `\n\n`;
+      currentPrompt += renderFiles(relevant);
+      currentPrompt += `=== END RELEVANT PROJECT FILES ===\n\n`;
+      currentPrompt += `Apply the change request with applyDiff, then print the task summary.`;
+    } else if (isNewBuild && template) {
+      currentPrompt = `${event.data.value}\n\n`;
+      currentPrompt += `=== TEMPLATE SOURCE (current project files) ===\n`;
+      currentPrompt += `This project was created by remixing the "${template.title}" template. The files below are a FINISHED, hand-built website — not a scaffold, and not placeholders.\n`;
+      currentPrompt += `Adapt this existing site to the request above: rewrite the copy, brand name, and palette as needed, and leave the layout, section structure, and animations intact. Do NOT rebuild the page from scratch and do NOT rewrite files you do not need to change.\n\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END TEMPLATE SOURCE ===`;
+    } else if (isNewBuild) {
+      currentPrompt = `${event.data.value}\n\n`;
+      currentPrompt += `=== STARTER SCAFFOLD (current project files) ===\n`;
+      currentPrompt += `This is a BRAND NEW project. The files below are a generic scaffold seeded by the platform — their copy, styling, and section content are PLACEHOLDERS.\n`;
+      currentPrompt += `You MUST replace the placeholder content of App.tsx, index.css, index.html, and every section/component so the finished site matches the brief above. Keep the structural wiring intact` +
+        (mode === "FULL_PAGE" ? ` (in particular: <ScrollFrames /> stays the first child of App.tsx — never modify or recreate ScrollFrames itself)` : "") + `.\n\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END STARTER SCAFFOLD ===`;
     } else {
-      currentPrompt = `=== STANDARD WEBSITE ARCHITECTURE ===
-Build a standard, high-quality React application based on the user's prompt. 
-You have full creative freedom. There is no background video, so you can use any colors, backgrounds, or layouts you want.
-Create unique, stunning designs. Do NOT just make a plain white page.
-=== END STANDARD WEBSITE ARCHITECTURE ===
-
-` + currentPrompt;
+      currentPrompt = `=== CHANGE REQUEST ===\n${event.data.value}\n=== END CHANGE REQUEST ===\n\n`;
+      currentPrompt += `=== CURRENT PROJECT STATE ===\n`;
+      currentPrompt += renderFiles(initialFiles as Record<string, string>);
+      currentPrompt += `=== END PROJECT STATE ===\n\n`;
+      currentPrompt += `You are updating the existing project above based on the change request. ONLY modify the specific files that require changes via editFiles. Do NOT rewrite the entire application. Keep the existing design, components, and structure intact unless the request explicitly asks to change them.`;
     }
+
+    // (Mode-specific video/architecture rules live in the system prompt — no patches here.)
 
     // Inject image reference into the prompt when a user attaches an image
     if (event.data.imageUrl) {
       currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
     }
 
-    // --- 1. INITIAL GENERATION (The Creator) ---
+    // --- 0. AS-IS TEMPLATE REMIX: no agent runs at all ---
+    // The user picked a finished site and asked for no changes. Handing that to
+    // an LLM can only make it worse: the code agent's environment rules describe
+    // the platform scaffold (Tailwind v4, named exports, Google-Font @imports in
+    // index.css) and it will "correct" a template that legitimately differs,
+    // breaking a repo that built fine a moment earlier. Skip straight to build.
+    const isAsIsTemplateRemix = Boolean(template) && isNewBuild && !hasSiteChangeRequest;
 
     // --- 1. INITIAL GENERATION (The Creator) ---
-    // Run the main massive agent exactly once to build the features
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,
       agents: [initialAgent],
-      maxIter: 5,
+      maxIter: 8,
       defaultState: state,
       router: async ({ network }) => {
-        await checkCancellation(event.data.projectId);
-        await checkCancellation(event.data.projectId);
+        if (await checkCancellation(event.data.projectId)) return;
         // If we have a summary, we are done! Return nothing to stop the loop.
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+      defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
-    console.log('DEBUG: Running initial Creator agent...');
-    const result = await initialNetwork.run(currentPrompt, { state });
+    let result: Awaited<ReturnType<typeof initialNetwork.run>> | null = null;
 
-    finalSummary = result.state.data.summary || "";
-    finalFiles = result.state.data.files;
+    if (isAsIsTemplateRemix) {
+      console.log(`DEBUG: As-is remix of template "${template!.id}" — skipping the code agent entirely.`);
+      state.data.summary = `<task_summary>\nBuilt the ${template!.title} template as-is.\n</task_summary>`;
+    } else {
+      console.log('DEBUG: Running initial Creator agent...');
+      result = await initialNetwork.run(currentPrompt, { state });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+    }
+
+    // --- VERIFICATION: the agent must have actually changed something. ---
+    // A lazy model can emit a task summary without a single tool call; the seeded
+    // scaffold compiles, so without this check the untouched template would ship
+    // as a "success". One corrective re-run before we accept the result.
+    const seedFiles = initialFiles as Record<string, string>;
+    const hasRealChanges = (files: Record<string, string> | undefined) =>
+      Object.entries(files || {}).some(([p, c]) => seedFiles[p] !== c);
+
+    // A remixed template is already a complete, working site. "Build it as-is"
+    // legitimately changes nothing, so an untouched template is a valid result —
+    // only nag when the user actually asked for something.
+    if (result && !hasRealChanges(result.state.data.files) && !isAsIsTemplateRemix) {
+      console.warn("DEBUG: Creator agent made no file changes. Running one corrective attempt...");
+      const retryState = createState<AgentState>(
+        { summary: "", files: state.data.files },
+        { messages: previousMessages as Message[] },
+      );
+      const retryAgent = createCodeAgentForAttempt(0, 1);
+      const retryNetwork = createNetwork<AgentState>({
+        name: `coding-agent-network-run-${runId}-retry`,
+        agents: [retryAgent],
+        maxIter: 8,
+        defaultState: retryState,
+        router: async ({ network }) => {
+          if (await checkCancellation(event.data.projectId)) return;
+          if (network.state.data.summary) return;
+          return retryAgent;
+        },
+        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+      });
+
+      const correctiveGoal = !isNewBuild || editMode === "DIFF"
+        ? "requested change MUST be applied"
+        : template
+          ? "template MUST be adapted to the request"
+          : "scaffold placeholders MUST be replaced with the brief's content";
+      const correctiveAction = editMode === "DIFF"
+        ? "Call the applyDiff tool now with an exact search snippet"
+        : "Call the editFiles tool now with the actual file contents";
+      const correctivePrompt = currentPrompt +
+        `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`;
+
+      result = await retryNetwork.run(correctivePrompt, { state: retryState });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
+      state.data.files = result.state.data.files;
+    }
+
+    // On an as-is remix no agent ran, so the seeded template files are final.
+    finalSummary = result ? (result.state.data.summary || "") : state.data.summary;
+    finalFiles = result ? result.state.data.files : state.data.files;
 
     if (!finalSummary) {
       console.error("DEBUG: AI returned no summary. Halting.");
@@ -640,100 +1235,28 @@ Create unique, stunning designs. Do NOT just make a plain white page.
     let isBuildSuccessful = false;
     const maxRetries = 5;
     let attempt = 1;
+    // Bumped when a deterministic repair re-runs the gate without consuming a
+    // fixer attempt. It has to reach the step id, or Inngest replays the
+    // memoised failure from before the repair and the repair looks like a no-op.
+    let repairPass = 0;
 
     while (!isBuildSuccessful && attempt <= maxRetries) {
-      await checkCancellation(event.data.projectId);
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
       // Step A: Check the build
-      const buildCheck = await step.run(`verify-build-run-${runId}-attempt-${attempt}`, async () => {
+      const buildStepId = `verify-build-run-${runId}-attempt-${attempt}` + (repairPass > 0 ? `-repair-${repairPass}` : "");
+      const buildCheck = await step.run(buildStepId, async () => {
         try {
           const sandbox = await getSandbox(sandboxId);
-          await sandbox.commands.run("rm -rf dist");
-
-          // Ensure all protected template files are present and correct in the sandbox
-          const PROTECTED_FILES = videoUrl ? [
-            "src/components/CanvasScroll.tsx",
-            "src/components/Preloader.tsx",
-            "src/store/useStore.ts",
-            "src/constants/frames.ts",
-            "src/components/headers/DotNav.tsx",
-            "src/components/headers/FullWidthNav.tsx",
-            "src/components/headers/PillNav.tsx",
-          ] : [];
-
-          const fs = await import("fs");
-          const path = await import("path");
-          for (const file of PROTECTED_FILES) {
-            const templatePath = path.join(process.cwd(), "src", "templates", file.replace("src/", ""));
-            if (fs.existsSync(templatePath)) {
-              try {
-                let content = fs.readFileSync(templatePath, "utf-8");
-                if (file === "src/constants/frames.ts") {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const frameCount = event.data.frameCount || (project as any)?.frameCount || 450;
-                  content = content.replace(/TOTAL_FRAMES = \d+;/, `TOTAL_FRAMES = ${frameCount};`);
-                }
-                const dir = path.dirname(file);
-                await sandbox.commands.run(`mkdir -p "/home/user/${dir}"`);
-                await sandbox.files.write(`/home/user/${file}`, content);
-                console.log(`DEBUG: Force-wrote template file ${file} to sandbox`);
-              } catch (e) {
-                console.error(`Failed to force-write template file ${file}`, e);
-              }
-            }
-          }
-
-          if (videoUrl) {
-            console.log(`DEBUG: Downloading and unzipping master frames sequence...`);
-            const zipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && rm frames.zip`);
-            if (zipResult.exitCode !== 0) {
-              console.error("ZIP FETCH ERR:", zipResult.stderr);
-              throw new Error(`CRITICAL: Failed to download or unzip frames zip. GCS Permissions issue or invalid URL: ${zipResult.stderr}`);
-            }
-          }
-
-          console.log(`DEBUG: Running structural checks (Attempt ${attempt})...`);
-          const checkStructureScript = videoUrl ? `
-const fs = require('fs');
-if (fs.existsSync('src/App.tsx')) {
-  const c = fs.readFileSync('src/App.tsx', 'utf8');
-  const hasCanvas = c.includes('<CanvasScroll');
-  const hasPreloader = c.includes('<Preloader');
-  const canvasCommented = c.match(/\\{\\/\\*\\s*<CanvasScroll/);
-  const preloaderCommented = c.match(/\\{\\/\\*\\s*<Preloader/);
-  
-  if (!hasCanvas || !hasPreloader || canvasCommented || preloaderCommented) {
-    console.error('CRITICAL ERROR: App.tsx is missing <CanvasScroll /> or <Preloader />, or they are commented out. They MUST be present and active.');
-    process.exit(1);
-  }
-}
-` : `console.log("No structure check for non-video projects.");`;
-          await sandbox.files.write("/app/check-structure.js", checkStructureScript);
-          const structCheck = await sandbox.commands.run("node /app/check-structure.js");
-          if (structCheck.exitCode !== 0) {
-            return { success: false, error: `Structural Error:\n${structCheck.stderr || structCheck.stdout}` };
+          try {
+            await sandbox.commands.run("rm -rf dist");
+          } catch (e) {
+            console.error("DEBUG: rm -rf dist failed", e);
           }
 
           console.log(`DEBUG: Running automated pre-fixes (Attempt ${attempt})...`);
-          try {
-            await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
-          } catch {
-            // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
-          }
-
-          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
-          try {
-            await sandbox.commands.run("npx tsc --noEmit");
-          } catch (tsErr) {
-            const err = tsErr as { stdout?: string, stderr?: string };
-            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `TypeScript Error:\n${tsErrorLog}` };
-          }
-
-          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
-          try {
-            // Safeguard: Convert absolute frame paths (/frame-) into relative paths (./frame-) 
-            // We use a robust Node script to avoid turning existing './frame-' into '.../frame-'
-            const fixPathsScript = `
+          // Deterministic source fixes run BEFORE the type check so the fixer
+          // agent is only invoked for errors the scripts cannot repair.
+          const fixPathsScript = `
 const fs = require('fs');
 const path = require('path');
 function fixPaths(dir) {
@@ -745,50 +1268,44 @@ function fixPaths(dir) {
       let content = fs.readFileSync(p, 'utf8');
       let changed = false;
 
-      // Fix App.tsx dummy declarations
+      // Fix CSS unresolvable imports (like bootstrap-icons)
+      if (p.endsWith('.css')) {
+        let originalContent = content;
+        content = content.replace(/@import\\s+['"]bootstrap-icons[^;]+;?/g, '');
+        if (content !== originalContent) {
+          changed = true;
+        }
+      }
+
+      // Fix App.tsx common issues
       if (f === 'App.tsx') {
         let originalContent = content;
         
-        // Remove dummy definitions
-        const dummyPatterns = [
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*null;?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*null;?/g,
-          /function\s+Preloader\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /function\s+CanvasScroll\s*\(\)\s*\{\s*return\s+null;?\s*\}/g,
-          /const\s+Preloader\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /const\s+CanvasScroll\s*=\s*\(\)\s*=>\s*\{\s*return\s+null;?\s*\};?/g,
-          /\/\/ Dummy components to satisfy imports/g,
-          /\/\/ Dummy components?/g,
-        ];
-        for (const pattern of dummyPatterns) {
-          content = content.replace(pattern, '');
-        }
-
         // Fix default to named imports
-        content = content.replace(/import\s+Preloader\s+from\s+["']([^"']+)["']/g, 'import { Preloader } from "$1"');
-        content = content.replace(/import\s+CanvasScroll\s+from\s+["']([^"']+)["']/g, 'import { CanvasScroll } from "$1"');
-        content = content.replace(/import\s+Navbar\s+from\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
-        content = content.replace(/import\s+useStore\s+from\s+["']([^"']+)["']/g, 'import { useStore } from "$1"');
+        content = content.replace(/import\\s+Navbar\\s+from\\s+["']([^"']+)["']/g, 'import { Navbar } from "$1"');
 
         // Fix alias paths
-        content = content.replace(/@\\/components\\/Preloader/g, './components/Preloader');
-        content = content.replace(/@\\/components\\/CanvasScroll/g, './components/CanvasScroll');
-        content = content.replace(/@\\/store\\/useStore/g, './store/useStore');
         content = content.replace(/@\\/components\\/Navbar/g, './components/Navbar');
-
-        // Ensure imports exist
-        const requiredImports = ${videoUrl ? `[
-          { name: 'Preloader', path: './components/Preloader' },
-          { name: 'CanvasScroll', path: './components/CanvasScroll' },
-          { name: 'useStore', path: './store/useStore' }
-        ]` : `[]`};
-
-        for (const req of requiredImports) {
-          if (content.includes(req.name) && !content.includes('import { ' + req.name + ' }')) {
-            content = 'import { ' + req.name + ' } from "' + req.path + '";\\n' + content;
-          }
-        }
         
+        if (content !== originalContent) {
+          changed = true;
+        }
+      }
+
+      // Fix framer-motion type widening (TS2322): string literals for
+      // ease/type/repeatType inside un-annotated variant/transition consts
+      // widen to 'string' and fail the strict TS check even though the code
+      // runs fine. Pin them with 'as const'. TSX sources only (never dist JS).
+      if (p.endsWith('.tsx')) {
+        let originalContent = content;
+        content = content.replace(
+          /\\b((?:ease|type|repeatType)\\s*:\\s*)(["'](?:easeIn|easeOut|easeInOut|linear|circIn|circOut|circInOut|backIn|backOut|backInOut|anticipate|spring|tween|inertia|keyframes|loop|reverse|mirror)["'])(?!\\s*as\\s+const)/g,
+          '$1$2 as const'
+        );
+        // Enforce the em/en-dash ban mechanically: these characters only ever
+        // appear in copy strings (they are invalid TS syntax outside strings),
+        // and they are the #1 AI design tell. Replace with a plain hyphen.
+        content = content.replace(/\u2014|\u2013/g, '-');
         if (content !== originalContent) {
           changed = true;
         }
@@ -846,7 +1363,7 @@ function fixPaths(dir) {
           } else if (originalName === 'Youtube') {
             svgPath = '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />';
           }
-          svgDeclarations += \`const \${localName} = (props) => (
+          svgDeclarations += \`const \${localName} = (props\${p.endsWith('.tsx') ? ': any' : ''}) => (
   <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
     \${svgPath}
   </svg>
@@ -856,41 +1373,63 @@ function fixPaths(dir) {
         content = newContent;
         changed = true;
       }
-
-      // Convert absolute frame paths in assets folder first: "/assets/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/assets\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/assets\\/frame-/g, '$1./frame-');
-        changed = true;
-      }
-      // Strip assets/ prefix if import.meta.url was used
-      if (content.includes('assets/frame-')) {
-        content = content.replace(/assets\\/frame-/g, 'frame-');
-        changed = true;
-      }
-      // Replace absolute paths but keep the surrounding quotes: "/frame-" -> "./frame-"
-      if (content.match(/(["'\\\`])\\/frame-/g)) {
-        content = content.replace(/(["'\\\`])\\/frame-/g, '$1./frame-');
-        changed = true;
-      }
       if (changed) fs.writeFileSync(p, content);
     }
   }
 }
 fixPaths(process.argv[2]);
 `;
+          // fix-paths repairs quirks of AI-written SCAFFOLD code — most notably it
+          // rewrites `import Navbar from ...` into a named import, because the
+          // platform scaffold's Navbar is a named export. A template repo that
+          // legitimately uses a default export gets broken by that on EVERY
+          // attempt, so the build fails, the fixer "repairs" it, and the next
+          // attempt breaks it again. Template code is known-good and hand-written:
+          // it needs no normalisation, and its author's choices must survive.
+          try {
+            // The script is always written — the post-build pass over dist/ still
+            // needs it to make the bundled output deployable.
             await sandbox.files.write("/app/fix-paths.js", fixPathsScript);
+            if (!template) {
+              await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
+            }
+          } catch (e) {
+            console.error("DEBUG: fix-paths pre-pass failed (continuing)", e);
+          }
 
-            // Run pre-build to fix source files
-            await sandbox.commands.run("node /app/fix-paths.js src", { timeoutMs: 15000 });
+          if (!template) {
+            // Templates ship their own linter config (or none). Running the
+            // platform's eslint with --fix over hand-written source rewrites code
+            // its author never asked us to touch.
+            try {
+              await sandbox.commands.run("npx eslint . --fix", { timeoutMs: 10000 });
+            } catch {
+              // ESLint might return non-zero exit code if some errors are unfixable; ignore and proceed
+            }
+          }
 
-            await sandbox.commands.run("npm run build --silent -- --base=./");
+          console.log(`DEBUG: Running strict TS check (Attempt ${attempt})...`);
+          try {
+            await sandbox.commands.run("npx tsc --noEmit");
+          } catch (tsErr) {
+            const err = tsErr as { stdout?: string, stderr?: string, message?: string };
+            const tsErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
+            return { success: false, error: `TypeScript Error:\n${tsErrorLog || err.message}` };
+          }
+
+          console.log(`DEBUG: Running Vite build (Attempt ${attempt})...`);
+          try {
+            // vite build directly (not "npm run build") — the npm script re-runs
+            // tsc -b, duplicating the strict gate above. Type checking happens
+            // once (tsc --noEmit); bundling only verifies the site actually builds.
+            await sandbox.commands.run("npx vite build --base=./");
 
             // Run post-build to fix bundled output files
             await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 });
           } catch (buildErr) {
-            const err = buildErr as { stdout?: string, stderr?: string };
+            const err = buildErr as { stdout?: string, stderr?: string, message?: string };
             const viteErrorLog = ((err.stdout || "") + "\n" + (err.stderr || "")).trim();
-            return { success: false, error: `Vite Build Error:\n${viteErrorLog}` };
+            return { success: false, error: `Vite Build Error:\n${viteErrorLog || err.message}` };
           }
 
           return { success: true, error: "" };
@@ -907,7 +1446,56 @@ fixPaths(process.argv[2]);
         break; // Exit the loop!
       }
 
-      // Step C: The Fixer Agent takes over
+      // Step B2: Self-heal the platform-owned background component.
+      //
+      // ScrollFrames is write-protected, so if it ever goes missing (a stray
+      // terminal `rm`, a botched refactor) the fixer cannot put it back and every
+      // subsequent attempt dies on the same unresolved import. The golden copy
+      // lives on the server with the video URL baked in, so restore it here
+      // instead of asking a model to reinvent a file it is forbidden to write.
+      if (mode === "FULL_PAGE" && !template && buildCheck.error.includes("ScrollFrames")) {
+        const restored = await step.run(`restore-scrollframes-run-${runId}-attempt-${attempt}-${repairPass}`, async () => {
+          const sandbox = await getSandbox(sandboxId);
+          const target = "/home/user/src/components/ScrollFrames.tsx";
+
+          if (await sandbox.files.exists(target).catch(() => false)) return null;
+
+          const fs = await import("fs");
+          const path = await import("path");
+          const goldenPath = path.join(process.cwd(), "src", "templates", "components", "ScrollFrames.tsx");
+          if (!fs.existsSync(goldenPath)) {
+            // Nothing to restore from. Say it plainly — silently returning here is
+            // what made this look like a fixer problem instead of a missing file.
+            console.error(
+              `[ScrollFrames] Cannot self-heal: golden copy absent at ${goldenPath}. ` +
+              `The deployed image is missing src/templates.`
+            );
+            return null;
+          }
+
+          const content = fs
+            .readFileSync(goldenPath, "utf-8")
+            .replaceAll("VIDEO_URL_HERE", videoUrl || "");
+
+          await sandbox.commands.run(`mkdir -p "/home/user/src/components"`);
+          await sandbox.files.write(target, content);
+          console.log("DEBUG: Restored missing golden ScrollFrames.tsx before running the fixer.");
+          return { content };
+        });
+
+        if (restored) {
+          state.data.files = {
+            ...(state.data.files || {}),
+            "src/components/ScrollFrames.tsx": restored.content,
+          };
+          finalFiles = state.data.files;
+          // Re-run the build gate rather than burning a fixer attempt: the
+          // restore alone often clears the failure.
+          repairPass++;
+          continue;
+        }
+      }
+
       // Step C: The Fixer Agent takes over
       console.log(`DEBUG: Build failed. Spinning up Fixer Agent (Attempt ${attempt})...`);
 
@@ -923,7 +1511,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+        model: getModel("x-ai/grok-4.5"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -944,11 +1532,11 @@ fixPaths(process.argv[2]);
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network }) => {
-          await checkCancellation(event.data.projectId);
+          if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "openai/gpt-oss-120b:free"),
+        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -973,49 +1561,103 @@ fixPaths(process.argv[2]);
 
       let fixPrompt = `🚨 CRITICAL BUILD FAILURE 🚨\n`;
       fixPrompt += `The build failed with these exact errors:\n\n${buildCheck.error}\n${brokenFilesContext}\n\n`;
-      
+
       if (attempt >= 3) {
         fixPrompt += `⚠️ NUCLEAR OPTION TRIGGERED (Attempt ${attempt}): You have failed to fix this error multiple times. DO NOT try to solve the logic or fix the complex implementation. You MUST simply DELETE the component, element, or hook that is causing the error, or replace it with a simple empty standard HTML element (like a <div>). Your ONLY goal is to make the build pass by removing the broken code.\n\n`;
+
+        // Without this carve-out the two instructions contradict each other:
+        // "delete whatever is breaking the build" versus a hard block on removing
+        // ScrollFrames from App.tsx. The agent then burns every remaining attempt
+        // trying an edit that is rejected on arrival.
+        if (mode === "FULL_PAGE" && !template) {
+          fixPrompt += `EXCEPTION: <ScrollFrames /> and its import in App.tsx are the one thing you may NOT delete, and you cannot write src/components/ScrollFrames.tsx (the platform owns it and has already restored it if it was missing). If the error involves ScrollFrames, fix the surrounding code instead — never remove the component.\n\n`;
+        }
       }
-      
+
       fixPrompt += `Follow your strict workflow: 1) Explain the fix, 2) Call the tool, 3) Output <task_summary>.`;
 
       // <--- USE THE CLEAN STATE HERE AS WELL
       const fixResult = await fixerNetwork.run(fixPrompt, { state: fixerState });
+      if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
 
       // Update our master state with whatever the fixer changed
       state.data.files = fixResult.state.data.files;
       finalFiles = state.data.files;
 
+      // Fixer attempts repair the platform's own generation failures —
+      // the user is never charged for them.
       attempt++;
     }
+
+    // --- LENIENT BUILD FALLBACK ---
+    // If the strict gate (tsc) could not be fully repaired, try bundling without
+    // it. Type-only errors (e.g. framer-motion Variants widening) have zero
+    // runtime impact — if Vite can bundle the site, ship it instead of failing
+    // the whole run. Real breakage (missing imports, syntax errors) still fails
+    // here because esbuild cannot bundle it.
+    if (!isBuildSuccessful) {
+      const lenientCheck = await step.run(`lenient-build-run-${runId}`, async () => {
+        try {
+          const sandbox = await getSandbox(sandboxId);
+          await sandbox.commands.run("rm -rf dist").catch(() => { });
+          await sandbox.commands.run("npx vite build --base=./");
+          await sandbox.commands.run("node /app/fix-paths.js dist", { timeoutMs: 15000 }).catch(() => { });
+          return { success: true };
+        } catch (e) {
+          console.error("DEBUG: Lenient build fallback also failed.", e);
+          return { success: false };
+        }
+      });
+
+      if (lenientCheck.success) {
+        console.log("DEBUG: Lenient build passed — shipping despite remaining type-only errors.");
+        isBuildSuccessful = true;
+      }
+    }
+
     const fragmentTitleGenerator = createAgent({
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "gemini-3.1-pro-preview"),
+      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);
-    const { output: responseOutput } = await responseGenerator.run(finalSummary);
+    // Only generate a cheerful "here's what I built" message when the build
+    // actually succeeded — otherwise the user gets an honest failure notice.
+    const responseOutput = isBuildSuccessful
+      ? (await responseGenerator.run(finalSummary)).output
+      : undefined;
 
-    console.log('hola', isBuildSuccessful);
-    // ... continues to deploymentUrl ...
+    console.log('DEBUG: Build successful:', isBuildSuccessful);
 
-    const deploymentUrl = await step.run("deploy-to-gcp", async () => {
+    const deploymentUrl = await step.run("deploy-to-r2", async () => {
       if (!isBuildSuccessful) {
-        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting GCP deployment.");
+        console.log("DEBUG: Build failed or fixing loops exhausted. Aborting deployment.");
         return null;
       }
 
-      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for GCS deployment...");
+      if (!isR2Configured()) {
+        console.error("DEBUG: R2 is not configured (missing R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_PUBLIC_URL). Skipping deployment.");
+        return null;
+      }
+
+      if (r2PublicUrlLooksLikeApiEndpoint()) {
+        console.error(
+          "DEBUG: R2_PUBLIC_URL points at the S3 API endpoint (*.r2.cloudflarestorage.com), which is NOT publicly browsable — it needs SigV4 auth and returns 'InvalidArgument / Authorization' in a browser. " +
+          "Set R2_PUBLIC_URL to the bucket's PUBLIC url instead: enable the bucket's r2.dev Public Development URL (https://pub-xxxx.r2.dev) or bind a custom domain. Skipping deployment (the sandbox preview URL still works)."
+        );
+        return null;
+      }
+
+      console.log("DEBUG: Build succeeded. Extracting dist/ text assets for R2 deployment...");
       const sandbox = await getSandbox(sandboxId);
 
       // Step 1: Write the extraction script as a file to the sandbox (avoids all quote/escape mangling)
@@ -1031,12 +1673,8 @@ fixPaths(process.argv[2]);
         "    if (fs.statSync(p).isDirectory()) {",
         "      getFiles(p, fileList);",
         "    } else {",
-        "      var name = items[i].toLowerCase();",
-        "      var isFrame = name.startsWith('frame-') && (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.gif'));",
-        "      if (!isFrame) {",
-        "        var key = p.split(path.sep).join('/').replace('dist/', '');",
-        "        fileList[key] = fs.readFileSync(p).toString('base64');",
-        "      }",
+        "      var key = p.split(path.sep).join('/').replace('dist/', '');",
+        "      fileList[key] = fs.readFileSync(p).toString('base64');",
         "    }",
         "  }",
         "  return fileList;",
@@ -1055,26 +1693,11 @@ fixPaths(process.argv[2]);
       }
 
       const files = JSON.parse(cmdResult.stdout);
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const storage = new Storage(
-        process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-          ? {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            credentials: {
-              client_email: process.env.GOOGLE_CLIENT_EMAIL,
-              private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-          }
-          : {
-            projectId: process.env.GOOGLE_CLOUD_PROJECT,
-          }
-      );
-
-      const bucket = storage.bucket(bucketName);
+      const r2 = getR2Client();
       const sitePrefix = `sites/${event.data.projectId}/`;
 
-      // Step 2: Upload text/code assets to GCS in batches
-      console.log(`DEBUG: Pushing ${Object.keys(files).length} text assets to GCS...`);
+      // Step 2: Upload text/code assets to R2 in batches (S3 PutObject)
+      console.log(`DEBUG: Pushing ${Object.keys(files).length} assets to R2 bucket "${R2_BUCKET_NAME}"...`);
       const entries = Object.entries(files);
       const chunkSize = 25;
 
@@ -1082,59 +1705,18 @@ fixPaths(process.argv[2]);
         const chunk = entries.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async ([relativePath, base64Content]) => {
           const buffer = Buffer.from(base64Content as string, 'base64');
-          let contentType = "application/octet-stream";
-          const lowerPath = relativePath.toLowerCase();
-          if (lowerPath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-          else if (lowerPath.endsWith(".js")) contentType = "application/javascript";
-          else if (lowerPath.endsWith(".css")) contentType = "text/css";
-          else if (lowerPath.endsWith(".svg")) contentType = "image/svg+xml";
-          else if (lowerPath.endsWith(".json")) contentType = "application/json";
-          else if (lowerPath.endsWith(".png")) contentType = "image/png";
-          else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) contentType = "image/jpeg";
-          else if (lowerPath.endsWith(".webp")) contentType = "image/webp";
-          else if (lowerPath.endsWith(".gif")) contentType = "image/gif";
-          else if (lowerPath.endsWith(".ico")) contentType = "image/x-icon";
-          else if (lowerPath.endsWith(".mp4")) contentType = "video/mp4";
-          else if (lowerPath.endsWith(".woff")) contentType = "font/woff";
-          else if (lowerPath.endsWith(".woff2")) contentType = "font/woff2";
-          else if (lowerPath.endsWith(".ttf")) contentType = "font/ttf";
-          else if (lowerPath.endsWith(".otf")) contentType = "font/otf";
-          await bucket.file(`${sitePrefix}${relativePath}`).save(buffer, { metadata: { contentType, cacheControl: "no-cache, max-age=0" }, resumable: false });
+          await r2.send(new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: `${sitePrefix}${relativePath}`,
+            Body: buffer,
+            ContentType: contentTypeFor(relativePath),
+            CacheControl: "no-cache, max-age=0",
+          }));
         }));
       }
 
-      // Step 3: Stream the frames ZIP directly from GCS (videoUrl) and re-upload each frame
-      // This avoids base64-encoding 450 large images through the E2B->Node pipeline entirely.
-      if (videoUrl) {
-        console.log(`DEBUG: Streaming frames ZIP from GCS and re-uploading to site prefix...`);
-        const JSZip = (await import("jszip")).default;
-        const zipResponse = await fetch(videoUrl);
-        if (!zipResponse.ok) throw new Error(`Failed to fetch frames zip: ${zipResponse.statusText}`);
-        const zipBuffer = Buffer.from(await zipResponse.arrayBuffer());
-        const zip = await JSZip.loadAsync(zipBuffer);
-
-        const frameEntries = Object.entries(zip.files).filter(([name, f]) => !f.dir && name.endsWith(".jpg"));
-        const frameChunkSize = 12; // Reduced to 5 to prevent socket hang up with high-quality larger frames
-        for (let i = 0; i < frameEntries.length; i += frameChunkSize) {
-          const chunk = frameEntries.slice(i, i + frameChunkSize);
-          await Promise.all(chunk.map(async ([name, zipEntry]) => {
-            const frameBuffer = await zipEntry.async("nodebuffer");
-            const meta = { metadata: { contentType: "image/jpeg" }, resumable: false };
-            // Upload to root site dir (for AI code using ./frame-N.jpg relative to the page)
-            // AND to assets/ subdir (for AI code using import.meta.url inside the JS bundle)
-            // This guarantees frames load correctly regardless of how the AI resolves paths.
-            await Promise.all([
-              bucket.file(`${sitePrefix}${name}`).save(frameBuffer, meta),
-              bucket.file(`${sitePrefix}assets/${name}`).save(frameBuffer, meta),
-            ]);
-          }));
-        }
-        console.log(`DEBUG: Uploaded ${frameEntries.length} frames to GCS.`);
-      }
-
-      const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-      const finalUrl = `${cdnBase}/${sitePrefix}index.html`;
-      console.log(`DEBUG: GCP Deployment complete: ${finalUrl}`);
+      const finalUrl = `${r2PublicBase()}/${sitePrefix}index.html`;
+      console.log(`DEBUG: R2 deployment complete: ${finalUrl}`);
       return finalUrl;
     });
 
@@ -1144,13 +1726,7 @@ fixPaths(process.argv[2]);
       // 1. Terminate any existing processes blocking port 3000 (prevents EADDRINUSE on rapid successive runs)
       await sandbox.commands.run("kill -9 $(lsof -t -i:3000) 2>/dev/null || true");
 
-      if (videoUrl) {
-        console.log(`DEBUG: Bootstrapping master frames sequence for Sandbox Dev Server...`);
-        const devZipResult = await sandbox.commands.run(`curl -f -s -L '${videoUrl}' -o frames.zip && (unzip -q -o frames.zip -d public || python3 -m zipfile -e frames.zip public) && mkdir -p public/assets && cp public/*.jpg public/assets/ 2>/dev/null || true && rm frames.zip`);
-        if (devZipResult.exitCode !== 0) {
-          throw new Error(`CRITICAL DEV SERVER: Failed to fetch frames. GCS limits or invalid URL: ${devZipResult.stderr}`);
-        }
-      }
+
 
       // 2. Start the Vite server in the background
       await sandbox.commands.run("npm run dev -- --host 0.0.0.0 --port 3000", { background: true });
@@ -1191,9 +1767,6 @@ fixPaths(process.argv[2]);
               } else {
                 const ext = path.extname(filePath).toLowerCase();
                 const normalizedPath = filePath.split(path.sep).join('/');
-                if (normalizedPath.startsWith('public/assets/frame-') && ext === '.jpg') {
-                  continue; // Hide these routing duplicates from the UI
-                }
                 if (['.jpg', '.webp'].includes(ext)) {
                    fileList[normalizedPath] = 'BINARY_ASSET_OMITTED_FROM_SYNC';
                 } else if (!['.png', '.jpeg', '.gif', '.ico', '.mp4', '.woff', '.woff2'].includes(ext)) {
@@ -1234,11 +1807,27 @@ fixPaths(process.argv[2]);
       }
     });
 
+    // Back to a resting stage — leaving it on BUILDING_SITE would make the next
+    // turn open on "Building website" before anything has started.
+    await step.run("mark-stage-site", async () => {
+      await prisma.project
+        .update({
+          where: { id: event.data.projectId },
+          data: { currentStage: PROJECT_STAGE.SITE },
+        })
+        .catch(() => { });
+    });
+
     await step.run("save-result", async () => {
+      const successContent = parseAgentOutput(responseOutput) || finalSummary;
+      const failureContent =
+        "I generated the site, but the automated build could not be fully repaired after several attempts, so it was not deployed. " +
+        "The live preview may show errors. Please send a follow-up prompt describing what to adjust (or simply ask me to fix the errors) and I'll repair it.";
+
       return await prisma.message.create({
         data: {
           projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput) || finalSummary,
+          content: isBuildSuccessful ? successContent : failureContent,
           role: "ASSISTANT",
           type: "RESULT",
           fragment: {
@@ -1253,11 +1842,11 @@ fixPaths(process.argv[2]);
       });
     });
 
-    await step.run("charge-credits", async () => {
-      const model = event.data.model || "gemini-3.1-pro-preview";
-      const cost = MODEL_COSTS[model] || 100;
-      await consumeCredits(cost, event.data.userId);
-    });
+    // NOTE: the code agent deliberately does NOT charge here. One user message can
+    // invoke it several times (template pass, lenient rebuild, retries) and the user
+    // must pay AGENT_COSTS.CODE once per message, not once per run. The charge is
+    // made by the caller that owns the message — see startAutonomousGeneration and
+    // buildSite in modules/projects/server/procedures.ts.
 
     return {
       url: deploymentUrl || sandboxUrl,
@@ -1272,10 +1861,19 @@ fixPaths(process.argv[2]);
 
 export const veoGenerateFunction = inngest.createFunction(
   { id: "veo-generate", retries: 0, timeouts: { finish: "15m" } },
-  { event: "veo/generate" },
+  {
+    event: "veo/generate",
+    cancelOn: [
+      {
+        event: "autonomous-agent/cancel",
+        match: "data.projectId",
+      }
+    ]
+  },
   async ({ event, step }) => {
-    const { projectId, prompt, model, userId } = event.data;
-    const cost = MODEL_COSTS[model as string] || 25;
+    const { projectId, prompt, model, userId, refinePrompt, imagePrompt, experiencePref } = event.data;
+    // Charged per video-agent run — a regenerate is a new run the user asked for.
+    const cost = AGENT_COSTS.VIDEO;
 
     try {
       await step.run("update-project-stage-generating", async () => {
@@ -1285,26 +1883,58 @@ export const veoGenerateFunction = inngest.createFunction(
         });
       });
 
+      // Opt-in only: refine when the agent invented the prompt ("Let AI Create" /
+      // "Build it for me"). A prompt the user typed themselves is never rewritten.
+      // Without this the raw website request reaches the video model with no camera
+      // direction, and it fills the gap with cuts and cross-fades.
+      const videoPrompt: string = !refinePrompt
+        ? prompt
+        : await step.run("refine-video-prompt", async () => {
+          try {
+            const { ChatOpenAI } = await import("@langchain/openai");
+            const { HumanMessage, SystemMessage } = await import("@langchain/core/messages");
+            const { getVideoSystemPrompt, getVideoPromptSuffix, buildVideoRefinerInput, stripMachineWords } =
+              await import("@/lib/media-prompts");
+
+            const routerModel = new ChatOpenAI({
+              modelName: "google/gemini-3.1-flash-lite",
+              apiKey: process.env.OPENROUTER_API_KEY!,
+              configuration: { baseURL: "https://openrouter.ai/api/v1" },
+            });
+
+            const suffix = getVideoPromptSuffix(experiencePref);
+            const response = await routerModel.invoke([
+              new SystemMessage(getVideoSystemPrompt(experiencePref)),
+              new HumanMessage(buildVideoRefinerInput(prompt, imagePrompt, experiencePref)),
+            ]);
+
+            // Strip machine words even from the model's own output — naming a
+            // drone is what makes the video model render one in frame.
+            const refined = stripMachineWords((response.content as string).trim());
+            if (!refined) return `${stripMachineWords(prompt)}. ${suffix}`;
+            return `${refined} ${suffix}`;
+          } catch (err) {
+            // Never fail the render over prompt polish — fall back to the raw
+            // prompt plus the hard no-transition constraints.
+            console.error("[Video] Prompt refinement failed, using fallback:", err);
+            const { getVideoPromptSuffix, stripMachineWords } = await import("@/lib/media-prompts");
+            return `${stripMachineWords(prompt)}. ${getVideoPromptSuffix(experiencePref)}`;
+          }
+        });
+
       const videoUri = await step.run("generate-video", async () => {
         let base64VideoData: string | null = null;
         let finalVideoUrl: string | null = null;
 
-        if (model.includes("replicate-") || model === "bytedance/seedance-1.5-pro") {
+        if (model === "bytedance/seedance-1.5-pro") {
           const Replicate = (await import("replicate")).default;
           const replicate = new Replicate({
             auth: process.env.REPLICATE_API_KEY!,
           });
 
-          let targetModel: `${string}/${string}` = "kwaivgi/kling-v2.5-turbo-pro"; // default fallback
-          if (model === "replicate-kling-v2.5-turbo-pro") {
-            targetModel = "kwaivgi/kling-v2.5-turbo-pro";
-          } else if (model === "replicate-prunaai/p-video-draft") {
-            targetModel = "prunaai/p-video";
-          } else if (model.includes("/")) {
-            targetModel = model.replace("replicate-", "") as `${string}/${string}`;
-          }
+          const targetModel: `${string}/${string}` = "bytedance/seedance-1.5-pro";
 
-          const input: Record<string, unknown> = { prompt };
+          const input: Record<string, unknown> = { prompt: videoPrompt };
 
           if (targetModel === "prunaai/p-video") {
             input.fps = 24;
@@ -1328,7 +1958,10 @@ export const veoGenerateFunction = inngest.createFunction(
             input.duration = 4;
             input.resolution = "720p";
             input.aspect_ratio = "16:9";
-            input.camera_fixed = false;
+            // Hero backgrounds loop, so the camera is pinned at the model level —
+            // any sustained translation makes the last frame mismatch the first
+            // and the loop point reads as a jump cut.
+            input.camera_fixed = experiencePref === "HERO_ONLY";
             input.generate_audio = false; // Usually it's better to default to false unless explicitly needed
             if (event.data.imageUrl) {
               input.image = event.data.imageUrl;
@@ -1360,10 +1993,15 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // Use predictions.create + poll to avoid non-serializable FileRef objects
           // replicate.run() may return FileRef objects that crash Inngest's JSON step serialization
-          const prediction = await replicate.predictions.create({
-            model: targetModel,
-            input,
-          });
+          //
+          // This function runs with retries: 0, so a transient 429 would otherwise
+          // kill the whole generation. The retry is inline (rather than an Inngest
+          // step retry) because re-running the step would create a second, billable
+          // prediction — here we only re-attempt calls that never got created.
+          const prediction = await withReplicateRateLimitRetry(
+            "predictions.create",
+            () => replicate.predictions.create({ model: targetModel, input })
+          );
 
           console.log(`[Video Pipeline] Prediction created: ${prediction.id}, polling...`);
 
@@ -1380,7 +2018,12 @@ export const veoGenerateFunction = inngest.createFunction(
               throw new Error(`Replicate prediction ${prediction.id} timed out after 5 minutes`);
             }
             await new Promise((r) => setTimeout(r, 5000));
-            completedPrediction = await replicate.predictions.get(prediction.id);
+            // Polling counts against the same rate limit, so a throttled poll must
+            // not discard a prediction that is already running (and already paid for).
+            completedPrediction = await withReplicateRateLimitRetry(
+              `predictions.get(${prediction.id})`,
+              () => replicate.predictions.get(prediction.id)
+            );
             console.log(`[Video Pipeline] Prediction status: ${completedPrediction.status}`);
           }
 
@@ -1405,7 +2048,7 @@ export const veoGenerateFunction = inngest.createFunction(
             throw new Error(`Invalid Replicate output: ${JSON.stringify(rawOutput)}`);
           }
 
-          // Fetch the video buffer to upload to GCS
+          // Fetch the video buffer to upload to R2
           const res = await fetch(finalVideoUrl);
           if (!res.ok) throw new Error(`Failed to download Replicate video: ${res.statusText}`);
           const arrayBuffer = await res.arrayBuffer();
@@ -1444,7 +2087,7 @@ export const veoGenerateFunction = inngest.createFunction(
             },
             body: JSON.stringify({
               model: actualModel,
-              prompt: prompt,
+              prompt: videoPrompt,
               audio: false,
               generate_audio: false, // Added as fallback for different providers
               ...(frame_images.length > 0 ? { frame_images } : {})
@@ -1484,7 +2127,7 @@ export const veoGenerateFunction = inngest.createFunction(
             await new Promise((resolve) => setTimeout(resolve, 5000));
           }
 
-          // Fetch the video buffer to upload to GCS
+          // Fetch the video buffer to upload to R2
           const videoRes = await fetch(finalVideoUrl!, {
             headers: {
               "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`
@@ -1505,7 +2148,7 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const source: any = { prompt };
-          
+
           if (event.data.imageUrl) {
             const imgRes = await fetch(event.data.imageUrl);
             if (imgRes.ok) {
@@ -1516,7 +2159,7 @@ export const veoGenerateFunction = inngest.createFunction(
               };
             }
           }
-          
+
           if (event.data.endImageUrl) {
             const endImgRes = await fetch(event.data.endImageUrl);
             if (endImgRes.ok) {
@@ -1541,12 +2184,12 @@ export const veoGenerateFunction = inngest.createFunction(
           });
 
           console.log(`[Video Pipeline] GCP operation created: ${operation.name}, polling...`);
-          
+
           while (!operation.done) {
             await new Promise((resolve) => setTimeout(resolve, 10000));
             if (ai.operations && ai.operations.get) {
               operation = await ai.operations.get({ operation });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } else if (typeof (ai.models as any).getVideosOperation === "function") {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               operation = await (ai.models as any).getVideosOperation({ operation });
@@ -1557,21 +2200,21 @@ export const veoGenerateFunction = inngest.createFunction(
 
           const response = operation.response;
           if (!response || !response.generatedVideos || response.generatedVideos.length === 0) {
-             throw new Error("No videos generated by GCP Veo.");
+            throw new Error("No videos generated by GCP Veo.");
           }
 
           const videoItem = response.generatedVideos[0].video;
           if (!videoItem) throw new Error("GCP Veo did not return a valid video item.");
-          
+
           if (videoItem.videoBytes) {
-             base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
+            base64VideoData = Buffer.from(videoItem.videoBytes, "base64").toString("base64");
           } else if (videoItem.uri) {
-             const videoRes = await fetch(videoItem.uri);
-             if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
-             const arrayBuffer = await videoRes.arrayBuffer();
-             base64VideoData = Buffer.from(arrayBuffer).toString("base64");
+            const videoRes = await fetch(videoItem.uri);
+            if (!videoRes.ok) throw new Error(`Failed to download GCP video: ${videoRes.statusText}`);
+            const arrayBuffer = await videoRes.arrayBuffer();
+            base64VideoData = Buffer.from(arrayBuffer).toString("base64");
           } else {
-             throw new Error("GCP Veo did not return video bytes or uri");
+            throw new Error("GCP Veo did not return video bytes or uri");
           }
         } else {
           throw new Error(`Unsupported model: ${model}`);
@@ -1579,32 +2222,16 @@ export const veoGenerateFunction = inngest.createFunction(
 
         if (!base64VideoData) throw new Error("No video data retrieved");
 
-        console.log(`[Video Pipeline] Pushing Video to GCS natively to bypass node limits...`);
-        const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-        const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-              },
-            }
-            : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
-        );
-
-        const bucket = storage.bucket(bucketName);
-        const finalOutputName = `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`;
-        const fileFinal = bucket.file(finalOutputName);
+        console.log(`[Video Pipeline] Pushing Video to R2 natively to bypass node limits...`);
+        const { uploadMediaAsset } = await import("@/lib/media-storage");
 
         const bufferFinal = Buffer.from(base64VideoData, 'base64');
-        await fileFinal.save(bufferFinal, { metadata: { contentType: "video/mp4" } });
-
-        const cdnBase = process.env.NEXT_PUBLIC_CDN_URL || `https://storage.googleapis.com/${bucketName}`;
-        return `${cdnBase}/${finalOutputName}`;
+        const { url } = await uploadMediaAsset({
+          buffer: bufferFinal,
+          key: `videos/project-${event.data.projectId}-final-${Date.now()}.mp4`,
+          contentType: "video/mp4",
+        });
+        return url;
       });
 
       await step.run("update-project-video-url", async () => {

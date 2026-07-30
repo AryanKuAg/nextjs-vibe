@@ -170,33 +170,8 @@ Then finish with:
 
       const base64Images: string[] = [];
 
-      if (payload.extractedZipUrl) {
-        const zipResponse = await fetch(payload.extractedZipUrl);
-        if (!zipResponse.ok) {
-          return NextResponse.json({ error: "Failed to download frames zip" }, { status: 400 });
-        }
-
-        const JSZip = (await import("jszip")).default;
-        const zipBuffer = await zipResponse.arrayBuffer();
-        const zip = await JSZip.loadAsync(zipBuffer);
-
-        const allFiles = Object.values(zip.files)
-          .filter(f => !f.dir && f.name.endsWith(".jpg"))
-          .sort((a, b) => a.name.localeCompare(b.name));
-
-        if (allFiles.length > 0) {
-          const numFramesToExtract = Math.min(5, allFiles.length);
-          const selectedFiles = [];
-          for (let i = 0; i < numFramesToExtract; i++) {
-            const index = Math.floor(i * (allFiles.length - 1) / (numFramesToExtract - 1 || 1));
-            selectedFiles.push(allFiles[index]);
-          }
-
-          for (const file of selectedFiles) {
-            const buffer = await file.async("nodebuffer");
-            base64Images.push(buffer.toString("base64"));
-          }
-        }
+      if (false) {
+        // Zip logic removed, fallback to project videos directly.
       } else {
         // Fallback: ffmpeg extraction from project videos
         const project = await prisma.project.findUnique({

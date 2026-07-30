@@ -2,6 +2,9 @@ import { serve } from "inngest/next";
 
 import { inngest } from "@/inngest/client";
 import { codeAgentFunction, veoGenerateFunction } from "@/inngest/functions";
+import { autonomousAgentFunction } from "@/inngest/autonomous";
+import { generateFramesFunction } from "@/inngest/mediaAgents";
+import { resetMonthlyCredits } from "@/inngest/credit-reset";
 
 // Allow Vercel serverless functions to run up to 5 minutes
 // Required for long E2B sandbox operations and GCS deployments
@@ -13,5 +16,8 @@ export const { GET, POST, PUT } = serve({
   functions: [
     codeAgentFunction,
     veoGenerateFunction,
+    autonomousAgentFunction,
+    generateFramesFunction,
+    resetMonthlyCredits,
   ],
 });

@@ -4,8 +4,11 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, FOLLOW_UP_COSTS } from "@/lib/usage";
+import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
+import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { getTemplate } from "@/lib/templates/registry";
+import { PROJECT_STAGE } from "@/lib/project-stage";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -73,10 +76,16 @@ export const projectsRouter = createTRPCRouter({
     .input(
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
+        isAgentMode: z.boolean().default(false),
+        // Set when the project is created by remixing a gallery template. An
+        // unknown id is rejected rather than silently ignored — a project that
+        // claims a template it cannot download would fail mid-build.
+        templateId: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        await checkCredits(1);
         await consumeCredits(0); // Project metadata creation is free; generation is charged separately
       } catch (error) {
         if (error instanceof Error) {
@@ -92,10 +101,18 @@ export const projectsRouter = createTRPCRouter({
         }
       }
 
+      const template = input.templateId ? getTemplate(input.templateId) : null;
+      if (input.templateId && !template) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown template "${input.templateId}".`,
+        });
+      }
+
       const count = await prisma.project.count({
         where: { userId: ctx.auth.userId },
       });
-      const name = `Project ${count + 1}`;
+      const name = template ? `${template.title} Remix` : `Project ${count + 1}`;
 
       const createdProject = await prisma.project.create({
         data: {
@@ -103,20 +120,8 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
+          templateId: template?.id ?? null,
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
-          // Only create the initial message if the user provided a prompt
-          ...(input.value.trim()
-            ? {
-              messages: {
-                create: {
-                  content: input.value,
-                  role: "USER",
-                  type: "RESULT",
-                  stage: "SCENE",
-                },
-              },
-            }
-            : {}),
         },
       });
 
@@ -172,45 +177,23 @@ export const projectsRouter = createTRPCRouter({
       const cost = MODEL_COSTS[input.model || ""] || 25;
       await checkCredits(cost);
 
-      const bucketName = process.env.GCS_BUCKET_NAME || 'sites.framerate.space';
-      const outputGcsUri = `gs://${bucketName}/project-${input.projectId}-${Date.now()}.mp4`;
-
       let imageUrl = input.imageUrl;
       let imageBase64 = input.imageBase64;
 
-      // Inngest payload limit is ~1MB. Upload base64 image to GCS first.
+      // Inngest payload limit is ~1MB. Upload base64 image to R2 first.
       if (imageBase64) {
-        const { Storage } = await import("@google-cloud/storage");
-        const storage = new Storage(
-          process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
-            ? {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-              credentials: {
-                client_email: process.env.GOOGLE_CLIENT_EMAIL,
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-              },
-            }
-            : {
-              projectId: process.env.GOOGLE_CLOUD_PROJECT,
-            }
-        );
-
-        const bucket = storage.bucket(bucketName);
         const match = imageBase64.match(/^data:(image\/[^;]+);/);
         const mimeType = match ? match[1] : "image/jpeg";
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-
         const ext = mimeType.split("/")[1] || "jpg";
-        const fileName = `frames/${input.projectId}/upload-${Date.now()}.${ext}`;
-        const file = bucket.file(fileName);
 
-        await file.save(buffer, {
-          metadata: { contentType: mimeType },
+        const uploaded = await uploadMediaAsset({
+          buffer,
+          key: `frames/${input.projectId}/upload-${Date.now()}.${ext}`,
+          contentType: mimeType,
         });
-
-        const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || `https://${bucketName}`;
-        imageUrl = `${cdnUrl}/${fileName}`;
+        imageUrl = uploaded.url;
 
         // Remove base64 so it doesn't get sent to Inngest
         imageBase64 = undefined;
@@ -226,11 +209,10 @@ export const projectsRouter = createTRPCRouter({
         data: {
           projectId: input.projectId,
           prompt: input.prompt,
-          outputGcsUri,
           imageUrl,
           endImageUrl: input.endImageUrl,
           imageBase64,
-          model: input.model || "replicate-kling-v2.5-turbo-pro",
+          model: input.model || "bytedance/seedance-1.5-pro",
           userId: ctx.auth.userId,
           blockIndex: input.blockIndex,
         },
@@ -247,6 +229,7 @@ export const projectsRouter = createTRPCRouter({
       model: z.string().optional(),
       isFollowUp: z.boolean().optional(),
       imageDataUrl: z.string().optional(),
+      isAgentMode: z.boolean().default(false),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -257,10 +240,8 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
       }
 
-      // Follow-up prompts cost varies by model.
-      // First-time generation costs 80 credits.
-      const cost = input.isFollowUp ? (FOLLOW_UP_COSTS[input.model || ""] || 10) : (MODEL_COSTS[input.model || ""] || 80);
-      await checkCredits(cost);
+      // Code generation is charged per user message, not per agent run.
+      await checkCredits(AGENT_COSTS.CODE);
 
       const createdMessage = await prisma.message.create({
         data: {
@@ -272,6 +253,8 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
       await inngest.send({
         name: "code-agent/run",
         data: {
@@ -282,13 +265,97 @@ export const projectsRouter = createTRPCRouter({
           model: input.model,
           userId: ctx.auth.userId,
           imageDataUrl: input.imageDataUrl,
+          isAgentMode: input.isAgentMode,
+          // Returned by the agent's onFailure handler if the run never completes.
+          refundOnFailure: AGENT_COSTS.CODE,
         },
       });
 
       await prisma.project.update({
         where: { id: input.projectId },
         data: {
-          currentStage: "SITE",
+          // The code agent flips this to BUILDING_SITE once it starts and back to
+          // SITE when it lands. Marking it THINKING here stops the previous turn's
+          // stage being read as this turn's status while the sandbox boots.
+          currentStage: PROJECT_STAGE.THINKING,
+        },
+      });
+
+      return createdMessage;
+    }),
+  startAutonomousGeneration: protectedProcedure
+    .input(z.object({
+      projectId: z.string().min(1),
+      prompt: z.string(),
+      model: z.string().optional(),
+      isAgentMode: z.boolean().default(false),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const existingProject = await prisma.project.findUnique({
+        where: { id: input.projectId, userId: ctx.auth.userId },
+      });
+
+      if (!existingProject) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+
+      // A project that already produced a fragment has a live site — anything after
+      // that is a follow-up edit, which skips the wizard instead of rebuilding.
+      const existingFragment = await prisma.fragment.findFirst({
+        where: { message: { projectId: input.projectId } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      const isFollowUp = Boolean(existingFragment);
+
+      // The original site request, so media agents regenerating a background still
+      // know what the site is about even when the follow-up message is just
+      // "make another video".
+      const firstUserMessage = await prisma.message.findFirst({
+        where: { projectId: input.projectId, role: "USER" },
+        orderBy: { createdAt: "asc" },
+        select: { content: true },
+      });
+
+      await checkCredits(AGENT_COSTS.CODE);
+
+      const createdMessage = await prisma.message.create({
+        data: {
+          projectId: existingProject.id,
+          content: input.prompt,
+          role: "USER",
+          type: "RESULT",
+          stage: "SITE",
+        },
+      });
+
+      // Charged once per user message. The code agent may run several times for this
+      // message (template pass, lenient rebuild, retries) and must not charge again.
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
+      await inngest.send({
+        name: "autonomous-agent/run",
+        data: {
+          prompt: input.prompt,
+          sitePrompt: firstUserMessage?.content || input.prompt,
+          projectId: input.projectId,
+          model: input.model,
+          userId: ctx.auth.userId,
+          isAgentMode: input.isAgentMode,
+          isFollowUp,
+          // Returned by the agent's onFailure handler if the run never completes.
+          // Only the code charge — image and video bill themselves on success.
+          refundOnFailure: AGENT_COSTS.CODE,
+        },
+      });
+
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          // A fresh build starts at the background step. A follow-up has no known
+          // step until an agent announces one — and it must not keep reporting the
+          // previous turn's stage, which is what made the status line look stuck.
+          currentStage: isFollowUp ? PROJECT_STAGE.THINKING : PROJECT_STAGE.SCENE,
         },
       });
 
@@ -299,11 +366,21 @@ export const projectsRouter = createTRPCRouter({
       projectId: z.string().uuid(),
     }))
     .mutation(async ({ input }) => {
-      // Stop the Inngest run
-      await inngest.send({
-        name: "code-agent/cancel",
-        data: { projectId: input.projectId }
-      });
+      // Stop the Inngest run for both v1 and v2 autonomous agents
+      await inngest.send([
+        {
+          name: "code-agent/cancel",
+          data: { projectId: input.projectId }
+        },
+        {
+          name: "autonomous-agent/cancel",
+          data: { projectId: input.projectId }
+        },
+        {
+          name: "project.user.response",
+          data: { projectId: input.projectId, action: "CANCEL", payload: null }
+        }
+      ]);
 
       // Inject a cancellation message to unblock the UI
       await prisma.message.create({

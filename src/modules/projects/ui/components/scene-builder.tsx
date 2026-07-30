@@ -21,8 +21,7 @@ interface Props {
 import { MODEL_COSTS } from "@/lib/pricing";
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "" },
+  { id: "google/nano-banana-2-lite", label: "Nano Banana 2", emoji: "" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 type ModelId = typeof MODELS[number]["id"];
@@ -39,7 +38,7 @@ export const SceneBuilder = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("replicate-nb-2");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("google/nano-banana-2-lite");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -171,7 +170,7 @@ export const SceneBuilder = ({
   return (
     <>
       <CustomOutOfCreditsModal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} />
-      <div className="flex flex-col h-full bg-background font-onest">
+      <div className="flex flex-col h-full bg-background font-sans">
         <div className="flex-1" />
 
         <div className="p-4 space-y-3">
@@ -238,7 +237,7 @@ export const SceneBuilder = ({
                         key={model.id}
                         type="button"
                         onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-sans transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"
                           }`}
                       >
                         <span className="whitespace-nowrap">{model.label}</span>
@@ -270,7 +269,7 @@ export const SceneBuilder = ({
           </div>
 
           <Button
-            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-onest text-sm h-9 hover:bg-white/5! font-[400]"
+            className="w-full rounded-[8px] bg-background! border-[1px] border-[#282825] text-white font-sans text-sm h-9 hover:bg-white/5! font-[400]"
             onClick={onNext}
           >
             Skip

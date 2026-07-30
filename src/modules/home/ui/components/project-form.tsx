@@ -5,17 +5,19 @@ import { toast } from "sonner";
 import { useState, useRef, useEffect } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 
-import { cn } from "@/lib/utils";
+
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
-import { Hint } from "@/components/hint";
+
 
 const formSchema = z.object({
   value: z
@@ -24,19 +26,41 @@ const formSchema = z.object({
     .max(100000, { message: "Value is too long" }),
 });
 
-export const ProjectForm = () => {
+const MODELS = [
+  // we're keeping the same deepseek model everything but on the frontend we're showing different models
+  { id: "google/gemini-3.1-flash-lite", label: "Fable 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Kimi K3", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Opus 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Sonnet 5", emoji: "" },
+];
+
+interface ProjectFormProps {
+  showModelSelector?: boolean;
+  dropdownDirection?: "up" | "down";
+  isLandingPage?: boolean;
+}
+
+export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "down", isLandingPage = false }: ProjectFormProps) => {
   const router = useRouter();
   const trpc = useTRPC();
   const clerk = useClerk();
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
+  // Stays true from submit through navigation so the button can't fire twice
+  // (createProject.isPending briefly drops between success and the route change,
+  // and the image branch defers the mutation inside a FileReader callback).
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].label);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Clean up object URLs
   useEffect(() => {
@@ -44,6 +68,22 @@ export const ProjectForm = () => {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
+
+  // Click outside to close model dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+
+    if (modelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [modelDropdownOpen]);
 
   // Global drag-and-drop listeners for the fullscreen overlay
   useEffect(() => {
@@ -119,20 +159,24 @@ export const ProjectForm = () => {
         router.push(url);
       },
       onError: (error) => {
-        toast.error(error.message, { duration: Infinity });
-
+        setIsRedirecting(false); // failed — let the user try again
         if (error.data?.code === "UNAUTHORIZED") {
           clerk.openSignIn();
+          return;
         }
 
-        if (error.data?.code === "TOO_MANY_REQUESTS") {
-          router.push("/pricing");
+        if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+          setShowCreditsModal(true);
+        } else {
+          toast.error(error.message, { duration: Infinity });
         }
       },
     })
   );
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (createProject.isPending || isRedirecting) return; // guard against double-submit
+
     if (window.innerWidth < 768) {
       setShowSignInModal(true);
       return;
@@ -143,8 +187,11 @@ export const ProjectForm = () => {
       return;
     }
 
-    // Persist the default model so the dashboard uses it
-    sessionStorage.setItem("pending_model", "openrouter-google/gemini-3.1-pro-preview");
+    setIsRedirecting(true); // lock the button immediately, before any async work
+
+    // Persist the selected model so the dashboard uses it
+    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.1-flash-lite";
+    sessionStorage.setItem("pending_model", actualModelId);
     sessionStorage.setItem("pending_builder_prompt", values.value);
 
     // Save image to sessionStorage to persist across redirect
@@ -176,7 +223,7 @@ export const ProjectForm = () => {
     }
   };
 
-  const isPending = createProject.isPending;
+  const isPending = createProject.isPending || isRedirecting;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
 
   return (
@@ -189,7 +236,7 @@ export const ProjectForm = () => {
         >
           <div className="flex flex-col items-center gap-2 text-white">
             <i className="ri-download-line text-white text-3xl mb-3" />
-            <p className="text-lg font-onest font-medium">Drop your image</p>
+            <p className="text-lg font-sans font-medium">Drop your image</p>
           </div>
         </div>
       )}
@@ -197,31 +244,25 @@ export const ProjectForm = () => {
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={cn(
-            "relative rounded-3xl overflow-hidden transition-all min-h-[148px]",
-            "bg-[#212121]/80 w-full md:w-[720px]!",
-            isFocused && "ring-1 ring-white/20 border-white/20"
-          )}
-          style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.45)" }}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border focus-within:border-purple ${isLandingPage ? "bg-transparent border-white-8" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
+          suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
           {imagePreviewUrl && (
-            <div className="px-4 pt-4">
-              <div className="relative w-fit">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imagePreviewUrl}
-                  alt="Uploaded"
-                  className="w-16 h-16 rounded-xl object-cover border border-white/10"
-                />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full border border-white/10 text-white/70 hover:text-white text-[10px]"
-                >
-                  <i className="ri-close-line" />
-                </button>
-              </div>
+            <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreviewUrl}
+                alt="Uploaded"
+                className="w-12 h-12 rounded-[4px] object-cover"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-white/50 hover:text-white border border-white/10 text-xs"
+              >
+                <i className="ri-close-line" />
+              </button>
             </div>
           )}
 
@@ -232,19 +273,12 @@ export const ProjectForm = () => {
             render={({ field }) => (
               <TextareaAutosize
                 {...field}
+                autoFocus={!isLandingPage}
                 disabled={isPending}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                minRows={3}
-                maxRows={10}
-                className={cn(
-                  "w-full resize-none border-none outline-none",
-                  "px-4 pt-4 ",
-                  "text-sm font-onest leading-relaxed text-white font-[500]",
-                  "placeholder:text-white/40 placeholder:whitespace-nowrap placeholder:text-[14px] ",
-                  "transition-colors bg-transparent placeholder:mt-1   placeholder:font-[500]"
-                )}
-                placeholder="Describe your website..."
+                minRows={1}
+                maxRows={12}
+                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[24px] placeholder:text-white-50 "
+                placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -256,93 +290,91 @@ export const ProjectForm = () => {
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center justify-between px-4 pb-4 font-onest pt-3">
-            <div className="flex gap-x-1 items-center flex-1">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg, image/png"
-                className="hidden"
-                onChange={handleFileInputChange}
-              />
-              <Hint text="Add photo" side="top" >
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-transparent hover:bg-white/4 text-white transition-colors"
-                >
-                  <i className="ri-add-line text-base" />
-                </button>
-              </Hint>
-              {/* <div className="relative" ref={dropdownRef}>
+          <div className="flex items-center gap-1 mt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg, image/png"
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isPending}
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px] border border-white-8 text-white hover:bg-white-8 cursor-pointer disabled:opacity-50 text-base"
+              title="Attach image"
+            >
+              <i className="ri-add-line text-base" />
+            </button>
+
+            {showModelSelector && (
+              <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-full border border-[#2c2c2c] text-xs md:text-sm text-white  hover:bg-white/5 transition-colors cursor-pointer"
+                  className="h-7 px-2 flex items-center gap-1 rounded-lg border border-white-8 text-sm leading-[20px] text-white-85 hover:bg-white-8 cursor-pointer"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.emoji}</span>
-                  <span>{MODELS.find((m) => m.id === selectedModel)?.label}</span>
-                  <i className="ri-arrow-down-s-line mt-0.5 text-white" />
+                  <span className="whitespace-nowrap">{selectedModel}</span>
+                  <i className={`ri-arrow-${modelDropdownOpen ? 'up' : 'down'}-s-line text-white-85 text-xs`} />
                 </div>
 
-                {modelDropdownOpen && (
-                  <div className="absolute bottom-10 left-0 z-50 bg-background border border-[#3B3B3B] rounded-[8px] overflow-hidden min-w-[180px] shadow-xl">
-                    {MODELS.map((model) => (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-onest transition-colors hover:bg-white/5 ${selectedModel === model.id ? "text-white" : "text-[#CCCCCC]"}`}
-                      >
-                        <span>{model.emoji}</span>
-                        <span>{model.label}</span>
-                        {selectedModel === model.id && <i className="ri-check-line ml-auto text-white" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div> */}
-            </div>
-
-            <div className="flex items-center gap-2">
-
-              <div className="flex gap-2 ml-auto">
-                {/* <div className="flex items-center gap-1 mr-1 text-[#CCCCCC]">
-                  <i className="ri-sparkling-fill text-white text-sm" />
-                  <span className="text-sm font-medium">{MODELS.find(m => m.id === selectedModel)?.credits}</span>
-                </div> */}
-                {isButtonDisabled ? (
-                  <button
-                    type="submit"
-                    disabled
-                    className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white/40 text-[#1C1C1C] cursor-not-allowed"
-                  >
-                    {isPending ? (
-                      <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                    ) : (
-                      <i className="ri-arrow-up-line text-[16px] rotate-90" />
-                    )}
-                  </button>
-                ) : (
-                  <Hint text="Generate" side="top">
-                    <button
-                      type="submit"
-                      className="flex items-center justify-center size-8 rounded-full transition-all duration-150 bg-white text-[#1C1C1C]"
+                <AnimatePresence>
+                  {modelDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className={`absolute ${dropdownDirection === "up" ? "bottom-9" : "top-9"} left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col`}
                     >
-                      {isPending ? (
-                        <i className="ri-loader-4-line text-[16px] animate-spin inline-block" />
-                      ) : (
-                        <i className="ri-arrow-up-line text-[16px] rotate-90" />
-                      )}
-                    </button>
-                  </Hint>
-                )}
+                      {MODELS.map((model) => (
+                        <button
+                          key={model.label}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSelectedModel(model.label); setModelDropdownOpen(false); }}
+                          className={`w-full flex items-center justify-between gap-3 px-2 py-2.5 text-sm font-sans rounded-[4px]  hover:bg-white-8 h-[28px] text-white-85`}
+                        >
+                          <span className="whitespace-nowrap">{model.label}</span>
+                          {selectedModel === model.label && <i className="ri-check-line text-white" />}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+            )}
+
+            <div className="flex gap-2 ml-auto shrink-0">
+              {isButtonDisabled ? (
+                <button
+                  type="submit"
+                  disabled
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white opacity-50"
+                >
+                  <i className="ri-arrow-up-line text-base" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white hover:bg-purple/80 active:scale-95 transition-transform duration-200"
+                >
+                  {isPending ? (
+                    <i className="ri-loader-4-line animate-spin inline-block" />
+                  ) : (
+                    <i className="ri-arrow-up-line text-base" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </form>
 
         {/* ── Template chips ── */}
-        {/* <div className="hidden md:flex flex-wrap justify-center gap-2 font-onest">
+        {/* <div className="hidden md:flex flex-wrap justify-center gap-2 font-sans">
           {SUGGESTED_PROMPTS.map((item) => (
             <button
               key={item.label}
@@ -363,6 +395,10 @@ export const ProjectForm = () => {
       <CustomSignInModal
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
+      />
+      <CustomOutOfCreditsModal
+        isOpen={showCreditsModal}
+        onClose={() => setShowCreditsModal(false)}
       />
     </Form>
   );

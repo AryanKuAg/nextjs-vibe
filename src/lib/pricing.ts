@@ -3,27 +3,31 @@
  * Keep this file free of any server-only imports (prisma, auth, etc.)
  */
 
+/**
+ * Authoritative per-agent credit costs. These are what actually get charged.
+ *
+ * IMAGE and VIDEO are charged per agent RUN — each run is one paid generation,
+ * and a regenerate is a new run the user asked for.
+ *
+ * CODE is charged per user MESSAGE, not per run: a single build can invoke the
+ * code agent several times (template pass, lenient rebuild, retries) and the
+ * user should pay once for the message that triggered it. It is therefore
+ * charged by the caller that owns the message, never inside the agent.
+ */
+export const AGENT_COSTS = {
+  IMAGE: 7,
+  VIDEO: 10,
+  CODE: 4,
+} as const;
+
+// Displayed in the model pickers. Kept in sync with AGENT_COSTS above.
 export const MODEL_COSTS: Record<string, number> = {
-  "replicate-nb-2": 7,
-  "bytedance/seedream-4.5": 4,
-  "replicate-kling-v2.5-turbo-pro": 35,
-  "replicate-prunaai/p-video": 8,
-  "replicate-prunaai/p-video-draft": 2,
-  "openrouter-seedance-2": 60,
-  "openrouter-seedance-2-fast": 48,
-  "kwaivgi/kling-v3-video": 34,
-  "openrouter-google/gemini-3.1-pro-preview": 80,
-  "openrouter-google/gemini-3.5-flash": 60,
-  "openrouter-google/gemini-3.1-flash-lite": 10,
-  "openai/gpt-oss-120b:free": 10,
-  "gcp-veo-3.1-lite": 12,
-  "bytedance/seedance-1.5-pro": 10
+  "google/nano-banana-2-lite": AGENT_COSTS.IMAGE,
+  "bytedance/seedance-1.5-pro": AGENT_COSTS.VIDEO,
+  "google/gemini-3.1-flash-lite": AGENT_COSTS.CODE
 };
 
 // Follow-up prompts (when a conversation already exists)
 export const FOLLOW_UP_COSTS: Record<string, number> = {
-  "openrouter-google/gemini-3.1-pro-preview": 30,
-  "openrouter-google/gemini-3.5-flash": 20,
-  "openrouter-google/gemini-3.1-flash-lite": 5,
-  'openai/gpt-oss-120b:free': 5
+  "google/gemini-3.1-flash-lite": AGENT_COSTS.CODE
 };

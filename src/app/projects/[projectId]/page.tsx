@@ -19,6 +19,7 @@ const Page = async ({ params }: Props) => {
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery(trpc.messages.getMany.queryOptions({
     projectId,
+    stage: "SITE",
   }));
   await queryClient.prefetchQuery(trpc.projects.getOne.queryOptions({
     id: projectId,

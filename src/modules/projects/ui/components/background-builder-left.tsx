@@ -75,15 +75,8 @@ const deleteImageFromIDB = async (key: string) => {
 };
 
 const MODELS = [
-  { id: "replicate-nb-2", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
-  { id: "bytedance/seedream-4.5", label: "Seedream 4.5", emoji: "", type: "IMAGE", time: "~20 sec" },
-  { id: "kwaivgi/kling-v3-video", label: "Kling 3.0", emoji: "", type: "VIDEO", time: "~3 min" },
-  { id: "openrouter-seedance-2", label: "Seedance 2.0", emoji: "", type: "VIDEO", time: "~2 min" },
-  { id: "replicate-prunaai/p-video", label: "Pruna P-Video", emoji: "", type: "VIDEO", time: "~20 sec" },
-  { id: "gcp-veo-3.1-lite", label: "Veo 3.1", emoji: "", type: "VIDEO", time: "~2 min" },
-  // { id: "replicate-prunaai/p-video-draft", label: "Pruna Draft", emoji: "", type: "VIDEO", time: "~10 sec" },
-
-  // { id: "openrouter-seedance-2-fast", label: "Seedance 2.0 Fast", emoji: "", type: "VIDEO", time: "~1 min" },
+  { id: "google/nano-banana-2-lite", label: "Nano Banana 2", emoji: "", type: "IMAGE", time: "~20 sec" },
+  { id: "bytedance/seedance-1.5-pro", label: "Seedance 1.5 Pro", emoji: "", type: "VIDEO", time: "~2 min" },
 ].map((m) => ({ ...m, credits: MODEL_COSTS[m.id] ?? 0 }));
 
 export const BackgroundBuilderLeft = ({
@@ -93,7 +86,8 @@ export const BackgroundBuilderLeft = ({
   onProceed,
   onSkip,
   updateBlock,
-  onApplyTemplate,
+  // onApplyTemplate is still part of Props for callers, but nothing in this panel
+  // can fire it yet — see the TemplatesModal note below.
   projectId,
   blocks,
   isExtracting
@@ -367,15 +361,10 @@ export const BackgroundBuilderLeft = ({
 
 
 
-  function adjustedPadding(modelId: string) {
-    if (modelId === "replicate-nb-2") return "pb-2";
-    if (modelId === "replicate-kling-v2.5-turbo-pro") return "pb-2";
-    if (modelId === "replicate-prunaai/p-video") return "pt-2";
-    if (modelId === "openrouter-seedance-2") return "py-2";
-    if (modelId === "bytedance/seedream-4.5") return "pt-2";
-    return ""
-
-  }
+  const getModelMargin = (modelId: string) => {
+    if (modelId === "google/nano-banana-2-lite") return "pb-2";
+    return "";
+  };
 
   return (
     <>
@@ -446,7 +435,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="bg-[#212121] border-t border-r border-l border-b-0 border-[#2c2c2c] rounded-[16px] my-3">
           <div className="flex items-center justify-between px-3 pt-2 pb-2 border-b-0 border-[#282825]">
-            <span className="text-white text-sm font-onest">Editing video {activeBlockIndex + 1}</span>
+            <span className="text-white text-sm font-sans">Editing video {activeBlockIndex + 1}</span>
             <span className="text-white/30 text-sm">
               {activeBlockIndex * 4}s - {(activeBlockIndex + 1) * 4}s
             </span>
@@ -536,7 +525,7 @@ export const BackgroundBuilderLeft = ({
                           key={model.id}
                           type="button"
                           onClick={() => { setSelectedModel(model.id); setModelDropdownOpen(false); }}
-                          className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", adjustedPadding(model.id))}
+                          className={cn("w-full flex items-center justify-between  p-3  transition-colors hover:bg-white/5 text-left group", getModelMargin(model.id))}
                         >
                           <div className="flex flex-col">
                             <span className="text-sm  tracking-tight text-white leading-5 mb-0.5">{model.label}</span>
@@ -606,7 +595,7 @@ export const BackgroundBuilderLeft = ({
 
         <div className="space-y-3 mt-auto">
           <Button
-            className="w-full rounded-[8px] bg-white text-black font-onest text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
+            className="w-full rounded-[8px] bg-white text-black font-sans text-sm h-8 hover:bg-[#e0e0e0] font-[500] disabled:bg-white/50"
             onClick={onProceed}
             disabled={isExtracting || (!blocks.every((block) => !!block.videoUrl) && !blocks.some(block => !!block.builderPrompt))}
           >
@@ -620,14 +609,14 @@ export const BackgroundBuilderLeft = ({
           <div className="flex gap-2">
             <Button
               variant="ghost"
-              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              className="rounded-[8px] flex-1 text-white font-sans h-8 border border-[#212121] hover:bg-[#212121]!"
               onClick={onSkip}
             >
               Skip
             </Button>
             <Button
               variant="ghost"
-              className="rounded-[8px] flex-1 text-white font-onest h-8 border border-[#212121] hover:bg-[#212121]!"
+              className="rounded-[8px] flex-1 text-white font-sans h-8 border border-[#212121] hover:bg-[#212121]!"
               onClick={() => setIsTemplatesModalOpen(true)}
             >
               Templates
@@ -636,14 +625,15 @@ export const BackgroundBuilderLeft = ({
         </div>
       </div>
 
+      {/* NOTE: this is the SITE template gallery (src/lib/templates/registry.ts),
+          not the video-block presets in src/lib/templates.ts that onApplyTemplate
+          expects. It is passed an empty list, so nothing here is selectable today.
+          Wiring block presets up needs its own component — this one now starts a
+          full template remix on select, which is not what this panel wants. */}
       <TemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
-        onSelect={(t) => {
-          if (onApplyTemplate) {
-            onApplyTemplate(t.blocks);
-          }
-        }}
+        templates={[]}
       />
     </>
   );

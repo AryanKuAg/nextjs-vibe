@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+
 
 function formatTimer(seconds: number) {
   if (seconds < 60) return `${seconds}s`;
@@ -7,37 +7,33 @@ function formatTimer(seconds: number) {
   return `${m}m ${s}s`;
 }
 
-const ShimmerMessages = () => {
-  const [elapsedMs, setElapsedMs] = useState(0);
-
-  useEffect(() => {
-    const startTime = Date.now();
-
-    const timerInterval = setInterval(() => {
-      setElapsedMs(Date.now() - startTime);
-    }, 1000);
-
-    return () => {
-      clearInterval(timerInterval);
-    };
-  }, []);
-
-  const timeString = formatTimer(Math.floor(elapsedMs / 1000));
+export const ShimmerMessages = ({ text = "Working", showTimer = false, globalElapsedMs = 0 }: { text?: string, showTimer?: boolean, globalElapsedMs?: number }) => {
+  const timeString = formatTimer(Math.floor(globalElapsedMs / 1000));
 
   return (
-    <div className="flex items-center gap-3 pl-1 ">
-      <i className="ri-loader-4-line animate-spin text-2xl text-white/80" />
-      <span className="text-white font-onest text-sm tracking-wide">
-        Building <span className="text-white/40 mx-1.5">&middot;</span> {timeString}
+    <div className="flex items-center gap-2 mb-0.5">
+      <span className="text-sm bg-gradient-to-r from-white via-white/50 to-white bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent leading-[20px]">
+        {text}
       </span>
+      {showTimer && (
+        <>
+          <span className="text-white/40 text-[13px]">&middot;</span>
+          <span className="text-white/40 text-[13px]">{timeString}</span>
+        </>
+      )}
     </div>
   );
 };
 
-export const MessageLoading = () => {
+export const MessageLoading = ({
+  globalElapsedMs = 0,
+  text,
+}: { globalElapsedMs?: number; text?: string }) => {
   return (
-    <div className="px-2 pb-4">
-      <ShimmerMessages />
+    <div className="flex group pb-4 px-3 items-start">
+      <div className="flex flex-col gap-y-4 pt-0.5 w-full">
+        <ShimmerMessages text={text} showTimer={true} globalElapsedMs={globalElapsedMs} />
+      </div>
     </div>
   );
 };

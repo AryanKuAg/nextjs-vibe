@@ -23,6 +23,12 @@ model Project {
   // Lifecycle — "draft" until first scene is generated, then "active"
   status String @default("draft") // "draft" | "active"
 
+  // Set when the project was started by remixing a gallery template. Null for
+  // every project built from a plain prompt — the presence of this field is the
+  // ONLY switch that enables the template pipeline (GitHub clone + diff edits),
+  // so the manual-prompt path is unaffected by anything gated on it.
+  templateId String? // matches TemplateManifest.id in src/lib/templates/registry.ts
+
   // Visual pipeline state
   currentStage   String @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
   videoUrls      Json   @default("[]") // Array of all generated cinematic videos
@@ -41,6 +47,7 @@ enum MessageRole {
 enum MessageType {
   RESULT
   ERROR
+  INTERACTIVE
 }
 
 model Message {
@@ -73,9 +80,12 @@ model Fragment {
 }
 
 model Usage {
-  key            String    @id
-  credits        Int       @default(0)
-  expire         DateTime?
-  plan           String    @default("free") // "free", "basic", "plus", "pro"
-  subscriptionId String?
+  key               String    @id
+  credits           Int       @default(0)
+  expire            DateTime? // End of the current paid period (next_billing_date from Dodo). Used to keep access until period end after cancellation.
+  plan              String    @default("free") // "free" | "plus" | "pro" | "max"
+  billing           String? // "monthly" | "yearly" — null on free
+  subscriptionId    String?
+  subscriptionStatus String   @default("active") // "active" | "on_hold" | "cancelled" | "failed" | "expired" — only "active" earns cron credit resets
+  lastCreditResetAt DateTime  @default(now())
 }

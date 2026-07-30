@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
 import { ClerkProvider, SignedOut } from "@clerk/nextjs";
-import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk, Onest } from "next/font/google";
+import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 
@@ -33,10 +33,6 @@ const stackSansNotch = localFont({
   display: "swap",
 });
 
-const onest = Onest({
-  variable: "--font-onest",
-  subsets: ["latin"],
-});
 
 const dmMono = DM_Mono({
   variable: "--font-dm-mono",
@@ -101,9 +97,12 @@ export default function RootLayout({
     >
       <TRPCReactProvider>
         <html lang="en" suppressHydrationWarning>
+          <head>
+            <link rel="stylesheet" href="https://use.typekit.net/xvp3dbf.css" />
+          </head>
           <body
             suppressHydrationWarning
-            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${onest.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
+            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
           >
             <CanonicalUrl />
             <Script

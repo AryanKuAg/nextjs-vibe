@@ -512,6 +512,18 @@ export const codeAgentFunction = inngest.createFunction(
       const path = await import("path");
       const templatesDir = path.join(process.cwd(), "src", "templates");
 
+      // A missing scaffold used to fail silently: hydration wrote nothing, the base
+      // image's App.tsx kept importing a ScrollFrames that never arrived, and the
+      // run burned every fixer attempt on an unresolvable import before shipping a
+      // broken site. It is a deployment fault, so say so and stop.
+      if (!fs.existsSync(templatesDir)) {
+        throw new Error(
+          `Golden scaffold missing at ${templatesDir}. It is read at runtime, so it must be ` +
+          `present in the deployed image — see outputFileTracingIncludes in next.config.ts ` +
+          `and the src/templates COPY in the Dockerfile.`
+        );
+      }
+
       if (Object.keys(files).length === 0) {
         const readDirRecursive = (dir: string) => {
           if (!fs.existsSync(dir)) return;
@@ -542,6 +554,20 @@ export const codeAgentFunction = inngest.createFunction(
           }
         };
         readDirRecursive(templatesDir);
+
+        // The directory existed but yielded nothing usable — same broken outcome as
+        // it being absent, so fail here rather than three minutes later.
+        if (Object.keys(files).length === 0) {
+          throw new Error(
+            `Golden scaffold at ${templatesDir} produced no files. A new sandbox cannot be seeded.`
+          );
+        }
+        if (mode === "FULL_PAGE" && !files["src/components/ScrollFrames.tsx"]) {
+          throw new Error(
+            `Golden scaffold is missing components/ScrollFrames.tsx, which App.tsx imports in ` +
+            `FULL_PAGE mode. Seeding would produce a site that cannot build.`
+          );
+        }
 
       } else if (mode === "FULL_PAGE" && videoUrl && !template) {
         // Existing project: always refresh the platform-owned golden ScrollFrames
@@ -1437,7 +1463,15 @@ fixPaths(process.argv[2]);
           const fs = await import("fs");
           const path = await import("path");
           const goldenPath = path.join(process.cwd(), "src", "templates", "components", "ScrollFrames.tsx");
-          if (!fs.existsSync(goldenPath)) return null;
+          if (!fs.existsSync(goldenPath)) {
+            // Nothing to restore from. Say it plainly — silently returning here is
+            // what made this look like a fixer problem instead of a missing file.
+            console.error(
+              `[ScrollFrames] Cannot self-heal: golden copy absent at ${goldenPath}. ` +
+              `The deployed image is missing src/templates.`
+            );
+            return null;
+          }
 
           const content = fs
             .readFileSync(goldenPath, "utf-8")

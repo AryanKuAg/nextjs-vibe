@@ -1135,9 +1135,71 @@ export const codeAgentFunction = inngest.createFunction(
 
     // (Mode-specific video/architecture rules live in the system prompt — no patches here.)
 
-    // Inject image reference into the prompt when a user attaches an image
-    if (event.data.imageUrl) {
-      currentPrompt = `[The user has attached a reference image. Use it as a visual guide for the design, layout, color palette, and style of the generated website.]\n\nReference image URL: ${event.data.imageUrl}\n\n` + currentPrompt;
+    // --- DESIGN REFERENCE ------------------------------------------------------
+    // The user attached a screenshot or mockup of a layout to reproduce. The code
+    // agent runs on a text-only agent network, so handing it a URL achieves
+    // nothing — it cannot open one. Read the image here with a vision model and
+    // hand the agent a written specification instead. That also survives the
+    // fixer loop, which re-reads the prompt on every repair attempt.
+    const designReferenceUrl = event.data.designReferenceUrl || event.data.imageUrl;
+
+    if (designReferenceUrl) {
+      const designSpec = await step.run("describe-design-reference", async () => {
+        try {
+          const { ChatOpenAI } = await import("@langchain/openai");
+          const { HumanMessage, SystemMessage } = await import("@langchain/core/messages");
+
+          const vision = new ChatOpenAI({
+            modelName: "google/gemini-3.1-flash-lite",
+            apiKey: process.env.OPENROUTER_API_KEY!,
+            configuration: { baseURL: "https://openrouter.ai/api/v1" },
+          });
+
+          const response = await vision.invoke([
+            new SystemMessage(
+              "You convert a screenshot of a website or UI into a precise build specification for a front-end engineer " +
+              "who cannot see the image. Be concrete and exhaustive about structure.\n\n" +
+              "Describe, in this order:\n" +
+              "1. Overall layout and page structure, section by section, top to bottom.\n" +
+              "2. The navigation: position, contents, alignment, and the CTA.\n" +
+              "3. The hero: how the headline is composed, its scale relative to the viewport, alignment, and what sits around it.\n" +
+              "4. Each subsequent section: its grid or arrangement, column counts, alignment, density and spacing rhythm.\n" +
+              "5. Typography: serif vs sans, weight, case, letter-spacing and relative sizes.\n" +
+              "6. Colour palette as hex codes: background, text, accent.\n" +
+              "7. Component shapes: corner radii, borders, button styling.\n\n" +
+              "Rules: describe only what is actually visible — never invent sections. " +
+              "Do NOT transcribe the reference's marketing copy verbatim; describe what each block is FOR so it can be " +
+              "rewritten for a different brand. Ignore browser chrome, cursors, scrollbars and watermarks."
+            ),
+            new HumanMessage({
+              content: [
+                {
+                  type: "text",
+                  text: "Produce the build specification for this reference. The user's own request supplies the brand and content; this supplies the layout and visual language.",
+                },
+                { type: "image_url", image_url: { url: designReferenceUrl } },
+              ],
+            }),
+          ]);
+
+          return (response.content as string).trim();
+        } catch (e) {
+          console.error("DEBUG: Failed to read design reference image.", e);
+          return null;
+        }
+      });
+
+      if (designSpec) {
+        console.log("DEBUG: Design reference converted to a build specification.");
+        currentPrompt =
+          `=== DESIGN REFERENCE (the user attached a layout to reproduce) ===\n` +
+          `Build the site to match this structure and visual language as closely as the request allows. ` +
+          `It governs LAYOUT, COMPOSITION, TYPOGRAPHY and PALETTE. The user's request below still governs the ` +
+          `brand, the copy and the subject matter — write fresh copy, never reuse the reference's wording.\n\n` +
+          `${designSpec}\n` +
+          `=== END DESIGN REFERENCE ===\n\n` +
+          currentPrompt;
+      }
     }
 
     // --- 0. AS-IS TEMPLATE REMIX: no agent runs at all ---

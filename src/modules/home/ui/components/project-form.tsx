@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { processImageFile } from "@/lib/process-image-file";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -194,25 +195,19 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
     sessionStorage.setItem("pending_model", actualModelId);
     sessionStorage.setItem("pending_builder_prompt", values.value);
 
-    // Save image to sessionStorage to persist across redirect
+    // Carry the attached image across the redirect to the project page, which
+    // passes it to the first generation. Downscaled first: a full-size data URL
+    // routinely blows the ~5MB sessionStorage quota, and the write throws.
     if (uploadedImage) {
       try {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64String = reader.result as string;
-          sessionStorage.setItem("pending_image_base64", base64String);
-          sessionStorage.setItem("pending_image_name", uploadedImage.name);
-          sessionStorage.setItem("pending_image_type", uploadedImage.type);
-          try {
-            await createProject.mutateAsync({ value: values.value });
-          } catch {
-            // Error is handled in the mutation's onError callback
-          }
-        };
-        reader.readAsDataURL(uploadedImage);
-        return; // Success handled in reader
+        const dataUrl = await processImageFile(uploadedImage);
+        sessionStorage.setItem("pending_image_base64", dataUrl);
+        sessionStorage.setItem("pending_image_name", uploadedImage.name);
+        sessionStorage.setItem("pending_image_type", uploadedImage.type);
       } catch (e) {
-        console.error("Failed to save image to session storage:", e);
+        // Losing the reference is not worth losing the build — carry on without it.
+        console.error("Failed to carry the attached image across the redirect:", e);
+        toast.error("Could not attach that image — continuing without it.");
       }
     }
 

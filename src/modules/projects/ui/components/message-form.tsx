@@ -29,44 +29,14 @@ interface Props {
   setInteractiveSubmittedAt?: (v: Date | null) => void;
 };
 
+import { processImageFile } from "@/lib/process-image-file";
+
 const formSchema = z.object({
   value: z.string()
     .min(1, { message: "Value is required" })
     .max(100000, { message: "Value is too long" }),
 })
 
-const processImageFile = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
-      reject(new Error("Unsupported format. Use JPEG, PNG, WebP, or GIF."));
-      return;
-    }
-    if (file.size > 7 * 1024 * 1024) {
-      reject(new Error("Image must be under 7MB."));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/jpeg", 0.9));
-        } else {
-          resolve(ev.target?.result as string);
-        }
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error("Failed to read file."));
-    reader.readAsDataURL(file);
-  });
 
 
 export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPrompt, pendingInteractiveAction, setPendingInteractiveAction, setInteractiveSubmittedAt }: Props) => {
@@ -142,7 +112,15 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
       });
 
       // Fire the generation directly — no visible form population, no delay.
-      startAutonomousGeneration.mutate({ prompt: pendingPrompt, projectId, model: selectedModel });
+      // The handed-off image is passed explicitly: setUploadedDataUrl above has
+      // not been applied yet within this same effect run, so reading the state
+      // here would silently drop it.
+      startAutonomousGeneration.mutate({
+        prompt: pendingPrompt,
+        projectId,
+        model: selectedModel,
+        imageDataUrl: pendingImage ?? undefined,
+      });
     } else if (initialPrompt && !form.getValues().value && !isFollowUp) {
       form.setValue("value", initialPrompt, { shouldValidate: true });
     }
@@ -233,6 +211,9 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
         prompt: values.value,
         projectId,
         model: selectedModel,
+        // What the agent does with it — start frame, look to match, or layout to
+        // reproduce — is classified server-side from this prompt.
+        imageDataUrl: uploadedDataUrl ?? undefined,
       });
       form.setValue("value", "");
       setUploadedDataUrl(null);

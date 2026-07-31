@@ -174,8 +174,14 @@ const AssistantMessage = ({
     if (["WRITE_PROMPT"].includes(action)) {
       if (pendingInteractiveAction === action) {
         setPendingInteractiveAction(null);
+        setLastAction(null);
       } else {
         setPendingInteractiveAction(action);
+        // Record the intent now, while we still know which card it came from.
+        // The prompt itself is submitted from the message form, which cannot set
+        // this, and without it the status line cannot tell whether a scene or a
+        // video is being regenerated until the backend catches up.
+        setLastAction(action);
       }
       return;
     }

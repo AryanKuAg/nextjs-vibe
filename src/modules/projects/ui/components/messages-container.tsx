@@ -207,6 +207,10 @@ export const MessagesContainer = ({
                 isLastMessage={index === messages.length - 1}
                 messageId={message.id}
                 currentStage={currentStage}
+                // Required for the card to switch from the media preview to the
+                // status line: "Prompt Again" is submitted from the message form,
+                // not the card, so the card has no local state to go on.
+                interactiveSubmittedAt={interactiveSubmittedAt}
                 globalElapsedMs={generationTimer.elapsedMs}
                 onActionSubmit={() => setInteractiveSubmittedAt(new Date())}
               />

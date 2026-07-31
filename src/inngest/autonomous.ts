@@ -12,6 +12,21 @@ import { TASTE_BRIEF_RULES } from "@/lib/taste";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
 import type { SceneLuminance } from "@/lib/scene-luminance";
 
+/**
+ * What an image attached to the prompt should be used for.
+ *
+ * - START_FRAME: use this exact image as the background's first frame. Image
+ *   generation is skipped entirely and the video animates from it.
+ *   ("animate this", "use this as the background", "make a video from this")
+ * - SCENE_REFERENCE: generate a NEW background image guided by this one's
+ *   subject, palette, lighting and composition.
+ *   ("generate an image like this", "same vibe as this photo")
+ * - DESIGN_REFERENCE: this is a website/UI/layout to reproduce in code. It is
+ *   never used as a background.
+ *   ("build a site like this", "use this layout", a screenshot of a webpage)
+ */
+export type ReferenceImageRole = "START_FRAME" | "SCENE_REFERENCE" | "DESIGN_REFERENCE";
+
 // 1. Define State
 export const AgentState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -50,6 +65,17 @@ export const AgentState = Annotation.Root({
     default: () => "",
   }),
   start_frame_url: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  // An image the user attached to their prompt, already stored and addressable.
+  reference_image_url: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+  // What that image is FOR. The same upload means three different things
+  // depending on the prompt, so it is classified once and routed accordingly.
+  reference_image_role: Annotation<ReferenceImageRole | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
@@ -471,6 +497,12 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
         prompt: state.current_prompt,
         model: "google/nano-banana-2-lite",
         startFrameUrl: state.start_frame_url || undefined,
+        // Only a SCENE_REFERENCE steers image generation. A DESIGN_REFERENCE is a
+        // webpage screenshot and would poison the background with UI.
+        referenceImageUrl:
+          state.reference_image_role === "SCENE_REFERENCE"
+            ? state.reference_image_url || undefined
+            : undefined,
         userId: state.userId,
         isAgentMode: state.isAgentMode,
         isDirectPrompt: state.isDirectPrompt,
@@ -750,6 +782,63 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
   // A user-chosen preference (wizard buttons / event data) always wins over detection.
   const experiencePref = state.experiencePref ?? result.experience_pref;
 
+  // --- What is the attached image for? ---------------------------------------
+  // The upload alone says nothing; the prompt beside it decides. Classified with
+  // vision so a screenshot of a webpage is never mistaken for a background plate.
+  const referenceImageUrl = state.reference_image_url;
+  let referenceRole: ReferenceImageRole | null = state.reference_image_role;
+
+  if (referenceImageUrl && !referenceRole) {
+    referenceRole = await step.run("classify-reference-image", async () => {
+      const classifierSys = new SystemMessage(
+        "The user attached an image to a request on an AI website builder. Decide what the image is FOR.\n\n" +
+        "Reply with exactly one role:\n" +
+        "- START_FRAME: use this exact image as the website's background, or animate it into the background video. " +
+        "Signals: 'animate this', 'use this as the background', 'make a video from this', 'this is my hero image'.\n" +
+        "- SCENE_REFERENCE: generate a NEW background image that looks like this one — same subject, mood, palette or composition, but not this exact file. " +
+        "Signals: 'generate an image like this', 'something like this', 'same vibe', 'similar scene'.\n" +
+        "- DESIGN_REFERENCE: the image shows a website, app UI, landing page, wireframe or layout the user wants reproduced in code. " +
+        "Signals: 'build a site like this', 'use this layout', 'copy this design', or the image itself is plainly a screenshot of a webpage.\n\n" +
+        "Judge the IMAGE as well as the words. A screenshot of a webpage is DESIGN_REFERENCE even if the user only says 'like this'. " +
+        "A photograph or rendered scene with no UI in it is never DESIGN_REFERENCE.\n" +
+        "If the prompt gives no clue, default by content: a webpage/UI screenshot is DESIGN_REFERENCE, anything else is SCENE_REFERENCE."
+      );
+
+      const roleModel = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(
+        z.object({
+          role: z.enum(["START_FRAME", "SCENE_REFERENCE", "DESIGN_REFERENCE"]),
+          reason: z.string().describe("One short sentence explaining the choice."),
+        })
+      );
+
+      try {
+        const out = await roleModel.invoke([
+          classifierSys,
+          new HumanMessage({
+            content: [
+              { type: "text", text: `User's request: ${state.current_prompt}` },
+              { type: "image_url", image_url: { url: referenceImageUrl } },
+            ],
+          }),
+        ]);
+        console.log(`[Reference Image] Role: ${out.role} — ${out.reason}`);
+        return out.role;
+      } catch (e) {
+        // Vision unavailable or the model failed. SCENE_REFERENCE is the safe
+        // default: it only guides image generation, so a wrong guess degrades
+        // quality instead of producing a site built from the wrong thing.
+        console.warn("[Reference Image] Classification failed, defaulting to SCENE_REFERENCE.", e);
+        return "SCENE_REFERENCE" as const;
+      }
+    });
+  }
+
+  // Treated as the background plate itself — no image generation needed.
+  if (referenceRole === "START_FRAME" && referenceImageUrl) {
+    startFrameUrl = referenceImageUrl;
+    console.log("[Sanitize Prompt] Attached image will be used as the start frame.");
+  }
+
   // If we have a valid start frame, skip image generation and go straight to video
   if (startFrameUrl) {
     return {
@@ -758,6 +847,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
       site_prompt: result.sanitized_prompt,
       experiencePref,
       start_frame_url: startFrameUrl,
+      reference_image_role: referenceRole,
       mediaRequired: true,
     };
   }
@@ -769,6 +859,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
     current_prompt: result.sanitized_prompt,
     site_prompt: result.sanitized_prompt,
     experiencePref,
+    reference_image_role: referenceRole,
     mediaRequired: true,
   };
 };
@@ -1167,6 +1258,12 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       model: "google/gemini-3.1-flash-lite",
       userId: state.userId,
       editMode,
+      // A layout/UI the user wants reproduced. Only forwarded for that role — a
+      // background photo is not something the code agent should be copying.
+      designReferenceUrl:
+        state.reference_image_role === "DESIGN_REFERENCE"
+          ? state.reference_image_url || undefined
+          : undefined,
     }
   });
 
@@ -1207,6 +1304,49 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
   console.log("[Follow-up Router] Classifying follow-up request...");
   const step = config.configurable?.step;
 
+  // An image attached to a follow-up changes what the request means, so it is
+  // classified first and the routing below defers to it. Without this the whole
+  // upload is invisible on the path users actually take — replacing a background
+  // they are unhappy with on a site that already exists.
+  const referenceImageUrl = state.reference_image_url;
+  const referenceRole: ReferenceImageRole | null = referenceImageUrl
+    ? await step.run("classify-followup-reference", async () => {
+      const roleModel = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(
+        z.object({
+          role: z.enum(["START_FRAME", "SCENE_REFERENCE", "DESIGN_REFERENCE"]),
+          reason: z.string().describe("One short sentence explaining the choice."),
+        })
+      );
+      try {
+        const out = await roleModel.invoke([
+          new SystemMessage(
+            "A user attached an image to a follow-up request on their generated website. Decide what the image is FOR.\n\n" +
+            "- START_FRAME: use this exact image as the background itself, or animate this exact image into the background video. " +
+            "Signals: 'use this as the background', 'animate this', 'make the video from this image'.\n" +
+            "- SCENE_REFERENCE: generate a NEW background image that looks like this one. " +
+            "Signals: 'generate an image like this', 'make it look like this', 'something similar to this'.\n" +
+            "- DESIGN_REFERENCE: the image shows a website, app UI, landing page or layout to reproduce in code. " +
+            "Signals: 'make the site look like this', 'use this layout', or the image is plainly a screenshot of a webpage.\n\n" +
+            "Judge the IMAGE as well as the words. A screenshot of a webpage is DESIGN_REFERENCE even if the user only says " +
+            "'like this'. A photograph or rendered scene is never DESIGN_REFERENCE. " +
+            "'exactly like this' pointing at a photo means START_FRAME; 'like this' meaning the style means SCENE_REFERENCE."
+          ),
+          new HumanMessage({
+            content: [
+              { type: "text", text: `User's follow-up request: ${state.current_prompt}` },
+              { type: "image_url", image_url: { url: referenceImageUrl } },
+            ],
+          }),
+        ]);
+        console.log(`[Follow-up Router] Reference image role: ${out.role} — ${out.reason}`);
+        return out.role;
+      } catch (e) {
+        console.warn("[Follow-up Router] Reference classification failed, defaulting to SCENE_REFERENCE.", e);
+        return "SCENE_REFERENCE" as const;
+      }
+    })
+    : null;
+
   const intent = await step.run("classify-followup", async () => {
     const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(FollowUpIntentSchema);
     try {
@@ -1237,7 +1377,18 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     }
   });
 
-  console.log(`[Follow-up Router] target=${intent.target} hasPrompt=${Boolean(intent.media_prompt)}`);
+  // The attachment is unambiguous evidence of what the user wants touched, so it
+  // outranks the text-only intent classifier.
+  if (referenceRole === "DESIGN_REFERENCE") {
+    intent.target = "CODE";
+  } else if (referenceRole === "SCENE_REFERENCE" || referenceRole === "START_FRAME") {
+    intent.target = "MEDIA_SCENE";
+  }
+
+  console.log(
+    `[Follow-up Router] target=${intent.target} hasPrompt=${Boolean(intent.media_prompt)}` +
+    `${referenceRole ? ` referenceRole=${referenceRole}` : ""}`
+  );
 
   // Carry the existing media forward so we only regenerate what was asked for.
   const existing = await step.run("load-existing-media", async () => {
@@ -1286,11 +1437,28 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
   // The scene changed, so the IMAGE must be regenerated first. Animating the old
   // frame would just replay the old scene — the video model is image-to-video, so
   // whatever is in the frame wins over anything the text prompt says.
+  // The user handed us the exact plate they want. Generating a new image would
+  // throw away the thing they asked for, so skip straight to animating it.
+  if (referenceRole === "START_FRAME" && referenceImageUrl) {
+    console.log("[Follow-up Router] Using the attached image as the start frame.");
+    return {
+      next_agent: "video_generation",
+      current_prompt: mediaPrompt,
+      isDirectPrompt: userWroteMediaPrompt,
+      start_frame_url: referenceImageUrl,
+      reference_image_role: referenceRole,
+      video_url: existing.videoUrl,
+      experiencePref: existing.experiencePref,
+      media_only_update: true,
+    };
+  }
+
   if (intent.target === "MEDIA_SCENE") {
     return {
       next_agent: "frame_generation",
       current_prompt: mediaPrompt,
       isDirectPrompt: false,
+      reference_image_role: referenceRole,
       // Drop the old frame so frame_generation starts clean.
       start_frame_url: null,
       // ...but keep its description. The frame is dropped because the video model
@@ -1359,6 +1527,8 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     experiencePref: existing.experiencePref,
     media_only_update: false,
     edit_mode: editMode,
+    // Carried so codeGenerationNode can forward a DESIGN_REFERENCE screenshot.
+    reference_image_role: referenceRole,
   };
 };
 
@@ -1538,6 +1708,9 @@ export const autonomousAgentFunction = inngest.createFunction(
       isAgentMode: isFollowUp ? true : (event.data.isAgentMode ?? false),
       buildPref: buildPref ?? null,
       experiencePref: experiencePref ?? null,
+      // Already uploaded to storage by the tRPC procedure — the graph only ever
+      // sees a URL, never the data URL that would burst the event payload limit.
+      reference_image_url: event.data.referenceImageUrl ?? null,
       messages: [new HumanMessage(prompt)],
     };
 

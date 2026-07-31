@@ -31,6 +31,9 @@ export const generateFramesFunction = inngest.createFunction(
       // context and produces something unrelated to the site.
       sitePrompt,
       previousImagePrompt,
+      // An image the user attached and asked us to match. Steers both the prompt
+      // refiner and the image model itself.
+      referenceImageUrl,
     } = event.data;
 
     await step.run("update-stage", async () => {
@@ -68,7 +71,28 @@ export const generateFramesFunction = inngest.createFunction(
       );
       console.log(`[Frame Agent] Refining with${previousImagePrompt ? "" : "out"} a previous scene; site context ${sitePrompt ? "present" : "missing"}.`);
 
-      const response = await routerModel.invoke([sysMsg, new HumanMessage(refinerInput)]);
+      // With a reference attached the refiner must SEE it, not guess from words.
+      // It describes what is actually in the picture — subject, palette, light,
+      // lens, composition — so the image model reproduces the look rather than
+      // inventing a scene from the prompt alone.
+      const humanMessage = referenceImageUrl
+        ? new HumanMessage({
+          content: [
+            {
+              type: "text",
+              text:
+                `${refinerInput}\n\n` +
+                `REFERENCE IMAGE ATTACHED: the user wants the new background to look like the image below. ` +
+                `Study it and carry its subject matter, colour palette, lighting, time of day, lens character and ` +
+                `compositional structure into your prompt, described in words. Do NOT copy any text, logo, UI or ` +
+                `watermark from it. The user's request above still governs the content — the reference governs the look.`,
+            },
+            { type: "image_url", image_url: { url: referenceImageUrl } },
+          ],
+        })
+        : new HumanMessage(refinerInput);
+
+      const response = await routerModel.invoke([sysMsg, humanMessage]);
       // A named machine gets drawn — strip it before the image model ever sees it.
       return stripMachineWords((response.content as string).trim());
     });
@@ -83,6 +107,13 @@ export const generateFramesFunction = inngest.createFunction(
         aspect_ratio: "16:9",
         output_format: "png",
       };
+
+      // nano-banana is multimodal: handing it the reference alongside the prompt
+      // holds the look far more faithfully than a written description alone.
+      if (referenceImageUrl) {
+        input.image_input = [referenceImageUrl];
+        console.log("[Frame Agent] Generating with a user-supplied reference image.");
+      }
 
       const output = await replicate.run("google/nano-banana-2-lite", { input });
       const outputItem = Array.isArray(output) ? output[0] : output;

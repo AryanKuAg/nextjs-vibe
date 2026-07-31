@@ -9,6 +9,7 @@ import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
 import { PROJECT_STAGE } from "@/lib/project-stage";
+import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -289,6 +290,10 @@ export const projectsRouter = createTRPCRouter({
       prompt: z.string(),
       model: z.string().optional(),
       isAgentMode: z.boolean().default(false),
+      // An image the user attached to their prompt. What it is FOR — a start
+      // frame, a look to match, or a layout to copy — is classified by the agent
+      // from the prompt, not decided here.
+      imageDataUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existingProject = await prisma.project.findUnique({
@@ -319,6 +324,13 @@ export const projectsRouter = createTRPCRouter({
 
       await checkCredits(AGENT_COSTS.CODE);
 
+      // Stored before the event is sent: a data URL is far too large for an
+      // Inngest payload, so only the resulting URL travels with the run.
+      const referenceImageUrl = await uploadDataUrlToStorage(
+        input.imageDataUrl,
+        `frames/${input.projectId}`,
+      );
+
       const createdMessage = await prisma.message.create({
         data: {
           projectId: existingProject.id,
@@ -343,6 +355,7 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.auth.userId,
           isAgentMode: input.isAgentMode,
           isFollowUp,
+          referenceImageUrl,
           // Returned by the agent's onFailure handler if the run never completes.
           // Only the code charge — image and video bill themselves on success.
           refundOnFailure: AGENT_COSTS.CODE,

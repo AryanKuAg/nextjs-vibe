@@ -1135,6 +1135,26 @@ export const codeAgentFunction = inngest.createFunction(
 
     // (Mode-specific video/architecture rules live in the system prompt — no patches here.)
 
+    // --- BACKGROUND VIDEO URL (anti-hallucination) -----------------------------
+    // For template projects and HERO_ONLY sites the background video lives in an
+    // agent-editable file (a plain <video src> or an injected placeholder). In
+    // FULL_PAGE scaffold mode the URL is baked into the write-protected
+    // ScrollFrames component, so the agent must never touch it there.
+    //
+    // Without this block the agent editing "change the background video" has no
+    // idea what the real generated URL is, so it invents one (e.g. a random
+    // ctfassets.net stock URL). Hand it the exact platform URL and forbid any other.
+    const videoIsAgentManaged = Boolean(videoUrl) && (Boolean(template) || mode === "HERO_ONLY");
+    if (videoIsAgentManaged) {
+      currentPrompt += `\n\n=== BACKGROUND VIDEO (platform-generated — use EXACTLY this) ===\n`;
+      currentPrompt += `The ONLY valid background/hero video URL for this site is:\n${videoUrl}\n\n`;
+      currentPrompt += `Rules:\n`;
+      currentPrompt += `- If the request touches the background/hero video, set the video src to EXACTLY the URL above.\n`;
+      currentPrompt += `- NEVER invent, guess, or reuse any other video URL — no ctfassets.net, no stock/CDN links, no template default videos, no placeholder tokens.\n`;
+      currentPrompt += `- Any existing <video src=...> (or scrolly-video src) in the current files that points anywhere else MUST be replaced with the URL above.\n`;
+      currentPrompt += `=== END BACKGROUND VIDEO ===`;
+    }
+
     // --- DESIGN REFERENCE ------------------------------------------------------
     // The user attached a screenshot or mockup of a layout to reproduce. The code
     // agent runs on a text-only agent network, so handing it a URL achieves

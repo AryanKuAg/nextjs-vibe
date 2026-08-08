@@ -239,7 +239,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border focus-within:border-purple ${isLandingPage ? "bg-transparent border-white-8" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] ${isLandingPage ? "bg-transparent border-white-8  border focus-within:border-purple" : "beam-border  bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}

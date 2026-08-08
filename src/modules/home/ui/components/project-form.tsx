@@ -7,6 +7,7 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { processImageFile } from "@/lib/process-image-file";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -235,7 +236,27 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
           </div>
         </div>
       )}
-      <section className="space-y-6 w-full flex flex-col items-center">
+      <section className="relative space-y-6 w-full flex flex-col items-center">
+        {/* ── Perspective grid backdrop ──
+            Full-bleed, so it has to break out of the page's max-width column.
+            It stays first in the DOM and neither it nor the card carries a
+            z-index, which is what puts the card in front of it. */}
+        {!isLandingPage && (
+          <div
+            aria-hidden
+            className="pointer-events-none select-none absolute left-1/2 top-1/2 w-screen -translate-x-1/2 -translate-y-[60%]"
+          >
+            <Image
+              src="/grid-pattern.svg"
+              alt=""
+              width={1431}
+              height={411}
+              priority
+              className="w-full h-auto opacity-12"
+            />
+          </div>
+        )}
+
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -272,7 +293,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
                 disabled={isPending}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[24px] placeholder:text-white-50 "
+                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[48px] placeholder:text-white-50 "
                 placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {

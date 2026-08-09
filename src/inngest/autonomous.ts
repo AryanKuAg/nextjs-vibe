@@ -7,6 +7,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
+import { shouldMockMedia, MOCK_VIDEO_URL, MOCK_IMAGE_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
 import { TASTE_BRIEF_RULES } from "@/lib/taste";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
@@ -290,10 +291,14 @@ const askWizard3DNode = async (state: typeof AgentState.State, config: RunnableC
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "Where should the background video live?",
+          text: "How do you want your 3D website to look?",
+          // icon + description render these as choice cards, not pills.
+          // Labels are the user-facing framing of the same two experiences the
+          // actions have always meant: FULL_PAGE = video behind every section,
+          // HERO_ONLY = video in the hero alone.
           buttons: [
-            { label: "Full page", action: "FULL_PAGE" },
-            { label: "Hero only", action: "HERO_ONLY" }
+            { label: "Scroll effect", action: "FULL_PAGE", icon: "ri-magic-line", description: "Interactive experience" },
+            { label: "Hero video", action: "HERO_ONLY", icon: "ri-pencil-ruler-2-line", description: "Create a cinematic hero" }
           ]
         })
       }
@@ -328,10 +333,10 @@ const askWizardBuildNode = async (state: typeof AgentState.State, config: Runnab
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "How hands-on do you want to be? I can handle the scene, video, and build end to end, or pause for your approval at each step.",
+          text: "How would you like to build your 3D website?",
           buttons: [
-            { label: "Build it for me", action: "BUILD_FOR_ME" },
-            { label: "I'll guide each step", action: "GUIDE_VISUALS" }
+            { label: "Build it for me", action: "BUILD_FOR_ME", icon: "ri-magic-line", description: "AI handles everything" },
+            { label: "I'll guide the visuals", action: "GUIDE_VISUALS", icon: "ri-pencil-ruler-2-line", description: "You control the look" }
           ]
         })
       }
@@ -386,10 +391,14 @@ const askMediaIntentNode = async (state: typeof AgentState.State, config: Runnab
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "Quick check — for the background scene, do you want me to create it, or will you write the prompt?",
+          // `step` is what tells the scene and video cards apart downstream:
+          // they carry identical button actions, so nothing else can. Stated
+          // outright so no reader ever has to infer it from the wording again.
+          step: "SCENE",
+          text: "How would you like to create the background image for your video?",
           buttons: [
-            { label: "Write Prompt", action: "WRITE_PROMPT" },
-            { label: "Let AI Create", action: "AI_CREATE" }
+            { label: "Write prompt", action: "WRITE_PROMPT" },
+            { label: "Let AI create", action: "AI_CREATE" }
           ]
         })
       }
@@ -436,10 +445,11 @@ const askVideoIntentNode = async (state: typeof AgentState.State, config: Runnab
         role: "ASSISTANT",
         type: "INTERACTIVE",
         content: JSON.stringify({
-          text: "Quick check — for the background video, do you want me to create it, or will you write the prompt?",
+          step: "VIDEO",
+          text: "How would you like to create the background video?",
           buttons: [
-            { label: "Write Prompt", action: "WRITE_PROMPT" },
-            { label: "Let AI Create", action: "AI_CREATE" }
+            { label: "Write prompt", action: "WRITE_PROMPT" },
+            { label: "Let AI create", action: "AI_CREATE" }
           ]
         })
       }
@@ -486,9 +496,9 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
 
   let frameUrl = "";
   let imagePrompt = "";
-  if (process.env.NODE_ENV === "development") {
+  if (shouldMockMedia()) {
     await step.sleep(`dev-delay-${currentIteration}`, "4s");
-    frameUrl = "https://assets.framerate.space/Hero%20BG%20IMG.png";
+    frameUrl = MOCK_IMAGE_URL;
   } else {
     const result = await step.invoke(`generate-frames-${currentIteration}`, {
       function: generateFramesFunction,
@@ -522,6 +532,7 @@ const frameGenerationNode = async (state: typeof AgentState.State, config: Runna
     await step.run(`ask-image-approval-message-${currentIteration}`, async () => {
       const content = JSON.stringify({
         iteration: currentIteration,
+        step: "SCENE",
         text: "Awaiting user input",
         mediaUrl: frameUrl,
         buttons: [
@@ -609,9 +620,9 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
     await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_VIDEO" } });
   });
 
-  if (process.env.NODE_ENV === "development") {
+  if (shouldMockMedia()) {
     await step.sleep(`dev-delay-video-${currentIteration}`, "4s");
-    videoUrl = "https://assets.framerate.space/hero_bg_480p.mp4";
+    videoUrl = MOCK_VIDEO_URL;
   } else {
     const result = await step.invoke(`generate-video-${currentIteration}`, {
       function: veoGenerateFunction,
@@ -641,6 +652,7 @@ const videoGenerationNode = async (state: typeof AgentState.State, config: Runna
     await step.run(`ask-video-approval-message-${currentIteration}`, async () => {
       const content = JSON.stringify({
         iteration: currentIteration,
+        step: "VIDEO",
         text: "Awaiting user input",
         mediaUrl: videoUrl,
         buttons: [

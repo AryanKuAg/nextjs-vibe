@@ -16,6 +16,7 @@ import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_A
 
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
+import { shouldMockMedia, MOCK_VIDEO_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
 import { PROJECT_STAGE } from "@/lib/project-stage";
 
@@ -1964,6 +1965,16 @@ export const veoGenerateFunction = inngest.createFunction(
           data: { currentStage: "GENERATING_VIDEO" }
         });
       });
+
+      // The money boundary. Every caller is expected to short-circuit before
+      // invoking this function at all, but the guard lives here too so no future
+      // call site can bill a developer machine by accident. Placed above the
+      // prompt refinement so a local run makes no paid call of any kind.
+      if (shouldMockMedia()) {
+        console.log("[Video Pipeline] MOCK_MEDIA is on — returning the demo video instead of generating.");
+        await step.sleep("mock-video-delay", "4s");
+        return { videoUrl: MOCK_VIDEO_URL };
+      }
 
       // Opt-in only: refine when the agent invented the prompt ("Let AI Create" /
       // "Build it for me"). A prompt the user typed themselves is never rewritten.

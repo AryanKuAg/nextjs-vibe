@@ -306,7 +306,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center mt-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -320,7 +320,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={isPending}
-              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px] border border-white-8 text-white hover:bg-white-8 cursor-pointer disabled:opacity-50 text-base"
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px]  text-white-85 hover:bg-white-4 cursor-pointer disabled:opacity-50 text-base"
               title="Attach image"
             >
               <i className="ri-add-line text-base" />
@@ -329,7 +329,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
             {showModelSelector && (
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-7 px-2 flex items-center gap-1 rounded-lg border border-white-8 text-sm leading-[20px] text-white-85 hover:bg-white-8 cursor-pointer"
+                  className="h-7 px-2 flex items-center gap-1 rounded-lg text-sm leading-[20px] text-white-85 hover:bg-white-4 cursor-pointer"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >

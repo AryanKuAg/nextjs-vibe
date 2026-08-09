@@ -87,7 +87,11 @@ const UserMessage = ({ content }: UserMessageProps) => {
 interface InteractiveContent {
   text: string;
   mediaUrl?: string;
-  buttons: { label: string; action: string }[];
+  /** "SCENE" | "VIDEO" — which step this card belongs to. */
+  step?: string;
+  /** A button carrying an icon or a description renders as a big choice card
+   *  instead of a pill — that's how the wizard's either/or questions are shown. */
+  buttons: { label: string; action: string; icon?: string; description?: string }[];
 }
 
 interface AssistantMessageProps {
@@ -213,6 +217,7 @@ const AssistantMessage = ({
       lastAction,
       interactiveButtonActions: interactiveContent?.buttons?.map((b) => b.action) ?? [],
       interactiveText: interactiveContent?.text,
+      interactiveStep: interactiveContent?.step,
       awaitingFirstResponse: false,
     });
 
@@ -264,9 +269,56 @@ const AssistantMessage = ({
                   )
                 )}
                 <div className="flex flex-col gap-3 mt-1">
-                  <div className="flex flex-wrap gap-2">
+                  {/* Choice cards share the row's width instead of wrapping —
+                      the chat panel is narrower than two cards at their natural
+                      172px, and stacking them is worse than making them thinner. */}
+                  <div className={cn(
+                    "flex",
+                    interactiveContent.buttons?.some((b) => b.icon || b.description)
+                      ? "flex-nowrap gap-3"
+                      : "flex-wrap gap-2"
+                  )}>
                     {interactiveContent.buttons?.map((btn, i) => {
                       const isSelected = pendingInteractiveAction === btn.action;
+
+                      // 102 tall: 16 padding + 20 icon + 12 gap + 20 title + 18
+                      // description + 16 padding. Width is Figma's "Fill" — an
+                      // equal share of the row, 172px at the mock's panel width.
+                      // The 1px edge is an inset
+                      // shadow rather than a border so it lands inside those 102px
+                      // (Figma's "inner alignment") instead of adding 2px to them.
+                      // A label long enough to wrap just makes both cards taller,
+                      // which is what the row's default stretch is for.
+                      if (btn.icon || btn.description) {
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => handleAction(btn.action)}
+                            disabled={isSubmitting}
+                            className={cn(
+                              "flex-1 basis-0 min-w-0 flex flex-col items-start gap-3 p-4 rounded-[24px] text-left",
+                              isSelected
+                                ? "bg-white-8 shadow-[inset_0_0_0_1px_var(--white-16)]"
+                                : "bg-transparent shadow-[inset_0_0_0_1px_var(--white-8)] hover:bg-white-4"
+                            )}
+                          >
+                            {btn.icon && (
+                              <i className={cn(btn.icon, "text-[20px] leading-none text-white")} />
+                            )}
+                            <span className="flex flex-col gap-1">
+                              <span className="text-[14px] leading-[20px] font-medium text-white">
+                                {btn.label}
+                              </span>
+                              {btn.description && (
+                                <span className="text-[12px] leading-[18px] text-white-50">
+                                  {btn.description}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      }
+
                       return (
                         <button
                           key={i}

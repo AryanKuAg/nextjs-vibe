@@ -9,7 +9,17 @@ import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import { shouldMockMedia, MOCK_VIDEO_URL, MOCK_IMAGE_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
-import { TASTE_BRIEF_RULES } from "@/lib/taste";
+import {
+  TASTE_BRIEF_RULES,
+  SECTION_SURFACES,
+  SURFACE_GUIDE,
+  LAYOUT_FAMILIES,
+  LAYOUT_FAMILY_GUIDE,
+  DESIGN_DIRECTIONS,
+  DESIGN_DIRECTION_NAMES,
+} from "@/lib/taste";
+import { generateSectionImages, type SectionImage, type SectionImageRequest } from "@/lib/section-images";
+import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
 import type { SceneLuminance } from "@/lib/scene-luminance";
 
@@ -897,6 +907,13 @@ const BuildBriefSchema = z.object({
   site_name: z.string().describe("Short brand/site name derived from the user's request"),
   tagline: z.string().describe("One-line tagline for the site"),
   tone: z.string().describe("3-6 adjectives describing the visual and copy tone"),
+  design_direction: z.enum(DESIGN_DIRECTION_NAMES).describe(
+    "The aesthetic direction for the whole page, chosen from the user's own words and industry. " +
+    "editorial = typography-led and magazine-like; brutalist = raw grid, heavy type, sharp edges; " +
+    "soft-premium = calm, spacious, low saturation; technical-minimal = precise, quiet, Linear-like; " +
+    "expressive-agency = loud, asymmetric, memorable; warm-craft = handmade, material, human. " +
+    "Pick the one that genuinely fits this brand. Do not default to the same direction every time."
+  ),
   heading_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Space Grotesk', 'Manrope', 'Playfair Display')"),
   body_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
   accent_color: z.string().describe("ONE accent color as a hex code fitting the brand. Never purple-pink gradient territory unless the user demands it."),
@@ -907,20 +924,212 @@ const BuildBriefSchema = z.object({
     "the navigation's shape and placement, how the page's rhythm changes from section to section, and the overall motion character. " +
     "Make a distinctive compositional choice that suits this brand's industry and tone; two different requests must never yield the same layout."
   ),
+  beats: z.array(z.object({
+    headline: z.string().describe("2-6 words. No numbering, no eyebrow label, no scroll cue."),
+    body: z.string().describe("One or two short sentences. Concrete, never mock-poetic."),
+  })).min(3).max(5).describe(
+    "FULL_PAGE only (omit for hero sites): the copy beats that cross-fade at the bottom-left while the background video scrubs. " +
+    "Each is a headline plus a sentence or two and nothing else — the point is that the viewer can watch the scene. " +
+    "They tell a short story that leads into the site proper."
+  ).optional(),
   sections: z.array(z.object({
     id: z.string().describe("kebab-case section id used for anchor links"),
     heading: z.string().describe("The actual heading copy for this section"),
-    content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. No images ever — content is typography, numbers, lists, and inline SVG only."),
-    layout: z.string().describe(
-      "1-3 sentences describing how THIS section is structured and animated: the arrangement (asymmetric grid, full-width numbered rows, two-column split with a sticky side, stat strip, vertical list with hover reveals, marquee, etc.), " +
-      "the alignment and density, and its scroll-reveal behaviour. Vary the arrangement between sections so the page has rhythm — never repeat the same card grid."
+    content_outline: z.string().describe("2-4 sentences of concrete content/copy direction: what the section says and shows. Every list or grid item needs a title, a one-line descriptor and a sentence of detail."),
+    images: z.array(z.object({
+      prompt: z.string().describe(
+        "A full text-to-image prompt for a photograph that belongs in THIS section: subject, setting, lighting, lens feel, mood. " +
+        "Write it like a photography brief, not a caption ('a joiner's hands scribing a shaker door against an uneven plaster wall, north light, shallow depth of field, muted greens'). " +
+        "Real photography only: never UI screenshots, never charts, never logos, never text in the image, never collages."
+      ),
+      aspect: z.enum(["16:9", "4:3", "3:2", "1:1", "3:4", "9:16"]).describe(
+        "Shape that suits where it sits: 16:9 or 3:2 for a wide band, 4:3 for a grid cell, 3:4 or 9:16 for a tall column, 1:1 for a square tile."
+      ),
+    })).max(6).describe(
+      "Photographs for this section. MOST content sections carry 2-4, and a gallery or card-set section can take 6. " +
+      "Aim for TEN OR MORE across the whole page: a real business site is carried by photography, and a page of pure typography reads as unfinished. " +
+      "Leave EMPTY only where images genuinely do not belong: the footer always, and any section whose whole point is a statement, a claim band or a quote."
     ),
-  })).min(3).max(6).describe("4-5 sections in page order; the last one is always the footer"),
+    surface: z.enum(SECTION_SURFACES).describe(
+      "The background this section sits on. The page MUST move between surfaces as it scrolls — 'base' everywhere is a flat wall of text. " +
+      "Use 'accent' exactly once, on the section that most deserves to shout."
+    ),
+    layout_family: z.enum(LAYOUT_FAMILIES).describe(
+      "The SHAPE of this section, chosen from the fixed list. Every content section on the page must pick a DIFFERENT one. " +
+      "The last section is always 'footer'."
+    ),
+    layout: z.string().describe(
+      "1-3 sentences of specifics WITHIN the chosen family: alignment, density, what sits where, and its scroll-reveal behaviour. " +
+      "Do not restate the family, describe how this particular section uses it."
+    ),
+  })).min(6).max(8).describe(
+    "The ordinary website BELOW the video, in page order: at least FIVE content sections plus a footer, which is always last. " +
+    "Counting the hero (or the scrolling beats) above, that gives the page at least SIX sections in total. " +
+    "This array never includes the hero or the beats — those live over the video and are described elsewhere."
+  ),
   text_scheme: z.enum(["light-text", "dark-text"]).describe("Base text color family over the video, chosen from the scene analysis"),
   must_honor: z.array(z.string()).describe("Verbatim requirements from the user's request that MUST appear in the final site (specific copy, features, section names, colors). Empty array if none."),
 });
 
 type BuildBrief = z.infer<typeof BuildBriefSchema>;
+
+/** Families where a second photograph always strengthens the section. */
+const IMAGE_HUNGRY_FAMILIES = new Set([
+  "split", "image-band", "offset-grid", "tall-portrait", "column-pair", "stacked-cards",
+]);
+
+/**
+ * Tops up thin sections so the page is actually carried by photography.
+ *
+ * Asked for "ten or more images", the brief compiler reliably returns six. Rather
+ * than asking again, the shortfall is filled here: a section that earned one
+ * photograph gets a second and third derived from it, re-framed rather than
+ * repeated, so they stay on subject without being the same picture twice.
+ *
+ * Sections that should stay text-only — the footer, a statement, a marquee —
+ * are never touched.
+ */
+function enforceImageCount(brief: BuildBrief): void {
+  const REFRAMINGS = [
+    "wide establishing shot of the same subject, more of the surroundings visible",
+    "tight detail of the same subject, shallow depth of field",
+    "the same subject from a low angle, natural light",
+  ];
+
+  for (const section of brief.sections) {
+    if (!IMAGE_HUNGRY_FAMILIES.has(section.layout_family)) continue;
+
+    const images = section.images ?? [];
+    // Nothing to derive from, and nothing to say about a section the brief
+    // deliberately left image-free.
+    if (images.length === 0 || images.length >= 3) continue;
+
+    const seed = images[0];
+    const target = section.layout_family === "offset-grid" ? 3 : 2;
+
+    while (images.length < target) {
+      images.push({
+        prompt: `${seed.prompt}. ${REFRAMINGS[(images.length - 1) % REFRAMINGS.length]}`,
+        aspect: seed.aspect,
+      });
+    }
+    section.images = images;
+  }
+
+  const total = brief.sections.reduce((sum, s) => sum + (s.images?.length ?? 0), 0);
+  console.log(`[Build Brief] images=${total} across ${brief.sections.length} sections`);
+}
+
+/**
+ * Forces every image inside one section to share a shape.
+ *
+ * A card set whose images are 1:1, 4:3 and 16:9 renders as three cards of
+ * different heights with ragged empty space underneath the short ones — the
+ * single most obvious "generated" tell in a grid. The model picks per image and
+ * does not think about the row, so the row is normalised here: the first
+ * image's aspect wins for the whole section.
+ */
+function enforceImageConsistency(brief: BuildBrief): void {
+  for (const section of brief.sections) {
+    const images = section.images ?? [];
+    if (images.length < 2) continue;
+
+    const shape = images[0].aspect;
+    const mixed = images.some((image) => image.aspect !== shape);
+    if (!mixed) continue;
+
+    for (const image of images) image.aspect = shape;
+    console.log(`[Build Brief] Section "${section.id}" had mixed image shapes — normalised to ${shape}.`);
+  }
+}
+
+/**
+ * Forces the page to actually change surface as it scrolls.
+ *
+ * Left alone, a model puts every section on the page background and the result
+ * is one flat wall from the video down to the footer — the single clearest
+ * signal that a page was generated rather than designed. Three rules, applied
+ * deterministically because asking has already been tried:
+ *
+ *   1. the accent block is the loudest moment, so there is only ever one
+ *   2. never three sections in a row on the same surface
+ *   3. a page must use at least three of the four surfaces
+ */
+function enforceSurfaceRhythm(brief: BuildBrief): void {
+  const sections = brief.sections;
+  if (sections.length === 0) return;
+
+  let seenAccent = false;
+  for (const section of sections) {
+    if (section.surface !== "accent") continue;
+    if (seenAccent) section.surface = "tinted";
+    else seenAccent = true;
+  }
+
+  const breakRuns = () => {
+    for (let i = 2; i < sections.length; i++) {
+      if (
+        sections[i].surface === sections[i - 1].surface &&
+        sections[i - 1].surface === sections[i - 2].surface
+      ) {
+        sections[i].surface = sections[i].surface === "base" ? "tinted" : "base";
+      }
+    }
+  };
+  breakRuns();
+
+  const distinct = new Set(sections.map((s) => s.surface));
+  if (distinct.size < 3) {
+    // Drop the missing surfaces onto alternating slots so the page gains a
+    // rhythm instead of a single change somewhere in the middle.
+    const missing = (["tinted", "inverted"] as const).filter((s) => !distinct.has(s));
+    let slot = 1;
+    for (const surface of missing) {
+      if (slot >= sections.length - 1) break;
+      sections[slot].surface = surface;
+      slot += 2;
+    }
+    breakRuns();
+  }
+
+  console.log(`[Build Brief] surfaces=${sections.map((s) => s.surface).join(",")}`);
+}
+
+/**
+ * Forces every content section onto a different layout family.
+ *
+ * The schema asks for variety and the prompt asks twice more, but a model under
+ * load still repeats itself — the same way it printed 01/02/03 under an explicit
+ * ban on section numbers. So the rule is enforced here instead of hoped for:
+ * the first use of a family wins, any later repeat is reassigned to whichever
+ * family is still free. Deterministic, and costs no extra model call.
+ *
+ * Mutates in place and reports what it changed.
+ */
+function enforceLayoutVariety(brief: BuildBrief): void {
+  const taken = new Set<string>();
+
+  for (const section of brief.sections) {
+    // The footer is the one family that is allowed to be what it is.
+    if (section.layout_family === "footer") continue;
+
+    if (!taken.has(section.layout_family)) {
+      taken.add(section.layout_family);
+      continue;
+    }
+
+    const free = LAYOUT_FAMILIES.find(
+      (family) => family !== "footer" && !taken.has(family),
+    );
+    if (!free) break; // more sections than families; leave the tail alone
+
+    console.log(
+      `[Build Brief] Section "${section.id}" repeated layout "${section.layout_family}" — reassigned to "${free}".`,
+    );
+    section.layout_family = free;
+    taken.add(free);
+  }
+}
 
 const renderReadabilityBlock = (
   brief: Pick<BuildBrief, "text_scheme">,
@@ -968,10 +1177,30 @@ const renderBuildBrief = (
   brief: BuildBrief,
   scene: SceneAnalysis | null,
   luminance: SceneLuminance | null,
+  photos?: SectionImage[],
 ): string => {
   const sections = brief.sections
-    .map((s, i) => `${i + 1}. [#${s.id}] "${s.heading}"\n   Content: ${s.content_outline}\n   Layout: ${s.layout}`)
+    .map((s, i) => {
+      const mine = (photos ?? []).filter((p) => p.sectionId === s.id);
+      const imageLines = mine.length
+        ? `\n   Images (use EVERY one of these exact URLs in this section, each once, with the aspect ratio given):\n` +
+        mine.map((p) => `     - ${p.aspect} | alt="${p.alt}" | ${p.url}`).join("\n")
+        : "";
+      return `${i + 1}. [#${s.id}] "${s.heading}"\n` +
+        `   Surface: ${s.surface} — ${SURFACE_GUIDE[s.surface]}\n` +
+        `   Shape: ${s.layout_family} — ${LAYOUT_FAMILY_GUIDE[s.layout_family]}\n` +
+        `   Content: ${s.content_outline}\n   Specifics: ${s.layout}${imageLines}`;
+    })
     .join("\n");
+
+  // The beats are the whole cinematic half of a full-page site, so they lead the
+  // brief rather than being tacked on after the sections.
+  const beats = brief.beats?.length
+    ? `\nScroll beats over the video (pass these to <ScrollFrames /> in order, as its \`beats\` prop — headline plus body, nothing else):\n${brief.beats
+      .map((b, i) => `${i + 1}. "${b.headline}" — ${b.body}`)
+      .join("\n")}\n`
+    : "";
+
   const mustHonor = brief.must_honor.length > 0
     ? `\nMust honor (verbatim user requirements — these win over everything else in this brief):\n${brief.must_honor.map((m) => `- ${m}`).join("\n")}`
     : "";
@@ -984,12 +1213,15 @@ Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import 
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
 
+${DESIGN_DIRECTIONS[brief.design_direction]}
+This direction governs the whole page. It outranks your defaults: if it says sharp corners, nothing is rounded; if it says minimal motion, nothing loops.
+
 Layout concept (composed for THIS site — build exactly this, do not substitute a generic template):
 ${brief.layout_concept}
 
 ${renderReadabilityBlock(brief, scene, luminance)}
-
-Sections (in this order):
+${beats}
+Sections below the video (in this order — the ordinary website that follows):
 ${sections}
 ${mustHonor}
 === END BUILD BRIEF ===`;
@@ -1027,16 +1259,20 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   // model, which then picks near-black text — and the headline, sitting over a
   // dark edge, becomes unreadable. The measurement is ground truth; the model is
   // left to do the subjective work (mood, palette, accent).
-  const luminance = state.start_frame_url
-    ? await step.run("measure-scene-luminance", async () => {
-      const { measureSceneLuminance } = await import("@/lib/scene-luminance");
-      return await measureSceneLuminance(state.start_frame_url!);
+  //
+  // Sampled from the finished VIDEO, not just its opening still: eight seconds
+  // of camera movement can carry a bright first frame into a dark interior, and
+  // a colour chosen for frame one goes unreadable partway down the scroll.
+  const luminance = (state.video_url || state.start_frame_url)
+    ? await step.run("measure-background-luminance", async () => {
+      const { measureBackgroundLuminance } = await import("@/lib/scene-luminance");
+      return await measureBackgroundLuminance(state.video_url, state.start_frame_url);
     })
     : null;
 
   if (luminance) {
     console.log(
-      `[Scene Luminance] mean=${(luminance.overall * 100).toFixed(0)}% ` +
+      `[Scene Luminance] frames=${luminance.framesSampled} mean=${(luminance.overall * 100).toFixed(0)}% ` +
       `white=${luminance.whiteTextWorstContrast.toFixed(1)}:1 ` +
       `dark=${luminance.darkTextWorstContrast.toFixed(1)}:1 ` +
       `-> ${luminance.recommendedScheme} (confident=${luminance.confident})`
@@ -1110,11 +1346,23 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "You are the creative director of Framerate, an AI website builder whose sites always have a platform-generated video background. " +
       "Turn the user's request into a concrete build brief for the coding agent.\n\n" +
       "Hard platform constraints (bake these into the brief, never contradict them):\n" +
-      `- Mode: ${mode === "HERO_ONLY" ? "the video plays only in the hero; sections below use solid backgrounds" : "the video scrubs behind the ENTIRE page; all section backgrounds are transparent"}.\n` +
+      (mode === "HERO_ONLY"
+        ? "- Mode: HERO VIDEO. The video plays only in the hero. Below it the page is an ordinary website with solid backgrounds. Leave `beats` empty.\n"
+        : "- Mode: CINEMATIC SCROLL. The video scrubs while 3-5 copy beats cross-fade at the bottom-left, one at a time, over an otherwise empty frame. " +
+        "When the video runs out the page becomes an ordinary website. Fill `beats` with that opening story: each is a short headline plus one or two sentences, " +
+        "no numbering, no eyebrow labels, no lists, no scroll cues. Nothing else is ever layered over the video.\n") +
       "- The background is ALWAYS the platform's video. Never mention alternative backgrounds (gradients, 3D, particles).\n" +
-      "- Sites contain NO images of any kind. Content outlines must never reference photos, screenshots, avatars, or logo images — visuals come from typography, color, thin borders, inline SVG shapes, and motion.\n" +
+      "- `sections` describes ONLY the ordinary website BELOW the video: at least THREE content sections plus a footer, which is always last. " +
+      "The hero and the beats are not sections and never appear in that array.\n" +
+      "- PHOTOGRAPHY: every photograph on this site is GENERATED from the prompts you write, so write them well. " +
+      "Aim for TEN OR MORE images across the page: most content sections carry 2-4 via their `images` array, and a gallery or card-set section can take 6. " +
+      "A page of pure typography reads as unfinished, and photography is what separates a real business site from a wireframe. " +
+      "Each entry is a full photography brief (subject, setting, light, lens feel, mood) plus the aspect ratio that suits its place in the layout. " +
+      "Keep them consistent with each other: one world, one lighting story, one palette, so the page looks shot rather than assembled. " +
+      "Leave `images` empty for the footer always, and for any section whose whole point is a statement, a stat strip or a quote. " +
+      "Never ask for text, logos, charts, UI screenshots or collages inside an image.\n" +
       "- Aesthetic: minimal, classy, editorial, a little creative. Never generic-template. One accent color only.\n" +
-      "- 4-5 sections total, footer last, realistic specific copy directions (no lorem ipsum).\n\n" +
+      "- Realistic specific copy directions, no lorem ipsum.\n\n" +
       "LAYOUT IS YOURS TO INVENT (important): there is no template library and no preset skeleton. " +
       "Compose the page structure from scratch for THIS request — the hero composition over the video, the nav's shape, " +
       "the arrangement and rhythm of each section, and the motion character all come from the brand, industry and tone in front of you. " +
@@ -1137,6 +1385,18 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     }
   });
 
+  // Variety is enforced, not requested — see enforceLayoutVariety.
+  if (brief) {
+    enforceLayoutVariety(brief);
+    enforceSurfaceRhythm(brief);
+    enforceImageConsistency(brief);
+    enforceImageCount(brief);
+    console.log(
+      `[Build Brief] direction=${brief.design_direction} ` +
+      `layouts=${(brief.sections as BuildBrief["sections"]).map((s) => s.layout_family).join(",")}`,
+    );
+  }
+
   // Both models above were *told* which text colour the measurement requires, but
   // neither is trusted to comply — an unreadable site is the one failure mode a
   // user cannot work around, so the measured value is stamped over the top.
@@ -1157,8 +1417,34 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     }
   }
 
+  // Photography for the sections below the video, generated in parallel.
+  // Optional throughout: a missing key or a failed prediction resolves to
+  // "fewer images than asked for", which the prompts already handle.
+  const photos = await step.run("generate-section-images", async () => {
+    const sections = (brief?.sections ?? []) as BuildBrief["sections"];
+    const requests: SectionImageRequest[] = sections.flatMap((section) =>
+      (section.images ?? []).map((image) => ({
+        sectionId: section.id,
+        prompt: image.prompt,
+        aspect: image.aspect,
+      })),
+    );
+
+    const generated = await generateSectionImages(requests, state.projectId);
+
+    // Charged per image that actually rendered, so a failed prediction is never
+    // billed. The code charge is taken up front by the mutation that starts the
+    // run; this is the only other per-build meter. Mocked images cost nothing to
+    // produce, so they cost the user nothing either — matching the video and
+    // start-frame agents, which skip their charge in mock mode too.
+    if (generated.length > 0 && state.userId && !shouldMockMedia()) {
+      await consumeCredits(generated.length * AGENT_COSTS.SECTION_IMAGE, state.userId);
+    }
+    return generated;
+  });
+
   const finalPrompt = brief
-    ? renderBuildBrief(brief, sceneAnalysis, luminance)
+    ? renderBuildBrief(brief, sceneAnalysis, luminance, photos ?? [])
     : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
     `${renderReadabilityBlock(
       { text_scheme: luminance?.recommendedScheme ?? sceneAnalysis?.text_scheme ?? "light-text" },

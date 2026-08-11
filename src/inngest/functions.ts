@@ -15,6 +15,7 @@ import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_A
 
 
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
+import { VIDEO_DURATION_SECONDS } from "@/lib/pricing";
 import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
 import { shouldMockMedia, MOCK_VIDEO_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
@@ -50,6 +51,7 @@ import { Navbar } from "./components/Navbar";
 
 import { Hero } from "./components/sections/Hero";
 import { Features } from "./components/sections/Features";
+import { Story } from "./components/sections/Story";
 import { Details } from "./components/sections/Details";
 import { Footer } from "./components/sections/Footer";
 
@@ -61,6 +63,7 @@ export default function App() {
       <main className="w-full relative z-10 flex flex-col">
         <Hero />
         <Features />
+        <Story />
         <Details />
         <Footer />
       </main>
@@ -370,6 +373,36 @@ export const codeAgentFunction = inngest.createFunction(
         baseUrl: "https://openrouter.ai/api/v1",
       });
     };
+
+    /**
+     * The model that writes the website.
+     *
+     * Deliberately NOT the model the user picked in the composer, and not the
+     * one the cheap agents use. Building a full page is the hardest job in the
+     * pipeline — six sections, a surface rhythm, ten images, a long list of
+     * design constraints — and the lite model was running out of turns before it
+     * could finish, shipping pages with nothing under the video.
+     *
+     * reasoning effort is "max": verified against the live endpoint, where it
+     * produces meaningfully more reasoning than "high" (166 vs 56 tokens on the
+     * same probe). Worth it here, where one bad layout decision costs a rebuild.
+     *
+     * Everything else — titles, chat replies, the fixer, the brief compiler —
+     * stays on its own cheaper model.
+     */
+    const getCodeModel = () =>
+      openai({
+        model: process.env.CODE_AGENT_MODEL || "openai/gpt-5.6-luna-pro",
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        baseUrl: "https://openrouter.ai/api/v1",
+        // Cast: agent-kit types defaultParameters against the stock OpenAI chat
+        // schema, which has no reasoning_effort. OpenRouter does accept it —
+        // verified against the live endpoint — so the parameter is real even
+        // though the local type does not know about it.
+        defaultParameters: {
+          reasoning_effort: process.env.CODE_AGENT_REASONING_EFFORT || "max",
+        } as unknown as Parameters<typeof openai>[0]["defaultParameters"],
+      });
 
     // --- TEMPLATE PROJECTS ---
     // A project carries a templateId only when it was started by remixing a
@@ -1012,7 +1045,7 @@ export const codeAgentFunction = inngest.createFunction(
         name: `code-agent-run-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`,
         description: "An expert coding agent",
         system: systemPrompt,
-        model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+        model: getCodeModel(),
         tools: getToolsForAgent(`creator-${runId}-attempt-${attemptIndex}-iter-${iterIndex}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -1236,7 +1269,11 @@ export const codeAgentFunction = inngest.createFunction(
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,
       agents: [initialAgent],
-      maxIter: 8,
+      // A full build is now roughly ten files — App.tsx, five or six section
+      // components, a footer, index.css and index.html — written at most four
+      // per call, plus an npm install and some reads. At 8 the agent ran out
+      // mid-build, never printed its summary, and a half-written site shipped.
+      maxIter: 16,
       defaultState: state,
       router: async ({ network }) => {
         if (await checkCancellation(event.data.projectId)) return;
@@ -1244,7 +1281,7 @@ export const codeAgentFunction = inngest.createFunction(
         if (network.state.data.summary) return;
         return initialAgent; // Otherwise, run the agent
       },
-      defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+      defaultModel: getCodeModel(),
     });
 
     let result: Awaited<ReturnType<typeof initialNetwork.run>> | null = null;
@@ -1269,8 +1306,18 @@ export const codeAgentFunction = inngest.createFunction(
     // A remixed template is already a complete, working site. "Build it as-is"
     // legitimately changes nothing, so an untouched template is a valid result —
     // only nag when the user actually asked for something.
-    if (result && !hasRealChanges(result.state.data.files) && !isAsIsTemplateRemix) {
-      console.warn("DEBUG: Creator agent made no file changes. Running one corrective attempt...");
+    // A missing task summary means the agent stopped mid-build — it ran out of
+    // iterations before finishing. Those runs DO write some files, so the
+    // no-changes check above waves them through and a site with a video and no
+    // sections under it ships as a success. An unfinished build gets the same
+    // corrective attempt as an empty one.
+    const unfinished = Boolean(result) && !result!.state.data.summary;
+    if (result && (!hasRealChanges(result.state.data.files) || unfinished) && !isAsIsTemplateRemix) {
+      console.warn(
+        unfinished
+          ? "DEBUG: Creator agent stopped without a task summary (ran out of iterations). Running one corrective attempt..."
+          : "DEBUG: Creator agent made no file changes. Running one corrective attempt..."
+      );
       const retryState = createState<AgentState>(
         { summary: "", files: state.data.files },
         { messages: previousMessages as Message[] },
@@ -1279,14 +1326,14 @@ export const codeAgentFunction = inngest.createFunction(
       const retryNetwork = createNetwork<AgentState>({
         name: `coding-agent-network-run-${runId}-retry`,
         agents: [retryAgent],
-        maxIter: 8,
+        maxIter: 16,
         defaultState: retryState,
         router: async ({ network }) => {
           if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
           return retryAgent;
         },
-        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+        defaultModel: getCodeModel(),
       });
 
       const correctiveGoal = !isNewBuild || editMode === "DIFF"
@@ -1297,8 +1344,9 @@ export const codeAgentFunction = inngest.createFunction(
       const correctiveAction = editMode === "DIFF"
         ? "Call the applyDiff tool now with an exact search snippet"
         : "Call the editFiles tool now with the actual file contents";
-      const correctivePrompt = currentPrompt +
-        `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`;
+      const correctivePrompt = currentPrompt + (unfinished
+        ? `\n\n⚠️ PREVIOUS ATTEMPT RAN OUT OF TIME: you stopped part-way through and never printed the task summary, so the site shipped unfinished. Work FASTER this time: batch four files per editFiles call, write every section component the brief lists, and do not re-read files you have already written. The ${correctiveGoal}. Finish, THEN print the task summary.`
+        : `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`);
 
       result = await retryNetwork.run(correctivePrompt, { state: retryState });
       if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
@@ -1310,7 +1358,13 @@ export const codeAgentFunction = inngest.createFunction(
     finalFiles = result ? result.state.data.files : state.data.files;
 
     if (!finalSummary) {
-      console.error("DEBUG: AI returned no summary. Halting.");
+      // Not a halt — the run continues into the build/fix loop with whatever is
+      // in the sandbox. Say so plainly: the old "Halting." made this look like a
+      // stop when it was actually shipping an unfinished site.
+      console.error(
+        "DEBUG: No task summary after the corrective attempt — the agent never finished. " +
+        "Continuing to the build loop with whatever it wrote; expect a thin page."
+      );
       finalSummary = "Task completed.";
     }
 
@@ -1943,7 +1997,7 @@ fixPaths(process.argv[2]);
 );
 
 export const veoGenerateFunction = inngest.createFunction(
-  { id: "veo-generate", retries: 0, timeouts: { finish: "15m" } },
+  { id: "veo-generate", retries: 0, timeouts: { finish: "30m" } },
   {
     event: "veo/generate",
     cancelOn: [
@@ -2048,7 +2102,9 @@ export const veoGenerateFunction = inngest.createFunction(
             }
           } else if (targetModel === "bytedance/seedance-1.5-pro") {
             input.fps = 24;
-            input.duration = 4;
+            // Seedance accepts 4-12s and bills per second — see the note on
+            // VIDEO_DURATION_SECONDS, which AGENT_COSTS.VIDEO is priced against.
+            input.duration = VIDEO_DURATION_SECONDS;
             input.resolution = "720p";
             input.aspect_ratio = "16:9";
             // Hero backgrounds loop, so the camera is pinned at the model level —
@@ -2100,7 +2156,11 @@ export const veoGenerateFunction = inngest.createFunction(
 
           // Poll until completed or failed
           let completedPrediction = prediction;
-          const maxWaitMs = 5 * 60 * 1000; // 5 min timeout
+          // Sized for the 8s clip: generation scales with duration, and this
+          // function runs with retries: 0, so a timeout throws away a Replicate
+          // prediction that was already billed. Kept well inside the function's
+          // own 30m finish timeout so the failure handler still gets to run.
+          const maxWaitMs = 12 * 60 * 1000;
           const startTime = Date.now();
           while (
             completedPrediction.status !== "succeeded" &&

@@ -43,6 +43,14 @@ export interface SceneLuminance {
   overall: number;
   /** Mean luminance of each cell of a 3x3 grid, row-major (top-left first). */
   regions: number[];
+  /** How many video frames fed the measurement. 1 means a single still. */
+  framesSampled: number;
+  /**
+   * Dominant colour of each sampled frame, as hex. Measured from pixels, so the
+   * accent can be chosen to sit with the footage instead of against it — a hot
+   * pink band over a green meadow is the failure this exists to prevent.
+   */
+  dominantColors: string[];
   /** Human-readable label for the darkest and brightest cells. */
   darkestRegion: string;
   brightestRegion: string;
@@ -79,16 +87,29 @@ export async function measureSceneLuminance(imageUrl: string): Promise<SceneLumi
   }
 }
 
-/** Same measurement for callers that already hold the decoded frame bytes. */
-export async function measureFrameLuminance(input: Buffer): Promise<SceneLuminance | null> {
+const GRID = 3;
+const SIZE = 60;
+
+const toHex = (r: number, g: number, b: number) =>
+  "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+
+/** The frame's dominant colour, or null if it cannot be read. */
+async function frameDominant(input: Buffer): Promise<string | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const { dominant } = await sharp(input).stats();
+    return dominant ? toHex(dominant.r, dominant.g, dominant.b) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Mean luminance of each cell of the 3x3 grid for one frame, or null. */
+async function frameRegions(input: Buffer): Promise<number[] | null> {
   try {
     // sharp ships with Next; importing it lazily keeps it off any path that
     // doesn't need it and lets a missing binary fall back instead of crashing.
     const sharp = (await import("sharp")).default;
-
-    // 60x60 is far more resolution than an average needs and keeps this ~instant.
-    const GRID = 3;
-    const SIZE = 60;
     const cell = SIZE / GRID;
 
     const { data } = await sharp(input)
@@ -97,59 +118,118 @@ export async function measureFrameLuminance(input: Buffer): Promise<SceneLuminan
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const regionSums = new Array(GRID * GRID).fill(0);
-    const regionCounts = new Array(GRID * GRID).fill(0);
-    let total = 0;
+    const sums = new Array(GRID * GRID).fill(0);
+    const counts = new Array(GRID * GRID).fill(0);
 
     for (let y = 0; y < SIZE; y++) {
       for (let x = 0; x < SIZE; x++) {
         const i = (y * SIZE + x) * 3;
-        const luminance = relativeLuminance(data[i], data[i + 1], data[i + 2]);
-        total += luminance;
-
         const region = Math.min(GRID - 1, Math.floor(y / cell)) * GRID
           + Math.min(GRID - 1, Math.floor(x / cell));
-        regionSums[region] += luminance;
-        regionCounts[region]++;
+        sums[region] += relativeLuminance(data[i], data[i + 1], data[i + 2]);
+        counts[region]++;
       }
     }
 
-    const regions = regionSums.map((sum, i) => sum / (regionCounts[i] || 1));
-    const overall = total / (SIZE * SIZE);
-
-    // A text colour is only as good as the worst patch it has to sit on.
-    const whiteTextWorstContrast = Math.min(
-      ...regions.map((l) => contrastRatio(WHITE_TEXT_LUMINANCE, l))
-    );
-    const darkTextWorstContrast = Math.min(
-      ...regions.map((l) => contrastRatio(NEAR_BLACK_TEXT_LUMINANCE, l))
-    );
-
-    const recommendedScheme =
-      whiteTextWorstContrast >= darkTextWorstContrast ? "light-text" : "dark-text";
-    const winningContrast = Math.max(whiteTextWorstContrast, darkTextWorstContrast);
-
-    let darkestIndex = 0;
-    let brightestIndex = 0;
-    regions.forEach((l, i) => {
-      if (l < regions[darkestIndex]) darkestIndex = i;
-      if (l > regions[brightestIndex]) brightestIndex = i;
-    });
-
-    return {
-      overall,
-      regions,
-      darkestRegion: REGION_NAMES[darkestIndex],
-      brightestRegion: REGION_NAMES[brightestIndex],
-      whiteTextWorstContrast,
-      darkTextWorstContrast,
-      recommendedScheme,
-      confident: winningContrast >= LARGE_TEXT_MIN_CONTRAST,
-    };
+    return sums.map((sum, i) => sum / (counts[i] || 1));
   } catch (e) {
-    console.warn("[Scene Luminance] Measurement failed, falling back to model analysis.", e);
+    console.warn("[Scene Luminance] Frame decode failed.", e);
     return null;
   }
+}
+
+/** Same measurement for callers that already hold the decoded frame bytes. */
+export async function measureFrameLuminance(input: Buffer): Promise<SceneLuminance | null> {
+  return measureFramesLuminance([input]);
+}
+
+/**
+ * Measures a whole sequence of frames and reports the colour that survives ALL
+ * of them.
+ *
+ * Per region we keep the brightest and darkest value any frame reaches, because
+ * that is what each colour actually has to cope with: white text is worst on
+ * the brightest patch the video ever shows in that spot, near-black text worst
+ * on the darkest. A colour picked from one frame can fail two seconds later;
+ * this cannot.
+ */
+export async function measureFramesLuminance(inputs: Buffer[]): Promise<SceneLuminance | null> {
+  const perFrame: number[][] = [];
+  const dominantColors: string[] = [];
+  for (const input of inputs) {
+    const regions = await frameRegions(input);
+    if (regions) perFrame.push(regions);
+    const dominant = await frameDominant(input);
+    if (dominant && !dominantColors.includes(dominant)) dominantColors.push(dominant);
+  }
+  if (perFrame.length === 0) return null;
+
+  const count = GRID * GRID;
+  const brightest = new Array(count).fill(0);
+  const darkest = new Array(count).fill(1);
+  const means = new Array(count).fill(0);
+
+  for (const regions of perFrame) {
+    for (let i = 0; i < count; i++) {
+      brightest[i] = Math.max(brightest[i], regions[i]);
+      darkest[i] = Math.min(darkest[i], regions[i]);
+      means[i] += regions[i] / perFrame.length;
+    }
+  }
+
+  const overall = means.reduce((a, b) => a + b, 0) / count;
+
+  const whiteTextWorstContrast = Math.min(
+    ...brightest.map((l) => contrastRatio(WHITE_TEXT_LUMINANCE, l))
+  );
+  const darkTextWorstContrast = Math.min(
+    ...darkest.map((l) => contrastRatio(NEAR_BLACK_TEXT_LUMINANCE, l))
+  );
+
+  const recommendedScheme =
+    whiteTextWorstContrast >= darkTextWorstContrast ? "light-text" : "dark-text";
+  const winningContrast = Math.max(whiteTextWorstContrast, darkTextWorstContrast);
+
+  let darkestIndex = 0;
+  let brightestIndex = 0;
+  means.forEach((l, i) => {
+    if (l < means[darkestIndex]) darkestIndex = i;
+    if (l > means[brightestIndex]) brightestIndex = i;
+  });
+
+  return {
+    overall,
+    regions: means,
+    framesSampled: perFrame.length,
+    dominantColors,
+    darkestRegion: REGION_NAMES[darkestIndex],
+    brightestRegion: REGION_NAMES[brightestIndex],
+    whiteTextWorstContrast,
+    darkTextWorstContrast,
+    recommendedScheme,
+    confident: winningContrast >= LARGE_TEXT_MIN_CONTRAST,
+  };
+}
+
+/**
+ * The measurement callers should prefer: samples the real video across its
+ * length, falling back to the still start frame if ffmpeg is unavailable.
+ */
+export async function measureBackgroundLuminance(
+  videoUrl: string | null | undefined,
+  startFrameUrl: string | null | undefined,
+): Promise<SceneLuminance | null> {
+  if (videoUrl) {
+    const { extractVideoFrames } = await import("@/lib/video-frames");
+    const frames = await extractVideoFrames(videoUrl, 5);
+    if (frames.length > 0) {
+      const measured = await measureFramesLuminance(frames);
+      if (measured) return measured;
+    }
+  }
+
+  if (startFrameUrl) return measureSceneLuminance(startFrameUrl);
+  return null;
 }
 
 /** Renders the measurement for the scene-analysis and build-brief prompts. */
@@ -158,8 +238,17 @@ export function describeSceneLuminance(m: SceneLuminance): string {
   const ratio = (n: number) => `${n.toFixed(1)}:1`;
 
   return [
-    `MEASURED FROM THE ACTUAL FRAME (pixel data, not an impression — this is ground truth):`,
+    m.framesSampled > 1
+      ? `MEASURED FROM ${m.framesSampled} FRAMES SAMPLED ACROSS THE ACTUAL VIDEO (pixel data, not an impression — this is ground truth, and it covers every point of the scroll, not just the opening shot):`
+      : `MEASURED FROM THE ACTUAL FRAME (pixel data, not an impression — this is ground truth):`,
     `- Mean brightness: ${pct(m.overall)}`,
+    m.dominantColors.length
+      ? `- DOMINANT COLOURS OF THE FOOTAGE (sampled from pixels): ${m.dominantColors.join(", ")}.\n` +
+      `  The accent MUST sit with these, not against them: either drawn from this family, or a considered ` +
+      `complement of it. An unrelated saturated hue (hot pink over a green meadow, electric blue over warm timber) ` +
+      `is a failure — it reads as a different website pasted underneath. This applies to the accent surface band ` +
+      `most of all, because it fills the screen.`
+      : `- Dominant colours could not be sampled — keep the accent restrained and neutral-leaning.`,
     `- Darkest area: ${m.darkestRegion} (${pct(Math.min(...m.regions))}); brightest: ${m.brightestRegion} (${pct(Math.max(...m.regions))})`,
     `- White text worst-case contrast over this frame: ${ratio(m.whiteTextWorstContrast)}`,
     `- Near-black text worst-case contrast over this frame: ${ratio(m.darkTextWorstContrast)}`,

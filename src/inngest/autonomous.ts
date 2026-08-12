@@ -176,14 +176,6 @@ export const AgentState = Annotation.Root({
   })
 });
 
-const getOpenRouterModel = (modelName: string) => new ChatOpenAI({
-  modelName,
-  apiKey: process.env.OPENROUTER_API_KEY!,
-  configuration: {
-    baseURL: "https://openrouter.ai/api/v1",
-  },
-});
-
 /**
  * Model for a named job, from the central routing table.
  *
@@ -1424,7 +1416,8 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "Extract every specific requirement the user stated (exact copy, features, section names, colors) into must_honor. " +
       "Where the user was vague, make confident, tasteful decisions that fit their idea.\n" +
       BRIEF_STRUCTURE_RULES +
-      sceneContext
+      sceneContext +
+      designSystemContext
     );
 
     const routerModel = modelForTask("brief");

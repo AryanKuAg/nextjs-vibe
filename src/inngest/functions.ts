@@ -366,15 +366,6 @@ export const codeAgentFunction = inngest.createFunction(
       });
     });
 
-    const getModel = (modelName: string) => {
-      // Fallback if OpenRouter models are passed
-      return openai({
-        model: modelName.replace("openrouter-", ""),
-        apiKey: process.env.OPENROUTER_API_KEY!,
-        baseUrl: "https://openrouter.ai/api/v1",
-      });
-    };
-
     /**
      * The model that writes the website.
      *

@@ -7,10 +7,11 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { buildImageRefinerInput, getImageSystemPrompt, stripMachineWords } from "@/lib/media-prompts";
 import { shouldMockMedia, MOCK_IMAGE_URL } from "@/lib/dev-media";
+import { RUN_TIMEOUT } from "./types";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
-  { id: "generate-frames-agent", timeouts: { finish: "5m" } },
+  { id: "generate-frames-agent", timeouts: { finish: RUN_TIMEOUT.frames } },
   {
     event: "frame-generation/run",
     cancelOn: [

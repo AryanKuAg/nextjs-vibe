@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSystemPrompt, buildDiffAgentSystemPrompt, type CodeAgentMode } from "@/prompt";
 
 import { inngest } from "./client";
-import { SANDBOX_TIMEOUT } from "./types";
+import { SANDBOX_TIMEOUT, RUN_TIMEOUT } from "./types";
 import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -322,7 +322,7 @@ const readTemplateFilesFromSandbox = async (sandbox: Sandbox): Promise<Record<st
 export const codeAgentFunction = inngest.createFunction(
   {
     id: "code-agent",
-    timeouts: { finish: "15m" },
+    timeouts: { finish: RUN_TIMEOUT.code },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
 
@@ -2014,7 +2014,7 @@ fixPaths(process.argv[2]);
 );
 
 export const veoGenerateFunction = inngest.createFunction(
-  { id: "veo-generate", retries: 0, timeouts: { finish: "30m" } },
+  { id: "veo-generate", retries: 0, timeouts: { finish: RUN_TIMEOUT.video } },
   {
     event: "veo/generate",
     cancelOn: [

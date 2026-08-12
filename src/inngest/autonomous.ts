@@ -9,6 +9,7 @@ import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import { shouldMockMedia, MOCK_VIDEO_URL, MOCK_IMAGE_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
+import { RUN_TIMEOUT } from "./types";
 import { modelFor } from "@/lib/models";
 import { resolveDesignSystem, renderDesignSystem, type DesignSystem } from "@/lib/design-system";
 import {
@@ -2002,7 +2003,9 @@ export const autonomousApp = workflow.compile();
 export const autonomousAgentFunction = inngest.createFunction(
   {
     id: "autonomous-agent",
-    timeouts: { finish: "15m" },
+    // Wraps the frames, video and code agents via step.invoke, so this budget
+    // has to clear the sum of theirs. See RUN_TIMEOUT.
+    timeouts: { finish: RUN_TIMEOUT.autonomous },
     onFailure: async ({ error, event, step }) => {
       const projectId = event.data.event.data.projectId;
 

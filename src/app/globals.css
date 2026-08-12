@@ -150,3 +150,100 @@
     }
   }
 }
+
+/* ── Travelling beam border (project form) ──
+   Two comets of light orbit the card's 1px border, held --beam-gap apart: a
+   crisp ring plus a blurred halo underneath it. The position is driven by a
+   registered custom property so the conic gradient itself can be animated. */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes beam-orbit {
+
+  /* Angles are the beam's clockwise position measured from the top edge's
+     centre; the checkpoints are the four corners of a typical card. The
+     percentage gaps are deliberately uneven — the short left/right edges get
+     less time than their share of the sweep, so the beam picks up speed as it
+     runs down them and settles back to normal along the long edges. */
+  0% {
+    --beam-angle: 0deg;
+  }
+
+  21.2% {
+    --beam-angle: 70deg;
+    /* top-right corner */
+  }
+
+  28.8% {
+    --beam-angle: 110deg;
+    /* bottom-right corner — right edge taken quickly */
+  }
+
+  71.2% {
+    --beam-angle: 250deg;
+    /* bottom-left corner */
+  }
+
+  78.8% {
+    --beam-angle: 290deg;
+    /* top-left corner — left edge taken quickly */
+  }
+
+  100% {
+    --beam-angle: 360deg;
+  }
+}
+
+.beam-border {
+  /* how far the trailing comet sits behind the leading one */
+  --beam-gap: 0deg;
+  /* one comet over a full turn: white-hot head at 0deg/360deg, a ~90deg tail
+     running back behind it, and dark the rest of the way round */
+  --beam-stops:
+    #c9c7ff 0deg,
+    rgba(61, 56, 245, 0) 6deg,
+    rgba(61, 56, 245, 0) 268deg,
+    rgba(61, 56, 245, 0.28) 300deg,
+    rgba(93, 88, 255, 0.95) 350deg,
+    #c9c7ff 360deg;
+}
+
+.beam-border::before,
+.beam-border::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  /* the element's border box, so the ring lands on the border itself */
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  /* the same comet twice, the second one --beam-gap further along the orbit */
+  background:
+    conic-gradient(from calc(var(--beam-angle) + var(--beam-gap)) at 50% 50%, var(--beam-stops)),
+    conic-gradient(from var(--beam-angle) at 50% 50%, var(--beam-stops));
+  /* punch out the middle so only the border ring is painted */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: beam-orbit 4.5s linear infinite;
+}
+
+/* the halo — same comet, thicker and blurred, painted under the crisp ring */
+.beam-border::before {
+  inset: -2px;
+  padding: 3px;
+  filter: blur(6px);
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .beam-border::before,
+  .beam-border::after {
+    animation: none;
+  }
+}

@@ -7,6 +7,7 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { processImageFile } from "@/lib/process-image-file";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -235,11 +236,31 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
           </div>
         </div>
       )}
-      <section className="space-y-6 w-full flex flex-col items-center">
+      <section className="relative space-y-6 w-full flex flex-col items-center">
+        {/* ── Perspective grid backdrop ──
+            Full-bleed, so it has to break out of the page's max-width column.
+            It stays first in the DOM and neither it nor the card carries a
+            z-index, which is what puts the card in front of it. */}
+        {!isLandingPage && (
+          <div
+            aria-hidden
+            className="pointer-events-none select-none absolute left-1/2 top-1/2 w-screen -translate-x-1/2 -translate-y-[60%]"
+          >
+            <Image
+              src="/grid-pattern.svg"
+              alt=""
+              width={1431}
+              height={411}
+              priority
+              className="w-full h-auto opacity-12"
+            />
+          </div>
+        )}
+
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border focus-within:border-purple ${isLandingPage ? "bg-transparent border-white-8" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] ${isLandingPage ? "bg-transparent border-white-8  border focus-within:border-purple" : "beam-border  bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -272,7 +293,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
                 disabled={isPending}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[24px] placeholder:text-white-50 "
+                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[48px] placeholder:text-white-50 "
                 placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -285,7 +306,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center mt-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -299,7 +320,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={isPending}
-              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px] border border-white-8 text-white hover:bg-white-8 cursor-pointer disabled:opacity-50 text-base"
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px]  text-white-85 hover:bg-white-4 cursor-pointer disabled:opacity-50 text-base"
               title="Attach image"
             >
               <i className="ri-add-line text-base" />
@@ -308,7 +329,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
             {showModelSelector && (
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="h-7 px-2 flex items-center gap-1 rounded-lg border border-white-8 text-sm leading-[20px] text-white-85 hover:bg-white-8 cursor-pointer"
+                  className="h-7 px-2 flex items-center gap-1 rounded-lg text-sm leading-[20px] text-white-85 hover:bg-white-4 cursor-pointer"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setModelDropdownOpen((o) => !o)}
                 >

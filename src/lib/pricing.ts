@@ -16,9 +16,23 @@
  */
 export const AGENT_COSTS = {
   IMAGE: 7,
-  VIDEO: 10,
+  VIDEO: 20,
   CODE: 4,
+  /** One generated section photograph. Charged per image actually produced. */
+  SECTION_IMAGE: 1,
 } as const;
+
+/**
+ * Length of the generated background video, in seconds.
+ *
+ * The model bills per second, so this and AGENT_COSTS.VIDEO move together:
+ * doubling the clip from 4s to 8s doubled the price, and the credit cost was
+ * doubled with it. Change one, change the other.
+ *
+ * Longer also scrubs better — at 24fps, 8s is 192 frames to spread across the
+ * scroll instead of 96.
+ */
+export const VIDEO_DURATION_SECONDS = 8;
 
 // Displayed in the model pickers. Kept in sync with AGENT_COSTS above.
 export const MODEL_COSTS: Record<string, number> = {

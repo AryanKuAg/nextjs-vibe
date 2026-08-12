@@ -40,7 +40,7 @@ function useGenerationTimer(isWorking: boolean, sessionKey: string) {
       const lastTickStr = sessionStorage.getItem(sessionKey + "_last_tick");
       const lastTick = lastTickStr ? parseInt(lastTickStr, 10) : now;
       const delta = now - lastTick;
-      
+
       setElapsedMs(prev => {
         const next = prev + delta;
         sessionStorage.setItem(sessionKey, next.toString());
@@ -183,7 +183,7 @@ export const MessagesContainer = ({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="pt-2 pr-1">
+        <div className="">
           {messages.map((message, index) => {
             let startedAt = message.createdAt;
             for (let i = index; i >= 0; i--) {

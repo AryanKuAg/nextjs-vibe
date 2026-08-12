@@ -113,7 +113,7 @@ export const UserControl = ({ showName }: Props) => {
           <div className="border-t-[0.5px] border-white-8 p-1.5 flex flex-col gap-[3px]">
             <DropdownMenuItem
               onClick={() => router.push('/projects')}
-              className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 rounded-lg focus:text-white h-[28px] mb-[3px] group"
+              className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 rounded-lg focus:text-white h-[28px]  group"
             >
               <i className="ri-folder-line text-white-50 text-base group-hover:text-white-85" />
               <span className="text-[12px] text-white">Projects</span>

@@ -27,6 +27,12 @@ export interface AgentStatusInput {
   /** Body text of that card, same purpose. */
   interactiveText?: string | null;
   /**
+   * `step` from the card's payload — "SCENE" or "VIDEO". The authoritative
+   * marker, set by the node that wrote the card. Cards written before it
+   * existed have none, hence the fallbacks below.
+   */
+  interactiveStep?: string | null;
+  /**
    * True while the user's message is still the newest thing in the thread, i.e.
    * the agent has not reported anything back yet. Distinguishes the opening
    * "Working" from a mid-run "Thinking".
@@ -34,11 +40,33 @@ export interface AgentStatusInput {
   awaitingFirstResponse?: boolean;
 }
 
+/**
+ * Whether an interactive card belongs to the video step rather than the scene
+ * step. "Prompt Again" and "Let AI Create" sit on both cards, so the card they
+ * were pressed on is the only thing that tells the two apart — which agent runs
+ * next, and therefore which price it charges.
+ */
+export function isVideoStepCard({
+  interactiveStep,
+  interactiveButtonActions = [],
+  interactiveText,
+}: Pick<AgentStatusInput, "interactiveStep" | "interactiveButtonActions" | "interactiveText">): boolean {
+  // Cards carry their step outright. Prefer it: the older signals below read the
+  // card's prose, which makes a copy edit silently mis-price the next run.
+  if (interactiveStep) return interactiveStep === "VIDEO";
+
+  return (
+    interactiveButtonActions.includes("USE_VIDEO") ||
+    Boolean(interactiveText?.toLowerCase().includes("background video"))
+  );
+}
+
 export function resolveAgentStatus({
   currentStage,
   lastAction,
   interactiveButtonActions = [],
   interactiveText,
+  interactiveStep,
   awaitingFirstResponse = false,
 }: AgentStatusInput): string {
   // 1. Optimistic, from the button the user just pressed. This wins over the
@@ -53,10 +81,9 @@ export function resolveAgentStatus({
   if (lastAction === "AI_CREATE" || lastAction === "WRITE_PROMPT" || lastAction === "REGENERATE") {
     // These labels appear on both the scene and the video approval cards, so the
     // card the user clicked is what tells us which step comes next.
-    const isVideoStep =
-      interactiveButtonActions.includes("USE_VIDEO") ||
-      Boolean(interactiveText?.toLowerCase().includes("background video"));
-    return isVideoStep ? AGENT_STATUS.VIDEO : AGENT_STATUS.SCENE;
+    return isVideoStepCard({ interactiveStep, interactiveButtonActions, interactiveText })
+      ? AGENT_STATUS.VIDEO
+      : AGENT_STATUS.SCENE;
   }
 
   // 2. What the backend says it is actually doing right now.

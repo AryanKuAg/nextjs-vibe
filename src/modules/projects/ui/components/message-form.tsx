@@ -12,6 +12,8 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { AGENT_COSTS } from "@/lib/pricing";
+import { isVideoStepCard } from "./agent-status";
 import { cn } from "@/lib/utils";
 
 type ModelId =
@@ -224,7 +226,46 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
 
   const isPending = startAutonomousGeneration.isPending;
   const promptValue = form.watch("value");
-  const isButtonDisabled = isPending || isInteractiveSubmitting || (!promptValue?.trim() && !isGenerating);
+
+  // Answering one of the agent's questions POSTs straight to the run and has
+  // nothing to do with startAutonomousGeneration, so it must not be gated on
+  // that mutation. That mutation only enqueues the Inngest run — the run's own
+  // progress is reported through the messages, not through this request — so
+  // a request that never resolves would otherwise lock the composer for the
+  // rest of the session while the agent carried on regardless.
+  const isSendBlocked = pendingInteractiveAction
+    ? isInteractiveSubmitting
+    : isPending || isInteractiveSubmitting;
+  const isButtonDisabled = isSendBlocked || (!promptValue?.trim() && !isGenerating);
+  const showStopButton = isGenerating || (isWaitingForInteractive && !pendingInteractiveAction);
+
+  // What sending this will actually cost. Answering one of the wizard's prompt
+  // questions bills as the media agent it feeds; anything else is a code
+  // message. Same numbers the server charges in AGENT_COSTS.
+  const nextChargeCredits = (() => {
+    if (!pendingInteractiveAction) return AGENT_COSTS.CODE;
+
+    let buttonActions: string[] = [];
+    let text = "";
+    let step: string | undefined;
+    try {
+      const parsed = JSON.parse(lastMessage?.content ?? "{}");
+      buttonActions = parsed?.buttons?.map((b: { action: string }) => b.action) ?? [];
+      text = parsed?.text ?? "";
+      step = parsed?.step;
+    } catch {
+      // Not a card we can read — fall through to the scene price, the cheaper of
+      // the two, rather than overstating the charge.
+    }
+
+    return isVideoStepCard({
+      interactiveStep: step,
+      interactiveButtonActions: buttonActions,
+      interactiveText: text,
+    })
+      ? AGENT_COSTS.VIDEO
+      : AGENT_COSTS.IMAGE;
+  })();
 
   return (
     <div className="flex flex-col w-full">
@@ -273,10 +314,14 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                   field.ref(e);
                   textareaRef.current = e;
                 }}
-                disabled={isPending || isInteractiveSubmitting}
+                // Only its own in-flight send locks the field. A disabled
+                // textarea silently swallows clicks and shows no caret, so the
+                // styles below make that state visible instead of looking like
+                // a dead input.
+                disabled={isInteractiveSubmitting}
                 minRows={1}
                 maxRows={12}
-                className="w-full bg-transparent text-[14px] placeholder:text-[14px] text-white outline-none resize-none min-h-[24px] placeholder:text-white/50 mb-0 ring-0"
+                className="w-full bg-transparent text-[14px] placeholder:text-[14px] text-white outline-none resize-none min-h-[24px] placeholder:text-white/50 mb-0 ring-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={pendingInteractiveAction ? "Enter your prompt..." : hasBuiltWebsite ? "Ask your changes..." : "Describe your website..."}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
@@ -294,21 +339,30 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
-              disabled={isPending}
-              className="w-7 h-7 flex items-center justify-center rounded-[8px] border border-[#333] text-white hover:bg-white/10 transition-colors disabled:opacity-50 text-base"
+              disabled={isSendBlocked}
+              className="w-7 h-7 flex items-center justify-center rounded-[8px]  text-white hover:bg-white-4 transition-colors disabled:opacity-50 text-base"
               title="Attach image"
             >
               <i className="ri-add-line" />
             </button>
 
 
-            <div className="flex gap-2 ml-auto">
-              {(isGenerating || (isWaitingForInteractive && !pendingInteractiveAction)) ? (
+            <div className="flex items-center gap-2 ml-auto">
+              {!showStopButton && (
+                <span
+                  className="flex items-center gap-1 text-[12px] leading-[18px] text-white-50 select-none"
+                  title={`Sending this will use ${nextChargeCredits} credits`}
+                >
+                  <i className="ri-sparkling-2-fill text-[12px]" />
+                  {nextChargeCredits}
+                </span>
+              )}
+              {showStopButton ? (
                 <button
                   type="button"
                   onClick={() => cancelGeneration.mutate({ projectId })}
                   disabled={cancelGeneration.isPending}
-                  className="w-7 h-7 flex items-center justify-center rounded-full border border-white-8 hover:bg-white-8 text-white "
+                  className="w-7 h-7 flex items-center justify-center rounded-full  hover:bg-white-4 text-white "
                 >
                   {cancelGeneration.isPending ? (
                     <i className="ri-loader-4-line animate-spin" />
@@ -339,7 +393,10 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
                       : "bg-purple text-white hover:bg-purple/80 "
                   )}
                 >
-                  {isPending ? (
+                  {/* Spins for a send this form actually made. Reading the
+                      kickoff mutation here showed a spinner for the whole run,
+                      on a button the user had not pressed. */}
+                  {isSendBlocked ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />
                   ) : (
                     <i className="ri-arrow-up-line font-bold" />

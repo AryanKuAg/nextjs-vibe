@@ -6,10 +6,12 @@ import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { buildImageRefinerInput, getImageSystemPrompt, stripMachineWords } from "@/lib/media-prompts";
+import { shouldMockMedia, MOCK_IMAGE_URL } from "@/lib/dev-media";
+import { RUN_TIMEOUT } from "./types";
 
 // 1. Frame Generation Agent
 export const generateFramesFunction = inngest.createFunction(
-  { id: "generate-frames-agent", timeouts: { finish: "5m" } },
+  { id: "generate-frames-agent", timeouts: { finish: RUN_TIMEOUT.frames } },
   {
     event: "frame-generation/run",
     cancelOn: [
@@ -42,6 +44,15 @@ export const generateFramesFunction = inngest.createFunction(
       // (or fall back to a stale "Generating video") during image generation.
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_SCENE" } });
     });
+
+    // The money boundary — see the matching guard in veoGenerateFunction. The
+    // caller short-circuits before invoking this at all; the check is repeated
+    // here so no future call site can bill a developer machine by accident.
+    if (shouldMockMedia()) {
+      console.log("[Frame Generation] MOCK_MEDIA is on — returning the demo image instead of generating.");
+      await step.sleep("mock-image-delay", "4s");
+      return { frameUrl: MOCK_IMAGE_URL, refinedPrompt: prompt };
+    }
 
     // Charged per image-agent run — a regenerate is a new run the user asked for.
     const cost = AGENT_COSTS.IMAGE;

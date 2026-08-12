@@ -52,9 +52,8 @@ const SitePreviewCard = ({
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className={`group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid ${
-      isLandingPage ? "opacity-80 hover:opacity-100 transition-opacity duration-300" : ""
-    }`}
+    className={`group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid ${isLandingPage ? "opacity-80 hover:opacity-100 transition-opacity duration-300" : ""
+      }`}
   >
     <div
       className={`relative w-full bg-grey-bg ${height ? "" : "aspect-[1280/720]"}`}
@@ -106,7 +105,9 @@ const LoggedInDashboard = () => {
   const { remix, isPending: isRemixPending } = useTemplateRemix();
   useCheckoutReturn();
   return (
-    <main className="min-h-screen bg-bg font-sans flex flex-col">
+    // overflow-x-clip: the form's grid backdrop is 100vw wide, which is a hair
+    // wider than the content box wherever a classic scrollbar is present.
+    <main className="min-h-screen bg-bg font-sans flex flex-col overflow-x-clip">
       {/* Top Navigation */}
       <header className="flex items-center justify-between p-3 md:px-3">
         <div className="flex items-center gap-2">
@@ -118,8 +119,8 @@ const LoggedInDashboard = () => {
 
       {/* Main Content (Centered) */}
       <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
-        <h1 className="text-white-85 text-2xl mb-10 text-center">
-          Describe your 3D website. We&apos;ll build it.
+        <h1 className="text-white-85 font-medium text-2xl mb-10 text-center">
+          Turn your idea into a stunning 3D website
         </h1>
 
         <div className="w-full max-w-3xl">

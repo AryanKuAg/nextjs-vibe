@@ -30,6 +30,14 @@ RUN npm install @radix-ui/react-dialog @radix-ui/react-popover @radix-ui/react-t
     @radix-ui/react-dropdown-menu @radix-ui/react-accordion @radix-ui/react-toast @radix-ui/react-label \
     @radix-ui/react-separator @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-radio-group
 
+# Everything shadcn/ui needs that the list above does not already cover.
+# class-variance-authority is imported by every shadcn component; without it the
+# sandbox build fails on an unresolved import.
+RUN npm install class-variance-authority tw-animate-css embla-carousel-react
+RUN npm install @radix-ui/react-aspect-ratio @radix-ui/react-scroll-area \
+    @radix-ui/react-navigation-menu @radix-ui/react-tooltip @radix-ui/react-progress \
+    @radix-ui/react-select @radix-ui/react-switch
+
 # Ensure Tailwind is set up in vite.config.ts robustly and Vite allows E2B hosts
 RUN npm install -D @types/node && \
     echo 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\nimport tailwindcss from "@tailwindcss/vite";\nimport path from "path";\n\nexport default defineConfig({\n  server: { allowedHosts: true },\n  plugins: [react(), tailwindcss()],\n  resolve: {\n    alias: {\n      "@": path.resolve(__dirname, "./src"),\n    },\n  },\n});' > vite.config.ts
@@ -45,6 +53,37 @@ RUN sed -i 's/"compilerOptions": {/"compilerOptions": {\n    "baseUrl": ".",\n  
 RUN sed -i 's/"noUnusedLocals": true/"noUnusedLocals": false/g' tsconfig.json tsconfig.app.json tsconfig.node.json || true
 RUN sed -i 's/"noUnusedParameters": true/"noUnusedParameters": false/g' tsconfig.json tsconfig.app.json tsconfig.node.json || true
 
+# --- shadcn/ui -----------------------------------------------------------------
+# Baked in at IMAGE BUILD time, never per generation: running the CLI inside a
+# live sandbox would add half a minute and a network dependency to every website
+# the platform builds.
+#
+# Runs AFTER the tsconfig path aliases above, because `init` resolves "@/lib/utils"
+# through them, and BEFORE the app is copied to /home/user below.
+#
+# The version is PINNED. `@latest` would mean a CLI release months from now can
+# silently change what this image contains, or break the build outright.
+#
+# `init` also rewrites src/index.css into the Tailwind v4 shape — :root holding
+# the raw values and an `@theme inline` block mapping them to real utilities. That
+# is what lets generated sites write `bg-background` and `text-muted-foreground`
+# instead of arbitrary var() values, and it replaces the hand-written block above,
+# whose bare HSL triplets were invalid as `background-color: var(--background)`.
+ENV CI=true
+RUN npx --yes shadcn@4.16.2 init --defaults --yes --base-color neutral
+
+RUN npx --yes shadcn@4.16.2 add --yes --overwrite \
+      button card badge separator input textarea label \
+      accordion tabs dialog sheet avatar carousel tooltip \
+      dropdown-menu navigation-menu skeleton aspect-ratio scroll-area sonner
+
+# Fail the image build loudly if the CLI silently did nothing — a sandbox whose
+# components are missing produces broken sites for every user until someone
+# notices.
+RUN test -f components.json && test -f src/components/ui/button.tsx \
+    && test -f src/components/ui/carousel.tsx \
+    && grep -q "@theme inline" src/index.css \
+    && echo "shadcn OK: $(ls src/components/ui | wc -l) components"
 
 # Move the Vite app to the home directory and cleanup
 RUN cp -a /home/user/vite-app/. /home/user/ && rm -rf /home/user/vite-app

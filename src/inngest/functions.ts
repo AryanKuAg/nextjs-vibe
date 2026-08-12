@@ -17,6 +17,7 @@ import { getTemplate, templateTarballUrl, TEMPLATE_VIDEO_PLACEHOLDER, TEMPLATE_A
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { VIDEO_DURATION_SECONDS } from "@/lib/pricing";
 import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
+import { modelFor } from "@/lib/models";
 import { shouldMockMedia, MOCK_VIDEO_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
 import { PROJECT_STAGE } from "@/lib/project-stage";
@@ -390,9 +391,25 @@ export const codeAgentFunction = inngest.createFunction(
      * Everything else — titles, chat replies, the fixer, the brief compiler —
      * stays on its own cheaper model.
      */
+    const modelForTask = (task: Parameters<typeof modelFor>[0]) => {
+      const choice = modelFor(task);
+      return openai({
+        model: choice.model,
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        baseUrl: "https://openrouter.ai/api/v1",
+        ...(choice.reasoningEffort
+          ? {
+            defaultParameters: {
+              reasoning_effort: choice.reasoningEffort,
+            } as unknown as Parameters<typeof openai>[0]["defaultParameters"],
+          }
+          : {}),
+      });
+    };
+
     const getCodeModel = () =>
       openai({
-        model: process.env.CODE_AGENT_MODEL || "openai/gpt-5.6-luna-pro",
+        model: modelFor("code").model,
         apiKey: process.env.OPENROUTER_API_KEY!,
         baseUrl: "https://openrouter.ai/api/v1",
         // Cast: agent-kit types defaultParameters against the stock OpenAI chat
@@ -400,7 +417,7 @@ export const codeAgentFunction = inngest.createFunction(
         // verified against the live endpoint — so the parameter is real even
         // though the local type does not know about it.
         defaultParameters: {
-          reasoning_effort: process.env.CODE_AGENT_REASONING_EFFORT || "max",
+          reasoning_effort: modelFor("code").reasoningEffort || "max",
         } as unknown as Parameters<typeof openai>[0]["defaultParameters"],
       });
 
@@ -1648,7 +1665,7 @@ fixPaths(process.argv[2]);
         name: `fixer-agent-run-${runId}-attempt-${attempt}`,
         description: "An expert debugging agent",
         system: FIXER_PROMPT,
-        model: getModel("x-ai/grok-4.5"),
+        model: modelForTask("fixer"),
         tools: getToolsForAgent(`fixer-${runId}-attempt-${attempt}`),
         lifecycle: {
           onResponse: async ({ result, network }) => {
@@ -1673,7 +1690,7 @@ fixPaths(process.argv[2]);
           if (network.state.data.summary) return;
           return fixerAgent;
         },
-        defaultModel: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+        defaultModel: modelForTask("fixer"),
       });
 
       // --- SMART CONTEXT INJECTION FOR THE FIXER ---
@@ -1756,14 +1773,14 @@ fixPaths(process.argv[2]);
       name: `fragment-title-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A fragment title generator",
       system: FRAGMENT_TITLE_PROMPT,
-      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+      model: modelForTask("utility"),
     });
 
     const responseGenerator = createAgent({
       name: `response-generator-run-${runId}`, // Ensure name is unique per run!
       description: "A response generator",
       system: RESPONSE_PROMPT,
-      model: getModel(event.data.model || "google/gemini-3.1-flash-lite"),
+      model: modelForTask("utility"),
     });
 
     const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(finalSummary);

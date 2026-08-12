@@ -9,15 +9,17 @@ import { generateFramesFunction } from "./mediaAgents";
 import { veoGenerateFunction, codeAgentFunction } from "./functions";
 import { shouldMockMedia, MOCK_VIDEO_URL, MOCK_IMAGE_URL } from "@/lib/dev-media";
 import { refundChargedCredits } from "./refund";
+import { modelFor } from "@/lib/models";
+import { resolveDesignSystem, renderDesignSystem, type DesignSystem } from "@/lib/design-system";
 import {
-  TASTE_BRIEF_RULES,
+  BRIEF_STRUCTURE_RULES,
   SECTION_SURFACES,
   SURFACE_GUIDE,
   LAYOUT_FAMILIES,
   LAYOUT_FAMILY_GUIDE,
   DESIGN_DIRECTIONS,
   DESIGN_DIRECTION_NAMES,
-} from "@/lib/taste";
+} from "@/lib/page-structure";
 import { generateSectionImages, type SectionImage, type SectionImageRequest } from "@/lib/section-images";
 import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
 import { getTemplate, templateVideoUrl } from "@/lib/templates/registry";
@@ -181,6 +183,26 @@ const getOpenRouterModel = (modelName: string) => new ChatOpenAI({
   },
 });
 
+/**
+ * Model for a named job, from the central routing table.
+ *
+ * The Build Brief in particular must NOT share the cheap utility model: it
+ * chooses the palette, the typography and the whole composition, and a weak
+ * model there caps the quality of everything downstream no matter how strong
+ * the code agent is.
+ */
+const modelForTask = (task: Parameters<typeof modelFor>[0]) => {
+  const choice = modelFor(task);
+  return new ChatOpenAI({
+    modelName: choice.model,
+    apiKey: process.env.OPENROUTER_API_KEY!,
+    configuration: { baseURL: "https://openrouter.ai/api/v1" },
+    ...(choice.reasoningEffort
+      ? { modelKwargs: { reasoning_effort: choice.reasoningEffort } }
+      : {}),
+  });
+};
+
 // 2. Define Nodes
 const supervisorNode = async (state: typeof AgentState.State, config: RunnableConfig) => {
   const step = config.configurable?.step;
@@ -234,7 +256,7 @@ const supervisorNode = async (state: typeof AgentState.State, config: RunnableCo
     );
 
     // We use a fast, reliable model for routing
-    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
+    const routerModel = modelForTask("utility");
 
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
@@ -736,7 +758,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
   const step = config.configurable?.step;
 
   const result = await step.run("sanitize-prompt-llm", async () => {
-    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
+    const routerModel = modelForTask("utility");
     const structuredLlm = routerModel.withStructuredOutput(
       z.object({
         sanitized_prompt: z.string().describe(
@@ -826,7 +848,7 @@ const sanitizePromptNode = async (state: typeof AgentState.State, config: Runnab
         "If the prompt gives no clue, default by content: a webpage/UI screenshot is DESIGN_REFERENCE, anything else is SCENE_REFERENCE."
       );
 
-      const roleModel = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(
+      const roleModel = modelForTask("utility").withStructuredOutput(
         z.object({
           role: z.enum(["START_FRAME", "SCENE_REFERENCE", "DESIGN_REFERENCE"]),
           reason: z.string().describe("One short sentence explaining the choice."),
@@ -955,12 +977,15 @@ const BuildBriefSchema = z.object({
       "Use 'accent' exactly once, on the section that most deserves to shout."
     ),
     layout_family: z.enum(LAYOUT_FAMILIES).describe(
-      "The SHAPE of this section, chosen from the fixed list. Every content section on the page must pick a DIFFERENT one. " +
-      "The last section is always 'footer'."
+      "OPTIONAL shorthand for this section's shape, ONLY if one of these happens to fit. " +
+      "Choose 'invent' whenever the section wants a structure that is not on this list — which should be often. " +
+      "The list is a convenience, not a menu you must order from. The footer is always 'footer'."
     ),
     layout: z.string().describe(
-      "1-3 sentences of specifics WITHIN the chosen family: alignment, density, what sits where, and its scroll-reveal behaviour. " +
-      "Do not restate the family, describe how this particular section uses it."
+      "The real layout description, 2-4 sentences. Compose this section however it should be composed: what sits where, " +
+      "the alignment and density, how it behaves on scroll. If you chose 'invent', describe the structure fully here. " +
+      "Vertical full-width bands are ONE option among many — horizontal scroll regions, persistent side rails, split screens, " +
+      "overlapping panels, grids that continue across sections and asymmetric compositions are all available and often better."
     ),
   })).min(6).max(8).describe(
     "The ordinary website BELOW the video, in page order: at least FIVE content sections plus a footer, which is always last. " +
@@ -1110,8 +1135,9 @@ function enforceLayoutVariety(brief: BuildBrief): void {
   const taken = new Set<string>();
 
   for (const section of brief.sections) {
-    // The footer is the one family that is allowed to be what it is.
-    if (section.layout_family === "footer") continue;
+    // The footer is what it is, and every "invent" section defines its own
+    // structure in prose — there is nothing to collide with.
+    if (section.layout_family === "footer" || section.layout_family === "invent") continue;
 
     if (!taken.has(section.layout_family)) {
       taken.add(section.layout_family);
@@ -1178,6 +1204,7 @@ const renderBuildBrief = (
   scene: SceneAnalysis | null,
   luminance: SceneLuminance | null,
   photos?: SectionImage[],
+  designSystem?: DesignSystem | null,
 ): string => {
   const sections = brief.sections
     .map((s, i) => {
@@ -1213,7 +1240,7 @@ Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import 
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
 
-${DESIGN_DIRECTIONS[brief.design_direction]}
+${designSystem ? renderDesignSystem(designSystem) + "\n" : ""}${DESIGN_DIRECTIONS[brief.design_direction]}
 This direction governs the whole page. It outranks your defaults: if it says sharp corners, nothing is rounded; if it says minimal motion, nothing loops.
 
 Layout concept (composed for THIS site — build exactly this, do not substitute a generic template):
@@ -1294,7 +1321,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "neutral dominant colors, and a neutral accent. An invented scene leads to an unreadable site."
     );
 
-    const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(SceneAnalysisSchema);
+    const model = modelForTask("vision").withStructuredOutput(SceneAnalysisSchema);
     const scenePrompt = state.media_prompt || state.current_prompt;
 
     const { describeSceneLuminance } = await import("@/lib/scene-luminance");
@@ -1330,6 +1357,19 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     }
   });
 
+  // Matched from the request against 192 curated product types. Returns null
+  // when nothing fits well, in which case the compiler picks its own look —
+  // a better failure mode than forcing a wrong palette onto a brand.
+  const designSystem = resolveDesignSystem(sitePrompt);
+  if (designSystem) {
+    console.log(
+      `[Design System] "${designSystem.productType}" | style=${designSystem.style?.name ?? "none"} ` +
+      `| fonts=${designSystem.fonts?.name ?? "model's choice"} | primary=${designSystem.palette.primary}`
+    );
+  } else {
+    console.log("[Design System] No confident match — the brief chooses its own palette and type.");
+  }
+
   const brief = await step.run("compile-build-brief", async () => {
     const mode = briefMode;
     const sceneContext = sceneAnalysis
@@ -1341,6 +1381,18 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "- Pick heading/body fonts whose personality matches this scene's mood.\n" +
       "- Do NOT invent or embellish scene visuals beyond this analysis — if it says the scene could not be analyzed, design for an unknown mixed-brightness video and never describe imaginary scenery in the brief."
       : "\n\nNo scene analysis available: set text_scheme to \"light-text\" (a safe default for an unknown video). Still NO overlays or blur anywhere.";
+
+    const designSystemContext = designSystem
+      ? "\n\nDESIGN SYSTEM MATCHED TO THIS REQUEST (use it — it is curated and contrast-checked):\n" +
+      `- Product type: ${designSystem.productType}\n` +
+      `- Style: ${designSystem.style?.name ?? "your choice"}${designSystem.style ? ` (${designSystem.style.effects})` : ""}\n` +
+      (designSystem.fonts
+        ? `- Typography: heading "${designSystem.fonts.heading}", body "${designSystem.fonts.body}" — put these in heading_font and body_font.\n`
+        : "- Typography: your choice.\n") +
+      `- Accent colour: ${designSystem.palette.primary} — put this in accent_color.\n` +
+      `- Context: ${designSystem.notes}\n` +
+      "Adopt these unless the user explicitly asked for something else, in which case the user wins."
+      : "\n\nNo design system matched this request — choose fonts and an accent colour that genuinely suit this brand, and make them specific rather than safe.";
 
     const sysMsg = new SystemMessage(
       "You are the creative director of Framerate, an AI website builder whose sites always have a platform-generated video background. " +
@@ -1361,7 +1413,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "Keep them consistent with each other: one world, one lighting story, one palette, so the page looks shot rather than assembled. " +
       "Leave `images` empty for the footer always, and for any section whose whole point is a statement, a stat strip or a quote. " +
       "Never ask for text, logos, charts, UI screenshots or collages inside an image.\n" +
-      "- Aesthetic: minimal, classy, editorial, a little creative. Never generic-template. One accent color only.\n" +
+      "- AESTHETIC IS YOURS: there is no house style. The look must come from THIS brand and industry, and two different requests must produce visibly different sites. Do not converge on restrained minimalism by default.\n" +
       "- Realistic specific copy directions, no lorem ipsum.\n\n" +
       "LAYOUT IS YOURS TO INVENT (important): there is no template library and no preset skeleton. " +
       "Compose the page structure from scratch for THIS request — the hero composition over the video, the nav's shape, " +
@@ -1370,11 +1422,11 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "request would produce a visibly different page. Fill layout_concept and every section's layout field with that thinking.\n\n" +
       "Extract every specific requirement the user stated (exact copy, features, section names, colors) into must_honor. " +
       "Where the user was vague, make confident, tasteful decisions that fit their idea.\n" +
-      TASTE_BRIEF_RULES +
+      BRIEF_STRUCTURE_RULES +
       sceneContext
     );
 
-    const routerModel = getOpenRouterModel("google/gemini-3.1-flash-lite");
+    const routerModel = modelForTask("brief");
     const structuredLlm = routerModel.withStructuredOutput(BuildBriefSchema);
 
     try {
@@ -1444,7 +1496,7 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
   });
 
   const finalPrompt = brief
-    ? renderBuildBrief(brief, sceneAnalysis, luminance, photos ?? [])
+    ? renderBuildBrief(brief, sceneAnalysis, luminance, photos ?? [], designSystem)
     : `=== USER REQUEST ===\n${sitePrompt}\n=== END USER REQUEST ===\n\n` +
     `${renderReadabilityBlock(
       { text_scheme: luminance?.recommendedScheme ?? sceneAnalysis?.text_scheme ?? "light-text" },
@@ -1609,7 +1661,7 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
   const referenceImageUrl = state.reference_image_url;
   const referenceRole: ReferenceImageRole | null = referenceImageUrl
     ? await step.run("classify-followup-reference", async () => {
-      const roleModel = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(
+      const roleModel = modelForTask("utility").withStructuredOutput(
         z.object({
           role: z.enum(["START_FRAME", "SCENE_REFERENCE", "DESIGN_REFERENCE"]),
           reason: z.string().describe("One short sentence explaining the choice."),
@@ -1646,7 +1698,7 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
     : null;
 
   const intent = await step.run("classify-followup", async () => {
-    const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(FollowUpIntentSchema);
+    const model = modelForTask("utility").withStructuredOutput(FollowUpIntentSchema);
     try {
       return await model.invoke([
         new SystemMessage(
@@ -1789,7 +1841,7 @@ const followUpRouterNode = async (state: typeof AgentState.State, config: Runnab
   let editMode: "FULL" | "DIFF" = "FULL";
   if (getTemplate(state.templateId)) {
     editMode = await step.run("classify-template-edit-scope", async () => {
-      const model = getOpenRouterModel("google/gemini-3.1-flash-lite").withStructuredOutput(TemplateEditScopeSchema);
+      const model = modelForTask("utility").withStructuredOutput(TemplateEditScopeSchema);
       try {
         const scope = await model.invoke([
           new SystemMessage(

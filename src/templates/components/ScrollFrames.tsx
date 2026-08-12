@@ -51,7 +51,7 @@ const FADE = 0.22;
  * the whole video passes in under two screens of scroll, which is the
  * QuickTime-scrubber feel, while each beat still holds long enough to read.
  */
-const BEAT_SCROLL_VH = 0.7;
+const BEAT_SCROLL_VH = 0.9;
 
 export default function ScrollFrames({ beats = [], cta, tone = 'light' }: ScrollFramesProps) {
   const trackRef = useRef<HTMLDivElement>(null);

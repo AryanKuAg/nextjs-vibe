@@ -7,7 +7,7 @@ import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSys
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT, RUN_TIMEOUT } from "./types";
-import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent } from "./utils";
+import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent, createProgressGuard } from "./utils";
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
@@ -408,7 +408,7 @@ export const codeAgentFunction = inngest.createFunction(
         // verified against the live endpoint — so the parameter is real even
         // though the local type does not know about it.
         defaultParameters: {
-          reasoning_effort: modelFor("code").reasoningEffort || "max",
+          reasoning_effort: modelFor("code").reasoningEffort || "high",
         } as unknown as Parameters<typeof openai>[0]["defaultParameters"],
       });
 
@@ -575,7 +575,14 @@ export const codeAgentFunction = inngest.createFunction(
             if (entry.isDirectory()) {
               readDirRecursive(fullPath);
             } else {
-              const relativePath = path.relative(templatesDir, fullPath);
+              // path.relative returns OS-native separators, so on Windows this is
+              // "components\ScrollFrames.tsx". Every comparison below — and the
+              // sandbox path the file is eventually written to — is POSIX, so
+              // normalise once here rather than at each use.
+              const relativePath = path
+                .relative(templatesDir, fullPath)
+                .split(path.sep)
+                .join("/");
               // ScrollFrames only exists in full-page mode — hero uses a plain
               // <video>, standard has no video, and an unseeded video URL
               // placeholder would render a broken player.
@@ -1274,6 +1281,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     // --- 1. INITIAL GENERATION (The Creator) ---
     const initialAgent = createCodeAgentForAttempt(0, 0);
+    const initialGuard = createProgressGuard();
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,
       agents: [initialAgent],
@@ -1283,10 +1291,18 @@ export const codeAgentFunction = inngest.createFunction(
       // mid-build, never printed its summary, and a half-written site shipped.
       maxIter: 16,
       defaultState: state,
-      router: async ({ network }) => {
+      router: async ({ network, lastResult }) => {
         if (await checkCancellation(event.data.projectId)) return;
         // If we have a summary, we are done! Return nothing to stop the loop.
         if (network.state.data.summary) return;
+        if (initialGuard.stalled(lastResult)) {
+          console.error(
+            "DEBUG: Creator agent returned no tool calls and no text twice in a row — " +
+            "stopping instead of burning the remaining iterations. Usually the model " +
+            "failed to emit a valid tool call (OpenRouter finish_reason \"error\").",
+          );
+          return;
+        }
         return initialAgent; // Otherwise, run the agent
       },
       defaultModel: getCodeModel(),
@@ -1331,14 +1347,19 @@ export const codeAgentFunction = inngest.createFunction(
         { messages: previousMessages as Message[] },
       );
       const retryAgent = createCodeAgentForAttempt(0, 1);
+      const retryGuard = createProgressGuard();
       const retryNetwork = createNetwork<AgentState>({
         name: `coding-agent-network-run-${runId}-retry`,
         agents: [retryAgent],
         maxIter: 16,
         defaultState: retryState,
-        router: async ({ network }) => {
+        router: async ({ network, lastResult }) => {
           if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
+          if (retryGuard.stalled(lastResult)) {
+            console.error("DEBUG: Corrective attempt is barren too — stopping.");
+            return;
+          }
           return retryAgent;
         },
         defaultModel: getCodeModel(),
@@ -1359,6 +1380,19 @@ export const codeAgentFunction = inngest.createFunction(
       result = await retryNetwork.run(correctivePrompt, { state: retryState });
       if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };
       state.data.files = result.state.data.files;
+    }
+
+    // Both passes produced nothing at all. Continuing would deploy the untouched
+    // scaffold as if it were the user's site, and the fixer cannot help — there is
+    // no build error to fix, just an empty page. Fail loudly with the cause.
+    if (result && !hasRealChanges(result.state.data.files) && !isAsIsTemplateRemix) {
+      throw new Error(
+        `The code agent wrote no files across both attempts. This is usually the model ` +
+        `failing to emit valid tool calls — check the step output for ` +
+        `finish_reason "error" / native_finish_reason "MALFORMED_FUNCTION_CALL", which ` +
+        `means MODEL_CODE (${modelFor("code").model}) cannot drive this agent's tools ` +
+        `reliably. Switch MODEL_CODE to a stronger tool-calling model.`
+      );
     }
 
     // On an as-is remix no agent ran, so the seeded template files are final.
@@ -1671,14 +1705,19 @@ fixPaths(process.argv[2]);
         },
       });
 
+      const fixerGuard = createProgressGuard();
       const fixerNetwork = createNetwork<AgentState>({
         name: `fixer-network-run-${runId}-attempt-${attempt}`,
         agents: [fixerAgent],
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
-        router: async ({ network }) => {
+        router: async ({ network, lastResult }) => {
           if (await checkCancellation(event.data.projectId)) return;
           if (network.state.data.summary) return;
+          if (fixerGuard.stalled(lastResult)) {
+            console.error(`DEBUG: Fixer attempt ${attempt} is barren — stopping this attempt.`);
+            return;
+          }
           return fixerAgent;
         },
         defaultModel: modelForTask("fixer"),

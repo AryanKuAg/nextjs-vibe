@@ -145,6 +145,7 @@ How to use it — this exact shape, at the root of App.tsx:
   <Navbar />
   <ScrollFrames
     tone="light"                              // "light" or "dark" — match the brief's text scheme
+    placement="bottom-left"                   // where the copy sits over the video — SEE BELOW
     cta={{ label: "Two or three words", href: "#first-section-id" }}
     beats={[
       { headline: "Short line", body: "One or two sentences." },
@@ -162,7 +163,8 @@ Beat rules (this is the part that makes or breaks the effect):
 1. Use the beats from the Build Brief, in order. 3 to 5 of them.
 2. A beat is a headline plus one or two sentences. NOTHING ELSE — no eyebrow labels, no numbering ("01", "02", "Chapter 3"), no stat rows, no cards, no lists, no icons, no scroll cues. Numbers and labels here look cheap and are banned.
 3. Only the FIRST beat carries the CTA, passed via the \`cta\` prop. Never put a CTA on the others.
-4. Do NOT build your own section wrappers, headings, or layout over the video. ScrollFrames renders every beat itself, bottom-left, at the right size. Your only job is the copy.
+4. Do NOT build your own section wrappers, headings, or layout over the video. ScrollFrames renders every beat itself, at the right size. Your job is the copy AND the \`placement\` prop.
+   PLACEMENT — pick the one this brand calls for, from the brief's layout concept: "bottom-left" (the classic, grounded and cinematic), "bottom-right", "center-left", "center" (formal, symmetrical, best for a single strong claim), "top-left" (editorial, masthead-like). This was hardcoded to bottom-left and it made every full-page site open identically — choosing the same one every time is the failure this prop exists to fix. Anything outside that list falls back to bottom-left.
 5. Nothing else may be layered over the video. No sections, no cards, no images, no decorative elements. The navbar is the single exception.
 
 Structural rules (breaking any of these visibly breaks the site):
@@ -298,13 +300,20 @@ Hero rules:
 2. The video is a native <video> element with EXACTLY this URL: "${videoUrl}"
    <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />
 3. THE HERO IS NEVER VIDEO-ONLY (CRITICAL): the site's main headline, subtext, and primary CTA MUST render INSIDE the hero section, layered above the video with relative z-10. Leaving the hero as a bare video and starting the text content in the section below it is a FAILURE. The navbar also sits inside/over the hero at the top.
-4. Correct hero structure (follow this shape — NO overlay div):
-   <section className="relative min-h-[100dvh] overflow-hidden flex items-center justify-center">
+4. Required LAYERING (this part is fixed — NO overlay div). The COMPOSITION is not:
+   <section className="relative min-h-[100dvh] overflow-hidden">
      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src="${videoUrl}" />
-     <div className="relative z-10 text-center px-6">
-       {/* headline + subtext + CTA here — real content from the brief */}
+     <div className="relative z-10 ...">   {/* ← you compose this container */}
+       {/* headline + subtext + CTA — real content from the brief */}
      </div>
    </section>
+   COMPOSE THE HERO FROM THE BRIEF, DO NOT CENTRE IT BY DEFAULT. A centred stack was hardcoded here
+   and it made every hero-video site on the platform identical. The brief's layout concept states
+   where the headline sits — read it and build that. Bottom-left anchored with the CTA inline,
+   split across the viewport with the headline left and the supporting line right, a corner-anchored
+   block with a stat strip along the base, an oversized headline bleeding past the container: all
+   valid. Centred is ONE option among many and needs a reason. Whatever you choose, the headline,
+   supporting line and CTA are all inside the hero and fully visible in the first viewport.
 5. Readability over the hero video: ZERO overlays and ZERO shadows ON THE HERO ITSELF (below the hero, both are yours to use). Follow the Build Brief's "Background video & readability" block exactly — its text color scheme was chosen for this video. Every hero text element uses that text color, at heavy weight and generous size so it carries on contrast alone. Never add a gradient/tint/scrim over the hero video, never a glass/blur panel, and never a text-shadow, drop-shadow, box-shadow or glow on anything; if the brief gives no scheme, use plain white text (text-white) with a bold display weight.
 6. Do NOT use scrolly-video, ScrollyVideo, ScrollFrames, or any scroll-scrubbing library — this is a plain HTML5 video tag, no extra packages.
 

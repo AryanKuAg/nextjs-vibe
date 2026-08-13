@@ -45,12 +45,42 @@ export interface ScrollBeat {
   body: string;
 }
 
+/**
+ * Where the beats sit over the video.
+ *
+ * Hardcoded to the bottom-left for a long time, which meant every full-page site
+ * the platform produced opened with its headline in the same corner. The scrub
+ * track and the cross-fade are unchanged — only the anchor moves — so the
+ * signature effect is intact while the composition can differ per brand.
+ */
+export type BeatPlacement =
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'center-left'
+  | 'center'
+  | 'top-left';
+
+/**
+ * Alignment per placement. Deliberately flex-based rather than translate-based:
+ * the scroll handler writes `transform` on these elements for the fade, so a
+ * Tailwind -translate-y-1/2 would be overwritten on the first scroll event.
+ */
+const PLACEMENT_CLASSES: Record<BeatPlacement, string> = {
+  'bottom-left': 'items-end justify-start text-left px-6 pb-16 md:px-14 md:pb-20',
+  'bottom-right': 'items-end justify-end text-right px-6 pb-16 md:px-14 md:pb-20',
+  'center-left': 'items-center justify-start text-left px-6 md:px-14',
+  'center': 'items-center justify-center text-center px-6 md:px-14',
+  'top-left': 'items-start justify-start text-left px-6 pt-28 md:px-14 md:pt-32',
+};
+
 interface ScrollFramesProps {
   beats?: ScrollBeat[];
   /** Rendered under the first beat only. */
   cta?: { label: string; href: string };
   /** Matches the Build Brief's text scheme over the video. */
   tone?: 'light' | 'dark';
+  /** Composition of the copy over the video. Defaults to the original bottom-left. */
+  placement?: BeatPlacement;
 }
 
 /** Share of each beat's slot spent fading in, and again fading out. */
@@ -81,7 +111,7 @@ const opacityFor = (progress: number, index: number, count: number) => {
   return 1;
 };
 
-export default function ScrollFrames({ beats = [], cta, tone = 'light' }: ScrollFramesProps) {
+export default function ScrollFrames({ beats = [], cta, tone = 'light', placement = 'bottom-left' }: ScrollFramesProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -185,7 +215,7 @@ export default function ScrollFrames({ beats = [], cta, tone = 'light' }: Scroll
             ref={(el) => {
               beatRefs.current[index] = el;
             }}
-            className="absolute bottom-0 left-0 w-full max-w-[36rem] px-6 pb-16 md:px-14 md:pb-20"
+            className={`absolute inset-0 flex ${PLACEMENT_CLASSES[placement] ?? PLACEMENT_CLASSES['bottom-left']}`}
             style={{
               // First paint only — the effect takes over on mount. The opening
               // beat must be visible before any scroll happens.
@@ -195,27 +225,31 @@ export default function ScrollFrames({ beats = [], cta, tone = 'light' }: Scroll
               willChange: 'opacity, transform',
             }}
           >
-            <h2
-              className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.08]"
-              style={{ color: text }}
-            >
-              {beat.headline}
-            </h2>
-            <p
-              className="mt-4 text-base md:text-lg leading-relaxed max-w-[34rem]"
-              style={{ color: secondary }}
-            >
-              {beat.body}
-            </p>
-            {index === 0 && cta ? (
-              <a
-                href={cta.href}
-                className="mt-7 inline-block border px-6 py-3 text-sm font-medium tracking-wide transition-colors"
-                style={{ color: text, borderColor: text }}
+            {/* The outer element is the alignment box (inset-0 + flex), so the
+                copy needs its own measured column inside it. */}
+            <div className="w-full max-w-[36rem]">
+              <h2
+                className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.08]"
+                style={{ color: text }}
               >
-                {cta.label}
-              </a>
-            ) : null}
+                {beat.headline}
+              </h2>
+              <p
+                className="mt-4 text-base md:text-lg leading-relaxed"
+                style={{ color: secondary }}
+              >
+                {beat.body}
+              </p>
+              {index === 0 && cta ? (
+                <a
+                  href={cta.href}
+                  className="mt-7 inline-block border px-6 py-3 text-sm font-medium tracking-wide transition-colors"
+                  style={{ color: text, borderColor: text }}
+                >
+                  {cta.label}
+                </a>
+              ) : null}
+            </div>
           </div>
         ))}
       </div>

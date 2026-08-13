@@ -932,6 +932,49 @@ const BuildBriefSchema = z.object({
   heading_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Space Grotesk', 'Manrope', 'Playfair Display')"),
   body_font: z.string().describe("EXACT Google Fonts family name only, no annotations or parentheses (e.g. 'Inter', 'Manrope', 'IBM Plex Sans')"),
   accent_color: z.string().describe("ONE accent color as a hex code fitting the brand. Never purple-pink gradient territory unless the user demands it."),
+  design_system: z.object({
+    rationale: z.string().describe(
+      "1-2 sentences: what this brand evokes, and the specific design decision you are making because of it. " +
+      "Name a real reference if one fits ('the quiet density of a Swiss rail timetable', 'a 70s paperback cover'). " +
+      "This is where the site stops being generic — be concrete about what makes THIS one different."
+    ),
+    page_mode: z.enum(["dark", "light"]).describe(
+      "Decided by the measured brightness of the background video, NOT by preference — the rule is stated in the " +
+      "readability block and you must follow it. A dark video gets a dark site; a bright video gets a light site. " +
+      "The page below the video has to feel like the same product as the hero above it."
+    ),
+    background: z.string().describe(
+      "Page background, hex, and it must be NEUTRAL — a near-black, charcoal, off-white, warm paper or cool grey. " +
+      "Its saturation must be very low: tint it toward the brand by a few percent at most. " +
+      "A coloured page background (pink, yellow, lime, bright blue) instantly reads cheap and unprofessional and is BANNED — " +
+      "colour belongs on the accent, on one band, and in the photography, never under the whole page. " +
+      "Match page_mode: dark mode means roughly #0A0A0C-#161616, light mode roughly #FAFAF8-#FFFFFF."
+    ),
+    foreground: z.string().describe("Body text on that background, hex. Must clear 4.5:1 against it."),
+    surface: z.string().describe(
+      "Card/panel fill, hex — one clear step from the background and equally NEUTRAL, never a saturated colour. " +
+      "In dark mode it is slightly lighter than the background; in light mode slightly darker or warmer."
+    ),
+    surface_foreground: z.string().describe("Text on the surface colour, hex."),
+    primary: z.string().describe("Primary brand colour for buttons and emphasis, hex."),
+    primary_foreground: z.string().describe("Text on primary, hex. Check contrast."),
+    muted_foreground: z.string().describe("Secondary/caption text, hex. Readable, not a whisper — 4.5:1 or better."),
+    border: z.string().describe("Hairline/border colour, hex."),
+    gradient_hero: z.string().describe(
+      "A CSS gradient built ONLY from the colours above, e.g. 'linear-gradient(135deg, #0B1220 0%, #16233B 100%)'. " +
+      "If this brand should have no gradient anywhere, return the single word 'none' — that is a real and often better answer."
+    ),
+    shadow_elevated: z.string().describe(
+      "One CSS box-shadow used for every raised element on the page, tinted with the primary colour rather than neutral black, " +
+      "e.g. '0 20px 50px -12px rgba(11,18,32,0.45)'. Return 'none' for a flat design that uses borders instead."
+    ),
+    radius: z.string().describe("ONE corner radius for the whole page, e.g. '0px', '4px', '14px', '9999px'. Sharp is a valid, strong choice."),
+    motion: z.string().describe("One easing + duration used everywhere, e.g. 'cubic-bezier(0.22, 1, 0.36, 1) 420ms'. Return 'none' for a deliberately static page."),
+  }).describe(
+    "INVENT the design system for THIS site rather than reaching for a default. These become the CSS variables in " +
+    "src/index.css and every section reads from them, so decide them once and commit. The category reference above is " +
+    "a starting position to react to, not values to copy — two sites in the same category must not share a palette."
+  ),
   nav_style: z.string().describe("One sentence: the navigation labels and CTA button wording"),
   layout_concept: z.string().describe(
     "3-5 sentences inventing the LAYOUT for THIS specific site, derived from the user's request — not a stock template. " +
@@ -1150,6 +1193,61 @@ function enforceLayoutVariety(brief: BuildBrief): void {
   }
 }
 
+/**
+ * The design system the brief INVENTED for this site, as the tokens to write.
+ *
+ * Emitted ahead of the category reference so the invented values are what the
+ * code agent reaches for first. Everything downstream reads from these
+ * variables, which is the point: deciding colour, radius, shadow and motion once
+ * is what makes a page look designed rather than assembled section by section.
+ */
+const renderInventedSystem = (brief: BuildBrief): string => {
+  const ds = brief.design_system;
+  if (!ds) return "";
+
+  const optional = (label: string, value: string) =>
+    value && value.trim().toLowerCase() !== "none"
+      ? `  ${label}: ${value};`
+      : `  /* ${label}: deliberately none for this site */`;
+
+  return `DESIGN SYSTEM INVENTED FOR THIS SITE — write these into the ":root { ... }" block of
+src/index.css, replacing the values already there, and leave the "@theme inline" block below it
+exactly as it is (that block is what turns these into bg-background / text-muted-foreground /
+border-border, and overwriting it silently unstyles the whole site).
+
+Why this system: ${ds.rationale}
+Page mode: ${ds.page_mode.toUpperCase()} — chosen from the video's measured brightness, not preference.
+
+  --background: ${ds.background};
+  --foreground: ${ds.foreground};
+  --card: ${ds.surface};
+  --card-foreground: ${ds.surface_foreground};
+  --primary: ${ds.primary};
+  --primary-foreground: ${ds.primary_foreground};
+  --muted: ${ds.surface};
+  --muted-foreground: ${ds.muted_foreground};
+  --accent: ${brief.accent_color};
+  --border: ${ds.border};
+  --input: ${ds.border};
+  --ring: ${ds.primary};
+  --radius: ${ds.radius};
+${optional("--gradient-hero", ds.gradient_hero)}
+${optional("--shadow-elevated", ds.shadow_elevated)}
+${optional("--ease-brand", ds.motion)}
+
+Use them everywhere: shadow-[var(--shadow-elevated)], bg-[image:var(--gradient-hero)],
+ease-[var(--ease-brand)]. Two sections that need the same treatment use the SAME token — that
+repetition is what reads as designed. Re-inventing a shadow per section is what reads as generated.
+
+SECTION BACKGROUNDS STAY NEUTRAL. The page background and every panel come from --background and
+--card above, which are deliberately near-neutral. Never give a section a saturated fill — no pink,
+yellow, lime or bright blue bands. Colour on this page comes from the accent used sparingly, from
+the single accent-surface section, and from the photography. A colourful section background is the
+fastest way to make a site look cheap, and it is not a style choice available here.
+
+`;
+};
+
 const renderReadabilityBlock = (
   brief: Pick<BuildBrief, "text_scheme">,
   scene: SceneAnalysis | null,
@@ -1233,6 +1331,7 @@ Typography: headings "${brief.heading_font}", body "${brief.body_font}" (import 
 Accent color: ${brief.accent_color} (the ONLY accent — everything else stays neutral)
 Navigation: ${brief.nav_style}
 
+${renderInventedSystem(brief)}
 ${designSystem ? renderDesignSystem(designSystem) + "\n" : ""}${DESIGN_DIRECTIONS[brief.design_direction]}
 This direction governs the whole page. It outranks your defaults: if it says sharp corners, nothing is rounded; if it says minimal motion, nothing loops.
 
@@ -1371,9 +1470,11 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       `- Brightness: ${sceneAnalysis.brightness}; dominant colors: ${sceneAnalysis.dominant_colors.join(", ")}\n` +
       `- Recommended accent: ${sceneAnalysis.accent_suggestion} (use this or a close refinement — the accent must harmonize with these scene colors while staying clearly visible against them)\n` +
       `- text_scheme MUST be "${sceneAnalysis.text_scheme}". There are NO overlays/scrims/blur and NO shadows anywhere on the site — text sits directly over the video and stays readable via this text color and heavy type alone.\n` +
+      `- design_system.page_mode MUST be "${sceneAnalysis.text_scheme === "light-text" ? "dark" : "light"}". The frame is ${sceneAnalysis.brightness}, so the site below the video follows it — a dark video over a blinding white page (or the reverse) reads as two different products bolted together. This follows from the measurement, not from taste.\n` +
+      "- The scene's dominant colours belong in the ACCENT, never in the page background: design_system.background and .surface stay near-neutral regardless of how colourful the footage is.\n" +
       "- Pick heading/body fonts whose personality matches this scene's mood.\n" +
       "- Do NOT invent or embellish scene visuals beyond this analysis — if it says the scene could not be analyzed, design for an unknown mixed-brightness video and never describe imaginary scenery in the brief."
-      : "\n\nNo scene analysis available: set text_scheme to \"light-text\" (a safe default for an unknown video). Still NO overlays or blur anywhere.";
+      : "\n\nNo scene analysis available: set text_scheme to \"light-text\" and design_system.page_mode to \"dark\" (the safe pair for an unknown video). Still NO overlays or blur anywhere, and the page background stays near-neutral.";
 
     const designSystemContext = designSystem
       ? "\n\nDESIGN SYSTEM MATCHED TO THIS REQUEST (use it — it is curated and contrast-checked):\n" +

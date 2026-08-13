@@ -47,14 +47,11 @@ interface AgentState {
 // Scaffold App.tsx used when the site has NO full-page scroll video (hero-only
 // and standard modes). The default template App.tsx imports ScrollFrames, which
 // is deliberately not seeded in these modes — seeding it would not compile.
+// Deliberately empty below the navbar, for the same reason the FULL_PAGE
+// scaffold is: seeding Hero/Features/Story/Details produced every site as those
+// same slots with new copy. The hero itself is composed from the brief.
 const NON_FULL_PAGE_APP_SEED = `// @ts-nocheck
 import { Navbar } from "./components/Navbar";
-
-import { Hero } from "./components/sections/Hero";
-import { Features } from "./components/sections/Features";
-import { Story } from "./components/sections/Story";
-import { Details } from "./components/sections/Details";
-import { Footer } from "./components/sections/Footer";
 
 export default function App() {
   return (
@@ -62,11 +59,7 @@ export default function App() {
       <Navbar />
 
       <main className="w-full relative z-10 flex flex-col">
-        <Hero />
-        <Features />
-        <Story />
-        <Details />
-        <Footer />
+        {/* Build the brief's hero and sections here, as components you create. */}
       </main>
     </>
   );
@@ -1170,8 +1163,8 @@ export const codeAgentFunction = inngest.createFunction(
       currentPrompt = `${event.data.value}\n\n`;
       currentPrompt += `=== STARTER SCAFFOLD (current project files) ===\n`;
       currentPrompt += `This is a BRAND NEW project. The files below are a generic scaffold seeded by the platform — their copy, styling, and section content are PLACEHOLDERS.\n`;
-      currentPrompt += `You MUST replace the placeholder content of App.tsx, index.css, index.html, and every section/component so the finished site matches the brief above. Keep the structural wiring intact` +
-        (mode === "FULL_PAGE" ? ` (in particular: <ScrollFrames /> stays the first child of App.tsx — never modify or recreate ScrollFrames itself)` : "") + `.\n\n`;
+      currentPrompt += `The scaffold below is EMPTY on purpose — it is wiring, not a page. There is no section layout to preserve and no slots to refill: compose the page yourself from the brief's sections, as components you create, in the shapes its layout concept calls for. Replace the placeholder content of App.tsx, index.css and index.html entirely` +
+        (mode === "FULL_PAGE" ? `. The ONE thing that must stay is <ScrollFrames /> as the first child of App.tsx — never modify or recreate ScrollFrames itself, and replace every one of its placeholder beats with the brief's copy` : "") + `.\n\n`;
       currentPrompt += renderFiles(initialFiles as Record<string, string>);
       currentPrompt += `=== END STARTER SCAFFOLD ===`;
     } else {
@@ -1333,6 +1326,31 @@ export const codeAgentFunction = inngest.createFunction(
     const hasRealChanges = (files: Record<string, string> | undefined) =>
       Object.entries(files || {}).some(([p, c]) => seedFiles[p] !== c);
 
+    /**
+     * Scaffold copy that reached production.
+     *
+     * "some file differs from the seed" was too weak a test: a run that edited a
+     * section component but never touched App.tsx passed it, and a build shipped
+     * with the scaffold's own beats still on screen — "Third beat / The last
+     * thing worth saying before the page proper begins" — over a video that had
+     * nothing to do with the request. These strings are the scaffold's, so
+     * finding one in the output means the agent did not finish, whatever else it
+     * changed.
+     */
+    const SCAFFOLD_PLACEHOLDERS = [
+      "Replace this headline",
+      "Second beat",
+      "Third beat",
+      "The last thing worth saying before the page proper begins",
+      "Replace me",
+      "One or two sentences of real copy",
+    ];
+
+    const placeholdersLeft = (files: Record<string, string> | undefined) => {
+      const app = (files || {})["src/App.tsx"] ?? "";
+      return SCAFFOLD_PLACEHOLDERS.filter((s) => app.includes(s));
+    };
+
     // A remixed template is already a complete, working site. "Build it as-is"
     // legitimately changes nothing, so an untouched template is a valid result —
     // only nag when the user actually asked for something.
@@ -1342,7 +1360,15 @@ export const codeAgentFunction = inngest.createFunction(
     // sections under it ships as a success. An unfinished build gets the same
     // corrective attempt as an empty one.
     const unfinished = Boolean(result) && !result!.state.data.summary;
-    if (result && (!hasRealChanges(result.state.data.files) || unfinished) && !isAsIsTemplateRemix) {
+    const leftovers = result ? placeholdersLeft(result.state.data.files) : [];
+    const shippedPlaceholders = leftovers.length > 0 && !isAsIsTemplateRemix;
+    if (shippedPlaceholders) {
+      console.error(
+        `DEBUG: App.tsx still contains scaffold placeholder copy (${leftovers.join(", ")}). ` +
+        `The agent did not replace the beats. Running a corrective attempt...`,
+      );
+    }
+    if (result && (!hasRealChanges(result.state.data.files) || unfinished || shippedPlaceholders) && !isAsIsTemplateRemix) {
       console.warn(
         unfinished
           ? "DEBUG: Creator agent stopped without a task summary (ran out of iterations). Running one corrective attempt..."
@@ -1385,9 +1411,11 @@ export const codeAgentFunction = inngest.createFunction(
       const correctiveAction = editMode === "DIFF"
         ? "Call the applyDiff tool now with an exact search snippet"
         : "Call the editFiles tool now with the actual file contents";
-      const correctivePrompt = currentPrompt + (unfinished
-        ? `\n\n⚠️ PREVIOUS ATTEMPT RAN OUT OF TIME: you stopped part-way through and never printed the task summary, so the site shipped unfinished. Work FASTER this time: batch four files per editFiles call, write every section component the brief lists, and do not re-read files you have already written. The ${correctiveGoal}. Finish, THEN print the task summary.`
-        : `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`);
+      const correctivePrompt = currentPrompt + (shippedPlaceholders
+        ? `\n\n⚠️ PREVIOUS ATTEMPT SHIPPED THE SCAFFOLD: src/App.tsx still contains the placeholder copy ${leftovers.map((s) => `"${s}"`).join(", ")}. Those strings are the empty scaffold's, not this brand's, and they were visible on the live site. Rewrite App.tsx now: every <ScrollFrames /> beat carries the brief's own headline and body, and the cta label is real copy. Then build the brief's sections. THEN print the task summary.`
+        : unfinished
+          ? `\n\n⚠️ PREVIOUS ATTEMPT RAN OUT OF TIME: you stopped part-way through and never printed the task summary, so the site shipped unfinished. Work FASTER this time: batch four files per editFiles call, write every section component the brief lists, and do not re-read files you have already written. The ${correctiveGoal}. Finish, THEN print the task summary.`
+          : `\n\n⚠️ PREVIOUS ATTEMPT FAILED: you finished without writing any files. That is not acceptable — the ${correctiveGoal}. ${correctiveAction}, THEN print the task summary.`);
 
       result = await retryNetwork.run(correctivePrompt, { state: retryState });
       if (await checkCancellation(event.data.projectId)) return { status: 'manually_stopped' };

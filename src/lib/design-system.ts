@@ -99,6 +99,30 @@ const weight = (keyword: string) =>
 /** Below this, the evidence is too thin to justify forcing a design system. */
 const MATCH_THRESHOLD = 3.5;
 
+/**
+ * Stable 32-bit hash of the request (FNV-1a).
+ *
+ * The catalogue lookup used to be a pure argmax, which meant every real-estate
+ * brief in the product's lifetime resolved to the same row and therefore the
+ * same teal and the same two fonts — the table was not merely failing to create
+ * variety, it was guaranteeing sameness inside a category. Wherever several
+ * candidates are genuinely defensible, the choice is now spread across them by
+ * this hash: deterministic for one exact prompt (a rerun reproduces its site),
+ * divergent between two prompts that happen to land on the same product.
+ */
+const hashPrompt = (text: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+/** Splits "Soft UI Evolution, Minimalism" / "Glassmorphism + Flat Design" into parts. */
+const styleParts = (value: string) =>
+  value.split(/\s*[+,]\s*/).map((p) => p.trim()).filter(Boolean);
+
 function scoreProduct(product: Product, prompt: string, promptWords: Set<string>): number {
   let score = 0;
 
@@ -138,23 +162,30 @@ function findStyle(name: string): Style | null {
   return null;
 }
 
-function findFonts(product: Product, style: Style | null): FontPairing | null {
+function findFonts(product: Product, style: Style | null, seed: number): FontPairing | null {
   const haystack = `${product.type} ${product.keywords.join(" ")} ${product.paletteFocus} ${style?.name ?? ""}`.toLowerCase();
   const hay = new Set(words(haystack));
 
-  let best: FontPairing | null = null;
-  let bestScore = 0;
-
+  const scored: { pairing: FontPairing; score: number }[] = [];
   for (const pairing of typography) {
     let score = 0;
     for (const mood of pairing.mood) if (hay.has(mood)) score += 2;
     for (const word of words(pairing.bestFor)) if (hay.has(word)) score += 1;
-    if (score > bestScore) { bestScore = score; best = pairing; }
+    if (score > 0) scored.push({ pairing, score });
   }
 
   // Deliberately no fallback to a default pairing: an unmatched brief should let
   // the model choose its own fonts rather than everyone landing on the same one.
-  return bestScore > 0 ? best : null;
+  if (scored.length === 0) return null;
+
+  // Any pairing within one point of the best is an equally defensible fit for
+  // this product, so the request picks among them instead of always taking the
+  // argmax. That is what stops every SaaS site opening in the same two faces.
+  scored.sort((a, b) => b.score - a.score);
+  const cutoff = scored[0].score - 1;
+  const viable = scored.filter((s) => s.score >= cutoff).slice(0, 4);
+
+  return viable[seed % viable.length].pairing;
 }
 
 /**
@@ -179,13 +210,19 @@ export function resolveDesignSystem(sitePrompt: string): DesignSystem | null {
   const palette = palettes[String(best.id)];
   if (!palette) return null;
 
-  const style = findStyle(best.style);
+  // The catalogue lists a primary style plus alternates that suit the same
+  // product. Treating only the primary as valid is why one product always
+  // produced one look; all of them are in play, picked by the request.
+  const seed = hashPrompt(sitePrompt.trim().toLowerCase());
+  const candidates = [...styleParts(best.style), ...styleParts(best.alternateStyles)];
+  const resolved = candidates.map(findStyle).filter((s): s is Style => Boolean(s));
+  const style = resolved.length > 0 ? resolved[seed % resolved.length] : findStyle(best.style);
 
   return {
     productType: best.type,
     style,
     palette,
-    fonts: findFonts(best, style),
+    fonts: findFonts(best, style, seed),
     landingPattern: best.landingPattern,
     notes: best.notes,
   };
@@ -223,13 +260,14 @@ export function renderDesignSystem(system: DesignSystem): string {
   ].join("\n");
 
   const lines: string[] = [
-    `Design system for the sections BELOW the video (matched to "${system.productType}"):`,
+    `REFERENCE POINT — how sites in the "${system.productType}" category usually look.`,
+    `This is a starting position, NOT a specification. It exists so a law firm does not open in`,
+    `candy colours, and nothing more. You are designing THIS brand: depart from any of it the moment`,
+    `the request justifies something better, and say so in the brief. Two requests that land in the`,
+    `same category must still produce two different-looking sites — if you adopt this wholesale every`,
+    `${system.productType} site we build will be identical, which is the failure we are trying to avoid.`,
     ``,
-    `PALETTE — src/index.css already contains a ":root { ... }" block and an "@theme inline { ... }" block`,
-    `below it. REPLACE THE VALUES INSIDE :root with these, and leave @theme inline exactly as it is —`,
-    `that block is what turns these variables into the bg-background / text-muted-foreground / border-border`,
-    `utilities, and rewriting the file over the top of it silently unstyles the whole site.`,
-    `Do not add colours anywhere else; everything on the page reads from here.`,
+    `Palette to react to (hex, and the shape the final tokens take):`,
     tokens,
     `  --radius: 0.625rem;`,
   ];
@@ -237,9 +275,9 @@ export function renderDesignSystem(system: DesignSystem): string {
   if (system.fonts) {
     lines.push(
       ``,
-      `TYPOGRAPHY — "${system.fonts.name}": ${system.fonts.heading} for headings, ${system.fonts.body} for body.`,
-      `Import at the very top of src/index.css:`,
-      system.fonts.cssImport,
+      `TYPOGRAPHY the category leans on — "${system.fonts.name}": ${system.fonts.heading} headings, ${system.fonts.body} body.`,
+      `Use it only if it genuinely suits THIS brand. A different pairing that fits better is the right answer,`,
+      `and you must put whichever you choose in heading_font / body_font with its Google Fonts @import.`,
     );
   }
 

@@ -1599,7 +1599,7 @@ const codeGenerationNode = async (state: typeof AgentState.State, config: Runnab
       value: codeInstruction,
       videoUrl: state.video_url || undefined,
       experiencePref: state.experiencePref || undefined,
-      model: "google/gemini-3.1-flash-lite",
+      model: "google/gemini-3.5-flash-lite",
       userId: state.userId,
       editMode,
       // A layout/UI the user wants reproduced. Only forwarded for that role — a

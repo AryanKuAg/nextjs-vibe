@@ -17,7 +17,7 @@ import { isVideoStepCard } from "./agent-status";
 import { cn } from "@/lib/utils";
 
 type ModelId =
-  | "google/gemini-3.1-flash-lite";
+  | "google/gemini-3.5-flash-lite";
 
 interface Props {
   projectId: string;
@@ -48,7 +48,7 @@ export const MessageForm = ({ projectId, stage = "SITE", isGenerating, initialPr
   const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const selectedModel: ModelId = "google/gemini-3.1-flash-lite";
+  const selectedModel: ModelId = "google/gemini-3.5-flash-lite";
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isInteractiveSubmitting, setIsInteractiveSubmitting] = useState(false);

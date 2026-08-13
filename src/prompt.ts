@@ -197,6 +197,21 @@ USE THE THEME UTILITIES, NOT HARD-CODED COLOUR. index.css maps the palette to re
   bg-muted · text-muted-foreground · bg-accent · border-border · ring-ring · rounded-lg (reads --radius)
 A hex value in a className is almost always a mistake: it escapes the theme and the section stops matching the rest of the page.
 
+THE TOKENS HOLD HEX, NOT HSL TRIPLETS. :root contains values like \`--primary: #2563EB\`, so reference them directly — \`var(--primary)\`. NEVER write \`hsl(var(--primary))\`: that is the convention from a different shadcn setup, and against these values it produces an invalid colour that silently renders as nothing, which is how a page ends up looking half-styled. For a translucent tint use \`color-mix(in oklab, var(--primary) 8%, transparent)\`.
+
+### DECIDE THE SIGNATURE EFFECTS ONCE, THEN REUSE THEM BY NAME
+The palette is handed to you; the EFFECTS are not. A page reads as assembled-by-machine when every section invents its own shadow, its own gradient and its own easing. Choose them ONCE, beside the palette in :root, and use them everywhere:
+  --gradient-hero, --gradient-subtle   built from the palette tokens, never from new colours
+  --shadow-soft, --shadow-elevated     tinted with the primary colour, not neutral black
+  --ease-brand                         one curve and duration for every transition on the page
+Reference them as arbitrary values: \`shadow-[var(--shadow-elevated)]\`, \`bg-[image:var(--gradient-hero)]\`, \`ease-[var(--ease-brand)]\`.
+Two sections that both need a raised panel use the SAME token. That repetition is exactly what makes a page look designed — \`shadow-2xl\` on one card and \`shadow-md\` on the next is the tell.
+
+### STOCK shadcn VARIANTS ARE THE "GENERATED SITE" TELL — CUSTOMISE THEM
+The defaults are a neutral starting point, not the design. A page where every button is the stock \`default\` button and every card is the stock card is recognisable as machine-made no matter how good the layout is. Add variants that belong to THIS brand in src/components/ui/button.tsx (and card.tsx if it needs one), built from the theme tokens, then use them BY NAME:
+  variants: { variant: { hero: "...", accentBand: "..." } }   // name them for where they are used
+Reuse each variant everywhere that role appears. Never patch a stock variant with a pile of inline overrides at the call site (\`<Button className="bg-... text-... border-... rounded-...">\`) — that is the same job done worse, and it drifts between sections.
+
 CAROUSEL: a gallery of photographs is a carousel, not a row of mismatched rectangles. Use it when a section has 3 or more images.
 
 THESE ARE CONTROLS AND CONTAINERS ONLY. shadcn has no opinion about layout, and neither should you take one from it. How the page is composed — what goes where, how sections are structured, what shape the page has — is entirely yours to invent.
@@ -307,6 +322,9 @@ const CHECKLIST_SHARED = `
 - No invented image URLs, no CSS background-image, no image placeholder boxes; the only <img> tags are brief-supplied URLs in sections below the video
 - No Lucide brand icons (Facebook/Twitter/Instagram/Linkedin/Github/Youtube)
 - Every import used, every used symbol imported, relative paths only
+- No \`hsl(var(--token))\` anywhere — the palette tokens hold hex, so they are referenced as \`var(--token)\`
+- The signature effect variables (gradient / shadow / easing) are defined once in :root and reused by name, not re-invented per section
+- At least one branded button variant was added and used by name, instead of stock variants patched with inline colour overrides at the call site
 - Framer Motion imported from "framer-motion", named easings only, every variants const annotated with ": Variants"
 - index.html <title> and emoji-SVG favicon updated to match the site
 - Fonts imported at the top of src/index.css
@@ -404,7 +422,7 @@ The environment rules above describe the platform's OWN starter scaffold. This p
 If you find yourself "fixing" template code that was not part of the request, stop — that is the single most common way this task fails.
 
 ## RULES
-1. START BY READING. Use readFiles to inspect the files you intend to change before you change them. Never guess at a file's contents.
+1. THE TEMPLATE SOURCE IS ALREADY IN FRONT OF YOU. Every file is included verbatim in your task input above — locate what you need there and never guess at a file's contents. Do NOT call readFiles on a file that is already shown: it costs a full round trip and returns text you already have. Use readFiles only for a path that is genuinely absent from the task input.
 2. CHANGE ONLY WHAT WAS ASKED. If the user asks for a furniture store, rewrite the copy, the brand name, and the palette. Do NOT restructure sections, swap the layout, remove animations, or "improve" spacing that nobody complained about.
 3. TOUCH THE FEWEST FILES POSSIBLE. A copy change is a copy change; it is not a reason to rewrite App.tsx.
 4. KEEP THE MOTION. The template's animations, scroll behaviour, and transitions are part of what the user selected. Preserve them unless the request is explicitly about motion.

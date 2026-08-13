@@ -7,7 +7,7 @@ import { FIXER_PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT, buildCodeAgentSys
 
 import { inngest } from "./client";
 import { SANDBOX_TIMEOUT, RUN_TIMEOUT } from "./types";
-import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent, createProgressGuard } from "./utils";
+import { getSandbox, parseAgentOutput, lastAssistantTextMessageContent, createProgressGuard, createTurnTracker } from "./utils";
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, isR2Configured, r2PublicBase, contentTypeFor, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
@@ -1219,7 +1219,7 @@ export const codeAgentFunction = inngest.createFunction(
           const { HumanMessage, SystemMessage } = await import("@langchain/core/messages");
 
           const vision = new ChatOpenAI({
-            modelName: "google/gemini-3.1-flash-lite",
+            modelName: "google/gemini-3.5-flash-lite",
             apiKey: process.env.OPENROUTER_API_KEY!,
             configuration: { baseURL: "https://openrouter.ai/api/v1" },
           });
@@ -1282,6 +1282,7 @@ export const codeAgentFunction = inngest.createFunction(
     // --- 1. INITIAL GENERATION (The Creator) ---
     const initialAgent = createCodeAgentForAttempt(0, 0);
     const initialGuard = createProgressGuard();
+    const initialTurns = createTurnTracker("creator");
     const initialNetwork = createNetwork<AgentState>({
       name: `coding-agent-network-run-${runId}-initial`,
       agents: [initialAgent],
@@ -1292,10 +1293,15 @@ export const codeAgentFunction = inngest.createFunction(
       maxIter: 16,
       defaultState: state,
       router: async ({ network, lastResult }) => {
+        initialTurns.record(lastResult);
         if (await checkCancellation(event.data.projectId)) return;
         // If we have a summary, we are done! Return nothing to stop the loop.
-        if (network.state.data.summary) return;
+        if (network.state.data.summary) {
+          initialTurns.log();
+          return;
+        }
         if (initialGuard.stalled(lastResult)) {
+          initialTurns.log();
           console.error(
             "DEBUG: Creator agent returned no tool calls and no text twice in a row — " +
             "stopping instead of burning the remaining iterations. Usually the model " +
@@ -1348,16 +1354,22 @@ export const codeAgentFunction = inngest.createFunction(
       );
       const retryAgent = createCodeAgentForAttempt(0, 1);
       const retryGuard = createProgressGuard();
+      const retryTurns = createTurnTracker("retry");
       const retryNetwork = createNetwork<AgentState>({
         name: `coding-agent-network-run-${runId}-retry`,
         agents: [retryAgent],
         maxIter: 16,
         defaultState: retryState,
         router: async ({ network, lastResult }) => {
+          retryTurns.record(lastResult);
           if (await checkCancellation(event.data.projectId)) return;
-          if (network.state.data.summary) return;
+          if (network.state.data.summary) {
+            retryTurns.log();
+            return;
+          }
           if (retryGuard.stalled(lastResult)) {
             console.error("DEBUG: Corrective attempt is barren too — stopping.");
+            retryTurns.log();
             return;
           }
           return retryAgent;
@@ -1706,16 +1718,22 @@ fixPaths(process.argv[2]);
       });
 
       const fixerGuard = createProgressGuard();
+      const fixerTurns = createTurnTracker(`fixer-${attempt}`);
       const fixerNetwork = createNetwork<AgentState>({
         name: `fixer-network-run-${runId}-attempt-${attempt}`,
         agents: [fixerAgent],
         maxIter: 3,
         defaultState: fixerState, // <--- USE THE CLEAN STATE HERE
         router: async ({ network, lastResult }) => {
+          fixerTurns.record(lastResult);
           if (await checkCancellation(event.data.projectId)) return;
-          if (network.state.data.summary) return;
+          if (network.state.data.summary) {
+            fixerTurns.log();
+            return;
+          }
           if (fixerGuard.stalled(lastResult)) {
             console.error(`DEBUG: Fixer attempt ${attempt} is barren — stopping this attempt.`);
+            fixerTurns.log();
             return;
           }
           return fixerAgent;
@@ -2091,7 +2109,7 @@ export const veoGenerateFunction = inngest.createFunction(
               await import("@/lib/media-prompts");
 
             const routerModel = new ChatOpenAI({
-              modelName: "google/gemini-3.1-flash-lite",
+              modelName: "google/gemini-3.5-flash-lite",
               apiKey: process.env.OPENROUTER_API_KEY!,
               configuration: { baseURL: "https://openrouter.ai/api/v1" },
             });

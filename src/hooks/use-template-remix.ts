@@ -51,7 +51,7 @@ export const useTemplateRemix = () => {
     setIsRedirecting(true);
     // The project page reads these on mount and auto-submits the first build.
     sessionStorage.setItem("pending_builder_prompt", value);
-    sessionStorage.setItem("pending_model", "google/gemini-3.1-flash-lite");
+    sessionStorage.setItem("pending_model", "google/gemini-3.5-flash-lite");
 
     try {
       await createProject.mutateAsync({ value, templateId });

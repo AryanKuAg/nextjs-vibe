@@ -65,6 +65,55 @@ export function createProgressGuard(limit = 2) {
   };
 }
 
+/**
+ * Wall-clock accounting for one agent network, printed as a single line at the end.
+ *
+ * A slow build is not diagnosable from the Inngest UI without clicking each
+ * `code-agent-run` span in turn and reading its metadata one at a time. The
+ * interesting quantities are aggregate — how many turns did the loop take, and
+ * how was the time distributed across them — because those decide whether a
+ * build is slow due to token volume per turn (fix: reasoning effort, smaller
+ * writes) or due to turn count (fix: fewer round trips, parallelism).
+ *
+ * `record` is called from the router, which runs once after each turn, so an
+ * interval spans one LLM call PLUS the tool execution it triggered. That is
+ * deliberate: it is the wall-clock the user actually waits through. Compare the
+ * per-turn ms here against `output_tokens` on the matching span to get the
+ * effective tokens/sec.
+ */
+export function createTurnTracker(label: string) {
+  const startedAt = Date.now();
+  let lastMark = startedAt;
+  const turns: { ms: number; chars: number; tools: number }[] = [];
+
+  return {
+    record(lastResult: AgentResult | undefined) {
+      if (!lastResult) return;
+      const now = Date.now();
+      turns.push({
+        ms: now - lastMark,
+        chars: (lastAssistantTextMessageContent(lastResult) ?? "").length,
+        tools: lastResult.toolCalls?.length ?? 0,
+      });
+      lastMark = now;
+    },
+    log() {
+      const totalMs = Date.now() - startedAt;
+      if (turns.length === 0) {
+        console.log(`[Turns:${label}] no turns recorded (${(totalMs / 1000).toFixed(1)}s)`);
+        return;
+      }
+      const secs = (ms: number) => (ms / 1000).toFixed(1);
+      const slowest = turns.reduce((a, b) => (b.ms > a.ms ? b : a));
+      console.log(
+        `[Turns:${label}] ${turns.length} turns in ${secs(totalMs)}s | ` +
+        `slowest ${secs(slowest.ms)}s | ` +
+        `per-turn ${turns.map((t) => `${secs(t.ms)}s/${t.tools}t`).join(" ")}`,
+      );
+    },
+  };
+}
+
 export const parseAgentOutput = (value: Message[] | undefined) => {
   if (!value || value.length === 0) {
     return undefined;

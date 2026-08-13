@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/client";
 import { Fragment } from "@prisma/client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
 import { FileExplorer } from "@/components/file-explorer";
@@ -51,6 +52,21 @@ export const ProjectView = ({ projectId }: Props) => {
 
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   const [isDownloading, startTransition] = useTransition();
+
+  // Fullscreen hides the chat column and lets the preview span the window. The
+  // sidebar is hidden with CSS rather than unmounted so that FragmentWeb's
+  // iframe keeps its state — unmounting it would reload the site on every
+  // toggle, which is exactly what someone inspecting a build does not want.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen]);
 
   const handleDownloadZip = () => {
     if (!activeFragment?.files) return;
@@ -105,13 +121,17 @@ export const ProjectView = ({ projectId }: Props) => {
           defaultSize={sidebarDefaultSize}
           minSize={sidebarMinSize}
           maxSize={sidebarMaxSize}
-          className="flex flex-col min-h-0 bg-transparent"
+          className={cn("flex flex-col min-h-0 bg-transparent", isFullscreen && "hidden")}
         >
-          <ErrorBoundary fallback={<p>Project header error</p>}>
-            <Suspense fallback={<p>Loading project...</p>}>
-              <ProjectHeader projectId={projectId} />
-            </Suspense>
-          </ErrorBoundary>
+          {/* Rendered here only when the sidebar is visible — the fullscreen
+              copy lives in the toolbar row, so exactly one is ever mounted. */}
+          {!isFullscreen && (
+            <ErrorBoundary fallback={<p>Project header error</p>}>
+              <Suspense fallback={<p>Loading project...</p>}>
+                <ProjectHeader projectId={projectId} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
 
           <ErrorBoundary fallback={<p>Messages container error</p>}>
             <Suspense fallback={<div className="flex-1 flex items-center justify-center"><i className="ri-loader-4-line animate-spin inline-block text-2xl text-white" /></div>}>
@@ -124,7 +144,7 @@ export const ProjectView = ({ projectId }: Props) => {
             </Suspense>
           </ErrorBoundary>
         </ResizablePanel>
-        <ResizableHandle className="w-px bg-transparent hover:bg-white-4 transition-colors" />
+        <ResizableHandle className={cn("w-px bg-transparent hover:bg-white-4 transition-colors", isFullscreen && "hidden")} />
         <ResizablePanel
           defaultSize={100 - sidebarDefaultSize}
           minSize={30}
@@ -137,6 +157,13 @@ export const ProjectView = ({ projectId }: Props) => {
             onValueChange={(value) => setTabState(value as "preview" | "code")}
           >
             <div className="w-full flex items-center py-2 pr-4 gap-x-[5px] h-[52px] shrink-0">
+              {isFullscreen && (
+                <ErrorBoundary fallback={<p>Project header error</p>}>
+                  <Suspense fallback={<p>Loading project...</p>}>
+                    <ProjectHeader projectId={projectId} />
+                  </Suspense>
+                </ErrorBoundary>
+              )}
               <TabsList className="h-7 p-0.5 rounded-[8px] bg-white-4">
                 <TabsTrigger value="preview" className="rounded-[6px] data-[state=active]:border-transparent data-[state=active]:shadow-none data-[state=active]:bg-white-4 text-white-50 data-[state=active]:text-white transition-colors ">
                   <i className="ri-eye-line px-1" />
@@ -184,6 +211,15 @@ export const ProjectView = ({ projectId }: Props) => {
                 >
                   <i className="ri-download-2-line text-base" />
                 </Button>
+                <Button
+                  className="h-7 w-7 p-0 rounded-[8px] bg-transparent hover:bg-white-4 text-white-85 hover:text-white border border-white-4 transition-colors"
+                  onClick={() => setIsFullscreen((prev) => !prev)}
+                  title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  aria-pressed={isFullscreen}
+                >
+                  <i className={cn("text-base", isFullscreen ? "ri-fullscreen-exit-line" : "ri-fullscreen-line")} />
+                </Button>
               </div>
 
               <div className="ml-auto flex items-center gap-x-1">
@@ -202,7 +238,8 @@ export const ProjectView = ({ projectId }: Props) => {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 w-full pb-3 pr-3">
+            {/* pl-3 only in fullscreen: normally the sidebar supplies that gap. */}
+            <div className={cn("flex-1 min-h-0 w-full pb-3 pr-3", isFullscreen && "pl-3")}>
               <div className="h-full w-full flex flex-col bg-bg border border-white-8 rounded-[12px] overflow-hidden relative">
                 <TabsContent value="preview" className="h-full m-0">
                   {activeFragment ? (

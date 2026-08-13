@@ -970,12 +970,32 @@ const BuildBriefSchema = z.object({
     ),
     radius: z.string().describe("ONE corner radius for the whole page, e.g. '0px', '4px', '14px', '9999px'. Sharp is a valid, strong choice."),
     motion: z.string().describe("One easing + duration used everywhere, e.g. 'cubic-bezier(0.22, 1, 0.36, 1) 420ms'. Return 'none' for a deliberately static page."),
-  }).describe(
+  }).partial().optional().describe(
     "INVENT the design system for THIS site rather than reaching for a default. These become the CSS variables in " +
     "src/index.css and every section reads from them, so decide them once and commit. The category reference above is " +
-    "a starting position to react to, not values to copy — two sites in the same category must not share a palette."
+    "a starting position to react to, not values to copy — two sites in the same category must not share a palette. " +
+    "Optional and partial ON PURPOSE: a model that cannot fill every field must still return a valid brief, because a " +
+    "brief that fails validation costs the run its entire section list. Fill in as much as you can."
   ),
-  nav_style: z.string().describe("One sentence: the navigation labels and CTA button wording"),
+  nav_style: z.string().describe(
+    "INVENT the navigation's SHAPE, not just its words. Nothing is pre-built, so describe what to construct: " +
+    "where it sits and how it behaves (a full-bleed bar on a hairline rule, a left-aligned wordmark with links pushed to the far edge, " +
+    "a vertical rail down one side, a single menu affordance that opens full-screen, links split either side of a centred mark, " +
+    "an oversized wordmark with the links set small beneath it), plus the actual link labels and CTA wording. " +
+    "The centred-links-with-a-pill-button bar is the default every AI site ships and it is the shape to beat — choose it only if you can say why it is right for this brand."
+  ),
+  hero_concept: z.string().optional().describe(
+    "2-4 sentences composing THIS hero, treated as the page's thesis: the first thing a visitor sees should be the most " +
+    "characteristic thing in this subject's world, not a generic headline stack. State where the copy sits over the video " +
+    "(bottom-left, bottom-right, center-left, center, top-left — this becomes the ScrollFrames `placement` prop for full-page sites), " +
+    "how the headline is set (scale, weight, case, line-breaks, whether it is one line or stacked), what sits beside or beneath it, " +
+    "and how it enters. A left-aligned headline with a paragraph and an outlined button under it is the template answer — beat it."
+  ),
+  signature: z.string().optional().describe(
+    "ONE element this page will be remembered by, described concretely enough to build: the single place the design spends its boldness. " +
+    "It must come from this subject's own world — its materials, instruments, artifacts or vernacular — not from a catalogue of effects. " +
+    "Everything around it stays quiet and disciplined. Name what it is, where it sits, and what it does."
+  ),
   layout_concept: z.string().describe(
     "3-5 sentences inventing the LAYOUT for THIS specific site, derived from the user's request — not a stock template. " +
     "Cover: how the hero content is composed over the video (where the headline sits — centered, bottom-left, corner-anchored, split across the viewport — and its scale/typographic treatment), " +
@@ -1033,6 +1053,21 @@ const BuildBriefSchema = z.object({
 });
 
 type BuildBrief = z.infer<typeof BuildBriefSchema>;
+
+/**
+ * The brief minus the three fields that only make a site *distinctive*.
+ *
+ * Used as the retry when the full schema is rejected outright by the provider.
+ * Everything left here is load-bearing: without `sections` there is no page to
+ * build, and the run ships a bare video. The dropped fields are all optional on
+ * BuildBrief, so a core result is a valid BuildBrief with those simply absent —
+ * renderInventedSystem and the hero/signature blocks already no-op when missing.
+ */
+const CoreBuildBriefSchema = BuildBriefSchema.omit({
+  design_system: true,
+  hero_concept: true,
+  signature: true,
+});
 
 /** Families where a second photograph always strengthens the section. */
 const IMAGE_HUNGRY_FAMILIES = new Set([
@@ -1203,34 +1238,39 @@ function enforceLayoutVariety(brief: BuildBrief): void {
  */
 const renderInventedSystem = (brief: BuildBrief): string => {
   const ds = brief.design_system;
-  if (!ds) return "";
+  // Every field is optional so a partial fill cannot fail the whole brief. A
+  // system with no colours in it is not worth printing, so fall back to the
+  // model's own judgement rather than emitting half a token block.
+  if (!ds || !ds.background || !ds.foreground) return "";
 
-  const optional = (label: string, value: string) =>
+  const optional = (label: string, value: string | undefined) =>
     value && value.trim().toLowerCase() !== "none"
       ? `  ${label}: ${value};`
       : `  /* ${label}: deliberately none for this site */`;
+
+  const or = (value: string | undefined, fallback: string) => value?.trim() || fallback;
 
   return `DESIGN SYSTEM INVENTED FOR THIS SITE — write these into the ":root { ... }" block of
 src/index.css, replacing the values already there, and leave the "@theme inline" block below it
 exactly as it is (that block is what turns these into bg-background / text-muted-foreground /
 border-border, and overwriting it silently unstyles the whole site).
 
-Why this system: ${ds.rationale}
-Page mode: ${ds.page_mode.toUpperCase()} — chosen from the video's measured brightness, not preference.
+Why this system: ${or(ds.rationale, "(not stated — derive it from the tone and direction below)")}
+Page mode: ${(ds.page_mode ?? "dark").toUpperCase()} — chosen from the video's measured brightness, not preference.
 
   --background: ${ds.background};
   --foreground: ${ds.foreground};
-  --card: ${ds.surface};
-  --card-foreground: ${ds.surface_foreground};
-  --primary: ${ds.primary};
-  --primary-foreground: ${ds.primary_foreground};
-  --muted: ${ds.surface};
-  --muted-foreground: ${ds.muted_foreground};
+  --card: ${or(ds.surface, ds.background)};
+  --card-foreground: ${or(ds.surface_foreground, ds.foreground)};
+  --primary: ${or(ds.primary, brief.accent_color)};
+  --primary-foreground: ${or(ds.primary_foreground, ds.background)};
+  --muted: ${or(ds.surface, ds.background)};
+  --muted-foreground: ${or(ds.muted_foreground, ds.foreground)};
   --accent: ${brief.accent_color};
-  --border: ${ds.border};
-  --input: ${ds.border};
-  --ring: ${ds.primary};
-  --radius: ${ds.radius};
+  --border: ${or(ds.border, ds.foreground)};
+  --input: ${or(ds.border, ds.foreground)};
+  --ring: ${or(ds.primary, brief.accent_color)};
+  --radius: ${or(ds.radius, "0.625rem")};
 ${optional("--gradient-hero", ds.gradient_hero)}
 ${optional("--shadow-elevated", ds.shadow_elevated)}
 ${optional("--ease-brand", ds.motion)}
@@ -1337,6 +1377,14 @@ This direction governs the whole page. It outranks your defaults: if it says sha
 
 Layout concept (composed for THIS site — build exactly this, do not substitute a generic template):
 ${brief.layout_concept}
+${brief.hero_concept ? `
+HERO — the page's thesis. Build this composition, not a headline stack:
+${brief.hero_concept}
+` : ""}${brief.signature ? `
+SIGNATURE — the one thing this page is remembered by. Build it properly and keep everything
+around it quiet; this is where the design spends its boldness, and it is spent ONCE:
+${brief.signature}
+` : ""}
 
 ${renderReadabilityBlock(brief, scene, luminance)}
 ${beats}
@@ -1508,6 +1556,14 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
       "Leave `images` empty for the footer always, and for any section whose whole point is a statement, a stat strip or a quote. " +
       "Never ask for text, logos, charts, UI screenshots or collages inside an image.\n" +
       "- AESTHETIC IS YOURS: there is no house style. The look must come from THIS brand and industry, and two different requests must produce visibly different sites. Do not converge on restrained minimalism by default.\n" +
+      "- CALIBRATION — THE THREE LOOKS TO AVOID. AI-generated design currently clusters around exactly three, and they show up regardless of subject:\n" +
+      "  (1) a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta accent;\n" +
+      "  (2) a near-black background with a single bright acid-green or vermilion accent;\n" +
+      "  (3) a broadsheet layout with hairline rules, zero border-radius and dense newspaper columns.\n" +
+      "  Each is legitimate for SOME brief, and if the user asked for one, give them it — their words always win. But where the request leaves the look open, do not spend that freedom on one of these. They are defaults, not choices, and they are why generated sites are recognisable on sight.\n" +
+      "- GROUND IT IN THE SUBJECT: distinctive choices come from the subject's own world — its materials, instruments, artifacts and vernacular. A joinery firm has timber, jigs and shop drawings; a freight company has manifests, weights and routes. Design from those, not from a catalogue of web effects.\n" +
+      "- SPEND BOLDNESS ONCE: the `signature` is the one memorable element. Everything around it stays quiet and disciplined. A page where every section shouts reads as noise, not confidence.\n" +
+      "- STRUCTURE MUST ENCODE SOMETHING TRUE: eyebrows, dividers, labels and numbering are information, not decoration. Numbered markers (01 / 02 / 03) are only right when the content genuinely IS a sequence — a real process, a dated timeline. On a feature grid they are pure decoration and read as generated.\n" +
       "- Realistic specific copy directions, no lorem ipsum.\n\n" +
       "LAYOUT IS YOURS TO INVENT (important): there is no template library and no preset skeleton. " +
       "Compose the page structure from scratch for THIS request — the hero composition over the video, the nav's shape, " +
@@ -1522,12 +1578,42 @@ const selectTemplateNode = async (state: typeof AgentState.State, config: Runnab
     );
 
     const routerModel = modelForTask("brief");
-    const structuredLlm = routerModel.withStructuredOutput(BuildBriefSchema);
+
+    /**
+     * Two-tier compile: never lose the page because of an enrichment.
+     *
+     * The design system, hero concept and signature make a site distinctive, but
+     * the SECTIONS are what make it a site at all. Asking for all of it in one
+     * structured call put both in the same basket, and when OpenRouter rejected
+     * the enlarged schema outright ("400 Provider returned error" — the provider
+     * refusing the request, before the model ran) the brief came back null and
+     * builds shipped with no navigation and nothing below the video.
+     *
+     * So the enrichment is now allowed to fail on its own. Tier one asks for
+     * everything; tier two drops the three optional fields and asks again for the
+     * brief the page cannot be built without. A plain site beats no site.
+     */
+    const attempt = async (schema: typeof BuildBriefSchema | typeof CoreBuildBriefSchema, label: string) => {
+      const structured = routerModel.withStructuredOutput(schema);
+      const brief = await structured.invoke([sysMsg, new HumanMessage(sitePrompt)]);
+      console.log(`[Compile Build Brief] Compiled with the ${label} schema (${brief.sections?.length ?? 0} sections).`);
+      return brief as BuildBrief;
+    };
 
     try {
-      return await structuredLlm.invoke([sysMsg, new HumanMessage(sitePrompt)]);
+      return await attempt(BuildBriefSchema, "full");
     } catch (e) {
-      console.warn("[Compile Build Brief] Structured output failed, code agent will receive the raw request.", e);
+      console.warn(
+        "[Compile Build Brief] Full schema failed — retrying without design_system / hero_concept / signature. " +
+        "A 400 here usually means the provider rejected the schema's size rather than the model failing.",
+        e,
+      );
+    }
+
+    try {
+      return await attempt(CoreBuildBriefSchema, "core");
+    } catch (e) {
+      console.error("[Compile Build Brief] Core schema failed too — code agent will receive the raw request.", e);
       return null;
     }
   });

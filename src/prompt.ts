@@ -105,7 +105,15 @@ const DESIGN_SYSTEM = `
 ## DESIGN — THE LOOK IS YOURS
 You are the designer here, not a template filler. There is no house style to conform to and no approved palette. Two different briefs must produce two visibly different websites: different type, different colour, different energy, different structure. If your page could be swapped with the last one you made and nobody would notice, you have failed.
 
-Go as far as the brief justifies. Colour is free — bright, dark, monochrome, saturated, whatever the brand calls for. Shadows, gradients, glass, texture, heavy borders, sharp corners, huge radii: all available. Motion is yours to judge. Take a real position instead of hedging toward safe minimalism.
+Go as far as the brief justifies. Shadows, gradients, glass, texture, heavy borders, sharp corners, huge radii: all available. Motion is yours to judge. Take a real position instead of hedging toward safe minimalism.
+
+THE HERO IS A THESIS. It opens with the most characteristic thing in this subject's world, in whatever form suits it. A big headline, a paragraph and an outlined button beneath it is the template answer — the brief's hero concept describes something better, so build that. The navigation is yours to construct too: nothing is pre-built, and a centred link row with a pill button on the right is the shape every generated site ships. Beat it unless the brief argues for it.
+
+SPEND THE BOLDNESS ONCE. The brief names a \`signature\` — the single element this page is remembered by. Build that one properly and keep everything around it quiet. A page where every section shouts reads as noise.
+
+STRUCTURE ENCODES MEANING. Eyebrows, rules, labels and numbering carry information; they are not decoration. Numbered markers (01 / 02 / 03) belong on content that genuinely IS a sequence — a real process, a dated timeline. On a feature grid they are the single clearest tell that a page was generated.
+
+THE THREE LOOKS TO AVOID (these are defaults, not choices, and they appear regardless of subject): a warm cream background near #F4F1EA with a high-contrast serif and terracotta accent; a near-black page with one acid-green or vermilion accent; a broadsheet of hairline rules with zero radius and dense columns. If the brief or the user asked for one, build it — their words win. Otherwise do not drift into one.
 
 The only things below that are not negotiable are the ones that stop a page from being BROKEN — type that explodes on wide monitors, images that do not exist, content that overflows the viewport. Everything else is a decision you get to make.
 
@@ -142,7 +150,7 @@ Setup:
 How to use it — this exact shape, at the root of App.tsx:
 \`\`\`jsx
 <>
-  <Navbar />
+  <Navbar />                                  {/* YOU create this — nothing is seeded. Build the brief's nav shape. */}
   <ScrollFrames
     tone="light"                              // "light" or "dark" — match the brief's text scheme
     placement="bottom-left"                   // where the copy sits over the video — SEE BELOW
@@ -174,7 +182,7 @@ Structural rules (breaking any of these visibly breaks the site):
 9. Backgrounds: set the Build Brief's fallback background-color on body in src/index.css. Never set a background on #root.
 10. ZERO OVERLAYS over the video (absolute): no fixed/absolute inset-0 tint, scrim, veil or gradient, no bg-black/xx or bg-white/xx over the video, no backdrop-blur or glass on the navbar. Readability comes only from the brief's text color, exactly as its "Background video & readability" block specifies.
 11. NO SHADOWS OR GLOWS ON ANYTHING OVER THE VIDEO: no text-shadow, drop-shadow or box-shadow on the beats or the navbar. Readability there comes from the brief's measured text colour and heavy type, never from a shadow propping it up. Below the video, shadows are yours to use or skip.
-12. The navbar is fixed, transparent, no fill and no blur, and uses the brief's text color while it is over the video.
+12. READABILITY constraints on the navbar (these are fixed): it is transparent, no fill, no blur, no shadow, and uses the brief's text color while it is over the video. Its SHAPE is not fixed — no navbar is seeded, so build the one the brief's nav concept describes rather than defaulting to a centred link row with a pill button.
 `;
 
 /**
@@ -331,6 +339,10 @@ const CHECKLIST_SHARED = `
 - No invented image URLs, no CSS background-image, no image placeholder boxes; the only <img> tags are brief-supplied URLs in sections below the video
 - No Lucide brand icons (Facebook/Twitter/Instagram/Linkedin/Github/Youtube)
 - Every import used, every used symbol imported, relative paths only
+- The brief's SIGNATURE element was actually built, and it is the only place the page raises its voice
+- The navigation was composed from the brief's nav concept — not a centred link row with a pill button on the right
+- The hero matches the brief's hero concept, rather than a headline + paragraph + outlined button stack
+- No 01 / 02 / 03 numbering on anything that is not genuinely a sequence
 - No \`hsl(var(--token))\` anywhere — the palette tokens hold hex, so they are referenced as \`var(--token)\`
 - The signature effect variables (gradient / shadow / easing) are defined once in :root and reused by name, not re-invented per section
 - At least one branded button variant was added and used by name, instead of stock variants patched with inline colour overrides at the call site

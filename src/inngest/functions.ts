@@ -51,17 +51,12 @@ interface AgentState {
 // scaffold is: seeding Hero/Features/Story/Details produced every site as those
 // same slots with new copy. The hero itself is composed from the brief.
 const NON_FULL_PAGE_APP_SEED = `// @ts-nocheck
-import { Navbar } from "./components/Navbar";
-
 export default function App() {
   return (
-    <>
-      <Navbar />
-
-      <main className="w-full relative z-10 flex flex-col">
-        {/* Build the brief's hero and sections here, as components you create. */}
-      </main>
-    </>
+    <main className="w-full relative z-10 flex flex-col">
+      {/* Build the brief's navigation, hero, sections and footer here, as
+          components you create. Nothing is seeded on purpose. */}
+    </main>
   );
 }
 `;
@@ -1351,6 +1346,25 @@ export const codeAgentFunction = inngest.createFunction(
       return SCAFFOLD_PLACEHOLDERS.filter((s) => app.includes(s));
     };
 
+    /**
+     * An App.tsx that renders nothing but the video.
+     *
+     * The scaffold seeds no navigation, sections or footer — that is deliberate,
+     * because seeding them made every site the same four slots with new copy.
+     * The cost of that choice is this failure mode: if the agent does not build
+     * the page, nothing catches it, and a site ships as a bare video with no
+     * header and nothing underneath. Any component the agent creates has to be
+     * imported into App.tsx to render, so counting local component imports is a
+     * reliable test of whether a page was actually composed.
+     */
+    const looksEmpty = (files: Record<string, string> | undefined) => {
+      const app = (files || {})["src/App.tsx"] ?? "";
+      if (!app) return false; // nothing to judge; other guards cover this
+      const localImports = app.match(/from\s+["']\.\/components\/[^"']+["']/g) ?? [];
+      const nonScroll = localImports.filter((i) => !i.includes("ScrollFrames"));
+      return nonScroll.length === 0;
+    };
+
     // A remixed template is already a complete, working site. "Build it as-is"
     // legitimately changes nothing, so an untouched template is a valid result —
     // only nag when the user actually asked for something.
@@ -1368,7 +1382,14 @@ export const codeAgentFunction = inngest.createFunction(
         `The agent did not replace the beats. Running a corrective attempt...`,
       );
     }
-    if (result && (!hasRealChanges(result.state.data.files) || unfinished || shippedPlaceholders) && !isAsIsTemplateRemix) {
+    const shippedEmpty = Boolean(result) && looksEmpty(result!.state.data.files) && !isAsIsTemplateRemix;
+    if (shippedEmpty) {
+      console.error(
+        "DEBUG: App.tsx imports no components of its own — the page has no navigation, no sections " +
+        "and no footer, only the video. Running a corrective attempt...",
+      );
+    }
+    if (result && (!hasRealChanges(result.state.data.files) || unfinished || shippedPlaceholders || shippedEmpty) && !isAsIsTemplateRemix) {
       console.warn(
         unfinished
           ? "DEBUG: Creator agent stopped without a task summary (ran out of iterations). Running one corrective attempt..."
@@ -1411,7 +1432,9 @@ export const codeAgentFunction = inngest.createFunction(
       const correctiveAction = editMode === "DIFF"
         ? "Call the applyDiff tool now with an exact search snippet"
         : "Call the editFiles tool now with the actual file contents";
-      const correctivePrompt = currentPrompt + (shippedPlaceholders
+      const correctivePrompt = currentPrompt + (shippedEmpty
+        ? `\n\n⚠️ PREVIOUS ATTEMPT SHIPPED AN EMPTY PAGE: src/App.tsx imports no components of its own, so the site is a video with no navigation, no sections and no footer. Nothing is seeded for you — you must CREATE those files and import them. Build, at minimum: src/components/Navbar.tsx, one component per section in the brief, and a footer. Import every one into App.tsx so it renders. THEN print the task summary.`
+        : shippedPlaceholders
         ? `\n\n⚠️ PREVIOUS ATTEMPT SHIPPED THE SCAFFOLD: src/App.tsx still contains the placeholder copy ${leftovers.map((s) => `"${s}"`).join(", ")}. Those strings are the empty scaffold's, not this brand's, and they were visible on the live site. Rewrite App.tsx now: every <ScrollFrames /> beat carries the brief's own headline and body, and the cta label is real copy. Then build the brief's sections. THEN print the task summary.`
         : unfinished
           ? `\n\n⚠️ PREVIOUS ATTEMPT RAN OUT OF TIME: you stopped part-way through and never printed the task summary, so the site shipped unfinished. Work FASTER this time: batch four files per editFiles call, write every section component the brief lists, and do not re-read files you have already written. The ${correctiveGoal}. Finish, THEN print the task summary.`

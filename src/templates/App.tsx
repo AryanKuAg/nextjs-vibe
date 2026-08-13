@@ -1,28 +1,28 @@
 // @ts-nocheck
 import ScrollFrames from "./components/ScrollFrames";
-import { Navbar } from "./components/Navbar";
 
 /**
- * The scaffold is deliberately EMPTY below the video.
+ * The scaffold is WIRING ONLY. There is no page here to refill.
  *
- * It used to seed Features / Story / Details / Footer in a fixed order. Every
- * site then arrived as those same four slots with the copy swapped, because a
- * concrete file in front of the model always beats an abstract instruction to
- * invent something. Compose the page from the Build Brief's sections instead:
- * create your own components, in your own order, with the shapes the brief's
- * layout concept calls for.
+ * It used to seed a Navbar, four sections and a Footer. Every site then arrived
+ * as those same slots with the copy swapped — same nav shape, same order, same
+ * two-line footer — because a concrete file in front of the model always beats
+ * an abstract instruction to invent something. ScrollFrames stays because it is
+ * the platform's scrub track and must not be reimplemented. Everything else —
+ * the navigation, the sections, the footer — you compose from the Build Brief.
  */
 export default function App() {
   return (
     <>
-      <Navbar />
+      {/* Build the brief's navigation here, in the shape its nav concept describes. */}
 
       {/* The cinematic scroll: the video scrubs for exactly this many viewports,
           one beat of copy on screen at a time, then the page continues below.
-          Replace every beat below with the brief's copy — shipping these strings
-          is a failed build. */}
+          Replace every beat with the brief's copy and set `placement` from the
+          brief's hero concept — shipping these strings is a failed build. */}
       <ScrollFrames
         tone="light"
+        placement="bottom-left"
         cta={{ label: "Replace me", href: "#story" }}
         beats={[
           { headline: "Replace this headline", body: "One or two sentences of real copy. Keep it short: the point is the view behind it." },
@@ -32,7 +32,7 @@ export default function App() {
       />
 
       <main className="w-full relative z-10 flex flex-col">
-        {/* Build the brief's sections here, as components you create. */}
+        {/* Build the brief's sections and footer here, as components you create. */}
       </main>
     </>
   );

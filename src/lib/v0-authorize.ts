@@ -31,7 +31,16 @@ const grants = new Map<string, { projectId: string; expiresAt: number }>();
 export async function authorizeChat(
   chatId: string,
 ): Promise<{ ok: true; chat: AuthorizedChat } | { ok: false; response: Response }> {
-  const { userId } = await auth();
+  // `auth()` throws — it does not return null — when Clerk cannot find its own
+  // middleware context, which happens for requests that reached us through a
+  // rewrite. A refusal is the honest answer there; letting it escape turns a
+  // missing session into a 500 and, for the preview proxy, an unstyled page.
+  let userId: string | null = null;
+  try {
+    ({ userId } = await auth());
+  } catch {
+    userId = null;
+  }
 
   if (!userId) {
     return {

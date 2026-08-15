@@ -59,7 +59,7 @@ export const generateFramesFunction = inngest.createFunction(
 
     const refinedPrompt = isDirectPrompt ? prompt : await step.run("refine-prompt", async () => {
       const routerModel = new ChatOpenAI({
-        modelName: "google/gemini-3.1-flash-lite",
+        modelName: "google/gemini-3.5-flash-lite",
         apiKey: process.env.OPENROUTER_API_KEY!,
         configuration: {
           baseURL: "https://openrouter.ai/api/v1",

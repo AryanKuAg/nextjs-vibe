@@ -38,10 +38,10 @@ export const VIDEO_DURATION_SECONDS = 8;
 export const MODEL_COSTS: Record<string, number> = {
   "google/nano-banana-2-lite": AGENT_COSTS.IMAGE,
   "bytedance/seedance-1.5-pro": AGENT_COSTS.VIDEO,
-  "google/gemini-3.1-flash-lite": AGENT_COSTS.CODE
+  "google/gemini-3.5-flash-lite": AGENT_COSTS.CODE
 };
 
 // Follow-up prompts (when a conversation already exists)
 export const FOLLOW_UP_COSTS: Record<string, number> = {
-  "google/gemini-3.1-flash-lite": AGENT_COSTS.CODE
+  "google/gemini-3.5-flash-lite": AGENT_COSTS.CODE
 };

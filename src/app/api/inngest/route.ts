@@ -1,23 +1,22 @@
 import { serve } from "inngest/next";
 
 import { inngest } from "@/inngest/client";
-import { codeAgentFunction, veoGenerateFunction } from "@/inngest/functions";
-import { autonomousAgentFunction } from "@/inngest/autonomous";
+import { veoGenerateFunction } from "@/inngest/video";
 import { generateFramesFunction } from "@/inngest/mediaAgents";
 import { resetMonthlyCredits } from "@/inngest/credit-reset";
 import { runCancelledFunction } from "@/inngest/cancelled";
 
-// Allow Vercel serverless functions to run up to 5 minutes
-// Required for long E2B sandbox operations and GCS deployments
+/**
+ * Inngest now runs the media pipeline only. Site builds moved to the v0
+ * Platform API and are driven straight from the browser through
+ * `/api/v0/*`, so there is no code-agent function left to register.
+ */
 export const maxDuration = 300;
 
-// Create an API that serves zero functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
-    codeAgentFunction,
     veoGenerateFunction,
-    autonomousAgentFunction,
     generateFramesFunction,
     resetMonthlyCredits,
     runCancelledFunction,

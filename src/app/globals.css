@@ -2,6 +2,11 @@
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 
+/* Streamdown renders the builder's markdown with Tailwind classes that live
+   inside its own dist bundle. Without this the scanner never sees them and
+   assistant messages render unstyled. Path is relative to this file. */
+@source "../../node_modules/streamdown/dist/*.js";
+
 :root {
   --black: #000000;
   --white: #ffffff;
@@ -18,6 +23,32 @@
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --radius: 0.5rem;
+
+  /* Semantic shadcn tokens. The v0 builder UI (and every ui/* primitive we
+     already vendored) is written against these names; before they existed the
+     primitives resolved to nothing and had to be re-skinned by hand at every
+     call site. Values are the dark palette above, so the tokens describe the
+     look the app already had rather than introducing a second theme. */
+  --background: #181818;
+  --foreground: #ffffff;
+  --card: #1f1f1f;
+  --card-foreground: #ffffff;
+  --popover: #212121;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #181818;
+  --secondary: #262626;
+  --secondary-foreground: #ffffff;
+  --muted: #232323;
+  --muted-foreground: rgba(255, 255, 255, 0.5);
+  --accent: #2a2a2a;
+  --accent-foreground: #ffffff;
+  --destructive: #f87171;
+  --destructive-foreground: #181818;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: rgba(255, 255, 255, 0.3);
+
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
@@ -41,6 +72,26 @@
   --color-white-50: var(--white-50);
   --color-white-85: var(--white-85);
   --color-purple: var(--purple);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
   --font-sans: "inter-variable", sans-serif;
   --font-mono: var(--font-mono);

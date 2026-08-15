@@ -1,5 +1,0 @@
-/* Seed stylesheet copied into the sandbox image by e2b.Dockerfile.
-   It only has to be enough for `shadcn init` to detect Tailwind v4 — init then
-   rewrites this file into the full `@theme inline` + :root token shape, which
-   the Dockerfile asserts on before the build is allowed to succeed. */
-@import "tailwindcss";

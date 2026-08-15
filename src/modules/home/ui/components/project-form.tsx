@@ -154,11 +154,10 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
 
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
-      onSuccess: (data, variables) => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        const url = `/projects/${data.id}${variables.value ? "?builderAutoSubmit=true" : ""}`;
-        router.push(url);
+        router.push(`/projects/${data.id}`);
       },
       onError: (error) => {
         setIsRedirecting(false); // failed — let the user try again
@@ -191,29 +190,24 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
 
     setIsRedirecting(true); // lock the button immediately, before any async work
 
-    // Persist the selected model so the dashboard uses it
-    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.5-flash-lite";
-    sessionStorage.setItem("pending_model", actualModelId);
-    sessionStorage.setItem("pending_builder_prompt", values.value);
-
-    // Carry the attached image across the redirect to the project page, which
-    // passes it to the first generation. Downscaled first: a full-size data URL
-    // routinely blows the ~5MB sessionStorage quota, and the write throws.
+    // The prompt and the image go with the mutation that starts the build, so
+    // there is nothing to carry across the redirect: by the time the project
+    // page loads, v0 is already working.
+    let imageDataUrl: string | undefined;
     if (uploadedImage) {
       try {
-        const dataUrl = await processImageFile(uploadedImage);
-        sessionStorage.setItem("pending_image_base64", dataUrl);
-        sessionStorage.setItem("pending_image_name", uploadedImage.name);
-        sessionStorage.setItem("pending_image_type", uploadedImage.type);
+        // Downscaled first — a full-size data URL is a large request body and
+        // v0 only needs it as a visual reference.
+        imageDataUrl = await processImageFile(uploadedImage);
       } catch (e) {
         // Losing the reference is not worth losing the build — carry on without it.
-        console.error("Failed to carry the attached image across the redirect:", e);
+        console.error("Failed to attach the reference image:", e);
         toast.error("Could not attach that image — continuing without it.");
       }
     }
 
     try {
-      await createProject.mutateAsync({ value: values.value });
+      await createProject.mutateAsync({ value: values.value, imageDataUrl });
     } catch {
       // Error is handled in the mutation's onError callback
     }

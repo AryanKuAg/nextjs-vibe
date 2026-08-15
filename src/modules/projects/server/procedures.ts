@@ -4,12 +4,11 @@ import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
+import { checkCredits, consumeCredits, refundCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
-import { PROJECT_STAGE } from "@/lib/project-stage";
-import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
+import { startProjectBuild } from "@/lib/v0-start-build";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -82,24 +81,18 @@ export const projectsRouter = createTRPCRouter({
         // unknown id is rejected rather than silently ignored — a project that
         // claims a template it cannot download would fail mid-build.
         templateId: z.string().optional(),
+        /** A reference image attached to the prompt, as a data URL. */
+        imageDataUrl: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        await checkCredits(1);
-        await consumeCredits(0); // Project metadata creation is free; generation is charged separately
+        await checkCredits(AGENT_COSTS.CODE);
       } catch (error) {
-        if (error instanceof Error) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message
-          });
-        } else {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message: "You have run out of credits"
-          });
-        }
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: error instanceof Error ? error.message : "You have run out of credits",
+        });
       }
 
       const template = input.templateId ? getTemplate(input.templateId) : null;
@@ -125,6 +118,30 @@ export const projectsRouter = createTRPCRouter({
           prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
         },
       });
+
+      // The build starts here rather than on the project page. Creating a
+      // project IS asking for a site, so the redirect lands on a builder that
+      // is already running instead of a form asking for the prompt again.
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
+      try {
+        await startProjectBuild({
+          projectId: createdProject.id,
+          prompt: input.value,
+          imageDataUrl: input.imageDataUrl,
+        });
+      } catch (error) {
+        // Fail loudly on the page the user is still looking at, where their
+        // prompt is still in the box, rather than handing them a half-made
+        // project with nothing in it.
+        await refundCredits(AGENT_COSTS.CODE, ctx.auth.userId).catch(() => {});
+        await prisma.project.delete({ where: { id: createdProject.id } }).catch(() => {});
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to start the build",
+        });
+      }
 
       return createdProject;
     }),
@@ -217,193 +234,6 @@ export const projectsRouter = createTRPCRouter({
           userId: ctx.auth.userId,
           blockIndex: input.blockIndex,
         },
-      });
-
-      return { success: true };
-    }),
-  buildSite: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      value: z.string(),
-      videoUrl: z.string().optional().nullable(),
-      frameCount: z.number().optional(),
-      model: z.string().optional(),
-      isFollowUp: z.boolean().optional(),
-      imageDataUrl: z.string().optional(),
-      isAgentMode: z.boolean().default(false),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      // Code generation is charged per user message, not per agent run.
-      await checkCredits(AGENT_COSTS.CODE);
-
-      const createdMessage = await prisma.message.create({
-        data: {
-          projectId: existingProject.id,
-          content: input.value,
-          role: "USER",
-          type: "RESULT",
-          stage: "SITE",
-        },
-      });
-
-      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
-
-      await inngest.send({
-        name: "code-agent/run",
-        data: {
-          value: input.value,
-          projectId: input.projectId,
-          videoUrl: input.videoUrl ?? undefined,
-          frameCount: input.frameCount,
-          model: input.model,
-          userId: ctx.auth.userId,
-          imageDataUrl: input.imageDataUrl,
-          isAgentMode: input.isAgentMode,
-          // Returned by the agent's onFailure handler if the run never completes.
-          refundOnFailure: AGENT_COSTS.CODE,
-        },
-      });
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          // The code agent flips this to BUILDING_SITE once it starts and back to
-          // SITE when it lands. Marking it THINKING here stops the previous turn's
-          // stage being read as this turn's status while the sandbox boots.
-          currentStage: PROJECT_STAGE.THINKING,
-        },
-      });
-
-      return createdMessage;
-    }),
-  startAutonomousGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      prompt: z.string(),
-      model: z.string().optional(),
-      isAgentMode: z.boolean().default(false),
-      // An image the user attached to their prompt. What it is FOR — a start
-      // frame, a look to match, or a layout to copy — is classified by the agent
-      // from the prompt, not decided here.
-      imageDataUrl: z.string().optional(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      // A project that already produced a fragment has a live site — anything after
-      // that is a follow-up edit, which skips the wizard instead of rebuilding.
-      const existingFragment = await prisma.fragment.findFirst({
-        where: { message: { projectId: input.projectId } },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      const isFollowUp = Boolean(existingFragment);
-
-      // The original site request, so media agents regenerating a background still
-      // know what the site is about even when the follow-up message is just
-      // "make another video".
-      const firstUserMessage = await prisma.message.findFirst({
-        where: { projectId: input.projectId, role: "USER" },
-        orderBy: { createdAt: "asc" },
-        select: { content: true },
-      });
-
-      await checkCredits(AGENT_COSTS.CODE);
-
-      // Stored before the event is sent: a data URL is far too large for an
-      // Inngest payload, so only the resulting URL travels with the run.
-      const referenceImageUrl = await uploadDataUrlToStorage(
-        input.imageDataUrl,
-        `frames/${input.projectId}`,
-      );
-
-      const createdMessage = await prisma.message.create({
-        data: {
-          projectId: existingProject.id,
-          content: input.prompt,
-          role: "USER",
-          type: "RESULT",
-          stage: "SITE",
-        },
-      });
-
-      // Charged once per user message. The code agent may run several times for this
-      // message (template pass, lenient rebuild, retries) and must not charge again.
-      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
-
-      await inngest.send({
-        name: "autonomous-agent/run",
-        data: {
-          prompt: input.prompt,
-          sitePrompt: firstUserMessage?.content || input.prompt,
-          projectId: input.projectId,
-          model: input.model,
-          userId: ctx.auth.userId,
-          isAgentMode: input.isAgentMode,
-          isFollowUp,
-          referenceImageUrl,
-          // Returned by the agent's onFailure handler if the run never completes.
-          // Only the code charge — image and video bill themselves on success.
-          refundOnFailure: AGENT_COSTS.CODE,
-        },
-      });
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          // A fresh build starts at the background step. A follow-up has no known
-          // step until an agent announces one — and it must not keep reporting the
-          // previous turn's stage, which is what made the status line look stuck.
-          currentStage: isFollowUp ? PROJECT_STAGE.THINKING : PROJECT_STAGE.SCENE,
-        },
-      });
-
-      return createdMessage;
-    }),
-  cancelGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().uuid(),
-    }))
-    .mutation(async ({ input }) => {
-      // Stop the Inngest run for both v1 and v2 autonomous agents
-      await inngest.send([
-        {
-          name: "code-agent/cancel",
-          data: { projectId: input.projectId }
-        },
-        {
-          name: "autonomous-agent/cancel",
-          data: { projectId: input.projectId }
-        },
-        {
-          name: "project.user.response",
-          data: { projectId: input.projectId, action: "CANCEL", payload: null }
-        }
-      ]);
-
-      // Inject a cancellation message to unblock the UI
-      await prisma.message.create({
-        data: {
-          projectId: input.projectId,
-          role: "ASSISTANT",
-          content: "Generation was manually stopped.",
-          type: "ERROR",
-          stage: "SITE"
-        }
       });
 
       return { success: true };

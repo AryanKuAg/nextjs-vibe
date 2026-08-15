@@ -1,5 +1,11 @@
 import { fetchPreview, type ChatsGetPreviewResponse } from "v0";
 
+import {
+  isValidPreviewGrant,
+  issuePreviewGrant,
+  PREVIEW_GRANT_TTL_MS,
+  previewGrantCookieName,
+} from "@/lib/preview-grant";
 import { authorizeChat } from "@/lib/v0-authorize";
 import { v0 } from "@/lib/v0-client";
 
@@ -54,11 +60,25 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
 
   if (!chatId) return new Response("Missing chat id", { status: 400 });
 
-  // This route lends out our API key, so it is gated like every other v0 route:
-  // without the check, a chat id alone would be enough to read someone else's
-  // unpublished site through our origin.
-  const authorized = await authorizeChat(chatId);
-  if (!authorized.ok) return authorized.response;
+  // This route lends out our API key, so it is gated: a chat id alone must not
+  // be enough to read someone else's unpublished site through our origin.
+  //
+  // Two ways in. The page's own assets present the signed grant issued below —
+  // they arrive via a rewrite and have no Clerk context to check. Anything else
+  // is a real navigation and gets the full ownership check.
+  // Read the cookie off the request rather than through `cookies()`: this
+  // handler is reached by a middleware rewrite for every asset, and the raw
+  // header is the one thing guaranteed to survive that.
+  const cookieName = previewGrantCookieName(chatId);
+  const granted = isValidPreviewGrant(
+    readCookie(request.headers.get("cookie"), cookieName),
+    chatId,
+  );
+
+  if (!granted) {
+    const authorized = await authorizeChat(chatId);
+    if (!authorized.ok) return authorized.response;
+  }
 
   const requestUrl = new URL(request.url);
   const fallbackUrl = new URL(
@@ -67,7 +87,7 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   );
   fallbackUrl.searchParams.set("returnTo", requestUrl.pathname + requestUrl.search);
 
-  return fetchPreview({
+  const response = await fetchPreview({
     request,
     preview: await resolvePreview(chatId),
     path,
@@ -76,6 +96,26 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
       previewCache.delete(chatId);
     },
   });
+
+  if (granted) return response;
+
+  // Just passed the ownership check, so mint the pass this page's assets will
+  // present. Issued on any authorized request, not only the document, so a
+  // reloaded asset can re-establish it if the cookie has lapsed.
+  const withGrant = new Response(response.body, response);
+  withGrant.headers.append(
+    "set-cookie",
+    [
+      `${cookieName}=${issuePreviewGrant(chatId)}`,
+      "Path=/",
+      "HttpOnly",
+      "SameSite=Lax",
+      `Max-Age=${Math.floor(PREVIEW_GRANT_TTL_MS / 1000)}`,
+      ...(requestUrl.protocol === "https:" ? ["Secure"] : []),
+    ].join("; "),
+  );
+
+  return withGrant;
 }
 
 export async function GET(request: Request, ctx: { params: Promise<{ slug: string[] }> }) {
@@ -106,4 +146,15 @@ export async function HEAD(request: Request, ctx: { params: Promise<{ slug: stri
 
 export async function OPTIONS(request: Request, ctx: { params: Promise<{ slug: string[] }> }) {
   return handle(request, ctx.params);
+}
+
+function readCookie(header: string | null, name: string) {
+  if (!header) return undefined;
+
+  for (const part of header.split(";")) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    if (part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
+  }
+  return undefined;
 }

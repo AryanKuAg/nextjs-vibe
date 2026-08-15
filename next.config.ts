@@ -67,12 +67,47 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      {
-        source: "/proxy-r2/:path*",
-        destination: "https://assets.framerate.space/:path*",
-      },
-    ];
+    return {
+      /**
+       * Routes a hosted preview's own requests to the preview proxy.
+       *
+       * The site v0 hosts emits root-relative URLs — its HTML asks for
+       * `/_next/static/...` and its runtime builds more of those after load.
+       * Inside our same-origin iframe those resolve against this app, where
+       * `/_next` is ours, so the preview would load its document and then fail
+       * to fetch a single chunk. Rewriting the HTML cannot fix it, because the
+       * URLs that matter are constructed in JavaScript.
+       *
+       * The requests are identified by where they came from: a same-origin
+       * iframe sends the full document URL as `Referer`, so anything refered
+       * from `/api/v0-preview/:chatId` is the preview asking for one of its own
+       * files. `beforeFiles` is what makes this work at all — it runs ahead of
+       * the filesystem, so it can claim `/_next/*` before Next serves our copy.
+       *
+       * This lived in middleware first, which was wrong twice over: middleware
+       * does not run for `/_next/*` under the matcher, and short-circuiting it
+       * to add coverage skipped Clerk and turned every 404 into a 500.
+       */
+      beforeFiles: [
+        {
+          source: "/:path((?!api/v0-preview).*)",
+          has: [
+            {
+              type: "header",
+              key: "referer",
+              value: ".*/api/v0-preview/(?<previewChatId>[^/?#]+).*",
+            },
+          ],
+          destination: "/api/v0-preview/:previewChatId/:path",
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/proxy-r2/:path*",
+          destination: "https://assets.framerate.space/:path*",
+        },
+      ],
+    };
   },
   async headers() {
     return [

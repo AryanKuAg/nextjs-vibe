@@ -5,9 +5,9 @@ export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 /** Zip of the current source, streamed straight from v0 to the browser. */
-export async function POST(_request: Request, { params }: { params: Promise<{ chatId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
-  const authorized = await authorizeChat(chatId);
+  const authorized = await authorizeChat(chatId, request);
   if (!authorized.ok) return authorized.response;
 
   const result = await v0.chats.downloadFiles({ chatId });

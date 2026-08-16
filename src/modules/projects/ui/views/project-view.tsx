@@ -69,6 +69,7 @@ export const ProjectView = ({ projectId }: Props) => {
   return (
     <div className="h-screen bg-bg">
       <ChatWorkspace
+        accessToken={workspace.accessToken}
         chat={workspace.chat}
         key={workspace.chat.id}
         messages={workspace.messages}

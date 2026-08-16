@@ -1,10 +1,10 @@
 import { fetchPreview, type ChatsGetPreviewResponse } from "v0";
 
 import {
-  isValidPreviewGrant,
   issuePreviewGrant,
   PREVIEW_GRANT_TTL_MS,
   previewGrantCookieName,
+  readPreviewGrant,
 } from "@/lib/preview-grant";
 import { authorizeChat } from "@/lib/v0-authorize";
 import { v0 } from "@/lib/v0-client";
@@ -63,21 +63,24 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   // This route lends out our API key, so it is gated: a chat id alone must not
   // be enough to read someone else's unpublished site through our origin.
   //
-  // Two ways in. The page's own assets present the signed grant issued below —
-  // they arrive via a rewrite and have no Clerk context to check. Anything else
-  // is a real navigation and gets the full ownership check.
-  // Read the cookie off the request rather than through `cookies()`: this
-  // handler is reached by a middleware rewrite for every asset, and the raw
-  // header is the one thing guaranteed to survive that.
+  // A signed pass (either `?t=` on the document, or the cookie set below) is
+  // the only thing the framed page's own asset requests can carry — they arrive
+  // through a rewrite, where a Clerk session is not available to check.
   const cookieName = previewGrantCookieName(chatId);
-  const granted = isValidPreviewGrant(
+  const granted = readPreviewGrant(
     readCookie(request.headers.get("cookie"), cookieName),
     chatId,
-  );
+  ) !== null;
 
-  if (!granted) {
-    const authorized = await authorizeChat(chatId);
-    if (!authorized.ok) return authorized.response;
+  const authorized = granted ? null : await authorizeChat(chatId, request);
+  if (authorized && !authorized.ok) {
+    // This response is rendered *inside the preview pane*, where a raw
+    // `{"message":"Not authenticated."}` reads as the user's own site being
+    // broken. Navigations get a page that explains itself; assets keep the
+    // machine-readable refusal.
+    return request.headers.get("accept")?.includes("text/html")
+      ? signedOutPage(authorized.response.status)
+      : authorized.response;
   }
 
   const requestUrl = new URL(request.url);
@@ -87,7 +90,7 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   );
   fallbackUrl.searchParams.set("returnTo", requestUrl.pathname + requestUrl.search);
 
-  const response = await fetchPreview({
+  const upstream = await fetchPreview({
     request,
     preview: await resolvePreview(chatId),
     path,
@@ -96,6 +99,8 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
       previewCache.delete(chatId);
     },
   });
+
+  const response = await keepNavigationInsidePreview(upstream, chatId);
 
   if (granted) return response;
 
@@ -106,7 +111,7 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   withGrant.headers.append(
     "set-cookie",
     [
-      `${cookieName}=${issuePreviewGrant(chatId)}`,
+      `${cookieName}=${issuePreviewGrant(chatId, authorized?.ok ? authorized.chat.userId : "")}`,
       "Path=/",
       "HttpOnly",
       "SameSite=Lax",
@@ -146,6 +151,94 @@ export async function HEAD(request: Request, ctx: { params: Promise<{ slug: stri
 
 export async function OPTIONS(request: Request, ctx: { params: Promise<{ slug: string[] }> }) {
   return handle(request, ctx.params);
+}
+
+/**
+ * Keeps the framed site's own navigation inside the proxy.
+ *
+ * Assets are routed here by `Referer`, which only works while the iframe's URL
+ * is still `/api/v0-preview/:chatId/...`. A link to `/about` took it to a bare
+ * `/about` on our origin, and from there two things broke: the page's styles
+ * 404'd because the referrer no longer named a preview, and a link back to `/`
+ * served *this application* inside the frame — Framerate rendered inside
+ * Framerate, indistinguishable from the user's own site.
+ *
+ * So every root-relative link, form target and asset in the HTML is rewritten
+ * to sit under the prefix, and a small script keeps client-side navigation
+ * there too — a framework router calling `pushState('/about')` would otherwise
+ * walk straight back out.
+ */
+async function keepNavigationInsidePreview(response: Response, chatId: string) {
+  if (!response.headers.get("content-type")?.includes("text/html")) return response;
+
+  const prefix = `/api/v0-preview/${encodeURIComponent(chatId)}`;
+  const html = (await response.text())
+    // `/x` but never `//host` — a protocol-relative URL is another origin.
+    .replace(/\b(href|src|action)=(["'])\/(?!\/)/g, `$1=$2${prefix}/`)
+    .replace("</head>", `${keepInsideScript(prefix)}</head>`);
+
+  const headers = new Headers(response.headers);
+  headers.delete("content-length"); // rewriting changed it
+  headers.delete("content-encoding"); // body is now decoded text
+
+  return new Response(html, { status: response.status, statusText: response.statusText, headers });
+}
+
+function keepInsideScript(prefix: string) {
+  return `<script>(function(){
+var P=${JSON.stringify(prefix)};
+function fix(u){if(typeof u!=="string")return u;if(u.indexOf(P)===0)return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;return u;}
+function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},location.origin);}catch(e){}}
+var p=history.pushState,r=history.replaceState;
+history.pushState=function(s,t,u){var v=p.call(this,s,t,u==null?u:fix(String(u)));report();return v;};
+history.replaceState=function(s,t,u){var v=r.call(this,s,t,u==null?u:fix(String(u)));report();return v;};
+addEventListener("popstate",report);
+addEventListener("hashchange",report);
+document.addEventListener("click",function(e){
+var t=e.target;if(!t||!t.closest)return;var a=t.closest("a[href]");if(!a)return;
+var h=a.getAttribute("href");if(h&&h.charAt(0)==="/"&&h.charAt(1)!=="/"&&h.indexOf(P)!==0)a.setAttribute("href",P+h);
+},true);
+report();
+})();</script>`;
+}
+
+/** Shown in the frame when the session has lapsed, instead of a JSON blob. */
+function signedOutPage(status: number) {
+  const expired = status === 401;
+
+  return new Response(
+    `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        align-items: center; background: #181818; display: flex;
+        flex-direction: column; gap: 8px; justify-content: center;
+        font: 14px system-ui, sans-serif; text-align: center; padding: 0 24px;
+      }
+      p { color: rgba(255,255,255,.5); margin: 0; max-width: 22rem; }
+      strong { color: #fff; font-weight: 500; }
+      button {
+        margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+        background: #fff; color: #181818; border: 0; font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <strong>${expired ? "Your session expired" : "This preview isn\u2019t available"}</strong>
+    <p>${
+      expired
+        ? "Sign in again and this preview will come straight back \u2014 your site is safe."
+        : "This build could not be found for your account."
+    }</p>
+    ${expired ? '<button onclick="parent.location.reload()">Reload</button>' : ""}
+  </body>
+</html>`,
+    { status, headers: { "cache-control": "no-store", "content-type": "text/html; charset=utf-8" } },
+  );
 }
 
 function readCookie(header: string | null, name: string) {

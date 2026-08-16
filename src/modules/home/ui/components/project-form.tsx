@@ -166,7 +166,11 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
           return;
         }
 
-        if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
+        // Only OUR credit system opens the upgrade modal. A build can also be
+        // refused because the v0 account behind it is out of quota, which is
+        // also TOO_MANY_REQUESTS but is nothing the visitor can buy their way
+        // out of — offering them an upgrade there would be a lie.
+        if (error.message?.toLowerCase().includes("credit")) {
           setShowCreditsModal(true);
         } else {
           toast.error(error.message, { duration: Infinity });

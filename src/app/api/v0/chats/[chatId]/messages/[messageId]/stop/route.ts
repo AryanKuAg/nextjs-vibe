@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 /** Aborts the run at v0's next safe point and marks the message finished. */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ chatId: string; messageId: string }> },
 ) {
   const { chatId, messageId } = await params;
-  const authorized = await authorizeChat(chatId);
+  const authorized = await authorizeChat(chatId, request);
   if (!authorized.ok) return authorized.response;
 
   const result = await v0.messages.stop({ chatId, messageId });

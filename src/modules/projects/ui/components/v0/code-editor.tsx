@@ -1,61 +1,38 @@
 "use client";
 
-import type { Files } from "@v0-sdk/react";
-import { useFiles, useUpdateChatFiles } from "@v0-sdk/react/swr";
-import { useEffect, useState } from "react";
+import { useFiles } from "@v0-sdk/react/swr";
+import { useEffect, useMemo, useState } from "react";
 
 import { Loader } from "@/components/ai-elements/loader";
-import { Button } from "@/components/ui/button";
-import { FileIcon, SpinnerIcon } from "@/lib/icons";
+import { CodeIcon, FileIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
-type ChatFile = Files["files"][number];
+import { withChatToken } from "./chat-token";
 
 /**
- * The code pane: v0's current files, editable in place.
+ * The code pane: v0's current files, read-only.
  *
- * Saving writes back through `PATCH /api/v0/chats/:id/files`, which rebuilds
- * the preview. It is blocked while the preview is still loading because a save
- * landing mid-build races v0's own writes and can lose the edit.
+ * Editing used to be possible here and was removed. Files written from this
+ * side land outside v0's own history, so the agent's next turn plans against a
+ * version of the project that no longer matches what is on disk, and a save
+ * racing an in-flight build silently loses. The chat is the way to change the
+ * site; this is for reading what it produced.
  */
-export function CodeEditor({
+export function CodeViewer({
+  accessToken,
   chatId,
-  isPreviewReady,
   revision,
 }: {
+  accessToken: string;
   chatId: string;
-  isPreviewReady: boolean;
   /** Changes whenever v0 finishes a turn, so the file list is refetched. */
   revision: number;
 }) {
-  const filesUrl = `/api/v0/chats/${encodeURIComponent(chatId)}/files`;
-  const filesQuery = useFiles(filesUrl);
-  const updateFiles = useUpdateChatFiles(filesUrl);
-
-  const remoteFiles = filesQuery.data?.files;
-  const [files, setFiles] = useState<ChatFile[]>([]);
-  const [savedFiles, setSavedFiles] = useState<ChatFile[]>([]);
+  const filesQuery = useFiles(withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/files`, accessToken));
+  // Memoised so the fallback empty array is not a fresh value on every render,
+  // which would re-run the selection effect below forever.
+  const files = useMemo(() => filesQuery.data?.files ?? [], [filesQuery.data]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-
-  // v0's copy is the source of truth. Adopting it wholesale would discard
-  // in-progress edits, so it is only taken when nothing local is dirty.
-  useEffect(() => {
-    if (!remoteFiles) return;
-
-    setFiles((current) => {
-      const dirty = current.some((file) => {
-        const saved = savedFiles.find((candidate) => candidate.path === file.path);
-        return saved && saved.content !== file.content;
-      });
-      if (dirty) return current;
-
-      setSavedFiles(remoteFiles);
-      return remoteFiles;
-    });
-    // savedFiles is read but must not retrigger this — it is set here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remoteFiles]);
 
   useEffect(() => {
     void filesQuery.mutate();
@@ -64,64 +41,38 @@ export function CodeEditor({
 
   useEffect(() => {
     if (selectedPath && files.some((file) => file.path === selectedPath)) return;
-    setSelectedPath(
-      files.find((file) => file.encoding === "utf8")?.path ?? files[0]?.path ?? null,
-    );
+    setSelectedPath(files.find((file) => file.encoding === "utf8")?.path ?? files[0]?.path ?? null);
   }, [files, selectedPath]);
-
-  const isSaving = updateFiles.isMutating;
-  const selectedFile = files.find((file) => file.path === selectedPath);
-  const changedFiles = files.filter((file) => {
-    if (file.encoding !== "utf8") return false;
-    return savedFiles.find((saved) => saved.path === file.path)?.content !== file.content;
-  });
-
-  const updateSelectedFile = (content: string) => {
-    setStatus(null);
-    setFiles((current) =>
-      current.map((file) => (file.path === selectedPath ? { ...file, content } : file)),
-    );
-  };
-
-  const save = async () => {
-    if (changedFiles.length === 0 || !isPreviewReady) return;
-
-    setStatus(null);
-
-    try {
-      await updateFiles.trigger({
-        files: changedFiles.map(({ path, content }) => ({ path, content })),
-      });
-      setSavedFiles(files);
-      setStatus("Saved");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to save files.");
-    }
-  };
 
   if (filesQuery.isLoading && files.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+      <EmptyState>
         <Loader size={16} /> Loading files…
-      </div>
+      </EmptyState>
     );
   }
 
   if (filesQuery.error && files.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-sm text-destructive">
-        Could not load the files for this build.
-      </div>
+      <EmptyState>
+        <span className="text-destructive">Could not load the files for this build.</span>
+      </EmptyState>
     );
   }
 
   if (files.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        No files yet.
-      </div>
+      <EmptyState>
+        <CodeIcon className="size-5 opacity-60" />
+        <p className="font-medium text-foreground">No code yet</p>
+        <p className="max-w-xs text-xs">
+          Your site&rsquo;s files will appear here once v0 has written them.
+        </p>
+      </EmptyState>
     );
   }
+
+  const selectedFile = files.find((file) => file.path === selectedPath);
 
   return (
     <div className="flex h-full min-h-0 bg-background">
@@ -148,42 +99,25 @@ export function CodeEditor({
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {selectedFile?.path}
           </span>
-          {status ? (
-            <span
-              className={cn(
-                "text-xs",
-                status === "Saved" ? "text-muted-foreground" : "text-destructive",
-              )}
-            >
-              {status}
-            </span>
-          ) : null}
-          <Button
-            disabled={changedFiles.length === 0 || isSaving || !isPreviewReady}
-            onClick={save}
-            size="xs"
-            title={isPreviewReady ? undefined : "Preview is still loading"}
-          >
-            {isSaving ? <SpinnerIcon className="size-3 animate-spin" /> : null}
-            {isSaving ? "Saving" : "Save"}
-          </Button>
+          <span className="shrink-0 text-[11px] text-muted-foreground">Read-only</span>
         </div>
 
         {selectedFile?.encoding === "utf8" ? (
-          <textarea
-            aria-label={`Edit ${selectedFile.path}`}
-            className="min-h-0 flex-1 resize-none bg-background p-4 font-mono text-xs leading-5 text-foreground outline-none"
-            disabled={isSaving}
-            onChange={(event) => updateSelectedFile(event.target.value)}
-            spellCheck={false}
-            value={selectedFile.content}
-          />
+          <pre className="min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-5 text-foreground">
+            <code>{selectedFile.content}</code>
+          </pre>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Binary files cannot be edited.
-          </div>
+          <EmptyState>This file is binary and cannot be shown.</EmptyState>
         )}
       </div>
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+      {children}
     </div>
   );
 }

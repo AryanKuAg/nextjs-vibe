@@ -4,16 +4,14 @@ import { Loader } from "@/components/ai-elements/loader";
 import {
   PromptInput,
   PromptInputBody,
-  PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import { ArrowUpIcon, StopIcon, V0LogoIcon } from "@/lib/icons";
+import { ArrowUpIcon, StopIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { V0_MODEL_LABEL } from "@/lib/v0-model";
 
 export function PromptBox({
   onSubmit,
@@ -62,21 +60,7 @@ export function PromptBox({
           placeholder={placeholder}
         />
       </PromptInputBody>
-      <PromptInputFooter className="px-2 pb-2">
-        <PromptInputTools>
-          {/* Not a picker. v0 Mini is the only model this app runs on, and the
-              server substitutes it regardless of what the browser sends — this
-              is a label so the user can see which model is answering. */}
-          <PromptInputButton
-            className="gap-1.5 hover:bg-transparent hover:text-muted-foreground"
-            disabled
-            tabIndex={-1}
-          >
-            <V0LogoIcon className="size-4" />
-            <span>{V0_MODEL_LABEL}</span>
-          </PromptInputButton>
-        </PromptInputTools>
-
+      <PromptInputFooter className="justify-end px-2 pb-2">
         <PromptInputTools>
           <PromptInputSubmit
             aria-label={isStreaming ? "Stop generating" : "Send message"}

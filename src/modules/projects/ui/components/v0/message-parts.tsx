@@ -4,6 +4,7 @@ import type { V0UIMessage } from "@v0-sdk/react";
 import type { ReactNode } from "react";
 
 import { Response } from "@/components/ai-elements/response";
+import { cn } from "@/lib/utils";
 import {
   AgentIcon,
   ChevronDownIcon,
@@ -19,52 +20,182 @@ import {
 /**
  * Renders one v0 message.
  *
- * v0 streams a turn as typed parts rather than a blob of text: reasoning, file
- * reads and edits, searches, shell commands, tool calls, agent actions. Each
- * gets a one-line "activity" row that expands only when there is output worth
- * reading, which is what makes a long build legible while it is still running.
+ * v0 streams a turn as typed parts: reasoning, file reads and edits, searches,
+ * shell commands, tool calls, agent actions. Two rules shape how they are
+ * shown, both aimed at somebody who is not a developer:
+ *
+ * 1. Say what happened, not which files. A build emits a dozen reads in a row,
+ *    and "Read file app/page.tsx" twelve times is noise to a person who has
+ *    never opened app/page.tsx. Consecutive parts of a kind collapse into one
+ *    line with a count; the paths stay, one click away.
+ * 2. The running step shimmers. Otherwise the last line just sits there and a
+ *    working build is indistinguishable from a hung one.
+ * 3. Only the closing summary is shown as prose. v0 opens each turn by
+ *    restating the request and describing its plan, which the list of steps
+ *    below then shows actually happening.
  */
 
 type MessagePart = V0UIMessage["parts"][number];
 type FileEditPart = Extract<MessagePart, { type: "data-v0-file-edit" }>;
 type AgentActionPart = Extract<MessagePart, { type: "data-v0-agent-action" }>;
 
+/** Consecutive same-kind parts, merged into the row that will represent them. */
+type Row =
+  | { kind: "single"; part: MessagePart }
+  | { kind: "reads"; paths: string[] }
+  | { kind: "edits"; parts: FileEditPart[] };
+
+/**
+ * Drops the agent's opening narration.
+ *
+ * v0 starts most turns by explaining what it is about to do — "I'll turn this
+ * into a polished interface, but I need one direction first…". It restates the
+ * request and then repeats itself in the closing summary, so on a screen that
+ * already lists every step it is noise.
+ *
+ * The distinction is positional: prose with work after it is a preamble, prose
+ * with nothing after it is the summary. Keeping only the trailing run also
+ * leaves a turn that is *only* prose — a plain answer, a refusal — fully
+ * intact, which a blanket "hide the first text part" rule would have eaten.
+ */
+function withoutPreamble(parts: readonly MessagePart[]): MessagePart[] {
+  const lastActivity = parts.findLastIndex((part) => part.type !== "text");
+
+  // All prose and no work — a plain answer or a refusal. Shown in full. This
+  // was briefly hidden while a turn was live, on the theory that prose arriving
+  // first is always a preamble. It is not: v0 answers plenty of turns in words
+  // alone, and those rendered as an empty panel until the turn closed.
+  if (lastActivity === -1) return [...parts];
+
+  return parts.filter((part, index) => part.type !== "text" || index > lastActivity);
+}
+
+function groupParts(parts: readonly MessagePart[]): Row[] {
+  const rows: Row[] = [];
+
+  for (const part of parts) {
+    const previous = rows.at(-1);
+
+    if (part.type === "data-v0-file-read") {
+      if (previous?.kind === "reads") previous.paths.push(...part.data.paths);
+      else rows.push({ kind: "reads", paths: [...part.data.paths] });
+      continue;
+    }
+
+    if (part.type === "data-v0-file-edit") {
+      if (previous?.kind === "edits") previous.parts.push(part);
+      else rows.push({ kind: "edits", parts: [part] });
+      continue;
+    }
+
+    rows.push({ kind: "single", part });
+  }
+
+  return rows;
+}
+
 export function MessageParts({
   message,
   isStreaming = false,
+  isLive = false,
 }: {
   message: V0UIMessage;
+  /** The SSE is delivering this message right now — drives text animation. */
   isStreaming?: boolean;
+  /** The turn is open, however the transcript is arriving — drives the shimmer. */
+  isLive?: boolean;
 }) {
   const isAssistant = message.role !== "user";
 
+  if (!isAssistant) {
+    return (
+      <div className="flex min-w-0 flex-col gap-2">
+        {message.parts.map((part, index) => (
+          <MessagePartView
+            isAssistant={false}
+            isActive={false}
+            isStreaming={false}
+            key={`${message.id}-${index}`}
+            part={part}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const rows = groupParts(withoutPreamble(message.parts));
+  // Only the final row can still be in flight, and only while the turn is open.
+  const activeIndex = isLive ? rows.length - 1 : -1;
+
   return (
-    <div
-      className={
-        isAssistant
-          ? "flex w-full min-w-0 flex-col gap-2.5"
-          : "flex min-w-0 flex-col gap-2"
-      }
-    >
-      {message.parts.map((part, index) => (
-        <MessagePartView
-          isAssistant={isAssistant}
-          isStreaming={isAssistant && isStreaming}
+    <div className="flex w-full min-w-0 flex-col gap-2.5">
+      {rows.map((row, index) => (
+        <RowView
+          isActive={index === activeIndex}
+          isStreaming={isStreaming}
           key={`${message.id}-${index}`}
-          part={part}
+          row={row}
         />
       ))}
     </div>
   );
 }
 
+function RowView({
+  row,
+  isActive,
+  isStreaming,
+}: {
+  row: Row;
+  isActive: boolean;
+  isStreaming: boolean;
+}) {
+  if (row.kind === "reads") {
+    const count = new Set(row.paths).size;
+    return (
+      <Activity
+        icon={<EyeIcon />}
+        isActive={isActive}
+        title={count === 1 ? "Read a file" : `Explored ${count} files`}
+      >
+        {row.paths.join("\n")}
+      </Activity>
+    );
+  }
+
+  if (row.kind === "edits") {
+    const count = new Set(row.parts.map((part) => part.data.path)).size;
+    return (
+      <Activity
+        icon={<FileIcon />}
+        isActive={isActive}
+        title={count === 1 ? "Applied changes to a file" : `Applied changes to ${count} files`}
+      >
+        {row.parts
+          .map((part) =>
+            part.data.operation === "rename" && part.data.toPath
+              ? `${fileEditLabel(part.data.operation)}: ${part.data.path} → ${part.data.toPath}`
+              : `${fileEditLabel(part.data.operation)}: ${part.data.path}`,
+          )
+          .join("\n")}
+      </Activity>
+    );
+  }
+
+  return (
+    <MessagePartView isAssistant isActive={isActive} isStreaming={isStreaming} part={row.part} />
+  );
+}
+
 function MessagePartView({
   part,
   isAssistant,
+  isActive,
   isStreaming,
 }: {
   part: MessagePart;
   isAssistant: boolean;
+  isActive: boolean;
   isStreaming: boolean;
 }) {
   switch (part.type) {
@@ -75,53 +206,33 @@ function MessagePartView({
       ) : null;
     }
     case "reasoning":
-      return <ThinkingPart isStreaming={isStreaming} part={part} />;
+      return <ThinkingPart isActive={isActive} isStreaming={isStreaming} part={part} />;
     case "file":
-      return (
-        <Activity detail={part.filename ?? part.url} icon={<FileIcon />} title="Attached file" />
-      );
-    case "data-v0-file-read":
-      return (
-        <Activity
-          detail={part.data.paths.join(", ")}
-          icon={<EyeIcon />}
-          title={part.data.paths.length === 1 ? "Read file" : `Read ${part.data.paths.length} files`}
-        />
-      );
-    case "data-v0-file-edit":
-      return (
-        <Activity
-          detail={
-            part.data.operation === "rename" && part.data.toPath
-              ? `${part.data.path} → ${part.data.toPath}`
-              : part.data.path
-          }
-          icon={<FileIcon />}
-          title={fileEditLabel(part.data.operation)}
-        />
-      );
+      return <Activity icon={<FileIcon />} isActive={false} title="Attached a file" />;
     case "data-v0-search":
       return (
         <Activity
-          detail={part.data.query}
           icon={<SearchIcon />}
+          isActive={isActive}
           title={part.data.scope === "web" ? "Searched the web" : "Searched the codebase"}
-        />
+        >
+          {part.data.query}
+        </Activity>
       );
     case "data-v0-bash":
       return (
-        <Activity detail={part.data.command} icon={<TerminalIcon />} title="Ran command">
-          {part.data.output}
+        <Activity icon={<TerminalIcon />} isActive={isActive} title="Ran a command">
+          {[part.data.command, part.data.output].filter(Boolean).join("\n\n")}
         </Activity>
       );
     case "data-v0-tool-call": {
-      const Icon = part.data.status === "error" ? CrossCircleIcon : ToolIcon;
+      const failed = part.data.status === "error";
       return (
         <Activity
-          detail={humanize(part.data.name)}
-          error={part.data.status === "error"}
-          icon={<Icon />}
-          title={part.data.status === "error" ? "Tool failed" : "Used tool"}
+          error={failed}
+          icon={failed ? <CrossCircleIcon /> : <ToolIcon />}
+          isActive={isActive && !failed}
+          title={failed ? `${humanize(part.data.name)} failed` : humanize(part.data.name)}
         >
           {formatToolDetails(part.data.input, part.data.output)}
         </Activity>
@@ -129,7 +240,7 @@ function MessagePartView({
     }
     case "data-v0-agent-action":
       return (
-        <Activity detail={part.data.summary} icon={<AgentIcon />} title={humanize(part.data.name)}>
+        <Activity icon={<AgentIcon />} isActive={isActive} title={humanize(part.data.name)}>
           {part.data.data === undefined || isPendingAgentAction(part)
             ? undefined
             : formatValue(part.data.data)}
@@ -172,22 +283,28 @@ function visibleAssistantText(text: string) {
 
 function ThinkingPart({
   part,
+  isActive,
   isStreaming,
 }: {
   part: Extract<MessagePart, { type: "reasoning" }>;
+  isActive: boolean;
   isStreaming: boolean;
 }) {
   if (!part.text) return null;
+
+  const thinking = isStreaming && part.state === "streaming";
 
   return (
     <details className="group text-muted-foreground">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 py-0.5 text-xs font-medium hover:text-foreground [&::-webkit-details-marker]:hidden">
         <SparklesIcon className="size-3.5 shrink-0" />
-        <span>Thought for a moment</span>
+        <span className={cn(thinking || isActive ? "shimmer-text" : undefined)}>
+          {thinking || isActive ? "Thinking" : "Thought for a moment"}
+        </span>
         <ChevronDownIcon className="size-3.5 transition-transform group-open:rotate-180" />
       </summary>
       <div className="mt-2 border-l border-border pl-3 text-xs leading-relaxed text-muted-foreground">
-        <Markdown isStreaming={isStreaming && part.state === "streaming"}>{part.text}</Markdown>
+        <Markdown isStreaming={thinking}>{part.text}</Markdown>
       </div>
     </details>
   );
@@ -206,39 +323,52 @@ function Markdown({ children, isStreaming }: { children: string; isStreaming: bo
   );
 }
 
+/**
+ * One line of "what the agent did". The detail — paths, queries, command
+ * output — is deliberately not on this line; it lives behind the disclosure so
+ * the transcript reads as a list of actions rather than a log.
+ */
 function Activity({
   title,
-  detail,
   icon,
+  isActive,
   error = false,
   children,
 }: {
   title: string;
-  detail?: string;
   icon: ReactNode;
+  isActive: boolean;
   error?: boolean;
   children?: string;
 }) {
+  const body = children?.trim() ? children : undefined;
+
   const row = (
     <div className="flex min-w-0 items-center gap-2 py-0.5 text-xs">
       <span
-        className={cnIcon(error)}
+        className={cn(
+          "shrink-0 [&>svg]:size-3.5",
+          error ? "text-destructive" : "text-muted-foreground",
+        )}
       >
         {icon}
       </span>
-      <span className={error ? "font-medium text-destructive" : "font-medium"}>{title}</span>
-      {detail ? (
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-          {detail}
-        </span>
-      ) : null}
-      {children ? (
+      <span
+        className={cn(
+          "min-w-0 truncate font-medium",
+          error && "text-destructive",
+          isActive && !error && "shimmer-text",
+        )}
+      >
+        {title}
+      </span>
+      {body ? (
         <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       ) : null}
     </div>
   );
 
-  if (!children) return row;
+  if (!body) return row;
 
   return (
     <details className="group min-w-0">
@@ -246,25 +376,19 @@ function Activity({
         {row}
       </summary>
       <pre className="mt-1.5 max-h-48 overflow-auto rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
-        {children}
+        {body}
       </pre>
     </details>
   );
 }
 
-function cnIcon(error: boolean) {
-  return error
-    ? "shrink-0 text-destructive [&>svg]:size-3.5"
-    : "shrink-0 text-muted-foreground [&>svg]:size-3.5";
-}
-
 function fileEditLabel(operation: FileEditPart["data"]["operation"]) {
   const labels = {
-    create: "Created file",
-    update: "Updated file",
-    delete: "Deleted file",
-    rename: "Renamed file",
-    patch: "Patched file",
+    create: "Created",
+    update: "Updated",
+    delete: "Deleted",
+    rename: "Renamed",
+    patch: "Patched",
   } as const;
 
   return labels[operation];

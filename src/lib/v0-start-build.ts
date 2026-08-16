@@ -6,6 +6,7 @@ import { latestVideoUrl } from "@/lib/project-video";
 import { getTemplate } from "@/lib/templates/registry";
 import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { v0 } from "@/lib/v0-client";
+import { v0Failure } from "@/lib/v0-error";
 import { V0_MODEL_CONFIGURATION } from "@/lib/v0-model";
 import { buildSitePrompt, type SiteMode } from "@/lib/v0-site-prompt";
 
@@ -52,7 +53,7 @@ export async function startProjectBuild(input: {
 
     const chatId = imported.data?.chat?.id;
     if (imported.error !== undefined || !chatId) {
-      throw new Error("v0 could not import the template repository");
+      throw v0Failure(imported, "v0 could not import the template repository");
     }
 
     await prisma.project.update({
@@ -84,7 +85,9 @@ export async function startProjectBuild(input: {
   });
 
   if (created.error !== undefined || !created.data?.chatId) {
-    throw new Error("v0 did not return a chat");
+    // v0's own wording is far more useful than anything we could invent here —
+    // "You have reached your daily message limit", for instance.
+    throw v0Failure(created, "v0 did not return a chat");
   }
 
   await prisma.project.update({

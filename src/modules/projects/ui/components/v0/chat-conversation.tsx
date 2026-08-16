@@ -13,6 +13,7 @@ import { useMessages, useResolveTask, useRestoreMessage, useStopMessage } from "
 import { useEffect, useMemo, useState } from "react";
 import { readV0Stream } from "v0/browser";
 
+import { withChatToken } from "./chat-token";
 import { ConversationView } from "./conversation-view";
 import { PromptBox } from "./prompt-box";
 import type { ResolveTask } from "./task-resolution";
@@ -26,10 +27,13 @@ import type { ResolveTask } from "./task-resolution";
  * by a tab that has since closed) is picked back up mid-stream on mount.
  */
 export function ChatConversation({
+  accessToken,
   chatId,
   messages: initialMessages,
   onContentChange,
 }: {
+  /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
+  accessToken: string;
   chatId: string;
   messages: Message[];
   /** Fired when a turn finishes, so the preview and code panes refresh. */
@@ -41,20 +45,40 @@ export function ChatConversation({
   const [restoringMessageId, setRestoringMessageId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const messagesUrl = `/api/v0/chats/${encodeURIComponent(chatId)}/messages`;
+  const messagesUrl = withChatToken(
+    `/api/v0/chats/${encodeURIComponent(chatId)}/messages`,
+    accessToken,
+  );
+  // True while v0's newest turn is still unfinished.
+  //
+  // The first build is started server-side, so the browser joins it through
+  // `resume` rather than having opened the stream itself. When that attach is
+  // slow or the stream arrives buffered, nothing renders for a long stretch and
+  // then the entire turn lands at once. Polling the transcript underneath is the
+  // safety net: parts show up as v0 writes them either way. It costs one small
+  // request every couple of seconds, and only while a run is actually open.
+  const [hasPendingRun, setHasPendingRun] = useState(() => shouldResumeV0Chat(initialMessages));
+
   const messagesQuery = useMessages(
     messagesUrl,
     { limit: 100 },
     {
       fallbackData: { cursor: null, messages: initialMessages },
       revalidateOnMount: false,
+      refreshInterval: hasPendingRun ? 2000 : 0,
     },
   );
   const persistedMessages = messagesQuery.data?.messages ?? initialMessages;
 
-  const resolveTaskMutation = useResolveTask(`/api/v0/chats/${encodeURIComponent(chatId)}/resolve`);
+  useEffect(() => {
+    setHasPendingRun(shouldResumeV0Chat(persistedMessages));
+  }, [persistedMessages]);
+
+  const resolveTaskMutation = useResolveTask(
+    withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/resolve`, accessToken),
+  );
   const restoreMessageMutation = useRestoreMessage(
-    `/api/v0/chats/${encodeURIComponent(chatId)}/restore`,
+    withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/restore`, accessToken),
   );
 
   const initialUiMessages = useMemo(() => toV0UIMessages(initialMessages), [initialMessages]);
@@ -67,11 +91,13 @@ export function ChatConversation({
           // Never reached: a chat only exists because `v0.startBuild` opened it
           // server-side, so the transport always has a chatId to send against.
           create: "/api/v0/chats",
-          send: (id) => `/api/v0/chats/${encodeURIComponent(id)}/messages`,
-          resume: (id) => `/api/v0/chats/${encodeURIComponent(id)}/resume`,
+          send: (id) =>
+            withChatToken(`/api/v0/chats/${encodeURIComponent(id)}/messages`, accessToken),
+          resume: (id) =>
+            withChatToken(`/api/v0/chats/${encodeURIComponent(id)}/resume`, accessToken),
         },
       }),
-    [chatId, persistedMessages],
+    [accessToken, chatId, persistedMessages],
   );
 
   const {
@@ -103,17 +129,35 @@ export function ChatConversation({
       );
 
   const stopMessageMutation = useStopMessage(
-    `/api/v0/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(
-      activeAssistantMessage?.id ?? "missing",
-    )}/stop`,
+    withChatToken(
+      `/api/v0/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(
+        activeAssistantMessage?.id ?? "missing",
+      )}/stop`,
+      accessToken,
+    ),
   );
 
-  // Reconcile with the server transcript, but never mid-turn — overwriting a
-  // streaming message with its half-written persisted copy makes it flicker.
+  /**
+   * Fold the polled transcript into what is on screen.
+   *
+   * Between turns this is a straight replace. Mid-turn it is not: overwriting a
+   * streaming message with its half-written persisted copy makes it flicker, so
+   * the polled copy is only adopted when it is strictly richer than what has
+   * rendered. That is what rescues a stream which attached but has delivered
+   * nothing — the symptom being a blank panel that suddenly fills in at the end
+   * — while a healthy stream, always ahead of the poll, is left alone.
+   */
   useEffect(() => {
-    if (chatIsBusy || isResolving) return;
+    if (isResolving) return;
 
-    setMessages(toV0UIMessages(persistedMessages));
+    const polled = toV0UIMessages(persistedMessages);
+
+    if (!chatIsBusy) {
+      setMessages(polled);
+      return;
+    }
+
+    setMessages((current) => (countParts(polled) > countParts(current) ? polled : current));
   }, [chatIsBusy, isResolving, persistedMessages, setMessages]);
 
   const refreshMessages = async () => {
@@ -203,6 +247,7 @@ export function ChatConversation({
     <>
       <ConversationView
         isStreaming={isStreaming}
+        isWorking={isSubmitting || hasPendingRun}
         messages={uiMessages}
         onRejectPermission={() => submitMessage("Do not run this action. Continue without it.")}
         onResolveTask={resolveTask}
@@ -218,12 +263,17 @@ export function ChatConversation({
           isSubmitting={isSubmitting || restoringMessageId !== null}
           onStop={stopMessage}
           onSubmit={submitMessage}
-          placeholder="Ask v0 to make changes..."
+          placeholder="Ask to make changes..."
         />
         {error ? <p className="mt-1.5 px-1 text-xs text-destructive">{error}</p> : null}
       </div>
     </>
   );
+}
+
+/** How much of a transcript has actually rendered, used to pick the richer copy. */
+function countParts(messages: V0UIMessage[]) {
+  return messages.reduce((total, message) => total + message.parts.length, 0);
 }
 
 function upsertMessage(messages: V0UIMessage[], message: V0UIMessage) {

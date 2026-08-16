@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
-  const authorized = await authorizeChat(chatId);
+  const authorized = await authorizeChat(chatId, request);
   if (!authorized.ok) return authorized.response;
 
   const body = (await request.json().catch(() => null)) as

@@ -8,6 +8,7 @@ import { checkCredits, consumeCredits, refundCredits, MODEL_COSTS, AGENT_COSTS }
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
+import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
 import { startProjectBuild } from "@/lib/v0-start-build";
 
 export const projectsRouter = createTRPCRouter({
@@ -136,6 +137,17 @@ export const projectsRouter = createTRPCRouter({
         // project with nothing in it.
         await refundCredits(AGENT_COSTS.CODE, ctx.auth.userId).catch(() => {});
         await prisma.project.delete({ where: { id: createdProject.id } }).catch(() => {});
+
+        // Always recorded in full: a capacity refusal is an incident for us,
+        // and the visitor's sanitised message would otherwise be the only
+        // trace that our v0 account had run out of quota.
+        console.error("[v0] build failed to start:", error);
+
+        // Our vendor quota is not something the visitor can act on, and telling
+        // them to "upgrade your plan" would point at the wrong plan entirely.
+        if (isCapacityError(error)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: CAPACITY_MESSAGE });
+        }
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

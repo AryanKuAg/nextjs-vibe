@@ -66,6 +66,37 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        /**
+         * A full navigation out of the preview, sent back under the prefix.
+         *
+         * Anchors that are not framework links do a real page load, landing on
+         * a bare `/contact` on this origin. A rewrite would serve the right
+         * page but leave the address bare, and every asset that page then asks
+         * for would be routed by a referrer that no longer names a preview.
+         * Redirecting fixes the address itself, so what follows is consistent.
+         *
+         * Scoped to navigations by `sec-fetch-dest`; sub-resources are rewritten
+         * below instead, since making each of them pay a round trip would be
+         * absurd.
+         */
+        source: "/:path((?!api/v0-preview).*)",
+        has: [
+          {
+            type: "header",
+            key: "referer",
+            value: ".*/api/v0-preview/(?<previewChatId>[^/?#]+).*",
+          },
+          { type: "header", key: "sec-fetch-dest", value: "(?:document|iframe)" },
+        ],
+        destination: "/api/v0-preview/:previewChatId/:path",
+        permanent: false,
+      },
+    ];
+  },
+
   async rewrites() {
     return {
       /**

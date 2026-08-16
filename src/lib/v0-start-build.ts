@@ -8,7 +8,7 @@ import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { v0 } from "@/lib/v0-client";
 import { v0Failure } from "@/lib/v0-error";
 import { V0_MODEL_CONFIGURATION } from "@/lib/v0-model";
-import { buildSitePrompt, type SiteMode } from "@/lib/v0-site-prompt";
+import { buildSitePrompt, type SiteMode, type VideoMotion } from "@/lib/v0-site-prompt";
 
 /**
  * Opens a project's v0 chat.
@@ -24,8 +24,14 @@ import { buildSitePrompt, type SiteMode } from "@/lib/v0-site-prompt";
 export async function startProjectBuild(input: {
   projectId: string;
   prompt: string;
-  /** Only meaningful once the project has a video to place. */
+  /** Classic or Cinematic, chosen on the home page. */
   mode?: SiteMode;
+  /** Cinematic only: how the video behaves once it is on the page. */
+  motion?: VideoMotion;
+  /** A video the user supplied by URL. Generated footage arrives separately. */
+  videoUrl?: string | null;
+  /** The footage the user described, when there is no file to point at. */
+  videoDescription?: string | null;
   /** A reference image the user attached, as a data URL. */
   imageDataUrl?: string;
 }): Promise<{ chatId: string }> {
@@ -75,9 +81,13 @@ export async function startProjectBuild(input: {
     // No systemPrompt: v0 already knows the stack and the conventions, so the
     // whole instruction is the user's brief plus where the video goes.
     message: buildSitePrompt({
-      mode: input.mode ?? "FULL_PAGE",
+      mode: input.mode ?? "CLASSIC",
       prompt: input.prompt,
-      videoUrl: latestVideoUrl(project.videoUrls),
+      motion: input.motion,
+      videoDescription: input.videoDescription,
+      // A URL the user pasted wins over anything the media pipeline produced
+      // earlier: it is the more recent, more explicit instruction.
+      videoUrl: input.videoUrl ?? latestVideoUrl(project.videoUrls),
     }),
     modelConfiguration: V0_MODEL_CONFIGURATION,
     privacy: "private",

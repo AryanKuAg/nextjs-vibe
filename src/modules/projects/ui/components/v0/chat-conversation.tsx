@@ -71,8 +71,17 @@ export function ChatConversation({
   const persistedMessages = messagesQuery.data?.messages ?? initialMessages;
 
   useEffect(() => {
-    setHasPendingRun(shouldResumeV0Chat(persistedMessages));
-  }, [persistedMessages]);
+    const pending = shouldResumeV0Chat(persistedMessages);
+
+    // A run that finished while nobody was watching. `onContentChange` normally
+    // fires from `onFinish`, but a backgrounded tab throttles the stream and
+    // that callback may never arrive — leaving the preview stuck on "your site
+    // will be built here" until a manual reload. The poll sees the turn close
+    // regardless, so it reports completion the same way the stream would.
+    if (hasPendingRun && !pending) onContentChange();
+
+    setHasPendingRun(pending);
+  }, [hasPendingRun, onContentChange, persistedMessages]);
 
   const resolveTaskMutation = useResolveTask(
     withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/resolve`, accessToken),

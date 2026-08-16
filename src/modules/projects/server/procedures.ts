@@ -84,6 +84,13 @@ export const projectsRouter = createTRPCRouter({
         templateId: z.string().optional(),
         /** A reference image attached to the prompt, as a data URL. */
         imageDataUrl: z.string().optional(),
+        /** Which of the two build treatments the user picked. */
+        mode: z.enum(["CLASSIC", "CINEMATIC"]).default("CLASSIC"),
+        /** Cinematic only: how the video behaves and where it comes from. */
+        motion: z.enum(["SCROLL", "LOOP"]).optional(),
+        videoSource: z.enum(["AUTO", "PROMPT", "URL"]).optional(),
+        videoPrompt: z.string().max(2000).optional(),
+        videoUrl: z.string().url().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -116,7 +123,21 @@ export const projectsRouter = createTRPCRouter({
           status: "draft",
           currentStage: "SCENE",
           templateId: template?.id ?? null,
-          prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
+          // The video intent is recorded alongside the brief so the media
+          // pipeline can act on it later — today only a pasted URL reaches the
+          // build, because nothing here generates footage yet.
+          prompts: input.value.trim()
+            ? [
+                {
+                  startPrompt: input.value,
+                  mode: input.mode,
+                  ...(input.motion ? { motion: input.motion } : {}),
+                  ...(input.videoSource ? { videoSource: input.videoSource } : {}),
+                  ...(input.videoPrompt ? { videoPrompt: input.videoPrompt } : {}),
+                  ...(input.videoUrl ? { videoUrl: input.videoUrl } : {}),
+                },
+              ]
+            : [],
         },
       });
 
@@ -129,6 +150,10 @@ export const projectsRouter = createTRPCRouter({
         await startProjectBuild({
           projectId: createdProject.id,
           prompt: input.value,
+          mode: input.mode,
+          motion: input.motion,
+          videoUrl: input.videoUrl,
+          videoDescription: input.videoPrompt,
           imageDataUrl: input.imageDataUrl,
         });
       } catch (error) {

@@ -119,9 +119,12 @@ const LoggedInDashboard = () => {
 
       {/* Main Content (Centered) */}
       <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
-        <h1 className="text-white-85 font-medium text-2xl mb-10 text-center">
-          Turn your idea into a stunning 3D website
+        <h1 className="text-white font-medium text-4xl md:text-5xl text-center tracking-tight">
+          Turn ideas into 3D websites
         </h1>
+        <p className="mt-4 mb-10 text-center text-sm text-white-50">
+          AI builds the design, motion, and experience from a simple prompt.
+        </p>
 
         <div className="w-full max-w-3xl">
           <ProjectForm showModelSelector />
@@ -276,7 +279,7 @@ const LoggedOutView = () => {
 
         {/* Bottom: Prompt Input */}
         <div className="mt-auto">
-          <ProjectForm showModelSelector dropdownDirection="up" isLandingPage />
+          <ProjectForm showModelSelector isLandingPage />
         </div>
       </div>
 

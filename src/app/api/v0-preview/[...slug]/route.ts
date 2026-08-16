@@ -172,16 +172,49 @@ async function keepNavigationInsidePreview(response: Response, chatId: string) {
   if (!response.headers.get("content-type")?.includes("text/html")) return response;
 
   const prefix = `/api/v0-preview/${encodeURIComponent(chatId)}`;
-  const html = (await response.text())
-    // `/x` but never `//host` — a protocol-relative URL is another origin.
-    .replace(/\b(href|src|action)=(["'])\/(?!\/)/g, `$1=$2${prefix}/`)
-    .replace("</head>", `${keepInsideScript(prefix)}</head>`);
+  const html = rewriteRootRelative(await response.text(), prefix).replace(
+    "</head>",
+    `${keepInsideScript(prefix)}</head>`,
+  );
 
   const headers = new Headers(response.headers);
   headers.delete("content-length"); // rewriting changed it
   headers.delete("content-encoding"); // body is now decoded text
 
   return new Response(html, { status: response.status, statusText: response.statusText, headers });
+}
+
+/**
+ * Prefixes the URLs the browser fetches, and deliberately not the ones a
+ * framework router owns.
+ *
+ * `<a href>` is left exactly as authored. The generated sites use `next/link`,
+ * which renders an anchor and then routes the click in JavaScript — rewriting
+ * that href pushed the router at `/api/v0-preview/<id>/contact`, a path outside
+ * its own route table, so it gave up and did a full page load. That is the
+ * blank flash between pages: client-side navigation was working until we broke
+ * the address it was given.
+ *
+ * Anchors that are *not* framework links still need containing, but a
+ * navigation is a request like any other, so `next.config.ts` redirects it to
+ * the prefix instead. That happens after the click rather than before it, which
+ * is what leaves the router's own links untouched.
+ */
+function rewriteRootRelative(html: string, prefix: string) {
+  return html.replace(/<(a|link|script|img|source|form|iframe|video|audio)\b([^>]*)>/gi, (tag, name, attrs) => {
+    const isAnchor = String(name).toLowerCase() === "a";
+
+    const rewritten = String(attrs).replace(
+      // `/x` but never `//host` — a protocol-relative URL is another origin.
+      /\b(href|src|action)=(["'])\/(?!\/)/gi,
+      (attribute, key, quote) =>
+        isAnchor && String(key).toLowerCase() === "href"
+          ? attribute
+          : `${key}=${quote}${prefix}/`,
+    );
+
+    return `<${name}${rewritten}>`;
+  });
 }
 
 function keepInsideScript(prefix: string) {
@@ -194,10 +227,6 @@ history.pushState=function(s,t,u){var v=p.call(this,s,t,u==null?u:fix(String(u))
 history.replaceState=function(s,t,u){var v=r.call(this,s,t,u==null?u:fix(String(u)));report();return v;};
 addEventListener("popstate",report);
 addEventListener("hashchange",report);
-document.addEventListener("click",function(e){
-var t=e.target;if(!t||!t.closest)return;var a=t.closest("a[href]");if(!a)return;
-var h=a.getAttribute("href");if(h&&h.charAt(0)==="/"&&h.charAt(1)!=="/"&&h.indexOf(P)!==0)a.setAttribute("href",P+h);
-},true);
 report();
 })();</script>`;
 }

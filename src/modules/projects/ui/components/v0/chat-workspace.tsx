@@ -62,10 +62,12 @@ export function ChatWorkspace({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFullscreen]);
 
-  const handleContentChange = () => {
+  // Stable identity: the conversation calls this from an effect, so a fresh
+  // function each render would re-run that effect on every render.
+  const handleContentChange = useCallback(() => {
     setHasBuild(true);
     setContentRevision((revision) => revision + 1);
-  };
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

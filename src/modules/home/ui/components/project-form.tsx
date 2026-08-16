@@ -7,16 +7,23 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import { CustomSignInModal } from "@/components/custom-sign-in-modal";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { processImageFile } from "@/lib/process-image-file";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
 
 
+import {
+  SITE_MODES,
+  VIDEO_MOTIONS,
+  VIDEO_SOURCES,
+  type SiteMode,
+  type VideoMotion,
+  type VideoSource,
+} from "@/lib/v0-site-prompt";
+import { ComposerChipMenu } from "./composer-chip-menu";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
@@ -28,22 +35,13 @@ const formSchema = z.object({
     .max(100000, { message: "Value is too long" }),
 });
 
-const MODELS = [
-  // we're keeping the same deepseek model everything but on the frontend we're showing different models
-  { id: "google/gemini-3.5-flash-lite", label: "Fable 5", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Kimi K3", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Opus 5", emoji: "" },
-  { id: "google/gemini-3.5-flash-lite", label: "Sonnet 5", emoji: "" },
-];
 
 interface ProjectFormProps {
   showModelSelector?: boolean;
-  dropdownDirection?: "up" | "down";
   isLandingPage?: boolean;
 }
 
-export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "down", isLandingPage = false }: ProjectFormProps) => {
+export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }: ProjectFormProps) => {
   const router = useRouter();
   const trpc = useTRPC();
   const clerk = useClerk();
@@ -58,11 +56,13 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].label);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [mode, setMode] = useState<SiteMode>("CLASSIC");
+  const [motion, setMotion] = useState<VideoMotion>("SCROLL");
+  const [videoSource, setVideoSource] = useState<VideoSource>("AUTO");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Clean up object URLs
   useEffect(() => {
@@ -70,22 +70,6 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
-
-  // Click outside to close model dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-
-    if (modelDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [modelDropdownOpen]);
 
   // Global drag-and-drop listeners for the fullscreen overlay
   useEffect(() => {
@@ -192,6 +176,22 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
       return;
     }
 
+    // A chosen video source that carries no value would build a site with no
+    // video and no explanation, so it is caught before anything is charged.
+    if (mode === "CINEMATIC" && videoSource === "URL") {
+      const trimmed = videoUrl.trim();
+      const valid = /^https?:\/\/\S+$/i.test(trimmed);
+      if (!valid) {
+        toast.error("Enter a video URL starting with http:// or https://");
+        return;
+      }
+    }
+
+    if (mode === "CINEMATIC" && videoSource === "PROMPT" && !videoPrompt.trim()) {
+      toast.error("Describe the video you want, or switch back to Auto video.");
+      return;
+    }
+
     setIsRedirecting(true); // lock the button immediately, before any async work
 
     // The prompt and the image go with the mutation that starts the build, so
@@ -211,11 +211,26 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
     }
 
     try {
-      await createProject.mutateAsync({ value: values.value, imageDataUrl });
+      await createProject.mutateAsync({
+        value: values.value,
+        imageDataUrl,
+        mode,
+        ...(mode === "CINEMATIC"
+          ? {
+              motion,
+              videoSource,
+              videoPrompt: videoSource === "PROMPT" ? videoPrompt.trim() : undefined,
+              videoUrl: videoSource === "URL" ? videoUrl.trim() : undefined,
+            }
+          : {}),
+      });
     } catch {
       // Error is handled in the mutation's onError callback
     }
   };
+
+  const motionOption = VIDEO_MOTIONS.find((o) => o.value === motion) ?? VIDEO_MOTIONS[0];
+  const sourceOption = VIDEO_SOURCES.find((o) => o.value === videoSource) ?? VIDEO_SOURCES[0];
 
   const isPending = createProject.isPending || isRedirecting;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
@@ -235,30 +250,10 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
         </div>
       )}
       <section className="relative space-y-6 w-full flex flex-col items-center">
-        {/* ── Perspective grid backdrop ──
-            Full-bleed, so it has to break out of the page's max-width column.
-            It stays first in the DOM and neither it nor the card carries a
-            z-index, which is what puts the card in front of it. */}
-        {!isLandingPage && (
-          <div
-            aria-hidden
-            className="pointer-events-none select-none absolute left-1/2 top-1/2 w-screen -translate-x-1/2 -translate-y-[60%]"
-          >
-            <Image
-              src="/grid-pattern.svg"
-              alt=""
-              width={1431}
-              height={411}
-              priority
-              className="w-full h-auto opacity-12"
-            />
-          </div>
-        )}
-
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] ${isLandingPage ? "bg-transparent border-white-8  border focus-within:border-purple" : "beam-border  bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] ${isLandingPage ? "bg-transparent border-white-8  border focus-within:border-purple" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -292,7 +287,7 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
                 minRows={1}
                 maxRows={12}
                 className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[48px] placeholder:text-white-50 "
-                placeholder="Describe your website"
+                placeholder="Describe the website you want..."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -302,6 +297,43 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
               />
             )}
           />
+
+          {/* ── Video detail ──
+              Only the two sources that need something from the user get a
+              field. Dismissing it returns the source to Auto rather than
+              leaving a chip that promises input the build will never receive. */}
+          {mode === "CINEMATIC" && videoSource !== "AUTO" && (
+            <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-white-8 px-3 py-2">
+              <i className={`${sourceOption.icon} shrink-0 text-base text-white-50`} />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm leading-[20px] text-white-85 outline-none placeholder:text-white-50"
+                disabled={isPending}
+                onChange={(e) =>
+                  videoSource === "URL" ? setVideoUrl(e.target.value) : setVideoPrompt(e.target.value)
+                }
+                placeholder={
+                  videoSource === "URL"
+                    ? "Paste your video URL"
+                    : "Slow aerial drift over foggy peaks, 35mm grain..."
+                }
+                type={videoSource === "URL" ? "url" : "text"}
+                value={videoSource === "URL" ? videoUrl : videoPrompt}
+              />
+              <button
+                aria-label="Remove"
+                className="shrink-0 text-white-50 transition-colors hover:text-white"
+                disabled={isPending}
+                onClick={() => {
+                  setVideoSource("AUTO");
+                  setVideoUrl("");
+                  setVideoPrompt("");
+                }}
+                type="button"
+              >
+                <i className="ri-close-line text-base" />
+              </button>
+            </div>
+          )}
 
           {/* Bottom toolbar */}
           <div className="flex items-center mt-2">
@@ -325,41 +357,59 @@ export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "do
             </button>
 
             {showModelSelector && (
-              <div className="relative" ref={dropdownRef}>
-                <div
-                  className="h-7 px-2 flex items-center gap-1 rounded-lg text-sm leading-[20px] text-white-85 hover:bg-white-4 cursor-pointer"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setModelDropdownOpen((o) => !o)}
-                >
-                  <span className="whitespace-nowrap">{selectedModel}</span>
-                  <i className={`ri-arrow-${modelDropdownOpen ? 'up' : 'down'}-s-line text-white-85 text-xs`} />
-                </div>
-
-                <AnimatePresence>
-                  {modelDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
-                      transition={{ duration: 0.15, ease: "easeOut" }}
-                      className={`absolute ${dropdownDirection === "up" ? "bottom-9" : "top-9"} left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col`}
-                    >
-                      {MODELS.map((model) => (
-                        <button
-                          key={model.label}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { setSelectedModel(model.label); setModelDropdownOpen(false); }}
-                          className={`w-full flex items-center justify-between gap-3 px-2 py-2.5 text-sm font-sans rounded-[4px]  hover:bg-white-8 h-[28px] text-white-85`}
-                        >
-                          <span className="whitespace-nowrap">{model.label}</span>
-                          {selectedModel === model.label && <i className="ri-check-line text-white" />}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              // Not a model picker — the model is fixed. This is the shape of
+              // the build: an ordinary site, or a motion-led one. It is the only
+              // decision the prompt box asks for, so it is two visible options
+              // rather than something hidden behind a dropdown.
+              <div
+                className="flex items-center gap-0.5 rounded-full bg-white-4 p-0.5"
+                role="radiogroup"
+                aria-label="Build style"
+              >
+                {SITE_MODES.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === option.value}
+                    disabled={isPending}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setMode(option.value)}
+                    className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-sm leading-[20px] transition-colors disabled:opacity-50 ${
+                      mode === option.value
+                        ? "bg-white-8 text-white"
+                        : "text-white-50 hover:text-white-85"
+                    }`}
+                  >
+                    <i className={`${option.icon} text-sm`} />
+                    <span className="whitespace-nowrap">{option.label}</span>
+                  </button>
+                ))}
               </div>
+            )}
+
+            {showModelSelector && mode === "CINEMATIC" && (
+              <>
+                <span aria-hidden className="h-5 w-px shrink-0 bg-white-8" />
+                <ComposerChipMenu
+                  ariaLabel="How the video behaves"
+                  chipIcon={motionOption.icon}
+                  chipLabel={motionOption.label}
+                  disabled={isPending}
+                  onChange={setMotion}
+                  options={VIDEO_MOTIONS.map((o) => ({ ...o, title: o.label }))}
+                  value={motion}
+                />
+                <ComposerChipMenu
+                  ariaLabel="Where the video comes from"
+                  chipIcon={sourceOption.icon}
+                  chipLabel={sourceOption.label}
+                  disabled={isPending}
+                  onChange={setVideoSource}
+                  options={VIDEO_SOURCES}
+                  value={videoSource}
+                />
+              </>
             )}
 
             <div className="flex gap-2 ml-auto shrink-0">

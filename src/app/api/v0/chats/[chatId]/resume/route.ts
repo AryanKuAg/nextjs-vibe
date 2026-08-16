@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
  * stream back up from wherever it has got to. No credits here — the message
  * this resumes was charged when it was sent.
  */
-export async function POST(_request: Request, { params }: { params: Promise<{ chatId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
-  const authorized = await authorizeChat(chatId);
+  const authorized = await authorizeChat(chatId, request);
   if (!authorized.ok) return authorized.response;
 
   const result = await v0.chats.resume({ chatId });

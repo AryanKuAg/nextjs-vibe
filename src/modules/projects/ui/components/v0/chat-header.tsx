@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeployChat, useDownloadChatFiles } from "@v0-sdk/react/swr";
+import { useDownloadChatFiles } from "@v0-sdk/react/swr";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -22,13 +22,16 @@ import {
   RefreshIcon,
   SettingsIcon,
   SpinnerIcon,
-  VercelLogoIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+
+import { withChatToken } from "./chat-token";
+import type { PreviewNavigation } from "./preview-pane";
 
 export type ChatView = "preview" | "code";
 
 export function ChatHeader({
+  accessToken,
   chatId,
   title,
   view,
@@ -36,8 +39,12 @@ export function ChatHeader({
   onReloadPreview,
   isFullscreen,
   onToggleFullscreen,
+  navigation,
 }: {
+  accessToken: string;
   chatId: string;
+  /** Live location of the framed site; null before it has loaded. */
+  navigation?: PreviewNavigation | null;
   title: string;
   view: ChatView;
   onViewChange: (view: ChatView) => void;
@@ -45,27 +52,15 @@ export function ChatHeader({
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
 }) {
-  const deployChat = useDeployChat(`/api/v0/chats/${encodeURIComponent(chatId)}/deploy`);
-  const downloadChat = useDownloadChatFiles(`/api/v0/chats/${encodeURIComponent(chatId)}/download`);
-  const [publishState, setPublishState] = useState<"idle" | "published">("idle");
+  const downloadChat = useDownloadChatFiles(
+    withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/download`, accessToken),
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const isPublishing = deployChat.isMutating;
   const isDownloading = downloadChat.isMutating;
-  const previewUrl = `/api/v0-preview/${encodeURIComponent(chatId)}`;
-
-  const publish = async () => {
-    setError(null);
-
-    try {
-      await deployChat.trigger();
-      // v0's deploy endpoint returns identifiers only — the Vercel build runs
-      // asynchronously afterwards — so there is no URL to link to here.
-      setPublishState("published");
-    } catch (error) {
-      setError(errorMessage(error, "Failed to publish."));
-    }
-  };
+  const previewUrl =
+    navigation?.externalUrl ??
+    withChatToken(`/api/v0-preview/${encodeURIComponent(chatId)}`, accessToken);
 
   const download = async () => {
     setError(null);
@@ -123,8 +118,9 @@ export function ChatHeader({
         <div className="hidden h-7 min-w-[150px] max-w-[420px] flex-1 items-center rounded-md border border-border px-0.5 lg:flex">
           <Button
             aria-label="Back"
-            className="size-6 text-muted-foreground"
-            disabled
+            className="size-6 text-muted-foreground hover:text-foreground"
+            disabled={!navigation?.canGoBack}
+            onClick={() => navigation?.back()}
             size="icon-xs"
             variant="ghost"
           >
@@ -132,14 +128,20 @@ export function ChatHeader({
           </Button>
           <Button
             aria-label="Forward"
-            className="size-6 text-muted-foreground"
-            disabled
+            className="size-6 text-muted-foreground hover:text-foreground"
+            disabled={!navigation?.canGoForward}
+            onClick={() => navigation?.forward()}
             size="icon-xs"
             variant="ghost"
           >
             <ChevronRightIcon className="size-3.5" />
           </Button>
-          <span className="min-w-0 flex-1 truncate px-2 text-xs text-muted-foreground">/</span>
+          <span
+            className="min-w-0 flex-1 truncate px-2 text-xs text-muted-foreground"
+            title={navigation?.path ?? "/"}
+          >
+            {navigation?.path ?? "/"}
+          </span>
           <Button
             aria-label="Refresh preview"
             className="size-6 p-0 text-muted-foreground hover:text-foreground"
@@ -194,6 +196,9 @@ export function ChatHeader({
                   event.preventDefault();
                   void download();
                 }}
+                // Download was the only action left that can fail visibly; the
+                // Publish button used to carry this message.
+                title={error ?? undefined}
               >
                 {isDownloading ? (
                   <SpinnerIcon className="size-4 animate-spin" />
@@ -205,21 +210,6 @@ export function ChatHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            aria-label={error ?? "Publish site"}
-            className="h-7 min-w-[72px] gap-1.5 rounded-md px-2 text-xs"
-            disabled={isPublishing}
-            onClick={publish}
-            size="sm"
-            title={error ?? undefined}
-          >
-            {isPublishing ? (
-              <SpinnerIcon className="size-3.5 animate-spin" />
-            ) : (
-              <VercelLogoIcon className="size-3.5" />
-            )}
-            {isPublishing ? "Publishing" : publishState === "published" ? "Published" : "Publish"}
-          </Button>
         </div>
       </div>
     </header>

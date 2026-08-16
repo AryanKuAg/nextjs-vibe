@@ -12,6 +12,7 @@ import { TaskResolution, type ResolveTask } from "./task-resolution";
 export function ConversationView({
   messages,
   isStreaming = false,
+  isWorking = false,
   pendingUserMessage,
   onRejectPermission,
   onResolveTask,
@@ -21,6 +22,8 @@ export function ConversationView({
 }: {
   messages: V0UIMessage[];
   isStreaming?: boolean;
+  /** A turn is open, whether or not its first part has arrived yet. */
+  isWorking?: boolean;
   pendingUserMessage?: string | null;
   onRejectPermission?: () => void | Promise<void>;
   onResolveTask?: (task: ResolveTask) => void | Promise<void>;
@@ -41,13 +44,23 @@ export function ConversationView({
       ]
     : messages;
 
+  // "Live" means a turn is open, which is not the same as the SSE reporting it.
+  // When the stream has not attached and polling is carrying the transcript,
+  // `isStreaming` is false while v0 is very much still working — keying the
+  // shimmer off it left the newest step looking stuck.
+  const isLive = isStreaming || isWorking;
+
   // Only the newest turn can still be answered — older cards are history, and
   // leaving them clickable would resolve a task v0 has already moved past.
   const interactiveTaskMessageId =
-    isStreaming || pendingUserMessage ? null : visibleMessages.at(-1)?.id;
-  const streamingMessageId = isStreaming
-    ? visibleMessages.findLast((message) => message.role === "assistant")?.id
-    : null;
+    isLive || pendingUserMessage ? null : visibleMessages.at(-1)?.id;
+  const newestAssistantId = visibleMessages.findLast(
+    (message) => message.role === "assistant",
+  )?.id;
+  // Markdown animation still follows the real stream; only the shimmer follows
+  // "a turn is open", so prose does not animate off a two-second poll.
+  const streamingMessageId = isStreaming ? newestAssistantId : null;
+  const liveMessageId = isLive ? newestAssistantId : null;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -61,6 +74,7 @@ export function ConversationView({
         ) : (
           visibleMessages.map((message) => (
             <ConversationMessage
+              isLive={liveMessageId === message.id}
               isRestoring={restoringMessageId === message.id}
               isStreaming={streamingMessageId === message.id}
               key={message.id}
@@ -74,6 +88,11 @@ export function ConversationView({
             />
           ))
         )}
+        {/* v0 can take a while to emit its first part. Without this the panel
+            sits empty after the user's message and the build looks stalled. */}
+        {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
+          <p className="shimmer-text py-0.5 text-xs font-medium">Working on it…</p>
+        ) : null}
         <div ref={endRef} />
       </div>
     </div>
@@ -85,6 +104,7 @@ function ConversationMessage({
   onRejectPermission,
   onResolveTask,
   onRestore,
+  isLive = false,
   isRestoring = false,
   isStreaming = false,
   taskDisabled = false,
@@ -93,6 +113,7 @@ function ConversationMessage({
   onRejectPermission?: () => void | Promise<void>;
   onResolveTask?: (task: ResolveTask) => void | Promise<void>;
   onRestore?: (messageId: string) => void;
+  isLive?: boolean;
   isRestoring?: boolean;
   isStreaming?: boolean;
   taskDisabled?: boolean;
@@ -106,7 +127,7 @@ function ConversationMessage({
             : "w-full text-[13px] leading-relaxed"
         }
       >
-        <MessageParts isStreaming={isStreaming} message={message} />
+        <MessageParts isLive={isLive} isStreaming={isStreaming} message={message} />
         {onResolveTask && onRejectPermission ? (
           <TaskResolution
             disabled={taskDisabled}

@@ -120,6 +120,19 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        /**
+         * This app must never render inside a frame — and specifically not
+         * inside the preview frame, where it once did. A link in a generated
+         * site pointing at `/` escaped the proxy and loaded Framerate into the
+         * builder's own preview pane, so the user was looking at our product
+         * dressed up as their website.
+         *
+         * The proxy route is excluded because that IS the frame's content.
+         */
+        source: "/:path((?!api/v0-preview).*)",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }],
+      },
     ];
   },
 };

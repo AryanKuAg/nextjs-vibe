@@ -140,6 +140,32 @@
   }
 }
 
+/* A band of light travelling through text, for a step that is still running.
+   A static label reads as a stall — the same words shimmering read as work in
+   progress, which is the only signal the builder can give while v0 is thinking
+   and has produced nothing to show yet. */
+.shimmer-text {
+  background: linear-gradient(90deg,
+      var(--white-50) 0%,
+      var(--white-50) 35%,
+      var(--white) 50%,
+      var(--white-50) 65%,
+      var(--white-50) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    color: var(--white-85);
+    -webkit-text-fill-color: var(--white-85);
+  }
+}
+
 /* Animations */
 @theme inline {
   --animate-first: moveVertical 30s ease infinite;

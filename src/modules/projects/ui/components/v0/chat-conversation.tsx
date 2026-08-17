@@ -30,6 +30,7 @@ export function ChatConversation({
   accessToken,
   chatId,
   messages: initialMessages,
+  openingPrompt,
   onContentChange,
   onBusyChange,
 }: {
@@ -37,6 +38,8 @@ export function ChatConversation({
   accessToken: string;
   chatId: string;
   messages: Message[];
+  /** The user's own words, shown instead of the composed opening message. */
+  openingPrompt?: string | null;
   /** Fired when a turn finishes, so the preview and code panes refresh. */
   onContentChange: () => void;
   /** Whether a turn is currently open, for the panes that show progress. */
@@ -268,12 +271,20 @@ export function ChatConversation({
     activeAssistantMessage !== undefined && (status === "streaming" || resolvingMessageId !== null);
   const error = actionError ?? chatError?.message;
 
+  // Only what is drawn. `uiMessages` is left exactly as v0 has it, because it is
+  // also what the transport replays and what every id and index here refers to;
+  // rewriting it at the source would put our display copy back into the chat.
+  const visibleMessages = useMemo(
+    () => withOriginalPrompt(uiMessages, openingPrompt),
+    [openingPrompt, uiMessages],
+  );
+
   return (
     <>
       <ConversationView
         isStreaming={isStreaming}
         isWorking={isSubmitting || hasPendingRun}
-        messages={uiMessages}
+        messages={visibleMessages}
         onRejectPermission={() => submitMessage("Do not run this action. Continue without it.")}
         onResolveTask={resolveTask}
         onRestoreMessage={restoreMessage}
@@ -294,6 +305,50 @@ export function ChatConversation({
       </div>
     </>
   );
+}
+
+/**
+ * Puts the user's own words back in front of the composed opening message.
+ *
+ * A build's first message is their brief plus our build rule and, on a
+ * cinematic site, the whole video treatment and its URL. v0 needs every line of
+ * that. The user wrote one sentence and should read one sentence back — being
+ * shown our instructions verbatim reads like the app talking to itself.
+ *
+ * Only the first user message is touched: every later one is exactly what they
+ * typed into the box.
+ */
+function withOriginalPrompt(
+  messages: V0UIMessage[],
+  prompt: string | null | undefined,
+): V0UIMessage[] {
+  if (!prompt?.trim()) return messages;
+
+  const index = messages.findIndex((message) => message.role === "user");
+  if (index === -1) return messages;
+
+  return messages.map((message, at) => {
+    if (at !== index) return message;
+
+    // The prompt replaces the first text part and removes any others, so a
+    // message that arrived split across parts does not repeat it. Attachments
+    // and every other part type are left alone.
+    const parts: V0UIMessage["parts"] = [];
+    let written = false;
+
+    for (const part of message.parts) {
+      if (part.type !== "text") {
+        parts.push(part);
+        continue;
+      }
+      if (written) continue;
+
+      written = true;
+      parts.push({ ...part, text: prompt });
+    }
+
+    return { ...message, parts };
+  });
 }
 
 /** How much of a transcript has actually rendered, used to pick the richer copy. */

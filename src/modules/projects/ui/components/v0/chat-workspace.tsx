@@ -20,6 +20,7 @@ import { PreviewPane, type PreviewNavigation } from "./preview-pane";
 export function ChatWorkspace({
   chat,
   messages,
+  openingPrompt,
   previewOrigin,
   projectId,
   publishedUrl,
@@ -29,6 +30,8 @@ export function ChatWorkspace({
 }: {
   chat: Chat;
   messages: Message[];
+  /** The user's own brief, shown instead of the composed opening message. */
+  openingPrompt?: string | null;
   projectId: string;
   /** Verified preview hostname for this chat, or null for the path proxy. */
   previewOrigin?: string | null;
@@ -111,6 +114,7 @@ export function ChatWorkspace({
             messages={messages}
             onBusyChange={handleBusyChange}
             onContentChange={handleContentChange}
+            openingPrompt={openingPrompt}
           />
         </div>
 

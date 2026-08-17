@@ -8,8 +8,10 @@ import { checkCredits, consumeCredits, refundCredits, MODEL_COSTS, AGENT_COSTS }
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
+import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
-import { startProjectBuild } from "@/lib/v0-start-build";
+import { beginProjectBuild } from "@/lib/v0-start-build";
+import { needsGeneratedVideo, type SiteBrief } from "@/lib/v0-site-prompt";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -94,8 +96,34 @@ export const projectsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      const template = input.templateId ? getTemplate(input.templateId) : null;
+      if (input.templateId && !template) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown template "${input.templateId}".`,
+        });
+      }
+
+      // Everything the user chose, in the one shape the whole pipeline reads.
+      const brief: SiteBrief = {
+        startPrompt: input.value,
+        mode: input.mode,
+        ...(input.motion ? { motion: input.motion } : {}),
+        ...(input.videoSource ? { videoSource: input.videoSource } : {}),
+        ...(input.videoPrompt ? { videoPrompt: input.videoPrompt } : {}),
+        ...(input.videoUrl ? { videoUrl: input.videoUrl } : {}),
+      };
+
+      // A cinematic build with no URL pays for footage as well as the site, and
+      // the video agent charges its own half when it runs. Checking the total
+      // up front is what stops a build being sold that cannot finish — the site
+      // would open, the video would fail on credits, and the money for the site
+      // would already be gone.
+      const willGenerateVideo = !template && needsGeneratedVideo(brief);
+      const cost = AGENT_COSTS.CODE + (willGenerateVideo ? AGENT_COSTS.VIDEO : 0);
+
       try {
-        await checkCredits(AGENT_COSTS.CODE);
+        await checkCredits(cost);
       } catch (error) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -103,12 +131,24 @@ export const projectsRouter = createTRPCRouter({
         });
       }
 
-      const template = input.templateId ? getTemplate(input.templateId) : null;
-      if (input.templateId && !template) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Unknown template "${input.templateId}".`,
-        });
+      // v0 fetches attachments itself, so a reference image has to be at a
+      // public URL before anything downstream can use it. Uploaded before the
+      // project exists so the brief is written complete, in one go: the video
+      // agent reads it back from the column much later.
+      const referenceImageUrl = await uploadDataUrlToStorage(
+        input.imageDataUrl,
+        `frames/${ctx.auth.userId}`,
+      );
+      if (referenceImageUrl) brief.referenceImageUrl = referenceImageUrl;
+
+      // The composer accepts an image with no words, and an empty string is not
+      // a brief: it reaches v0 as nothing but our build rule, and it fails to
+      // read back at all — which would strand a cinematic build, because the
+      // video agent finds no brief to start the site from once its clip lands.
+      if (!brief.startPrompt.trim()) {
+        brief.startPrompt = referenceImageUrl
+          ? "Build a website that matches the attached image."
+          : "Build a website.";
       }
 
       const count = await prisma.project.count({
@@ -123,21 +163,10 @@ export const projectsRouter = createTRPCRouter({
           status: "draft",
           currentStage: "SCENE",
           templateId: template?.id ?? null,
-          // The video intent is recorded alongside the brief so the media
-          // pipeline can act on it later — today only a pasted URL reaches the
-          // build, because nothing here generates footage yet.
-          prompts: input.value.trim()
-            ? [
-                {
-                  startPrompt: input.value,
-                  mode: input.mode,
-                  ...(input.motion ? { motion: input.motion } : {}),
-                  ...(input.videoSource ? { videoSource: input.videoSource } : {}),
-                  ...(input.videoPrompt ? { videoPrompt: input.videoPrompt } : {}),
-                  ...(input.videoUrl ? { videoUrl: input.videoUrl } : {}),
-                },
-              ]
-            : [],
+          // Always written. Everything downstream reads the build's choices back
+          // out of here — the video agent, the v0 call, a retry — so a project
+          // without this row is a project that cannot be finished.
+          prompts: [brief],
         },
       });
 
@@ -147,14 +176,10 @@ export const projectsRouter = createTRPCRouter({
       await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
 
       try {
-        await startProjectBuild({
+        await beginProjectBuild({
           projectId: createdProject.id,
-          prompt: input.value,
-          mode: input.mode,
-          motion: input.motion,
-          videoUrl: input.videoUrl,
-          videoDescription: input.videoPrompt,
-          imageDataUrl: input.imageDataUrl,
+          userId: ctx.auth.userId,
+          brief,
         });
       } catch (error) {
         // Fail loudly on the page the user is still looking at, where their

@@ -1,39 +1,102 @@
 import "server-only";
 
+import { inngest } from "@/inngest/client";
 import { prisma } from "@/lib/db";
 import { PROJECT_STAGE } from "@/lib/project-stage";
 import { latestVideoUrl } from "@/lib/project-video";
 import { getTemplate } from "@/lib/templates/registry";
-import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { v0 } from "@/lib/v0-client";
 import { v0Failure } from "@/lib/v0-error";
 import { V0_MODEL_CONFIGURATION } from "@/lib/v0-model";
-import { buildSitePrompt, type SiteMode, type VideoMotion } from "@/lib/v0-site-prompt";
+import {
+  buildSitePrompt,
+  needsGeneratedVideo,
+  siteBriefOf,
+  videoLookFor,
+  videoRequestFor,
+  type SiteBrief,
+} from "@/lib/v0-site-prompt";
+
+/**
+ * Getting a project from "created" to "v0 is working on it".
+ *
+ * Two paths, decided entirely by the brief the user filled in — there is no
+ * router and no agent choosing between them:
+ *
+ *   footage in hand  ->  open the v0 chat now
+ *   footage to make  ->  run the video agent, open the chat when its URL lands
+ *
+ * The second path is why the builder can open on a project with no chat yet.
+ * That is a real state, not a failure, and `v0.workspace` reports it as one.
+ */
+
+/** What starting a project did. `pending` means the video agent has it now. */
+export type BuildStart = { chatId: string } | { pending: "video" };
+
+export async function beginProjectBuild(input: {
+  projectId: string;
+  userId: string;
+  brief: SiteBrief;
+}): Promise<BuildStart> {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: { id: true, templateId: true, videoUrls: true },
+  });
+
+  if (!project) throw new Error("Project not found");
+
+  // A video the media pipeline already produced counts as footage in hand.
+  // Without this a retry after a v0 failure would pay to generate a second one.
+  const brief: SiteBrief = {
+    ...input.brief,
+    videoUrl: input.brief.videoUrl ?? latestVideoUrl(project.videoUrls) ?? undefined,
+  };
+
+  // A remix starts from somebody else's finished repo, so there is no page for
+  // a background to go behind and nothing for the brief to describe.
+  const isRemix = Boolean(getTemplate(project.templateId));
+
+  if (!isRemix && needsGeneratedVideo(brief)) {
+    const request = videoRequestFor(brief);
+
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { currentStage: PROJECT_STAGE.GENERATING_VIDEO },
+    });
+
+    await inngest.send({
+      name: "veo/generate",
+      data: {
+        projectId: project.id,
+        userId: input.userId,
+        prompt: request.prompt,
+        refinePrompt: request.refinePrompt,
+        // Decides the shot: a held loop for a hero, a travelling camera for a
+        // scroll-driven background.
+        experiencePref: videoLookFor(brief.motion),
+        model: "bytedance/seedance-1.5-pro",
+        // The half that is new. Everything else here is the media pipeline as
+        // it already was; this is what makes it hand off to v0 when it lands.
+        buildSiteAfter: true,
+      },
+    });
+
+    return { pending: "video" };
+  }
+
+  return startProjectBuild({ projectId: project.id, brief });
+}
 
 /**
  * Opens a project's v0 chat.
  *
- * This runs as part of creating the project, so by the time the browser reaches
- * `/projects/:id` the chat already exists and the builder renders a live run.
- * There is deliberately no intermediate screen asking the user to confirm the
- * prompt they just typed.
- *
- * Throws on failure. The caller owns the credit refund, because it is the one
- * that charged.
+ * Called directly when the brief needs no footage, and from the tail of the
+ * video agent when it does. Throws on failure; the caller owns the credit
+ * refund, because the caller is the one that charged.
  */
 export async function startProjectBuild(input: {
   projectId: string;
-  prompt: string;
-  /** Classic or Cinematic, chosen on the home page. */
-  mode?: SiteMode;
-  /** Cinematic only: how the video behaves once it is on the page. */
-  motion?: VideoMotion;
-  /** A video the user supplied by URL. Generated footage arrives separately. */
-  videoUrl?: string | null;
-  /** The footage the user described, when there is no file to point at. */
-  videoDescription?: string | null;
-  /** A reference image the user attached, as a data URL. */
-  imageDataUrl?: string;
+  brief: SiteBrief;
 }): Promise<{ chatId: string }> {
   const project = await prisma.project.findUnique({
     where: { id: input.projectId },
@@ -70,28 +133,23 @@ export async function startProjectBuild(input: {
     return { chatId };
   }
 
-  // v0 fetches attachments itself, so a reference image has to be at a public
-  // URL — a data URL is not something it can pull.
-  const referenceImageUrl = await uploadDataUrlToStorage(
-    input.imageDataUrl,
-    `frames/${project.id}`,
-  );
+  const brief: SiteBrief = {
+    ...input.brief,
+    // A URL on the brief wins over anything the media pipeline produced
+    // earlier: it is the more recent, more explicit instruction.
+    videoUrl: input.brief.videoUrl ?? latestVideoUrl(project.videoUrls) ?? undefined,
+  };
 
   const created = await v0.chats.createAsync({
     // No systemPrompt: v0 already knows the stack and the conventions, so the
-    // whole instruction is the user's brief plus where the video goes.
-    message: buildSitePrompt({
-      mode: input.mode ?? "CLASSIC",
-      prompt: input.prompt,
-      motion: input.motion,
-      videoDescription: input.videoDescription,
-      // A URL the user pasted wins over anything the media pipeline produced
-      // earlier: it is the more recent, more explicit instruction.
-      videoUrl: input.videoUrl ?? latestVideoUrl(project.videoUrls),
-    }),
+    // whole instruction is the user's brief plus what to do with the video.
+    message: buildSitePrompt(brief),
     modelConfiguration: V0_MODEL_CONFIGURATION,
     privacy: "private",
-    ...(referenceImageUrl ? { attachments: [{ url: referenceImageUrl }] } : {}),
+    // v0 fetches attachments itself, so a reference image has to be at a public
+    // URL — a data URL is not something it can pull. Uploading happens when the
+    // project is created, so by here it is already one.
+    ...(brief.referenceImageUrl ? { attachments: [{ url: brief.referenceImageUrl }] } : {}),
   });
 
   if (created.error !== undefined || !created.data?.chatId) {
@@ -113,4 +171,34 @@ export async function startProjectBuild(input: {
   });
 
   return { chatId: created.data.chatId };
+}
+
+/**
+ * Starts the site for a project whose video has just finished.
+ *
+ * Lives here rather than in the video agent so the v0 call has exactly one
+ * shape wherever it is made. Returns false when there is nothing to do, which
+ * is the ordinary case for every video that was not part of a build.
+ */
+export async function startBuildAfterVideo(input: {
+  projectId: string;
+  videoUrl: string;
+}): Promise<boolean> {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: { prompts: true, v0ChatId: true },
+  });
+
+  // Already has a chat: this video was a regenerate, not the opening build.
+  if (!project || project.v0ChatId) return false;
+
+  const brief = siteBriefOf(project.prompts);
+  if (!brief) return false;
+
+  await startProjectBuild({
+    projectId: input.projectId,
+    brief: { ...brief, videoUrl: input.videoUrl },
+  });
+
+  return true;
 }

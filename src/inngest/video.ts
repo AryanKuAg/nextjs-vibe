@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/db";
 import { shouldMockMedia, MOCK_VIDEO_URL } from "@/lib/dev-media";
+import { getVideoPromptSuffix } from "@/lib/media-prompts";
 import { VIDEO_DURATION_SECONDS } from "@/lib/pricing";
 import { withReplicateRateLimitRetry } from "@/lib/replicate-retry";
-import { consumeCredits, AGENT_COSTS } from "@/lib/usage";
+import { consumeCredits, refundCredits, AGENT_COSTS } from "@/lib/usage";
 
 import { inngest } from "./client";
 import { RUN_TIMEOUT } from "./types";
@@ -42,18 +43,30 @@ export const veoGenerateFunction = inngest.createFunction(
       // invoking this function at all, but the guard lives here too so no future
       // call site can bill a developer machine by accident. Placed above the
       // prompt refinement so a local run makes no paid call of any kind.
-      if (shouldMockMedia()) {
+      //
+      // It short-circuits the generation, NOT the run: the mock URL is stored
+      // and handed on exactly like a real one, so the rest of the pipeline —
+      // and the site build waiting at the end of it — is what actually gets
+      // exercised locally. Returning here instead left a cinematic project
+      // parked at "creating your video" forever on every dev machine.
+      const isMocked = shouldMockMedia();
+      if (isMocked) {
         console.log("[Video Pipeline] MOCK_MEDIA is on — returning the demo video instead of generating.");
         await step.sleep("mock-video-delay", "4s");
-        return { videoUrl: MOCK_VIDEO_URL };
       }
 
       // Opt-in only: refine when the agent invented the prompt ("Let AI Create" /
       // "Build it for me"). A prompt the user typed themselves is never rewritten.
       // Without this the raw website request reaches the video model with no camera
       // direction, and it fills the gap with cuts and cross-fades.
-      const videoPrompt: string = !refinePrompt
-        ? prompt
+      //
+      // Their words still get the house constraints appended when the clip is
+      // going behind a page. That is not a rewrite of their idea — "one
+      // continuous take, no cuts, locked-off camera" is what makes footage
+      // usable as a background at all, and a hero loop without it visibly jumps
+      // every time it repeats. A standalone regenerate is left alone.
+      const videoPrompt: string = isMocked || !refinePrompt
+        ? (event.data.buildSiteAfter ? `${prompt}. ${getVideoPromptSuffix(experiencePref)}` : prompt)
         : await step.run("refine-video-prompt", async () => {
           try {
             const { ChatOpenAI } = await import("@langchain/openai");
@@ -87,7 +100,7 @@ export const veoGenerateFunction = inngest.createFunction(
           }
         });
 
-      const videoUri = await step.run("generate-video", async () => {
+      const videoUri = isMocked ? MOCK_VIDEO_URL : await step.run("generate-video", async () => {
         let base64VideoData: string | null = null;
         let finalVideoUrl: string | null = null;
 
@@ -422,9 +435,34 @@ export const veoGenerateFunction = inngest.createFunction(
         });
       });
 
-      await step.run("charge-credits", async () => {
-        await consumeCredits(cost, userId);
-      });
+      // Nothing was generated and nothing was billed by a third party, so there
+      // is nothing to charge for either.
+      if (!isMocked) {
+        await step.run("charge-credits", async () => {
+          await consumeCredits(cost, userId);
+        });
+      }
+
+      // The handoff. A cinematic build asks for footage first and the site
+      // second, so this is where v0 is finally called — with a real URL in the
+      // prompt rather than a description of a video that does not exist yet.
+      if (event.data.buildSiteAfter) {
+        await step.run("start-site-build", async () => {
+          const { startBuildAfterVideo } = await import("@/lib/v0-start-build");
+
+          try {
+            return { started: await startBuildAfterVideo({ projectId, videoUrl: videoUri }) };
+          } catch (error) {
+            // Deliberately swallowed. The video is made, uploaded and paid for;
+            // throwing would run the failure handler below and reset the stage,
+            // losing that. The project is left with footage and no chat, which
+            // is exactly the state the builder offers a retry for — and the
+            // retry reuses this video rather than generating a second one.
+            console.error("[Video Pipeline] Video succeeded but v0 refused the build:", error);
+            return { started: false };
+          }
+        });
+      }
 
       return { videoUrl: videoUri };
     } catch (error: unknown) {
@@ -435,6 +473,14 @@ export const veoGenerateFunction = inngest.createFunction(
           where: { id: projectId },
           data: { currentStage: "SCENE" }
         }).catch(() => { });
+
+        // 2. When this run was the first half of a site build, the site half was
+        //    already charged by whoever dispatched it — and no site exists. The
+        //    video itself is only charged on success, so this is the whole of
+        //    what the user paid for nothing.
+        if (event.data.buildSiteAfter) {
+          await refundCredits(AGENT_COSTS.CODE, userId).catch(() => { });
+        }
       });
 
       throw error;

@@ -95,7 +95,7 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
       : authorized.response;
   }
 
-  const requestUrl = new URL(request.url);
+  const requestUrl = publicUrl(request);
   const selfUrl = new URL(requestUrl);
   selfUrl.searchParams.delete(WAIT_MARKER);
 
@@ -141,6 +141,47 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
 }
 
 /**
+ * The URL the browser actually asked for.
+ *
+ * A preview host reaches this route through a middleware rewrite, and behind a
+ * rewrite `request.url` carries this application's own internal origin rather
+ * than the hostname in the address bar. Every URL we hand back for the browser
+ * to follow therefore has to be rebuilt from the Host header.
+ *
+ * Getting this wrong was not subtle. The holding page shown while v0 boots a
+ * sandbox refreshes itself at `selfUrl`, which came out as
+ * `http://localhost:3000/` — this application's home page. So a preview that
+ * was merely still starting redirected the frame to Framerate two seconds
+ * later, and "open in new tab" did the same: the user was shown our marketing
+ * site where their own site should have been.
+ *
+ * It also decides whether the grant cookie is marked Secure, which behind TLS
+ * termination was reading the internal `http:` and quietly leaving it off.
+ */
+function publicUrl(request: Request): URL {
+  const url = new URL(request.url);
+
+  const host = request.headers.get("host");
+  if (host) url.host = host;
+
+  // The browser's scheme, not the one this hop happens to be using.
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  if (forwarded === "https" || forwarded === "http") url.protocol = `${forwarded}:`;
+
+  return url;
+}
+
+/** Browsers treat these as secure origins even over plain http. */
+function isLocalhost(hostname: string) {
+  return (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
+/**
  * Mints the pass this page's own requests will present. Issued on any
  * authorized request, not only the document, so a reloaded asset can
  * re-establish it if the cookie has lapsed.
@@ -157,6 +198,15 @@ function withGrant(
 ) {
   if (context.granted) return response;
 
+  // The preview is framed by a builder on a different site, so every request it
+  // makes for its own stylesheet, chunk and font is a third-party one. A Lax
+  // cookie is not sent with those, so they arrived unauthenticated, answered
+  // 401, and the site rendered as raw unstyled HTML — the "CSS is not loading"
+  // report. SameSite=None is what a framed document needs, and browsers only
+  // accept it alongside Secure. Localhost counts as a secure context, so this
+  // holds in development over plain http too.
+  const secure = context.requestUrl.protocol === "https:" || isLocalhost(context.requestUrl.hostname);
+
   const withCookie = new Response(response.body, response);
   withCookie.headers.append(
     "set-cookie",
@@ -164,9 +214,11 @@ function withGrant(
       `${context.cookieName}=${issuePreviewGrant(context.chatId, context.userId ?? "")}`,
       "Path=/",
       "HttpOnly",
-      "SameSite=Lax",
       `Max-Age=${Math.floor(PREVIEW_GRANT_TTL_MS / 1000)}`,
-      ...(context.requestUrl.protocol === "https:" ? ["Secure"] : []),
+      // Falling back to Lax rather than dropping the cookie: over plain http on
+      // a non-local host SameSite=None would be rejected outright, and Lax at
+      // least keeps the same-origin path proxy working.
+      ...(secure ? ["SameSite=None", "Secure"] : ["SameSite=Lax"]),
     ].join("; "),
   );
 

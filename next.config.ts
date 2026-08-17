@@ -32,6 +32,11 @@ try {
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // A production build and a running `next dev` share `.next` and corrupt each
+  // other — the build dies with "Cannot find module for page: /cookies" while
+  // the dev server rewrites the manifest underneath it. Setting this lets a
+  // build run beside a dev server instead of requiring you to stop yours.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   output: "standalone", // Required for Docker/Cloud Run deployment
   serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static", "inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   outputFileTracingIncludes: {

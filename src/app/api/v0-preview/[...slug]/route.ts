@@ -1,5 +1,7 @@
 import { fetchPreview, type ChatsGetPreviewResponse } from "v0";
 
+import { chatIdFromHost } from "@/lib/preview-host";
+
 import {
   issuePreviewGrant,
   PREVIEW_GRANT_TTL_MS,
@@ -30,6 +32,9 @@ import { v0 } from "@/lib/v0-client";
 
 export const dynamic = "force-dynamic";
 
+/** Breaks the redirect loop when v0 asks us to re-resolve a preview. */
+const WAIT_MARKER = "__v0_wait";
+
 /** Tokens last hours; re-resolving per asset would be absurd. */
 const previewCache = new Map<string, NonNullable<ChatsGetPreviewResponse>>();
 
@@ -56,7 +61,14 @@ async function resolvePreview(chatId: string): Promise<ChatsGetPreviewResponse> 
  */
 async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   const { slug } = await params;
-  const [chatId, ...path] = slug;
+  const [pathChatId, ...path] = slug;
+
+  // On its own host the site owns the whole origin, so there is no prefix to
+  // add to anything — the one fact that decides how its HTML is treated. The
+  // subdomain is the authority there; the path segment is only its encoding.
+  const hostChatId = chatIdFromHost(request.headers.get("host"));
+  const ownsOrigin = hostChatId !== null;
+  const chatId = hostChatId ?? pathChatId;
 
   if (!chatId) return new Response("Missing chat id", { status: 400 });
 
@@ -84,43 +96,81 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   }
 
   const requestUrl = new URL(request.url);
-  const fallbackUrl = new URL(
-    `/api/v0-preview-loading/${encodeURIComponent(chatId)}`,
-    requestUrl.origin,
-  );
-  fallbackUrl.searchParams.set("returnTo", requestUrl.pathname + requestUrl.search);
+  const selfUrl = new URL(requestUrl);
+  selfUrl.searchParams.delete(WAIT_MARKER);
+
+  const preview = await resolvePreview(chatId);
+
+  // Nothing to serve yet, or v0 just asked us to re-resolve. Either way the
+  // frame gets a page that retries rather than an error it cannot recover from.
+  // The marker is what stops a refresh signal becoming a tight redirect loop.
+  if (!preview || requestUrl.searchParams.has(WAIT_MARKER)) {
+    return withGrant(holdingPage(selfUrl.toString()), {
+      chatId,
+      cookieName,
+      granted,
+      requestUrl,
+    });
+  }
+
+  const waitUrl = new URL(selfUrl);
+  waitUrl.searchParams.set(WAIT_MARKER, "1");
 
   const upstream = await fetchPreview({
     request,
-    preview: await resolvePreview(chatId),
+    preview,
     path,
-    fallbackUrl,
+    fallbackUrl: waitUrl,
     onPreviewRefresh: () => {
       previewCache.delete(chatId);
     },
   });
 
-  const response = await keepNavigationInsidePreview(upstream, chatId);
+  // On its own host nothing needs rewriting — the site already owns the origin.
+  const response = ownsOrigin
+    ? await addPathReporter(upstream)
+    : await keepNavigationInsidePreview(upstream, chatId);
 
-  if (granted) return response;
+  return withGrant(response, {
+    chatId,
+    cookieName,
+    granted,
+    requestUrl,
+    userId: authorized?.ok ? authorized.chat.userId : "",
+  });
+}
 
-  // Just passed the ownership check, so mint the pass this page's assets will
-  // present. Issued on any authorized request, not only the document, so a
-  // reloaded asset can re-establish it if the cookie has lapsed.
-  const withGrant = new Response(response.body, response);
-  withGrant.headers.append(
+/**
+ * Mints the pass this page's own requests will present. Issued on any
+ * authorized request, not only the document, so a reloaded asset can
+ * re-establish it if the cookie has lapsed.
+ */
+function withGrant(
+  response: Response,
+  context: {
+    chatId: string;
+    cookieName: string;
+    granted: boolean;
+    requestUrl: URL;
+    userId?: string;
+  },
+) {
+  if (context.granted) return response;
+
+  const withCookie = new Response(response.body, response);
+  withCookie.headers.append(
     "set-cookie",
     [
-      `${cookieName}=${issuePreviewGrant(chatId, authorized?.ok ? authorized.chat.userId : "")}`,
+      `${context.cookieName}=${issuePreviewGrant(context.chatId, context.userId ?? "")}`,
       "Path=/",
       "HttpOnly",
       "SameSite=Lax",
       `Max-Age=${Math.floor(PREVIEW_GRANT_TTL_MS / 1000)}`,
-      ...(requestUrl.protocol === "https:" ? ["Secure"] : []),
+      ...(context.requestUrl.protocol === "https:" ? ["Secure"] : []),
     ].join("; "),
   );
 
-  return withGrant;
+  return withCookie;
 }
 
 export async function GET(request: Request, ctx: { params: Promise<{ slug: string[] }> }) {
@@ -153,8 +203,89 @@ export async function OPTIONS(request: Request, ctx: { params: Promise<{ slug: s
   return handle(request, ctx.params);
 }
 
+/** Where the builder is, so the framed page can talk back to it and no further. */
+function parentOrigin() {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "").origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Keeps the framed site's own navigation inside the proxy.
+ * On a dedicated host nothing needs rewriting; the frame only has to say where
+ * it is, so the builder's address bar and Back button mean something.
+ */
+async function addPathReporter(response: Response) {
+  if (!response.headers.get("content-type")?.includes("text/html")) return response;
+
+  const html = (await response.text()).replace("</head>", `${pathReporterScript()}</head>`);
+
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+
+  return new Response(html, { status: response.status, statusText: response.statusText, headers });
+}
+
+function pathReporterScript() {
+  return `<script>(function(){
+var T=${JSON.stringify(parentOrigin() ?? "*")};
+function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},T);}catch(e){}}
+var p=history.pushState,r=history.replaceState;
+history.pushState=function(){var v=p.apply(this,arguments);report();return v;};
+history.replaceState=function(){var v=r.apply(this,arguments);report();return v;};
+addEventListener("popstate",report);
+addEventListener("hashchange",report);
+addEventListener("message",function(e){if(e.source===parent&&e.data&&e.data.type==="v0-preview-go")history.go(e.data.delta|0);});
+document.addEventListener("click",function(e){
+var t=e.target;if(!t||!t.closest)return;var a=t.closest("a[href]");if(!a)return;
+try{parent.postMessage({type:"v0-preview-navigate",href:new URL(a.getAttribute("href"),location.href).href},T);}catch(_){}
+},true);
+report();
+})();</script>`;
+}
+
+/** The frame's holding page while v0 boots the sandbox. Retries on its own. */
+function holdingPage(retryTo: string) {
+  return new Response(
+    `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="2;url=${escapeHtml(retryTo)}" />
+    <script>
+      var notify = function () {
+        try { parent.postMessage({ type: "v0-preview-loading" }, ${JSON.stringify(parentOrigin() ?? "*")}); } catch (e) {}
+      };
+      notify();
+      setInterval(notify, 250);
+    </script>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        align-items: center; background: #181818; color: rgba(255,255,255,.5);
+        display: flex; font: 14px system-ui, sans-serif; justify-content: center;
+      }
+    </style>
+  </head>
+  <body>Starting preview…</body>
+</html>`,
+    { headers: { "cache-control": "no-store", "content-type": "text/html; charset=utf-8" } },
+  );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+/**
+ * Fallback only: keeps a shared-origin preview's navigation inside the proxy.
  *
  * Assets are routed here by `Referer`, which only works while the iframe's URL
  * is still `/api/v0-preview/:chatId/...`. A link to `/about` took it to a bare
@@ -219,14 +350,19 @@ function rewriteRootRelative(html: string, prefix: string) {
 
 function keepInsideScript(prefix: string) {
   return `<script>(function(){
-var P=${JSON.stringify(prefix)};
+var P=${JSON.stringify(prefix)},T=${JSON.stringify(parentOrigin() ?? "*")};
 function fix(u){if(typeof u!=="string")return u;if(u.indexOf(P)===0)return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;return u;}
-function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},location.origin);}catch(e){}}
+function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},T);}catch(e){}}
 var p=history.pushState,r=history.replaceState;
 history.pushState=function(s,t,u){var v=p.call(this,s,t,u==null?u:fix(String(u)));report();return v;};
 history.replaceState=function(s,t,u){var v=r.call(this,s,t,u==null?u:fix(String(u)));report();return v;};
 addEventListener("popstate",report);
 addEventListener("hashchange",report);
+addEventListener("message",function(e){if(e.source===parent&&e.data&&e.data.type==="v0-preview-go")history.go(e.data.delta|0);});
+document.addEventListener("click",function(e){
+var t=e.target;if(!t||!t.closest)return;var a=t.closest("a[href]");if(!a)return;
+try{parent.postMessage({type:"v0-preview-navigate",href:new URL(a.getAttribute("href"),location.href).href},T);}catch(_){}
+},true);
 report();
 })();</script>`;
 }

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { PREVIEW_HOST, previewHostPattern } from "./src/lib/preview-host";
+
 // Node 22–25 exposes a sealed Proxy as global.localStorage during SSR.
 // You cannot mutate its properties. Shadow the entire global with a safe no-op
 // so libraries like next-themes and @clerk/nextjs don't crash on the server.
@@ -67,21 +69,13 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
+    // The path proxy needs a full navigation out of a preview sent back under
+    // its prefix. On a dedicated host there is no prefix and nothing to send
+    // back, so the rule only exists in fallback mode.
+    if (PREVIEW_HOST) return [];
+
     return [
       {
-        /**
-         * A full navigation out of the preview, sent back under the prefix.
-         *
-         * Anchors that are not framework links do a real page load, landing on
-         * a bare `/contact` on this origin. A rewrite would serve the right
-         * page but leave the address bare, and every asset that page then asks
-         * for would be routed by a referrer that no longer names a preview.
-         * Redirecting fixes the address itself, so what follows is consistent.
-         *
-         * Scoped to navigations by `sec-fetch-dest`; sub-resources are rewritten
-         * below instead, since making each of them pay a round trip would be
-         * absurd.
-         */
         source: "/:path((?!api/v0-preview).*)",
         has: [
           {
@@ -98,40 +92,10 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
+    // Preview routing lives in middleware, in both modes. Rewrites here cannot
+    // claim `/_next/*` — Next reserves that prefix — and a preview's fonts and
+    // runtime-loaded chunks arrive under exactly that path.
     return {
-      /**
-       * Routes a hosted preview's own requests to the preview proxy.
-       *
-       * The site v0 hosts emits root-relative URLs — its HTML asks for
-       * `/_next/static/...` and its runtime builds more of those after load.
-       * Inside our same-origin iframe those resolve against this app, where
-       * `/_next` is ours, so the preview would load its document and then fail
-       * to fetch a single chunk. Rewriting the HTML cannot fix it, because the
-       * URLs that matter are constructed in JavaScript.
-       *
-       * The requests are identified by where they came from: a same-origin
-       * iframe sends the full document URL as `Referer`, so anything refered
-       * from `/api/v0-preview/:chatId` is the preview asking for one of its own
-       * files. `beforeFiles` is what makes this work at all — it runs ahead of
-       * the filesystem, so it can claim `/_next/*` before Next serves our copy.
-       *
-       * This lived in middleware first, which was wrong twice over: middleware
-       * does not run for `/_next/*` under the matcher, and short-circuiting it
-       * to add coverage skipped Clerk and turned every 404 into a 500.
-       */
-      beforeFiles: [
-        {
-          source: "/:path((?!api/v0-preview).*)",
-          has: [
-            {
-              type: "header",
-              key: "referer",
-              value: ".*/api/v0-preview/(?<previewChatId>[^/?#]+).*",
-            },
-          ],
-          destination: "/api/v0-preview/:previewChatId/:path",
-        },
-      ],
       afterFiles: [
         {
           source: "/proxy-r2/:path*",
@@ -140,6 +104,7 @@ const nextConfig: NextConfig = {
       ],
     };
   },
+
   async headers() {
     return [
       {
@@ -162,6 +127,11 @@ const nextConfig: NextConfig = {
          * The proxy route is excluded because that IS the frame's content.
          */
         source: "/:path((?!api/v0-preview).*)",
+        // Headers are applied before rewrites, so on the preview host this
+        // would land on the site itself and stop the builder framing it.
+        ...(PREVIEW_HOST
+          ? { missing: [{ type: "host" as const, value: previewHostPattern() }] }
+          : {}),
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }],
       },
     ];

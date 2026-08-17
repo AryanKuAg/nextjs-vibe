@@ -88,9 +88,21 @@ export type SiteBrief = {
   motion?: VideoMotion;
 };
 
+/**
+ * The one structural constraint we impose.
+ *
+ * Left to itself v0 sometimes answers a brief by writing a loose `index.html`
+ * and a script beside the Next.js app rather than inside it. The files are real
+ * and the work is done, but the preview renders the app — still the untouched
+ * starter — so the user is shown v0's "your generation will show here"
+ * placeholder and concludes their site was never built.
+ */
+const BUILD_IN_THE_APP =
+  "Build this inside the existing Next.js app: edit app/page.tsx and add any further routes under app/. Do not create a standalone index.html or a separate static server.";
+
 /** Compose the opening message for a build. */
 export function buildSitePrompt(input: SiteBrief): string {
-  const brief = input.prompt.trim();
+  const brief = [input.prompt.trim(), "", BUILD_IN_THE_APP].join("\n");
 
   if (input.mode !== "CINEMATIC") {
     // Classic with footage still gets a hero treatment; without, the brief

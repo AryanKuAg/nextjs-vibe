@@ -6,6 +6,8 @@ import { AGENT_COSTS, checkCredits, consumeCredits, refundCredits } from "@/lib/
 import { issuePreviewGrant } from "@/lib/preview-grant";
 import { v0 } from "@/lib/v0-client";
 import { CAPACITY_MESSAGE, isCapacityError, v0Failure } from "@/lib/v0-error";
+import { previewOriginForChat } from "@/lib/preview-host-check";
+import { PublishError, publishSiteToR2 } from "@/lib/publish-site";
 import { startProjectBuild } from "@/lib/v0-start-build";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
@@ -21,7 +23,13 @@ import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 async function requireProject(projectId: string, userId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId, userId },
-    select: { id: true, name: true, v0ChatId: true, prompts: true },
+    select: {
+      id: true,
+      name: true,
+      v0ChatId: true,
+      prompts: true,
+      publishedUrl: true,
+    },
   });
 
   if (!project) {
@@ -55,9 +63,12 @@ export const v0Router = createTRPCRouter({
       if (!project.v0ChatId) return null;
 
       const chatId = project.v0ChatId;
-      const [chat, messages] = await Promise.all([
+      const [chat, messages, previewOrigin] = await Promise.all([
         v0.chats.get({ chatId }),
         v0.messages.list({ chatId, limit: 100 }),
+        // Null unless the wildcard DNS record actually exists, so the browser
+        // is never pointed at a hostname that will fail to resolve.
+        previewOriginForChat(chatId),
       ]);
 
       if (chat.error !== undefined) {
@@ -71,6 +82,8 @@ export const v0Router = createTRPCRouter({
 
       return {
         chat: chat.data,
+        publishedUrl: project.publishedUrl,
+        previewOrigin,
         // A transcript that fails to load is recoverable — the client refetches
         // it through SWR — so an empty list beats failing the whole view.
         messages: messages.error === undefined ? messages.data.messages : [],
@@ -122,6 +135,57 @@ export const v0Router = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to start the build",
+        });
+      }
+    }),
+
+  /**
+   * Build the site and put it on R2.
+   *
+   * Deliberately separate from the preview: a preview is v0's live sandbox,
+   * this is a static export the user owns at a URL of ours. It runs the
+   * customer's own build in a throwaway E2B sandbox, so it is slow (a minute or
+   * two) and explicitly asked for rather than automatic.
+   */
+  publish: protectedProcedure
+    .input(z.object({ projectId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const project = await requireProject(input.projectId, ctx.auth.userId);
+
+      if (!project.v0ChatId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "There is nothing to publish yet.",
+        });
+      }
+
+      try {
+        const result = await publishSiteToR2({
+          chatId: project.v0ChatId,
+          projectId: project.id,
+        });
+
+        await prisma.project.update({
+          where: { id: project.id },
+          data: { publishedUrl: result.url, publishedAt: new Date() },
+        });
+
+        return result;
+      } catch (error) {
+        // The build log is the useful part of a publish failure, and it is the
+        // user's own code that failed — so it goes to them, not just to us.
+        console.error("[publish] failed:", error);
+
+        if (error instanceof PublishError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.detail ? `${error.message}\n\n${error.detail}` : error.message,
+          });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to publish the site.",
         });
       }
     }),

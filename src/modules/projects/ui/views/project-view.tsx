@@ -73,6 +73,9 @@ export const ProjectView = ({ projectId }: Props) => {
         chat={workspace.chat}
         key={workspace.chat.id}
         messages={workspace.messages}
+        previewOrigin={workspace.previewOrigin}
+        projectId={projectId}
+        publishedUrl={workspace.publishedUrl}
         title={project.name}
         toolbar={
           <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">

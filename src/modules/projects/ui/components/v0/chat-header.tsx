@@ -1,7 +1,9 @@
 "use client";
 
 import { useDownloadChatFiles } from "@v0-sdk/react/swr";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,9 +23,11 @@ import {
   FullscreenIcon,
   RefreshIcon,
   SettingsIcon,
+  PublishIcon,
   SpinnerIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useTRPC } from "@/trpc/client";
 
 import { withChatToken } from "./chat-token";
 import type { PreviewNavigation } from "./preview-pane";
@@ -33,6 +37,8 @@ export type ChatView = "preview" | "code";
 export function ChatHeader({
   accessToken,
   chatId,
+  projectId,
+  publishedUrl,
   title,
   view,
   onViewChange,
@@ -43,6 +49,9 @@ export function ChatHeader({
 }: {
   accessToken: string;
   chatId: string;
+  projectId: string;
+  /** Where this project was last published, if it has been. */
+  publishedUrl?: string | null;
   /** Live location of the framed site; null before it has loaded. */
   navigation?: PreviewNavigation | null;
   title: string;
@@ -56,6 +65,27 @@ export function ChatHeader({
     withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/download`, accessToken),
   );
   const [error, setError] = useState<string | null>(null);
+
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const publish = useMutation(
+    trpc.v0.publish.mutationOptions({
+      onSuccess: async (result) => {
+        toast.success("Published", {
+          description: result.url,
+          action: { label: "Open", onClick: () => window.open(result.url, "_blank") },
+        });
+        await queryClient.invalidateQueries(trpc.v0.workspace.queryOptions({ projectId }));
+      },
+      // A build failure is the user's own code failing, so the log is shown
+      // rather than swallowed — it is the only thing that makes it fixable.
+      onError: (mutationError) =>
+        toast.error("Could not publish", {
+          description: mutationError.message,
+          duration: Infinity,
+        }),
+    }),
+  );
 
   const isDownloading = downloadChat.isMutating;
   const previewUrl =
@@ -167,6 +197,20 @@ export function ChatHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {publishedUrl && !publish.isPending ? (
+            <Button
+              asChild
+              className="h-7 gap-1.5 rounded-md px-2 text-xs"
+              size="sm"
+              variant="ghost"
+            >
+              <a href={publishedUrl} rel="noreferrer" target="_blank">
+                <ExternalIcon className="size-3.5" />
+                View site
+              </a>
+            </Button>
+          ) : null}
+
           <Button
             aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             aria-pressed={isFullscreen}
@@ -210,6 +254,20 @@ export function ChatHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <Button
+            className="h-7 min-w-[76px] gap-1.5 rounded-md px-2 text-xs"
+            disabled={publish.isPending}
+            onClick={() => publish.mutate({ projectId })}
+            size="sm"
+            title="Build this site and put it online"
+          >
+            {publish.isPending ? (
+              <SpinnerIcon className="size-3.5 animate-spin" />
+            ) : (
+              <PublishIcon className="size-3.5" />
+            )}
+            {publish.isPending ? "Publishing" : publishedUrl ? "Republish" : "Publish"}
+          </Button>
         </div>
       </div>
     </header>

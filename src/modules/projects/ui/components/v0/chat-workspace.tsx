@@ -20,12 +20,20 @@ import { PreviewPane, type PreviewNavigation } from "./preview-pane";
 export function ChatWorkspace({
   chat,
   messages,
+  previewOrigin,
+  projectId,
+  publishedUrl,
   title,
   toolbar,
   accessToken,
 }: {
   chat: Chat;
   messages: Message[];
+  projectId: string;
+  /** Verified preview hostname for this chat, or null for the path proxy. */
+  previewOrigin?: string | null;
+  /** Where this project was last published, if it has been. */
+  publishedUrl?: string | null;
   title: string;
   /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
   accessToken: string;
@@ -38,6 +46,10 @@ export function ChatWorkspace({
   // framed site actually is, and move through its history.
   const [navigation, setNavigation] = useState<PreviewNavigation | null>(null);
   const handleNavigationChange = useCallback(setNavigation, [setNavigation]);
+  // Whether v0 has a turn open, so the preview can say "building" rather than
+  // accusing the site of having failed.
+  const [isBuilding, setIsBuilding] = useState(false);
+  const handleBusyChange = useCallback(setIsBuilding, [setIsBuilding]);
 
   // Whether v0 has ever finished a turn for this chat. Before that there is no
   // site to preview and no sandbox to wait on, so the pane says so plainly
@@ -75,6 +87,8 @@ export function ChatWorkspace({
         accessToken={accessToken}
         chatId={chat.id}
         navigation={navigation}
+        projectId={projectId}
+        publishedUrl={publishedUrl}
         isFullscreen={isFullscreen}
         onReloadPreview={handleContentChange}
         onToggleFullscreen={() => setIsFullscreen((current) => !current)}
@@ -95,6 +109,7 @@ export function ChatWorkspace({
             accessToken={accessToken}
             chatId={chat.id}
             messages={messages}
+            onBusyChange={handleBusyChange}
             onContentChange={handleContentChange}
           />
         </div>
@@ -105,7 +120,9 @@ export function ChatWorkspace({
               accessToken={accessToken}
               chatId={chat.id}
               hasBuild={hasBuild}
+              isBuilding={isBuilding}
               onNavigationChange={handleNavigationChange}
+              previewOrigin={previewOrigin}
               reloadKey={contentRevision}
             />
           </div>

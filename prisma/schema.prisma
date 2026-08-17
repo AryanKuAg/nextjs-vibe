@@ -36,6 +36,11 @@ model Project {
   // a Message + Fragment. Doubles as the idempotency key for that reconcile.
   v0PendingMessageId String?
 
+  // Set when the user publishes. The built site is uploaded to R2 under
+  // sites/<projectId>/, so this URL is stable across republishes.
+  publishedUrl String?
+  publishedAt  DateTime?
+
   // Visual pipeline state
   currentStage   String @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
   videoUrls      Json   @default("[]") // Array of all generated cinematic videos

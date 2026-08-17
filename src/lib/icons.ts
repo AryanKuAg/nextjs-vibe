@@ -29,6 +29,7 @@ export {
   ExternalSmall as ExternalIcon,
   Copy as CopyIcon,
   Download as DownloadIcon,
+  Globe as PublishIcon,
   LogoV0 as V0LogoIcon,
   LogoVercel as VercelLogoIcon,
   Stop as StopIcon,

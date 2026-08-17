@@ -31,6 +31,7 @@ export function ChatConversation({
   chatId,
   messages: initialMessages,
   onContentChange,
+  onBusyChange,
 }: {
   /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
   accessToken: string;
@@ -38,6 +39,8 @@ export function ChatConversation({
   messages: Message[];
   /** Fired when a turn finishes, so the preview and code panes refresh. */
   onContentChange: () => void;
+  /** Whether a turn is currently open, for the panes that show progress. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [isResolving, setIsResolving] = useState(false);
   const [resolvingMessageId, setResolvingMessageId] = useState<string | null>(null);
@@ -59,11 +62,20 @@ export function ChatConversation({
   // request every couple of seconds, and only while a run is actually open.
   const [hasPendingRun, setHasPendingRun] = useState(() => shouldResumeV0Chat(initialMessages));
 
+  // Memoised deliberately. An object literal here is a new value on every
+  // render, so SWR hands back fresh `data`, the effects below see changed
+  // input, they setState, and that renders again — "Maximum update depth
+  // exceeded", on a loop that never settles.
+  const fallbackData = useMemo(
+    () => ({ cursor: null, messages: initialMessages }),
+    [initialMessages],
+  );
+
   const messagesQuery = useMessages(
     messagesUrl,
     { limit: 100 },
     {
-      fallbackData: { cursor: null, messages: initialMessages },
+      fallbackData,
       revalidateOnMount: false,
       refreshInterval: hasPendingRun ? 2000 : 0,
     },
@@ -248,6 +260,10 @@ export function ChatConversation({
   };
 
   const isSubmitting = chatIsBusy || isResolving;
+
+  useEffect(() => {
+    onBusyChange?.(isSubmitting || hasPendingRun);
+  }, [hasPendingRun, isSubmitting, onBusyChange]);
   const isStreaming =
     activeAssistantMessage !== undefined && (status === "streaming" || resolvingMessageId !== null);
   const error = actionError ?? chatError?.message;

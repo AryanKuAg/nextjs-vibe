@@ -36,6 +36,52 @@ const formSchema = z.object({
 });
 
 
+/**
+ * How much decoded video a scroll-scrubbed page may hold in memory.
+ *
+ * `scrolly-video` decodes the whole clip up front and keeps every frame as an
+ * uncompressed bitmap in one array — no cap, no downscale, no eviction. The
+ * cost is resolution times frame count, and it is brutal: a 4K 10s clip at
+ * 30fps is 300 frames of 3840x2160x4 bytes, near enough 10GB, re-paid on every
+ * reload of the preview. A pasted 4K link took a 8GB machine to 30GB of swap
+ * and an out-of-memory dialog.
+ *
+ * Two gigabytes is roughly a 1080p clip of a few seconds, or 720p of ten — the
+ * shape of the footage this product generates itself. Above that the site would
+ * not be usable by whoever it is built for either, so it is refused here rather
+ * than discovered by their browser.
+ *
+ * Only scroll-driven builds decode anything. A looping hero is a plain <video>
+ * and costs nothing, whatever its resolution.
+ */
+const SCRUB_MEMORY_BUDGET_BYTES = 2 * 1024 ** 3;
+
+/** Reads a video's dimensions without downloading it. Null if it cannot be read. */
+function probeVideo(url: string) {
+  return new Promise<{ width: number; height: number; duration: number } | null>((resolve) => {
+    const video = document.createElement("video");
+    let settled = false;
+
+    const finish = (value: { width: number; height: number; duration: number } | null) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute("src");
+      video.load();
+      resolve(value);
+    };
+
+    video.preload = "metadata";
+    video.muted = true;
+    video.onloadedmetadata = () =>
+      finish({ width: video.videoWidth, height: video.videoHeight, duration: video.duration });
+    // Unreadable is not the same as too big: a host that blocks us still builds
+    // fine, so anything we cannot measure is allowed through.
+    video.onerror = () => finish(null);
+    window.setTimeout(() => finish(null), 8000);
+    video.src = url;
+  });
+}
+
 interface ProjectFormProps {
   showModelSelector?: boolean;
   isLandingPage?: boolean;
@@ -184,6 +230,28 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
       if (!valid) {
         toast.error("Enter a video URL starting with http:// or https://");
         return;
+      }
+
+      // Scroll-scrubbing decodes the whole clip into memory, so an oversized
+      // one is refused before it can take the browser down with it.
+      if (motion === "SCROLL") {
+        const meta = await probeVideo(trimmed);
+        if (meta && meta.width > 0 && Number.isFinite(meta.duration)) {
+          // 30fps assumed: the element does not expose a frame rate, and
+          // over-estimating is the safe direction.
+          const frames = Math.ceil(meta.duration) * 30;
+          const bytes = meta.width * meta.height * 4 * frames;
+
+          if (bytes > SCRUB_MEMORY_BUDGET_BYTES) {
+            toast.error(
+              `That clip is ${meta.width}x${meta.height} and ${Math.round(meta.duration)}s, which needs about ` +
+                `${(bytes / 1024 ** 3).toFixed(1)}GB of memory to scrub — enough to crash the browser. ` +
+                "Use a shorter or lower-resolution video (1080p or below), or switch to Looping, which has no such limit.",
+              { duration: 15000 },
+            );
+            return;
+          }
+        }
       }
     }
 
@@ -405,7 +473,17 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                   chipIcon={sourceOption.icon}
                   chipLabel={sourceOption.label}
                   disabled={isPending}
-                  onChange={setVideoSource}
+                  onChange={(next) => {
+                    // One visible field, two pieces of state. Without this,
+                    // typing a URL and then switching the chip to "Video URL"
+                    // leaves the URL stranded in videoPrompt and submits it as
+                    // a description of footage to generate — which is exactly
+                    // how a pasted link ended up at the video model.
+                    const typed = videoSource === "URL" ? videoUrl : videoPrompt;
+                    if (next === "URL") setVideoUrl(typed);
+                    else if (next === "PROMPT") setVideoPrompt(typed);
+                    setVideoSource(next);
+                  }}
                   options={VIDEO_SOURCES}
                   value={videoSource}
                 />

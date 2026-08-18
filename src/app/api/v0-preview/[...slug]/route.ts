@@ -199,12 +199,22 @@ function withGrant(
   if (context.granted) return response;
 
   // The preview is framed by a builder on a different site, so every request it
-  // makes for its own stylesheet, chunk and font is a third-party one. A Lax
-  // cookie is not sent with those, so they arrived unauthenticated, answered
-  // 401, and the site rendered as raw unstyled HTML — the "CSS is not loading"
-  // report. SameSite=None is what a framed document needs, and browsers only
-  // accept it alongside Secure. Localhost counts as a secure context, so this
-  // holds in development over plain http too.
+  // makes for its own stylesheet, chunk and font is a third-party one. Three
+  // attributes are needed together and none of them is optional:
+  //
+  //   SameSite=Lax  never travels with a framed page's subresources at all, so
+  //                 they arrive unauthenticated and answer 401 — the site
+  //                 renders as raw unstyled HTML.
+  //   SameSite=None fixes that only where third-party cookies are allowed.
+  //                 Chrome blocks them by default now and refuses both to store
+  //                 and to send this one, so the fix held in a top-level tab and
+  //                 changed nothing inside the builder. That is exactly the
+  //                 "loads externally, not in the builder" split.
+  //   Partitioned   is the mechanism for this case (CHIPS): a third-party cookie
+  //                 keyed to the embedding site, which survives that blocking.
+  //                 It requires Secure and Path=/.
+  //
+  // Localhost counts as a secure context, so this holds over plain http in dev.
   const secure = context.requestUrl.protocol === "https:" || isLocalhost(context.requestUrl.hostname);
 
   const withCookie = new Response(response.body, response);
@@ -218,7 +228,7 @@ function withGrant(
       // Falling back to Lax rather than dropping the cookie: over plain http on
       // a non-local host SameSite=None would be rejected outright, and Lax at
       // least keeps the same-origin path proxy working.
-      ...(secure ? ["SameSite=None", "Secure"] : ["SameSite=Lax"]),
+      ...(secure ? ["SameSite=None", "Secure", "Partitioned"] : ["SameSite=Lax"]),
     ].join("; "),
   );
 

@@ -139,6 +139,31 @@ export function siteBriefOf(prompts: unknown): SiteBrief | null {
   };
 }
 
+/** A bare http(s) URL and nothing else — no prose around it. */
+const BARE_URL = /^https?:\/\/\S+$/i;
+
+/**
+ * Repairs a brief whose video URL arrived in the prompt field.
+ *
+ * The composer shows one input for both "write a video prompt" and "paste a
+ * video URL", backed by two pieces of state and switched by a chip. Type a URL
+ * while the chip says prompt — or paste one, then change the chip — and the
+ * URL is submitted as a description of footage to generate. Which is what
+ * happened: a pixabay link was sent to the video model as a creative brief, and
+ * the build came back with a generated clip instead of the video that was
+ * pasted.
+ *
+ * Nobody has ever meant "make me a video that looks like https://…", so a bare
+ * URL in that field is read as the URL it plainly is. Done here rather than
+ * only in the composer so it holds however the request was made.
+ */
+export function normalizeBrief(brief: SiteBrief): SiteBrief {
+  const written = brief.videoPrompt?.trim();
+  if (brief.videoUrl || !written || !BARE_URL.test(written)) return brief;
+
+  return { ...brief, videoPrompt: undefined, videoSource: "URL", videoUrl: written };
+}
+
 /**
  * Whether this brief needs footage made before the site can be built.
  *
@@ -191,48 +216,82 @@ const BUILD_IN_THE_APP =
   "Build this inside the existing Next.js app: edit app/page.tsx and add any further routes under app/. Do not create a standalone index.html or a separate static server.";
 
 /**
+ * The rule both treatments share.
+ *
+ * Asking for content that stays "readable against" footage, or for "enough
+ * contrast over it", is read as permission to drop a scrim — and a black 40%
+ * sheet over the whole frame is the cheapest way to satisfy it. The result is a
+ * dimmed, washed-out video with a hero pasted on top, which is the one thing a
+ * video-led site must not look like: the footage is the reason the page exists
+ * and the overlay is what stops it earning its place. Legibility has to come
+ * out of the typography instead.
+ */
+const NO_OVERLAY =
+  "Never put an overlay on the video: no dark tint, scrim, gradient wash, blur or semi-transparent panel between the footage and the content, at any opacity. The footage plays at full strength and the content sits directly on it. Get legibility from the type instead — its scale, weight and colour, and placing it where the frame is already calm.";
+
+/**
  * Scroll-driven — what used to be called a full-page site.
  *
- * The scrubbing is handed to `scrolly-video` rather than described. Both
- * attempts at describing it failed, in opposite directions: asking only for
- * "buttery smooth" got an eased chase that reassigned `currentTime` sixty times
- * a second, so every seek superseded the one still decoding and the picture
- * never moved at all. Spelling out the seeking instead fixed nothing and cost
- * the layout — the three chapters ended up stacked in one pinned viewport,
- * headlines overlapping each other.
+ * Three things here are requirements and everything else is the model's call.
+ * The line between them has moved twice, so it is worth stating plainly.
  *
- * The package solves the part that is genuinely hard (decoding frames ahead and
- * presenting the right one for a scroll position) and leaves the page to v0,
- * which was never the thing going wrong.
+ * WHAT IS REQUIRED. The scrubbed video opens the page, content is laid over it,
+ * and the page continues without it once the scroll passes. That is what the
+ * product IS, not a layout preference — with it left unsaid the video turned up
+ * as the third or fourth section with nothing on top of it, which is not a
+ * scroll-driven site by any reading.
  *
- * Naming the package was not enough on its own, though. Left to guess at its
- * API, v0 passed `fullHeight fullWidth` — neither exists, and the three props
- * that do (cover, sticky, full) are all true by default anyway — and then wrapped
- * it in an absolutely positioned, overflow-hidden layer. That is fatal twice
- * over: the component sets `position: sticky` on its own container, which any
- * clipping ancestor disables, and it reads its scroll range from
- * `container.parentNode`'s height, which an inset-0 parent does not have. The
- * video rendered nothing at all. Hence the paragraph about layout: what it needs
- * is to be left alone inside a tall, ordinary block.
+ * WHAT IS MECHANISM. The package's own contract: `scrolly-video` sets
+ * `position: sticky` on its container and reads its scroll range from
+ * `container.parentNode`'s height, so a clipping or absolutely positioned
+ * ancestor makes it render nothing at all. And because the container is sticky
+ * and full-height, anything after it in flow starts a viewport lower — which is
+ * why the overlay has to be pulled back up. Both were discovered by watching it
+ * fail, not by reading design taste into it.
+ *
+ * WHAT IS NOT OURS. How many screens the passage lasts, what is layered over
+ * the footage, and what the rest of the site becomes. An earlier version of
+ * this prompt specified three full-height sections and "an ordinary website"
+ * below them; every build came out as that same template, because we were
+ * designing the site instead of the model.
+ *
+ * The scrubbing itself is handed to the package rather than described. Asking
+ * for "buttery smooth" produced an eased chase that reassigned `currentTime`
+ * sixty times a second, so every seek superseded the one still decoding and the
+ * picture never moved; spelling the seeking out fixed nothing and wrecked the
+ * layout instead.
  */
 const SCROLL_DRIVEN = [
-  "Use this video as the page background:",
+  "Use this video as a scroll-scrubbed background:",
   "%URL%",
   "",
-  "Use the `scrolly-video` package for it: add it to package.json and import the React build (`scrolly-video/dist/ScrollyVideo.esm.jsx`) in a client component. Render it as `<ScrollyVideo src=\"…\" />` and pass nothing but the src — it already defaults to cover, sticky and full-viewport. It does the scrubbing itself, so write no scroll listener and never touch the video's currentTime.",
+  "Use the `scrolly-video` package for it: add it to package.json and import the React build (`scrolly-video/dist/ScrollyVideo.esm.jsx`) in a client component. Render it as `<ScrollyVideo src=\"…\" />` and pass nothing but the src — cover, sticky and full-viewport are already its defaults. It does the scrubbing itself, so write no scroll listener and never touch the video's currentTime.",
   "",
-  "It only draws if you let it own its own layout, so give it a plain block element as its direct parent, about three viewports tall. That parent's height is the scroll range the video is mapped onto. Do not position that parent absolutely, do not put overflow: hidden on it or on any ancestor — the component relies on position: sticky, which either of those kills — and do not set any width, height or position on the component or on what it renders, which is a canvas it creates rather than a video element you can target.",
+  "The video opens the site. Its container is the first thing on the page, it fills the viewport, and the site's own content sits directly on the footage — as many screens of it as the story wants. Scrolling moves the visitor through the video; when the scroll passes it the video is finished and the rest of the page carries on without it.",
   "",
-  "The three story sections sit over the video inside that same tall parent, one per viewport, each with its own headline and copy, readable against the footage. Where that parent ends the video is finished, and the rest of the page is an ordinary website on a normal background — the sections the brief calls for, then a footer.",
+  NO_OVERLAY,
+  "",
+  "Two mechanics make that work, and it renders nothing without them. Give the component a plain block element as its direct parent, taller than the viewport — that parent's height is the scroll range the video is mapped onto. Never position that parent absolutely, never put overflow: hidden on it or any ancestor, and never set width, height or position on the component or on the canvas it renders. Then put the sections that sit on the video inside that same parent, after the component, pulled back up by one viewport with a negative top margin and a higher z-index, so it rides on the footage from the first screen instead of starting below it.",
+  "",
+  "Everything else is yours: how many screens the scrubbed passage runs for, what is layered over it, and what the rest of the site becomes.",
 ].join("\n");
 
-/** Looping — what used to be called a hero site. */
+/**
+ * Looping — what used to be called a hero site.
+ *
+ * One requirement: the first section is the looping footage with the page's
+ * own opening content over it. What the rest of the page becomes is the
+ * model's call.
+ */
 const LOOPING_HERO = [
   "Use this video in the hero:",
   "%URL%",
   "",
-  "Play it full-bleed behind the first section only — autoplay, muted, looping, playsInline, object-cover — with a dark overlay so the headline and the nav stay readable. It just loops; it does not react to scroll.",
-  "Everything below the hero is an ordinary website on a normal background: the sections the brief calls for, then a footer.",
+  "The first section of the site is this video: full-bleed behind it — autoplay, muted, looping, playsInline, object-cover — with the site's own opening content sitting directly on the footage. It just loops; it does not react to scroll.",
+  "",
+  NO_OVERLAY,
+  "",
+  "Everything after that first section is yours to design.",
 ].join("\n");
 
 /** Compose the opening message for a build. */

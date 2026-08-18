@@ -11,7 +11,7 @@ import { getTemplate } from "@/lib/templates/registry";
 import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
 import { beginProjectBuild } from "@/lib/v0-start-build";
-import { needsGeneratedVideo, type SiteBrief } from "@/lib/v0-site-prompt";
+import { needsGeneratedVideo, normalizeBrief, type SiteBrief } from "@/lib/v0-site-prompt";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -105,14 +105,16 @@ export const projectsRouter = createTRPCRouter({
       }
 
       // Everything the user chose, in the one shape the whole pipeline reads.
-      const brief: SiteBrief = {
+      // Normalised, because the composer can hand us a pasted URL sitting in
+      // the prompt field — see normalizeBrief.
+      const brief: SiteBrief = normalizeBrief({
         startPrompt: input.value,
         mode: input.mode,
         ...(input.motion ? { motion: input.motion } : {}),
         ...(input.videoSource ? { videoSource: input.videoSource } : {}),
         ...(input.videoPrompt ? { videoPrompt: input.videoPrompt } : {}),
         ...(input.videoUrl ? { videoUrl: input.videoUrl } : {}),
-      };
+      });
 
       // A cinematic build with no URL pays for footage as well as the site, and
       // the video agent charges its own half when it runs. Checking the total

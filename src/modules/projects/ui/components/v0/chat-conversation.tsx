@@ -124,14 +124,6 @@ export function ChatConversation({
     .map((message) => `${message.id}:${message.updatedAt?.valueOf() ?? ""}`)
     .join("|");
 
-  useEffect(() => {
-    setHasStalled(false);
-    if (!hasPendingRun) return;
-
-    const timer = window.setTimeout(() => setHasStalled(true), STALLED_AFTER_MS);
-    return () => window.clearTimeout(timer);
-  }, [hasPendingRun, transcriptMark]);
-
   const resolveTaskMutation = useResolveTask(
     withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/resolve`, accessToken),
   );
@@ -280,6 +272,10 @@ export function ChatConversation({
 
   const stopMessage = async () => {
     setActionError(null);
+    // The banner that is on screen is usually from the run being abandoned, and
+    // it survives until something clears it — leaving red text over a chat that
+    // is working again.
+    clearError();
     setIsStopping(true);
     setHasStalled(false);
 
@@ -302,9 +298,41 @@ export function ChatConversation({
 
   const isSubmitting = chatIsBusy || isResolving;
 
+  // Keyed on the composer being locked, not just on v0 having an open run.
+  //
+  // Those are different, and the difference is what left a build unrecoverable:
+  // `status` describes OUR stream and `hasPendingRun` describes v0's. When a
+  // resumed stream attaches to a run that then ends — v0 stopping early on its
+  // output limit, say — status stays "submitted" for good, the textarea stays
+  // disabled, and the earlier version of this check saw hasPendingRun go false
+  // and offered nothing. Locked box, no button, no explanation.
+  useEffect(() => {
+    setHasStalled(false);
+    if (!isSubmitting && !hasPendingRun) return;
+
+    const timer = window.setTimeout(() => setHasStalled(true), STALLED_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [hasPendingRun, isSubmitting, transcriptMark]);
+
   useEffect(() => {
     onBusyChange?.(isSubmitting || hasPendingRun);
   }, [hasPendingRun, isSubmitting, onBusyChange]);
+  /**
+   * A turn that ended without doing the work.
+   *
+   * v0 sometimes stops on its own output limit part-way through planning: the
+   * message closes with finishReason "length", no files are written, and the
+   * preview shows v0's own "your generation will show here" placeholder. From
+   * the outside that is indistinguishable from our build being broken, and the
+   * transcript simply stops with no explanation. Naming it, and saying what
+   * unsticks it, is the difference between a dead project and a follow-up.
+   */
+  const abandonedTurn =
+    !isSubmitting &&
+    !hasPendingRun &&
+    uiMessages.findLast((message) => message.role === "assistant")?.metadata?.finishReason ===
+      "length";
+
   const isStreaming =
     activeAssistantMessage !== undefined && (status === "streaming" || resolvingMessageId !== null);
   const error = actionError ?? chatError?.message;
@@ -333,6 +361,14 @@ export function ChatConversation({
         {/* A run that has gone quiet. Offered rather than done automatically:
             v0 is occasionally just slow, and cancelling a turn that was about
             to land would throw away the build the user paid for. */}
+        {!hasStalled && abandonedTurn ? (
+          <div className="mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              v0 stopped part-way through this turn and did not write the site. Send a follow-up —
+              &ldquo;continue&rdquo; is usually enough — and it will pick up where it left off.
+            </p>
+          </div>
+        ) : null}
         {hasStalled ? (
           <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
             <p className="min-w-0 flex-1 text-xs text-muted-foreground">

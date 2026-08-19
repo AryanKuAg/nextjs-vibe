@@ -143,7 +143,91 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     isTall: true,
   },
 
-
+  // ---------------------------------------------------------------------------
+  // TODO: demoUrl and imgSrc are intentionally empty for the templates below.
+  // Fill each in once the demo is deployed to sites.framerate.space and the
+  // cover image is uploaded to assets.framerate.space.
+  // ---------------------------------------------------------------------------
+  {
+    id: "aeroforge-website",
+    title: "AeroForge",
+    repo: "AryanKuAg/aeroforge-website",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/aeroforge-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-aeroforge-website-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "atelier-viaggio-website",
+    title: "Atelier Viaggio",
+    repo: "AryanKuAg/atelier-viaggio-website",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/atelier-viaggio-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-atelier-viaggio-website-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "fableforge-site",
+    title: "FableForge",
+    repo: "AryanKuAg/fableforge-site",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/fableforge-site/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-fableforge-site-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "horizon-house-website",
+    title: "Horizon House",
+    repo: "AryanKuAg/horizon-house-website",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/horizon-house-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-horizon-house-website-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "nala-maldives-website",
+    title: "Nala Maldives",
+    repo: "AryanKuAg/nala-maldives-website",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/nala-maldives-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-nala-maldives-website-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "orbit-react",
+    title: "Orbit",
+    repo: "AryanKuAg/orbit-react",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/orbit-react/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orbit-react-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "relay-website",
+    title: "Relay",
+    repo: "AryanKuAg/relay-website",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/relay-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-relay-website-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "vesper-ai-react-vite",
+    title: "Vesper AI",
+    repo: "AryanKuAg/vesper-ai-react-vite",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/vesper-ai-react-vite/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-vesper-ai-react-vite-index.html.png",
+    isTall: false,
+  },
 ];
 
 /** The token a template repo uses wherever the background video URL belongs. */

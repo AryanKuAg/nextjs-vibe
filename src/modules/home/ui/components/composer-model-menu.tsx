@@ -89,7 +89,7 @@ export function ComposerModelMenu({
         {open && (
           <motion.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className={`absolute left-0 z-50 flex w-[180px] flex-col gap-2 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl ${PLACEMENT[menuPlacement]}`}
+            className={`absolute left-0 z-50 flex w-[180px] flex-col gap-1 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl ${PLACEMENT[menuPlacement]}`}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             initial={{ opacity: 0, y: 4, scale: 0.97 }}
             role="menu"

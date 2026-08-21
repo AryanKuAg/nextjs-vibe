@@ -1,9 +1,7 @@
 "use client";
 
 import { useDownloadChatFiles } from "@v0-sdk/react/swr";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
 
 import {
   CodeIcon,
@@ -15,9 +13,9 @@ import {
   SpinnerIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
 
 import { withChatToken } from "./chat-token";
+import { PublishControl } from "./publish-control";
 
 export type ChatView = "preview" | "code";
 
@@ -70,27 +68,6 @@ export function ChatHeader({
     withChatToken(`/api/v0/chats/${encodeURIComponent(chatId)}/download`, accessToken),
   );
   const [error, setError] = useState<string | null>(null);
-
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const publish = useMutation(
-    trpc.v0.publish.mutationOptions({
-      onSuccess: async (result) => {
-        toast.success("Published", {
-          description: result.url,
-          action: { label: "Open", onClick: () => window.open(result.url, "_blank") },
-        });
-        await queryClient.invalidateQueries(trpc.v0.workspace.queryOptions({ projectId }));
-      },
-      // A build failure is the user's own code failing, so the log is shown
-      // rather than swallowed — it is the only thing that makes it fixable.
-      onError: (mutationError) =>
-        toast.error("Could not publish", {
-          description: mutationError.message,
-          duration: Infinity,
-        }),
-    }),
-  );
 
   const isDownloading = downloadChat.isMutating;
 
@@ -194,16 +171,7 @@ export function ChatHeader({
         </button>
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
-          <button
-            className="flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-white-12 px-[14px] text-sm leading-[20px] font-medium text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50"
-            disabled={publish.isPending}
-            onClick={() => publish.mutate({ projectId })}
-            title="Build this site and put it online"
-            type="button"
-          >
-            {publish.isPending ? <SpinnerIcon className="size-3.5 animate-spin" /> : null}
-            {publish.isPending ? "Publishing" : publishedUrl ? "Republish" : "Publish"}
-          </button>
+          <PublishControl projectId={projectId} publishedUrl={publishedUrl} />
           {accountSlot}
         </div>
       </div>

@@ -196,10 +196,10 @@ const LoggedInDashboard = () => {
 
       {/* Main Content (Centered) */}
       <div className="relative z-10 flex-1 flex flex-col items-center mt-12 md:mt-20 px-4 w-full">
-        <h1 className="text-white font-onest font-semibold text-[28px] leading-[36px] md:text-[38px] md:leading-[48px] text-center">
+        <h1 className="text-white-85 font-onest font-semibold text-[28px] leading-[36px] md:text-[38px] md:leading-[48px] text-center">
           What do you want to create?
         </h1>
-        <p className="mt-4 mb-10 text-center text-sm leading-[20px] text-white-50 font-onest">
+        <p className="mt-3 mb-10 text-center text-sm leading-[20px] text-white-50 font-onest">
           AI builds the design, motion, and experience from a simple prompt.
         </p>
 

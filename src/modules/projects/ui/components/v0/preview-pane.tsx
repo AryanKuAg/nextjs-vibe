@@ -230,7 +230,7 @@ export function PreviewPane({
   if (!hasBuild) {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center">
-        <p className="text-sm text-muted-foreground">Your site will be built here</p>
+        <p className="text-sm text-white-50">Your website will preview here</p>
       </div>
     );
   }

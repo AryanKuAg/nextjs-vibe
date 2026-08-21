@@ -9,6 +9,12 @@ export type ComposerModel = {
   label: string;
 };
 
+const PLACEMENT = {
+  down: "top-9",
+  up: "bottom-9",
+  "up-on-desktop": "top-9 md:top-auto md:bottom-9",
+} as const;
+
 export const COMPOSER_MODELS: readonly ComposerModel[] = [
   { value: "grok-4.6", label: "Grok 4.6" },
   { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
@@ -18,19 +24,22 @@ export const COMPOSER_MODELS: readonly ComposerModel[] = [
 /**
  * The model name in the composer toolbar, and the short list behind it.
  *
- * Opens upward on desktop: there the composer is pinned to the bottom of the
- * landing page's left panel, so a menu dropping down would open off-screen.
- * On mobile the composer sits mid-page with the templates below it, so the
- * menu opens downward instead.
+ * Where the menu opens follows where the composer sits. The dashboard's is
+ * mid-page, so the menu drops down. The builder's is pinned to the bottom of
+ * the conversation column at every width, so it opens up. The landing page is
+ * the split case: pinned to the bottom of the left panel on desktop, mid-page
+ * above the templates on mobile.
  */
 export function ComposerModelMenu({
   disabled = false,
   onChange,
+  menuPlacement = "down",
   options = COMPOSER_MODELS,
   value,
 }: {
   disabled?: boolean;
   onChange: (value: string) => void;
+  menuPlacement?: "down" | "up" | "up-on-desktop";
   options?: readonly ComposerModel[];
   value: string;
 }) {
@@ -80,7 +89,7 @@ export function ComposerModelMenu({
         {open && (
           <motion.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="absolute top-9 md:top-auto md:bottom-9 left-0 z-50 flex w-[180px] flex-col gap-2 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl"
+            className={`absolute left-0 z-50 flex w-[180px] flex-col gap-2 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl ${PLACEMENT[menuPlacement]}`}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             initial={{ opacity: 0, y: 4, scale: 0.97 }}
             role="menu"

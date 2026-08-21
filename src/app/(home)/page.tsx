@@ -4,9 +4,12 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { SignedIn, SignedOut, useSignIn, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { useTRPC } from "@/trpc/client";
 import { TemplatesModal } from "@/components/templates-modal";
 import { useTemplateRemix } from "@/hooks/use-template-remix";
 import { useCheckoutReturn } from "@/hooks/use-checkout-return";
@@ -22,6 +25,10 @@ const SITES = TEMPLATE_REGISTRY.map((t) => ({
   imgSrc: t.imgSrc,
   isTall: t.isTall,
 }));
+
+/** Templates shown inline on the dashboard — three full rows. The rest are
+ *  reachable through the See more modal, which gets the whole registry. */
+const DASHBOARD_TEMPLATE_COUNT = 9;
 
 /**
  * Tall/short rhythm for the landing page's right-panel grid, one row of four
@@ -125,51 +132,98 @@ const SitePreviewCard = ({
   );
 };
 
+/* ─── Upgrade pill ───
+   Sits beside the avatar in the dashboard header. Hidden on paid plans, whose
+   affordance is the credits bar inside the account menu instead. */
+const UpgradeButton = () => {
+  const trpc = useTRPC();
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+
+  // Nothing until the plan is known, so paid users never see the pill flash.
+  if (usage === undefined) return null;
+  if (usage?.plan && usage.plan !== "free") return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setIsPricingModalOpen(true)}
+        className="h-[28px] flex items-center gap-[6px] rounded-[8px] border border-white-12 bg-white-8 pl-[8px] pr-[10px] font-onest text-[13px] font-medium leading-[20px] text-white hover:bg-white-12 transition-colors"
+      >
+        <i className="ri-vip-diamond-fill text-[13px] text-white-85" />
+        <span className="[text-box:trim-both_cap_alphabetic]">Upgrade</span>
+      </button>
+      <CustomOutOfCreditsModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+      />
+    </>
+  );
+};
+
+/* ─── Dashboard grid backdrop ───
+   The dashed rule under the header and the pair of dashed verticals bracketing
+   the content column, both from the design. Decoration only. */
+const DashboardGrid = () => (
+  <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div className="absolute inset-x-0 top-[104px] border-t border-dashed border-white/[0.07]" />
+    <div className="absolute top-[104px] bottom-0 left-1/2 -ml-[520px] w-[1040px] border-x border-dashed border-white/[0.07]" />
+  </div>
+);
+
 /* ─── Logged In Dashboard ─── */
 const LoggedInDashboard = () => {
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
   const { remix, isPending: isRemixPending } = useTemplateRemix();
   useCheckoutReturn();
   return (
-    // overflow-x-clip: the form's grid backdrop is 100vw wide, which is a hair
-    // wider than the content box wherever a classic scrollbar is present.
-    <main className="min-h-screen bg-bg font-sans flex flex-col overflow-x-clip">
-      {/* Top Navigation */}
-      <header className="flex items-center justify-between p-3 md:px-3">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Framerate" width={24} height={24} />
+    // overflow-x-clip: the grid backdrop is wider than the content box wherever
+    // a classic scrollbar is present.
+    <main className="relative min-h-screen bg-bg font-sans flex flex-col overflow-x-clip">
+      <DashboardGrid />
 
+      {/* Top Navigation */}
+      <header className="relative z-10 flex items-center justify-between p-3">
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Framerate" width={32} height={32} />
         </div>
-        <UserControl />
+        <div className="flex items-center gap-3">
+          <UpgradeButton />
+          <UserControl />
+        </div>
       </header>
 
       {/* Main Content (Centered) */}
-      <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
-        <h1 className="text-white font-medium text-4xl md:text-5xl text-center tracking-tight">
-          Turn ideas into 3D websites
+      <div className="relative z-10 flex-1 flex flex-col items-center mt-12 md:mt-20 px-4 w-full">
+        <h1 className="text-white font-onest font-semibold text-[28px] leading-[36px] md:text-[38px] md:leading-[48px] text-center">
+          What do you want to create?
         </h1>
-        <p className="mt-4 mb-10 text-center text-sm text-white-50">
+        <p className="mt-4 mb-10 text-center text-sm leading-[20px] text-white-50 font-onest">
           AI builds the design, motion, and experience from a simple prompt.
         </p>
 
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-[680px]">
           <ProjectForm showModelSelector />
         </div>
 
-        {/* Templates Section */}
-        <div className="w-full max-w-[960px] mt-30 mb-12">
+        {/* Templates Section — 1008 wide, 24px padding and gap, white 4% on
+            both the fill and the border, per the design. */}
+        <div className="w-full max-w-[1008px] mt-[100px] mb-12 rounded-[24px] border border-white-4 bg-white-4 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-white/80 text-sm font-medium">Templates</h2>
+            <h2 className="text-white/80 text-sm font-onest font-medium">Templates</h2>
             <button
               onClick={() => setIsTemplatesModalOpen(true)}
-              className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
+              className="px-2 rounded-[8px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] font-onest hover:bg-white-8 disabled:opacity-50 h-[28px] font-medium leading-[20px]"
             >
               See more
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {SITES.map((site, idx) => (
+          {/* 960px of inner width: three 304px cards and two 24px gutters.
+              Three rows here; the rest of the registry lives behind See more. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+            {SITES.slice(0, DASHBOARD_TEMPLATE_COUNT).map((site, idx) => (
               <SitePreviewCard
                 key={`${site.title}-${idx}`}
                 title={site.title}

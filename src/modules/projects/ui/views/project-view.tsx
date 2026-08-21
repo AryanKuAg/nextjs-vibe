@@ -119,18 +119,14 @@ export const ProjectView = ({ projectId }: Props) => {
         projectId={projectId}
         publishedUrl={workspace.publishedUrl}
         title={project.name}
-        toolbar={
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-            <ErrorBoundary fallback={<p className="text-xs text-destructive">Header error</p>}>
-              <Suspense fallback={null}>
-                <ProjectHeader projectId={projectId} />
-              </Suspense>
-            </ErrorBoundary>
-            <div className="ml-auto">
-              <UserControl />
-            </div>
-          </div>
+        titleSlot={
+          <ErrorBoundary fallback={<p className="text-xs text-destructive">Header error</p>}>
+            <Suspense fallback={null}>
+              <ProjectHeader projectId={projectId} />
+            </Suspense>
+          </ErrorBoundary>
         }
+        accountSlot={<UserControl />}
       />
     </div>
   );

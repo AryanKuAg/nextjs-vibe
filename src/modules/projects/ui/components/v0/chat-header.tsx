@@ -2,59 +2,64 @@
 
 import { useDownloadChatFiles } from "@v0-sdk/react/swr";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CodeIcon,
   DownloadIcon,
-  ExternalIcon,
   EyeIcon,
   FullscreenCloseIcon,
   FullscreenIcon,
   RefreshIcon,
-  SettingsIcon,
-  PublishIcon,
   SpinnerIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 
 import { withChatToken } from "./chat-token";
-import type { PreviewNavigation } from "./preview-pane";
 
 export type ChatView = "preview" | "code";
 
+/** The three plain actions and both halves of the view toggle share one shape. */
+const ICON_BUTTON =
+  "flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-white-4 text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50";
+
+/**
+ * The builder's single top bar.
+ *
+ * Left of the pane divider it carries the project's identity (logo, name);
+ * right of it, the controls for whatever the preview is showing, then Publish
+ * and the account menu. It was two stacked bars until the design collapsed
+ * them into one, which is why `titleSlot` and `accountSlot` are passed in
+ * rather than rendered here — both need data this component does not have.
+ */
 export function ChatHeader({
   accessToken,
   chatId,
   projectId,
   publishedUrl,
   title,
+  titleSlot,
+  accountSlot,
   view,
   onViewChange,
   onReloadPreview,
   isFullscreen,
   onToggleFullscreen,
-  navigation,
 }: {
+  /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
   accessToken: string;
   chatId: string;
   projectId: string;
   /** Where this project was last published, if it has been. */
   publishedUrl?: string | null;
-  /** Live location of the framed site; null before it has loaded. */
-  navigation?: PreviewNavigation | null;
+  /** Used to name the downloaded zip. */
   title: string;
+  /** Logo and the editable project name, in the column-width left segment. */
+  titleSlot?: ReactNode;
+  /** The avatar menu, at the far right. */
+  accountSlot?: ReactNode;
   view: ChatView;
   onViewChange: (view: ChatView) => void;
   onReloadPreview: () => void;
@@ -88,9 +93,6 @@ export function ChatHeader({
   );
 
   const isDownloading = downloadChat.isMutating;
-  const previewUrl =
-    navigation?.externalUrl ??
-    withChatToken(`/api/v0-preview/${encodeURIComponent(chatId)}`, accessToken);
 
   const download = async () => {
     setError(null);
@@ -111,163 +113,98 @@ export function ChatHeader({
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center border-b border-border">
+    <header className="flex h-[52px] shrink-0 items-center border-b border-border">
       <div
         className={cn(
-          "flex w-full shrink-0 items-center gap-2 px-3 md:w-80 md:max-w-[42%]",
+          "flex w-full shrink-0 items-center gap-3 px-3 md:w-96 md:max-w-[42%]",
           isFullscreen && "md:w-auto md:max-w-none",
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
+        {titleSlot}
       </div>
 
-      <div className="hidden h-full min-w-0 flex-1 items-center justify-between gap-3 px-3 md:flex">
-        <div className="flex shrink-0 items-center rounded-md bg-muted p-0.5">
-          <Button
+      <div className="hidden h-full min-w-0 flex-1 items-center gap-2.5 px-3 md:flex">
+        <div className="flex shrink-0 items-center gap-0.5 rounded-[8px] bg-white-4 p-0.5">
+          <button
             aria-label="Preview"
             aria-pressed={view === "preview"}
-            className={cn("size-6 rounded-sm p-0", view === "preview" && "bg-background shadow-xs")}
+            className={cn(
+              "flex size-6 items-center justify-center rounded-[6px] transition-colors",
+              view === "preview" ? "bg-white-12 text-white" : "text-white-50 hover:text-white-85",
+            )}
             onClick={() => onViewChange("preview")}
-            size="icon-xs"
-            variant="ghost"
+            type="button"
           >
             <EyeIcon className="size-3.5" />
-          </Button>
-          <Button
+          </button>
+          <button
             aria-label="Code"
             aria-pressed={view === "code"}
-            className={cn("size-6 rounded-sm p-0", view === "code" && "bg-background shadow-xs")}
+            className={cn(
+              "flex size-6 items-center justify-center rounded-[6px] transition-colors",
+              view === "code" ? "bg-white-12 text-white" : "text-white-50 hover:text-white-85",
+            )}
             onClick={() => onViewChange("code")}
-            size="icon-xs"
-            variant="ghost"
+            type="button"
           >
             <CodeIcon className="size-3.5" />
-          </Button>
+          </button>
         </div>
 
-        <div className="hidden h-7 min-w-[150px] max-w-[420px] flex-1 items-center rounded-md border border-border px-0.5 lg:flex">
-          <Button
-            aria-label="Back"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            disabled={!navigation?.canGoBack}
-            onClick={() => navigation?.back()}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <ChevronLeftIcon className="size-3.5" />
-          </Button>
-          <Button
-            aria-label="Forward"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            disabled={!navigation?.canGoForward}
-            onClick={() => navigation?.forward()}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <ChevronRightIcon className="size-3.5" />
-          </Button>
-          <span
-            className="min-w-0 flex-1 truncate px-2 text-xs text-muted-foreground"
-            title={navigation?.path ?? "/"}
-          >
-            {navigation?.path ?? "/"}
-          </span>
-          <Button
-            aria-label="Refresh preview"
-            className="size-6 p-0 text-muted-foreground hover:text-foreground"
-            onClick={onReloadPreview}
-            size="icon-xs"
-            title="Refresh preview"
-            variant="ghost"
-          >
-            <RefreshIcon className="size-3.5" />
-          </Button>
-          <Button
-            aria-label="Open preview in new tab"
-            asChild
-            className="size-6 p-0 text-muted-foreground hover:text-foreground"
-            size="icon-xs"
-            title="Open preview in new tab"
-            variant="ghost"
-          >
-            <a href={previewUrl} rel="noreferrer" target="_blank">
-              <ExternalIcon className="size-3.5" />
-            </a>
-          </Button>
-        </div>
+        <button
+          aria-label="Refresh preview"
+          className={ICON_BUTTON}
+          onClick={onReloadPreview}
+          title="Refresh preview"
+          type="button"
+        >
+          <RefreshIcon className="size-3.5" />
+        </button>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {publishedUrl && !publish.isPending ? (
-            <Button
-              asChild
-              className="h-7 gap-1.5 rounded-md px-2 text-xs"
-              size="sm"
-              variant="ghost"
-            >
-              <a href={publishedUrl} rel="noreferrer" target="_blank">
-                <ExternalIcon className="size-3.5" />
-                View site
-              </a>
-            </Button>
-          ) : null}
+        <button
+          aria-label="Download"
+          className={ICON_BUTTON}
+          disabled={isDownloading}
+          onClick={() => void download()}
+          // Download is the only action here that can fail visibly; the message
+          // rides on the control that produced it.
+          title={error ?? (isDownloading ? "Downloading" : "Download")}
+          type="button"
+        >
+          {isDownloading ? (
+            <SpinnerIcon className="size-3.5 animate-spin" />
+          ) : (
+            <DownloadIcon className="size-3.5" />
+          )}
+        </button>
 
-          <Button
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            aria-pressed={isFullscreen}
-            className="size-7"
-            onClick={onToggleFullscreen}
-            size="icon-sm"
-            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-            variant="ghost"
-          >
-            {isFullscreen ? (
-              <FullscreenCloseIcon className="size-3.5" />
-            ) : (
-              <FullscreenIcon className="size-3.5" />
-            )}
-          </Button>
+        <button
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          aria-pressed={isFullscreen}
+          className={ICON_BUTTON}
+          onClick={onToggleFullscreen}
+          title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+          type="button"
+        >
+          {isFullscreen ? (
+            <FullscreenCloseIcon className="size-3.5" />
+          ) : (
+            <FullscreenIcon className="size-3.5" />
+          )}
+        </button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button aria-label="Project menu" className="size-7" size="icon-sm" variant="ghost">
-                <SettingsIcon className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={isDownloading}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  void download();
-                }}
-                // Download was the only action left that can fail visibly; the
-                // Publish button used to carry this message.
-                title={error ?? undefined}
-              >
-                {isDownloading ? (
-                  <SpinnerIcon className="size-4 animate-spin" />
-                ) : (
-                  <DownloadIcon className="size-4" />
-                )}
-                {isDownloading ? "Downloading" : "Download"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            className="h-7 min-w-[76px] gap-1.5 rounded-md px-2 text-xs"
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <button
+            className="flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-white-12 px-[14px] text-sm leading-[20px] font-medium text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50"
             disabled={publish.isPending}
             onClick={() => publish.mutate({ projectId })}
-            size="sm"
             title="Build this site and put it online"
+            type="button"
           >
-            {publish.isPending ? (
-              <SpinnerIcon className="size-3.5 animate-spin" />
-            ) : (
-              <PublishIcon className="size-3.5" />
-            )}
+            {publish.isPending ? <SpinnerIcon className="size-3.5 animate-spin" /> : null}
             {publish.isPending ? "Publishing" : publishedUrl ? "Republish" : "Publish"}
-          </Button>
+          </button>
+          {accountSlot}
         </div>
       </div>
     </header>

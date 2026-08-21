@@ -387,13 +387,11 @@ export function ChatConversation({
           </div>
         ) : null}
         <PromptBox
-          compact
           isStopping={isStopping}
           isStreaming={isStreaming}
           isSubmitting={isSubmitting || restoringMessageId !== null}
           onStop={stopMessage}
           onSubmit={submitMessage}
-          placeholder="Ask to make changes..."
         />
         {error ? <p className="mt-1.5 px-1 text-xs text-destructive">{error}</p> : null}
       </div>

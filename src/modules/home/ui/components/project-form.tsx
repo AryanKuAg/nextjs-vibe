@@ -26,6 +26,7 @@ import { ComposerChipMenu } from "./composer-chip-menu";
 import { COMPOSER_MODELS, ComposerModelMenu } from "./composer-model-menu";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
+import { cn } from "@/lib/utils";
 
 
 const formSchema = z.object({
@@ -322,7 +323,17 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="rounded-[12px] p-3 flex flex-col gap-2.5 relative transition-all w-full max-w-[640px] min-h-[84px] bg-white-12  shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
+          className={cn(
+            "rounded-[12px] p-3 flex flex-col relative transition-all w-full",
+            isLandingPage
+              // Signed-out landing composer — pinned to the bottom of the left
+              // panel and deliberately left as it was.
+              ? "gap-2.5 max-w-[640px] min-h-[84px] bg-white-12 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
+              // Dashboard composer, to the design spec: 680 wide, 12px padding
+              // and gap, white 8% fill, a 1px fully-transparent top edge, and a
+              // 106px resting height (12 + 40 textarea + 12 + 28 toolbar + 12).
+              : "gap-3 max-w-[680px] min-h-[106px] bg-white-8 border-t border-white/0 shadow-[0_25px_60px_-30px_rgba(0,0,0,0.35)]",
+          )}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -353,7 +364,9 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 {...field}
                 autoFocus={!isLandingPage}
                 disabled={isPending}
-                minRows={1}
+                // The dashboard composer rests two lines tall so the box hugs
+                // to the 106px in the design; the landing one stays single-line.
+                minRows={isLandingPage ? 1 : 2}
                 maxRows={8}
                 className="block w-full bg-transparent text-sm leading-[20px] font-onest font-medium text-white-85 outline-none resize-none placeholder:text-white-50"
                 placeholder="Describe your website"
@@ -426,7 +439,12 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
             </button>
 
             {showModelSelector && (
-              <ComposerModelMenu disabled={isPending} onChange={setModel} value={model} />
+              <ComposerModelMenu
+                disabled={isPending}
+                onChange={setModel}
+                menuPlacement={isLandingPage ? "up-on-desktop" : "down"}
+                value={model}
+              />
             )}
 
             {showModelSelector && mode === "CINEMATIC" && (

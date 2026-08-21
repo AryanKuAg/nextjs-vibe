@@ -16,7 +16,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 
 import {
-  SITE_MODES,
   VIDEO_MOTIONS,
   VIDEO_SOURCES,
   type SiteMode,
@@ -24,6 +23,7 @@ import {
   type VideoSource,
 } from "@/lib/v0-site-prompt";
 import { ComposerChipMenu } from "./composer-chip-menu";
+import { COMPOSER_MODELS, ComposerModelMenu } from "./composer-model-menu";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
 
@@ -102,7 +102,8 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [mode, setMode] = useState<SiteMode>("CLASSIC");
+  const [mode] = useState<SiteMode>("CLASSIC");
+  const [model, setModel] = useState<string>(COMPOSER_MODELS[0].value);
   const [motion, setMotion] = useState<VideoMotion>("SCROLL");
   const [videoSource, setVideoSource] = useState<VideoSource>("AUTO");
   const [videoPrompt, setVideoPrompt] = useState("");
@@ -245,8 +246,8 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
           if (bytes > SCRUB_MEMORY_BUDGET_BYTES) {
             toast.error(
               `That clip is ${meta.width}x${meta.height} and ${Math.round(meta.duration)}s, which needs about ` +
-                `${(bytes / 1024 ** 3).toFixed(1)}GB of memory to scrub — enough to crash the browser. ` +
-                "Use a shorter or lower-resolution video (1080p or below), or switch to Looping, which has no such limit.",
+              `${(bytes / 1024 ** 3).toFixed(1)}GB of memory to scrub — enough to crash the browser. ` +
+              "Use a shorter or lower-resolution video (1080p or below), or switch to Looping, which has no such limit.",
               { duration: 15000 },
             );
             return;
@@ -285,11 +286,11 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
         mode,
         ...(mode === "CINEMATIC"
           ? {
-              motion,
-              videoSource,
-              videoPrompt: videoSource === "PROMPT" ? videoPrompt.trim() : undefined,
-              videoUrl: videoSource === "URL" ? videoUrl.trim() : undefined,
-            }
+            motion,
+            videoSource,
+            videoPrompt: videoSource === "PROMPT" ? videoPrompt.trim() : undefined,
+            videoUrl: videoSource === "URL" ? videoUrl.trim() : undefined,
+          }
           : {}),
       });
     } catch {
@@ -321,7 +322,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] ${isLandingPage ? "bg-transparent border-white-8  border focus-within:border-purple" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
+          className="rounded-[12px] p-3 flex flex-col gap-2.5 relative transition-all w-full max-w-[640px] min-h-[84px] bg-white-12  shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -353,9 +354,9 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 autoFocus={!isLandingPage}
                 disabled={isPending}
                 minRows={1}
-                maxRows={12}
-                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[48px] placeholder:text-white-50 "
-                placeholder="Describe the website you want..."
+                maxRows={8}
+                className="block w-full bg-transparent text-sm leading-[20px] font-onest font-medium text-white-85 outline-none resize-none placeholder:text-white-50"
+                placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -371,7 +372,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
               field. Dismissing it returns the source to Auto rather than
               leaving a chip that promises input the build will never receive. */}
           {mode === "CINEMATIC" && videoSource !== "AUTO" && (
-            <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-white-8 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-[10px] border border-white-8 px-3 py-2">
               <i className={`${sourceOption.icon} shrink-0 text-base text-white-50`} />
               <input
                 className="min-w-0 flex-1 bg-transparent text-sm leading-[20px] text-white-85 outline-none placeholder:text-white-50"
@@ -404,7 +405,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
           )}
 
           {/* Bottom toolbar */}
-          <div className="flex items-center mt-2">
+          <div className="flex items-center">
             <input
               ref={fileInputRef}
               type="file"
@@ -418,42 +419,14 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={isPending}
-              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px]  text-white-85 hover:bg-white-4 cursor-pointer disabled:opacity-50 text-base"
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-full text-white-85 hover:bg-white-8 transition-colors cursor-pointer disabled:opacity-50 text-base"
               title="Attach image"
             >
-              <i className="ri-add-line text-base" />
+              <i className="ri-add-line text-base [text-box:trim-both_cap_alphabetic]" />
             </button>
 
             {showModelSelector && (
-              // Not a model picker — the model is fixed. This is the shape of
-              // the build: an ordinary site, or a motion-led one. It is the only
-              // decision the prompt box asks for, so it is two visible options
-              // rather than something hidden behind a dropdown.
-              <div
-                className="flex items-center gap-0.5 rounded-full bg-white-4 p-0.5"
-                role="radiogroup"
-                aria-label="Build style"
-              >
-                {SITE_MODES.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={mode === option.value}
-                    disabled={isPending}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setMode(option.value)}
-                    className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-sm leading-[20px] transition-colors disabled:opacity-50 ${
-                      mode === option.value
-                        ? "bg-white-8 text-white"
-                        : "text-white-50 hover:text-white-85"
-                    }`}
-                  >
-                    <i className={`${option.icon} text-sm`} />
-                    <span className="whitespace-nowrap">{option.label}</span>
-                  </button>
-                ))}
-              </div>
+              <ComposerModelMenu disabled={isPending} onChange={setModel} value={model} />
             )}
 
             {showModelSelector && mode === "CINEMATIC" && (
@@ -495,14 +468,14 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 <button
                   type="submit"
                   disabled
-                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white opacity-50"
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white-50 text-bg"
                 >
                   <i className="ri-arrow-up-line text-base" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white hover:bg-purple/80 active:scale-95 transition-transform duration-200"
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-bg hover:bg-white-85 active:scale-95 transition-transform duration-200"
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />

@@ -50,7 +50,7 @@ const isPublicRoute = createRouteMatcher([
  * prefix — Next reserves it, so middleware is the only place the request can
  * be caught.
  */
-const STATIC_FILE = /\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4)$/i;
+const STATIC_FILE = /\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4)$/i;
 
 function isAppAsset(pathname: string) {
   return pathname.startsWith("/_next/") || STATIC_FILE.test(pathname);

@@ -18,8 +18,10 @@ export const COMPOSER_MODELS: readonly ComposerModel[] = [
 /**
  * The model name in the composer toolbar, and the short list behind it.
  *
- * Opens upward: on the landing page the composer is pinned to the bottom of the
- * left panel, so a menu dropping down would open off-screen.
+ * Opens upward on desktop: there the composer is pinned to the bottom of the
+ * landing page's left panel, so a menu dropping down would open off-screen.
+ * On mobile the composer sits mid-page with the templates below it, so the
+ * menu opens downward instead.
  */
 export function ComposerModelMenu({
   disabled = false,
@@ -78,7 +80,7 @@ export function ComposerModelMenu({
         {open && (
           <motion.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="absolute bottom-9 left-0 z-50 flex w-[180px] flex-col gap-2 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl"
+            className="absolute top-9 md:top-auto md:bottom-9 left-0 z-50 flex w-[180px] flex-col gap-2 rounded-[12px] border border-white-4 bg-[#1e1e1e] p-1 shadow-xl"
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             initial={{ opacity: 0, y: 4, scale: 0.97 }}
             role="menu"

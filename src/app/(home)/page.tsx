@@ -262,7 +262,7 @@ const LoggedOutView = () => {
           </div>
 
           {/* Social proof pill */}
-          <div className="inline-flex items-center gap-1 border border-white-12 rounded-full h-[22px] pl-0.5 pr-2 mt-8 md:mt-20 w-fit">
+          <div className="inline-flex items-center gap-1 border border-white-16 rounded-full h-[22px] pl-0.5 pr-2 mt-8 md:mt-20 w-fit">
             {/* Overlapping avatars */}
             <div className="flex items-center">
               <div className="w-4 h-4 shrink-0 rounded-full overflow-hidden border-1 border-white relative z-30">
@@ -275,7 +275,7 @@ const LoggedOutView = () => {
                 <Image src="/male_2.avif" alt="User" width={16} height={16} className="object-cover w-full h-full" />
               </div>
             </div>
-            <span className="text-white text-[11px] leading-none font-onest font-medium whitespace-nowrap">Trusted by 20k+ users</span>
+            <span className="text-white text-sm leading-none font-onest font-medium whitespace-nowrap">Trusted by 20k+ users</span>
           </div>
 
           {/* Headline */}

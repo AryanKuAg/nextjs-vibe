@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
 
     const { plan, billing, returnUrl } = await req.json();
 
+    // Set in the browser by the DataFast script in the root layout. Forwarding it
+    // as checkout metadata is what lets DataFast tie the resulting payment back to
+    // the marketing channel that brought the visitor in. Absent for visitors who
+    // block the script or arrive without it, so it stays optional.
+    const datafastVisitorId = req.cookies.get("datafast_visitor_id")?.value;
+
     const planToProduct: Record<string, string | undefined> = billing === "yearly"
       ? {
         plus: process.env.DODO_PRODUCT_PLUS_YEARLY,
@@ -83,7 +89,8 @@ export async function POST(req: NextRequest) {
       metadata: {
         userId,
         plan,
-        billing: billing === "yearly" ? "yearly" : "monthly"
+        billing: billing === "yearly" ? "yearly" : "monthly",
+        ...(datafastVisitorId && { datafast_visitor_id: datafastVisitorId }),
       }
     });
 

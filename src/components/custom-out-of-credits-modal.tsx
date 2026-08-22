@@ -79,13 +79,7 @@ const ModalPricingCard = ({
   const handleCheckout = async () => {
     if (!isSignedIn) {
       if (!isLoaded) return;
-      setLoading(true);
-      try {
-        window.google?.accounts.id.cancel();
-      } catch {
-        // Ignore
-      }
-      await signIn.authenticateWithRedirect({
+      setLoading(true);      await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
         redirectUrlComplete: `${window.location.pathname}#pricing`,

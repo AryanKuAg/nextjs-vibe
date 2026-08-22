@@ -35,12 +35,6 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
     if (!isLoaded || isPending) return;
     setIsPending(true);
 
-    try {
-      window.google?.accounts.id.cancel();
-    } catch {
-      // ignore
-    }
-
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",

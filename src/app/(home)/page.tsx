@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { SignedIn, SignedOut, useSignIn, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -40,6 +41,38 @@ const RIGHT_PANEL_TALL_PATTERN: readonly boolean[][] = [
   [true, false, false, true],
   [false, true, true, false],
 ];
+
+/**
+ * One slot in the landing page's right-panel grid.
+ *
+ * The slots arrive one at a time rather than all at once: a dozen empty boxes
+ * appearing together read as a layout that failed to load, whereas a cascade
+ * reads as content on its way in. `order` is the tile's position in that
+ * cascade, not its position in a column — the desktop grid is fed round-robin,
+ * so ordering by column would run three separate animations side by side.
+ */
+const PLACEHOLDER_STAGGER_SECONDS = 0.07;
+
+const PlaceholderTile = ({ height, order }: { height: number; order: number }) => {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      aria-hidden
+      className="w-full rounded-[12px] border border-white-12"
+      style={{ height }}
+      // `false` rather than a hidden state: with reduced motion the tile should
+      // start where it ends, not fade from it.
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        delay: reduceMotion ? 0 : order * PLACEHOLDER_STAGGER_SECONDS,
+        duration: 0.5,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    />
+  );
+};
 
 /* ─── Site Preview Card ─── */
 interface SitePreviewCardProps {
@@ -259,13 +292,6 @@ const LoggedOutView = () => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
 
-    try {
-
-      window.google?.accounts.id.cancel();
-    } catch {
-      // Ignore cancel errors
-    }
-
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -385,11 +411,10 @@ const LoggedOutView = () => {
         {/* Mobile: the templates as one vertical column, in source order. */}
         <div className="flex md:hidden flex-col gap-4">
           {SITES.slice(0, 12).map((site, idx) => (
-            <div
+            <PlaceholderTile
               key={site.title}
-              aria-hidden
-              className="w-full rounded-[12px] border border-white-12"
-              style={{ height: idx % 2 === 0 ? 238 : 189 }}
+              height={idx % 2 === 0 ? 238 : 189}
+              order={idx}
             />
           ))}
         </div>
@@ -408,11 +433,10 @@ const LoggedOutView = () => {
                 .filter((_, idx) => idx % 3 === col)
                 .slice(0, 4)
                 .map((site, slotIdx) => (
-                  <div
+                  <PlaceholderTile
                     key={`${site.title}-${col}-${slotIdx}`}
-                    aria-hidden
-                    className="w-full rounded-[12px] border border-white-12"
-                    style={{ height: RIGHT_PANEL_TALL_PATTERN[col][slotIdx] ? 238 : 189 }}
+                    height={RIGHT_PANEL_TALL_PATTERN[col][slotIdx] ? 238 : 189}
+                    order={slotIdx * 3 + col}
                   />
                 ))}
             </div>

@@ -155,7 +155,7 @@ export async function startProjectBuild(input: {
   if (created.error !== undefined || !created.data?.chatId) {
     // v0's own wording is far more useful than anything we could invent here —
     // "You have reached your daily message limit", for instance.
-    throw v0Failure(created, "v0 did not return a chat");
+    throw v0Failure(created, "The build service did not return a chat.");
   }
 
   await prisma.project.update({

@@ -96,7 +96,12 @@ export function ConversationView({
           {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
             <p className="shimmer-text py-0.5 text-xs leading-[16px] font-medium">Working on it…</p>
           ) : null}
-          <div ref={endRef} />
+          {/* The scroll anchor is also the bottom gap. The fade below is h-60 of
+              solid --bg at its lower end, so a zero-height anchor would park the
+              last message underneath it and make the newest text unreadable.
+              Matching the fade's height lets "end" alignment land that message
+              clear of the gradient instead. */}
+          <div aria-hidden className="h-60 shrink-0" ref={endRef} />
         </div>
       </div>
       <div

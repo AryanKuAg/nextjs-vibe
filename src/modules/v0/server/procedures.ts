@@ -112,7 +112,7 @@ export const v0Router = createTRPCRouter({
       ]);
 
       if (chat.error !== undefined) {
-        const failure = v0Failure(chat, "Could not load this build from v0.");
+        const failure = v0Failure(chat, "Could not load this build from the build service.");
         console.error("[v0] workspace load failed:", failure);
         throw new TRPCError({
           code: isCapacityError(failure) ? "TOO_MANY_REQUESTS" : "INTERNAL_SERVER_ERROR",

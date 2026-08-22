@@ -164,11 +164,13 @@ const UpgradeButton = () => {
 
 /* ─── Dashboard grid backdrop ───
    The dashed rule under the header and the pair of dashed verticals bracketing
-   the content column, both from the design. Decoration only. */
+   the content column, both from the design. Decoration only. The verticals run
+   the full height and cross the rule — in the design they meet the top edge
+   rather than hanging off the rule, so only the horizontal is offset by 104px. */
 const DashboardGrid = () => (
   <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
     <div className="absolute inset-x-0 top-[104px] border-t border-dashed border-white/[0.07]" />
-    <div className="absolute top-[104px] bottom-0 left-1/2 -ml-[520px] w-[1040px] border-x border-dashed border-white/[0.07]" />
+    <div className="absolute inset-y-0 left-1/2 -ml-[520px] w-[1040px] border-x border-dashed border-white/[0.07]" />
   </div>
 );
 

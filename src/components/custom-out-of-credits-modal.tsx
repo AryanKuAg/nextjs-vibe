@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth, useSignIn } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -185,8 +186,41 @@ export const CustomOutOfCreditsModal = ({
   onClose,
 }: CustomOutOfCreditsModalProps) => {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
+  // Every trigger for this modal sits inside some positioned, z-indexed shell
+  // (the dashboard header, the builder panels). A fixed overlay is still bound
+  // by that ancestor's stacking context, so sibling content painted later wins
+  // and the modal ends up underneath it. Portalling to the body escapes them all.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
+  // The dialog owns the viewport while it is open. Letting the page keep
+  // scrolling underneath detaches the backdrop from the content it is dimming
+  // and scrolls the trigger out from under the user. The padding makes up for
+  // the scrollbar the lock removes so the page behind does not jump sideways
+  // on open (a no-op wherever scrollbars are overlays, as on macOS).
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      const basePadding = parseFloat(window.getComputedStyle(body).paddingRight) || 0;
+      body.style.paddingRight = `${basePadding + scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, [isOpen]);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -204,7 +238,7 @@ export const CustomOutOfCreditsModal = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="bg-gray-bg rounded-[16px] w-full max-w-[948px] p-4 relative overflow-y-auto max-h-[90vh] font-sans bg-grey-bg! border-[0.5px] border-white-12"
+            className="bg-grey-bg rounded-[16px] w-full max-w-[948px] p-4 relative overflow-y-auto max-h-[90vh] font-sans border-[0.5px] border-white-12"
             style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.25)" }}
           >
             {/* Header */}
@@ -258,6 +292,7 @@ export const CustomOutOfCreditsModal = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

@@ -2,6 +2,7 @@ import "server-only";
 
 import { Sandbox } from "@e2b/code-interpreter";
 
+import { NEUTRAL_ICON_SVG } from "@/lib/debrand";
 import { contentTypeFor, r2PublicBase } from "@/lib/r2";
 import { uploadMediaAsset } from "@/lib/media-storage";
 import { v0 } from "@/lib/v0-client";
@@ -71,7 +72,7 @@ export async function publishSiteToR2(input: {
 async function sourceFiles(chatId: string) {
   const result = await v0.chats.getFiles({ chatId });
   if (result.error !== undefined) {
-    throw v0Failure(result, "Could not read this build's files from v0.");
+    throw v0Failure(result, "Could not read this build's files from the build service.");
   }
 
   // Text and binary alike. Filtering to utf8 dropped every image v0 had put in
@@ -184,7 +185,14 @@ async function collectExport(
     throw new PublishError("The build finished but produced no export directory.");
   }
 
-  const paths = listed.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  const paths = listed.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    // The icon files themselves never ship. The HTML pass below stops referring
+    // to them, but an uploaded object stays fetchable at its own URL, and
+    // `…/sites/<id>/icon.svg` serving the vendor's mark defeats the point.
+    .filter((path) => !isIconAsset(path));
 
   return Promise.all(
     paths.map(async (path) => {
@@ -194,10 +202,63 @@ async function collectExport(
 
       return {
         path,
-        body: path.endsWith(".html") ? anchorToSitePath(bytes, projectId) : bytes,
+        body: path.endsWith(".html") ? rewriteHtml(bytes, projectId) : bytes,
       };
     }),
   );
+}
+
+/**
+ * A published site must not advertise what built it.
+ *
+ * v0 scaffolds an `app/icon.svg` carrying its own logo and sets `generator` in
+ * the layout's metadata, so an untouched export ships a v0 favicon in the
+ * browser tab and a v0 `<meta name="generator">` in the source — both plainly
+ * visible to anyone the customer shows the site to.
+ *
+ * Sanitising the built HTML rather than the source is what makes this hold: v0
+ * is free to declare its icon through any of Next's several conventions — a
+ * file in `app/`, an `icons` entry in metadata, a hand-written `<link>` — and
+ * they all converge on link tags in the output. Rewriting there covers every
+ * route at once and cannot be sidestepped by v0 changing its scaffold.
+ */
+const ICON_LINK_TAG = /<link\b[^>]*\brel=(["'])[^"']*icon[^"']*\1[^>]*>/gi;
+const GENERATOR_META_TAG = /<meta\b[^>]*\bname=(["'])generator\1[^>]*>/gi;
+
+/**
+ * Next's icon file conventions, anchored to the export root — the only place
+ * they land. Deliberately not a suffix match: a site of its own may legitimately
+ * ship `assets/hero-icon.svg`, and `_next/` holds build output the page needs.
+ * Dropping either would break the customer's site to fix our branding problem.
+ */
+const ICON_ASSET = /^(?:favicon\.ico|(?:apple-)?icon\d*\.(?:ico|png|jpe?g|svg)|apple-touch-icon[^/]*\.png)$/i;
+
+function isIconAsset(path: string) {
+  return ICON_ASSET.test(path);
+}
+
+/**
+ * Inlined as a data URI so the icon needs no uploaded file and no basePath
+ * anchoring, which also means it cannot 404 the way a path-relative icon can.
+ */
+const NEUTRAL_ICON_LINK = `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(
+  NEUTRAL_ICON_SVG,
+)}"/>`;
+
+function rewriteHtml(html: Buffer, projectId: string): Buffer {
+  const anchored = anchorToSitePath(html, projectId).toString("utf8");
+
+  const stripped = anchored
+    .replace(ICON_LINK_TAG, "")
+    .replace(GENERATOR_META_TAG, "");
+
+  // A replacer function, not a string: the data URI is percent-encoded and a
+  // literal `$&` in it would otherwise be read as a backreference.
+  const iconed = stripped.includes("</head>")
+    ? stripped.replace(/<\/head>/i, () => `${NEUTRAL_ICON_LINK}</head>`)
+    : stripped;
+
+  return Buffer.from(iconed, "utf8");
 }
 
 /**

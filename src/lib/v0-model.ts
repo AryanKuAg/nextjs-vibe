@@ -8,8 +8,6 @@
  */
 export const V0_MODEL_ID = "v0-mini" as const;
 
-export const V0_MODEL_LABEL = "v0 Mini";
-
 export const V0_MODEL_CONFIGURATION = {
   modelId: V0_MODEL_ID,
   /** Generated imagery is billed on top of the message; we supply our own. */

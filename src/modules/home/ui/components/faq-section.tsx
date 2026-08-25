@@ -7,7 +7,7 @@ import { useState } from "react";
 const faqs_list = [
   {
     q: "How does Framerate work?",
-    a: "Framerate lets you turn a background image into a cinematic video, then uses that video's frames to create a smooth scrolling background on your website. As visitors scroll, the frames play forward, making the page feel like an interactive 3D experience.",
+    a: "Describe the website you want — and attach a reference image if you have one — and Framerate builds it for you. You can keep refining it in chat, edit the code directly, preview it live, and publish it when it looks right.",
   },
   {
     q: "Do I need any design or coding experience?",

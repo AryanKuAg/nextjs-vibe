@@ -38,17 +38,7 @@ const nextConfig: NextConfig = {
   // build run beside a dev server instead of requiring you to stop yours.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   output: "standalone", // Required for Docker/Cloud Run deployment
-  serverExternalPackages: ["fluent-ffmpeg", "ffmpeg-static", "inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
-  outputFileTracingIncludes: {
-    "/api/extract-frames": ["./node_modules/ffmpeg-static/**/*"],
-    // The code agent seeds every new sandbox from src/templates, reading it at
-    // runtime with fs via a path built from process.cwd(). Next cannot trace a
-    // dynamic read like that, so without this the standalone output ships without
-    // the scaffold: hydration silently writes nothing, the base image's App.tsx
-    // is left importing a ScrollFrames component that was never created, and the
-    // Vite build fails with "Could not resolve ./components/ScrollFrames".
-    "/api/inngest": ["./src/templates/**/*"],
-  },
+  serverExternalPackages: ["inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -95,20 +85,6 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
     ];
-  },
-
-  async rewrites() {
-    // Preview routing lives in middleware, in both modes. Rewrites here cannot
-    // claim `/_next/*` — Next reserves that prefix — and a preview's fonts and
-    // runtime-loaded chunks arrive under exactly that path.
-    return {
-      afterFiles: [
-        {
-          source: "/proxy-r2/:path*",
-          destination: "https://assets.framerate.space/:path*",
-        },
-      ],
-    };
   },
 
   async headers() {

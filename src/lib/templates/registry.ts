@@ -2,17 +2,11 @@
 // Template registry — the source of truth for the remixable gallery templates.
 //
 // A template is a real, hand-built site living in a PUBLIC GitHub repo. When a
-// user remixes one, the code agent downloads that repo into the E2B sandbox and
-// uses it as the starting code instead of the generic scaffold in src/templates/.
-//
-// The repo is fetched as a tarball over HTTPS (codeload) rather than cloned with
-// git: the E2B image (sandbox-templates/react/e2b.Dockerfile) installs curl but
-// NOT git, so `git clone` would fail inside the sandbox.
+// user remixes one, v0 imports that repo directly (chats.createFromRepo) and the
+// chat opens on it as the starting code.
 //
 // See ./README.md for the contract every template repo must satisfy.
 // ---------------------------------------------------------------------------
-
-export type TemplateMode = "FULL_PAGE" | "HERO_ONLY";
 
 export interface TemplateManifest {
   /** Stable slug. Persisted on Project.templateId — never rename in place. */
@@ -25,20 +19,6 @@ export interface TemplateManifest {
   branch: string;
   /** Optional path within the repo if it is a monorepo (e.g. "sites/vaultone"). */
   subdir?: string;
-  /**
-   * Whether the background video plays behind the whole page or only the hero.
-   * MUST match how the repo is actually built — this drives the code agent's
-   * system prompt and the follow-up router's media handling.
-   */
-  mode: TemplateMode;
-  /**
-   * The video this template was designed around. Remixing does NOT generate a
-   * video — the user gets the template exactly as built, immediately. This URL
-   * is substituted into the repo's TEMPLATE_VIDEO_PLACEHOLDER at build time.
-   * Only when the user later asks for a different background does the media
-   * pipeline run and swap it. Falls back to DEFAULT_TEMPLATE_VIDEO if unset.
-   */
-  defaultVideoUrl?: string;
   /** Live demo, also used as the gallery card link. */
   demoUrl: string;
   /** Cover image for the gallery card. */
@@ -46,9 +26,6 @@ export interface TemplateManifest {
   /** Whether the card is rendered with a taller height in the masonry grid */
   isTall?: boolean;
 }
-
-/** Used when a template does not declare its own defaultVideoUrl. */
-export const DEFAULT_TEMPLATE_VIDEO = "https://assets.framerate.space/hero_bg_480p.mp4";
 
 // NOTE: the `repo` values below are placeholders — the template repos do not
 // exist yet. Create one repo per template following ./README.md, then replace
@@ -59,7 +36,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Beach House",
     repo: "AryanKuAg/beach-house",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/Beach_House/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-Beach_House-index.html.png",
@@ -70,7 +46,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "AI Trip Planner",
     repo: "AryanKuAg/ai-trip-planner",
     branch: "main",
-    mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
     imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
     isTall: false,
@@ -80,7 +55,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Orange Furry Creature",
     repo: "AryanKuAg/orange-furry-creature",
     branch: "main",
-    mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/orange-furry-creature/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orange-furry-creature-index.html%20(1).png",
@@ -91,7 +65,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Flower and Plane",
     repo: "AryanKuAg/flower-and-plane",
     branch: "main",
-    mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
@@ -102,7 +75,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Ai Workflow Agents",
     repo: "AryanKuAg/ai-workflow-agents",
     branch: "main",
-    mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/ai-workflow-agents/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-ai-workflow-agents-index.html.png",
@@ -113,7 +85,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Australia Beach Road",
     repo: "AryanKuAg/australia-beach-road",
     branch: "main",
-    mode: "HERO_ONLY",
     demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
@@ -124,7 +95,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Rotating Earth",
     repo: "AryanKuAg/rotating-earth",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
@@ -136,7 +106,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Haunted House",
     repo: "AryanKuAg/haunted-house",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
     imgSrc:
       "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
@@ -153,7 +122,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "AeroForge",
     repo: "AryanKuAg/aeroforge-website",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/aeroforge-website/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-aeroforge-website-index.html.png",
     isTall: false,
@@ -163,7 +131,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Atelier Viaggio",
     repo: "AryanKuAg/atelier-viaggio-website",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/atelier-viaggio-website/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-atelier-viaggio-website-index.html.png",
     isTall: false,
@@ -173,7 +140,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "FableForge",
     repo: "AryanKuAg/fableforge-site",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/fableforge-site/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-fableforge-site-index.html.png",
     isTall: false,
@@ -183,7 +149,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Horizon House",
     repo: "AryanKuAg/horizon-house-website",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/horizon-house-website/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-horizon-house-website-index.html.png",
     isTall: false,
@@ -193,7 +158,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Nala Maldives",
     repo: "AryanKuAg/nala-maldives-website",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/nala-maldives-website/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-nala-maldives-website-index.html.png",
     isTall: false,
@@ -203,7 +167,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Orbit",
     repo: "AryanKuAg/orbit-react",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/orbit-react/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orbit-react-index.html.png",
     isTall: false,
@@ -213,7 +176,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Relay",
     repo: "AryanKuAg/relay-website",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/relay-website/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-relay-website-index.html.png",
     isTall: false,
@@ -223,15 +185,11 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
     title: "Vesper AI",
     repo: "AryanKuAg/vesper-ai-react-vite",
     branch: "main",
-    mode: "FULL_PAGE",
     demoUrl: "https://sites.framerate.space/template-sites/vesper-ai-react-vite/index.html",
     imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-vesper-ai-react-vite-index.html.png",
     isTall: false,
   },
 ];
-
-/** The token a template repo uses wherever the background video URL belongs. */
-export const TEMPLATE_VIDEO_PLACEHOLDER = "__FRAMERATE_VIDEO_URL__";
 
 /**
  * Prompt used when a user remixes a template without describing any changes.
@@ -254,7 +212,3 @@ export const getTemplate = (id: string | null | undefined): TemplateManifest | n
  */
 export const templateTarballUrl = (t: TemplateManifest): string =>
   `https://codeload.github.com/${t.repo}/tar.gz/refs/heads/${t.branch}`;
-
-/** The video a fresh remix of this template is built with. */
-export const templateVideoUrl = (t: TemplateManifest): string =>
-  t.defaultVideoUrl || DEFAULT_TEMPLATE_VIDEO;

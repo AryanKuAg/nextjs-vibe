@@ -4,14 +4,12 @@ import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/db";
 import { AGENT_COSTS, checkCredits, consumeCredits, refundCredits } from "@/lib/usage";
 import { issuePreviewGrant } from "@/lib/preview-grant";
-import { PROJECT_STAGE } from "@/lib/project-stage";
-import { latestVideoUrl } from "@/lib/project-video";
 import { v0 } from "@/lib/v0-client";
 import { CAPACITY_MESSAGE, isCapacityError, v0Failure } from "@/lib/v0-error";
 import { previewOriginForChat } from "@/lib/preview-host-check";
 import { PublishError, publishSiteToR2 } from "@/lib/publish-site";
-import { beginProjectBuild } from "@/lib/v0-start-build";
-import { needsGeneratedVideo, siteBriefOf } from "@/lib/v0-site-prompt";
+import { startProjectBuild } from "@/lib/v0-start-build";
+import { siteBriefOf } from "@/lib/v0-site-prompt";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 /**
@@ -23,23 +21,6 @@ import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
  * so there is nothing here that polls, reconciles or mirrors v0's transcript.
  */
 
-/**
- * Past this, a video run has been cancelled by Inngest and cannot still land.
- * Mirrors `RUN_TIMEOUT.video` (30m) with a minute of slack, and the same figure
- * governs when the builder offers its retry.
- */
-const VIDEO_RUN_LIMIT_MS = 31 * 60 * 1000;
-
-/**
- * How long the video → v0 handoff may take before it is treated as failed.
- *
- * The clip has landed and `chats.createAsync` is in flight. That call answers
- * in seconds, so this is generous — but it has to be non-zero, because for its
- * whole duration the project has a video, no chat, and nobody polling on its
- * behalf unless this window says to keep waiting.
- */
-const V0_HANDOFF_LIMIT_MS = 90 * 1000;
-
 async function requireProject(projectId: string, userId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId, userId },
@@ -49,9 +30,6 @@ async function requireProject(projectId: string, userId: string) {
       v0ChatId: true,
       prompts: true,
       publishedUrl: true,
-      currentStage: true,
-      videoUrls: true,
-      updatedAt: true,
     },
   });
 
@@ -66,10 +44,9 @@ export const v0Router = createTRPCRouter({
   /**
    * Everything the builder needs to render on load.
    *
-   * Three outcomes, because a project can legitimately exist before its chat
-   * does: a cinematic build makes its video first and v0 is not called until
-   * that lands. So "no chat" is not automatically a failure, and the builder is
-   * told which of the two it is rather than having to guess.
+   * Two outcomes. The chat is opened synchronously by whoever starts the build,
+   * so a project without one is a build that failed to start — the builder shows
+   * that and offers a retry rather than waiting on anything.
    */
   workspace: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
@@ -77,29 +54,7 @@ export const v0Router = createTRPCRouter({
       const project = await requireProject(input.projectId, ctx.auth.userId);
 
       if (!project.v0ChatId) {
-        // Whether somebody is still working on this, which is NOT the same as
-        // "the stage says GENERATING_VIDEO". A cinematic build passes through
-        // two waits, and the second one has its own stage: the clip lands, the
-        // stage becomes VIDEO, and only then is v0 called. Treating that second
-        // window as a failure showed "something went wrong when it was created"
-        // over a project that was building perfectly well — and because the
-        // builder stops polling once it believes that, the screen never
-        // recovered even after the chat opened.
-        const ageMs = Date.now() - project.updatedAt.getTime();
-        const waiting =
-          (project.currentStage === PROJECT_STAGE.GENERATING_VIDEO &&
-            ageMs < VIDEO_RUN_LIMIT_MS) ||
-          (project.currentStage === PROJECT_STAGE.VIDEO && ageMs < V0_HANDOFF_LIMIT_MS);
-
-        return {
-          status: "preparing" as const,
-          // False means nobody is working on it and the user is offered a retry.
-          // Each poll re-decides, so a wait that never resolves becomes a retry
-          // on its own rather than spinning for the rest of the day.
-          waiting,
-          // Which of the two waits it is, so the builder can say so.
-          stage: project.currentStage,
-        };
+        return { status: "preparing" as const };
       }
 
       const chatId = project.v0ChatId;
@@ -125,10 +80,10 @@ export const v0Router = createTRPCRouter({
         chat: chat.data,
         publishedUrl: project.publishedUrl,
         // What the user actually typed. The message that opened this chat is
-        // composed — their brief plus our build rule and the video treatment —
-        // and v0 needs all of it, but reading our instructions back to the
-        // person who wrote one sentence is not something they asked to see.
-        // The builder renders this in place of that first message.
+        // composed — their brief plus our build rule — and v0 needs all of it,
+        // but reading our instructions back to the person who wrote one
+        // sentence is not something they asked to see. The builder renders this
+        // in place of that first message.
         openingPrompt: siteBriefOf(project.prompts)?.startPrompt ?? null,
         previewOrigin,
         // A transcript that fails to load is recoverable — the client refetches
@@ -162,46 +117,14 @@ export const v0Router = createTRPCRouter({
         });
       }
 
-      // A video agent that is still running will open the chat itself when it
-      // lands, and re-dispatching would generate — and charge for — a second
-      // video alongside the first. The window matches `RUN_TIMEOUT.video`:
-      // past it Inngest has cancelled the run, so nothing is in flight to
-      // collide with. The builder shows the same threshold as a retry button.
-      const generatingFor =
-        project.currentStage === PROJECT_STAGE.GENERATING_VIDEO
-          ? Date.now() - project.updatedAt.getTime()
-          : Infinity;
+      // The brief the user filled in, not just the sentence they typed.
+      const brief = siteBriefOf(project.prompts) ?? { startPrompt: "Build a website." };
 
-      if (generatingFor < VIDEO_RUN_LIMIT_MS) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Your video is still being generated. The site starts building on its own when it lands.",
-        });
-      }
-
-      // The brief the user filled in, not just the sentence they typed. Retry
-      // used to rebuild from the prompt alone, which quietly turned every
-      // cinematic project into a plain one the moment anything went wrong.
-      const brief = siteBriefOf(project.prompts) ?? {
-        startPrompt: "Build a website.",
-        mode: "CLASSIC" as const,
-      };
-
-      // A video that already exists is reused rather than regenerated, so this
-      // only pays for footage when the first attempt never produced any.
-      const existingVideo = latestVideoUrl(project.videoUrls);
-      const willGenerateVideo = !existingVideo && needsGeneratedVideo(brief);
-      const cost = AGENT_COSTS.CODE + (willGenerateVideo ? AGENT_COSTS.VIDEO : 0);
-
-      await checkCredits(cost);
+      await checkCredits(AGENT_COSTS.CODE);
       await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
 
       try {
-        return await beginProjectBuild({
-          projectId: project.id,
-          userId: ctx.auth.userId,
-          brief,
-        });
+        return await startProjectBuild({ projectId: project.id, brief });
       } catch (error) {
         // The user paid for a build that never started — hand it back.
         await refundCredits(AGENT_COSTS.CODE, ctx.auth.userId).catch(() => {});

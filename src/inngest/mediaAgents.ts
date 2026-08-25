@@ -40,14 +40,14 @@ export const generateFramesFunction = inngest.createFunction(
 
     await step.run("update-stage", async () => {
       // While the image is being generated the stage must read GENERATING_SCENE —
-      // setting "SCENE" here would make the UI shimmer show the wrong label
-      // (or fall back to a stale "Generating video") during image generation.
+      // setting "SCENE" here would make the UI shimmer show a resting label
+      // during image generation.
       await prisma.project.update({ where: { id: projectId }, data: { currentStage: "GENERATING_SCENE" } });
     });
 
-    // The money boundary — see the matching guard in veoGenerateFunction. The
-    // caller short-circuits before invoking this at all; the check is repeated
-    // here so no future call site can bill a developer machine by accident.
+    // The money boundary. The caller short-circuits before invoking this at
+    // all; the check is repeated here so no future call site can bill a
+    // developer machine by accident.
     if (shouldMockMedia()) {
       console.log("[Frame Generation] MOCK_MEDIA is on — returning the demo image instead of generating.");
       await step.sleep("mock-image-delay", "4s");
@@ -66,9 +66,9 @@ export const generateFramesFunction = inngest.createFunction(
         },
       });
 
-      // The image is frame one of the background video, so it is composed for the
-      // move that follows: HERO_ONLY loops in place (calm plate + ambient motion),
-      // FULL_PAGE is flown through (depth layers, an opening, deep focus).
+      // HERO_ONLY is a calm plate that sits behind a fixed banner; FULL_PAGE is
+      // composed with depth layers, an opening and deep focus. See the note at
+      // the top of media-prompts on why that wording survives the video agent.
       const sysMsg = new SystemMessage(getImageSystemPrompt(experiencePref));
 
       // `prompt` is this turn's ask; `sitePrompt` is what the site is about. On a
@@ -179,8 +179,6 @@ export const generateFramesFunction = inngest.createFunction(
       await consumeCredits(cost, userId);
     });
 
-    // refinedPrompt is returned so the video agent can describe motion through
-    // this exact scene instead of guessing from the raw website request.
     return { frameUrl, refinedPrompt };
   }
 );

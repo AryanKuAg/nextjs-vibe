@@ -8,9 +8,9 @@ import type { TimeStr } from "inngest";
  * the user is charged for work that is then thrown away, so each budget sits
  * above its slow path rather than on top of its average one.
  *
- * Only the media pipeline is left here: site builds run on the v0 Platform API
- * and are not Inngest runs at all, so the code and autonomous budgets went with
- * the functions they governed.
+ * Only the image agent is left here: site builds run on the v0 Platform API and
+ * are not Inngest runs at all, so the code and autonomous budgets went with the
+ * functions they governed — as did the video budget with the video agent.
  */
 const budget = (envKey: string, fallback: TimeStr): TimeStr => {
   const raw = process.env[envKey]?.trim();
@@ -27,6 +27,5 @@ const budget = (envKey: string, fallback: TimeStr): TimeStr => {
 
 /** Env-overridable so a budget can be tuned without a deploy. */
 export const RUN_TIMEOUT = {
-  video: budget("TIMEOUT_VIDEO_AGENT", "30m"),
   frames: budget("TIMEOUT_FRAMES_AGENT", "5m"),
 } as const;

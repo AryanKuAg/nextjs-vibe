@@ -402,10 +402,9 @@ export function ChatConversation({
 /**
  * Puts the user's own words back in front of the composed opening message.
  *
- * A build's first message is their brief plus our build rule and, on a
- * cinematic site, the whole video treatment and its URL. v0 needs every line of
- * that. The user wrote one sentence and should read one sentence back — being
- * shown our instructions verbatim reads like the app talking to itself.
+ * A build's first message is their brief plus our build rule. v0 needs every
+ * line of that. The user wrote one sentence and should read one sentence back —
+ * being shown our instructions verbatim reads like the app talking to itself.
  *
  * Only the first user message is touched: every later one is exactly what they
  * typed into the box.

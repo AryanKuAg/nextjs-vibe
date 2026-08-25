@@ -18,9 +18,9 @@ import { cn } from "@/lib/utils";
  *
  * This is a trimmed version of the upstream ai-elements `PromptInput`: the same
  * component names and layout, without the attachment pipeline, drag-and-drop or
- * speech recognition. The builder sends text only — the reference video is
- * chosen earlier in the project pipeline, not pasted into the chat — so those
- * subsystems had nothing to drive them.
+ * speech recognition. The builder sends text only — a reference image is
+ * attached in the composer when the project is created, not pasted into the
+ * chat — so those subsystems had nothing to drive them.
  */
 
 export type PromptInputMessage = {

@@ -15,14 +15,6 @@ import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 
-import {
-  VIDEO_MOTIONS,
-  VIDEO_SOURCES,
-  type SiteMode,
-  type VideoMotion,
-  type VideoSource,
-} from "@/lib/v0-site-prompt";
-import { ComposerChipMenu } from "./composer-chip-menu";
 import { COMPOSER_MODELS, ComposerModelMenu } from "./composer-model-menu";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
@@ -36,52 +28,6 @@ const formSchema = z.object({
     .max(100000, { message: "Value is too long" }),
 });
 
-
-/**
- * How much decoded video a scroll-scrubbed page may hold in memory.
- *
- * `scrolly-video` decodes the whole clip up front and keeps every frame as an
- * uncompressed bitmap in one array — no cap, no downscale, no eviction. The
- * cost is resolution times frame count, and it is brutal: a 4K 10s clip at
- * 30fps is 300 frames of 3840x2160x4 bytes, near enough 10GB, re-paid on every
- * reload of the preview. A pasted 4K link took a 8GB machine to 30GB of swap
- * and an out-of-memory dialog.
- *
- * Two gigabytes is roughly a 1080p clip of a few seconds, or 720p of ten — the
- * shape of the footage this product generates itself. Above that the site would
- * not be usable by whoever it is built for either, so it is refused here rather
- * than discovered by their browser.
- *
- * Only scroll-driven builds decode anything. A looping hero is a plain <video>
- * and costs nothing, whatever its resolution.
- */
-const SCRUB_MEMORY_BUDGET_BYTES = 2 * 1024 ** 3;
-
-/** Reads a video's dimensions without downloading it. Null if it cannot be read. */
-function probeVideo(url: string) {
-  return new Promise<{ width: number; height: number; duration: number } | null>((resolve) => {
-    const video = document.createElement("video");
-    let settled = false;
-
-    const finish = (value: { width: number; height: number; duration: number } | null) => {
-      if (settled) return;
-      settled = true;
-      video.removeAttribute("src");
-      video.load();
-      resolve(value);
-    };
-
-    video.preload = "metadata";
-    video.muted = true;
-    video.onloadedmetadata = () =>
-      finish({ width: video.videoWidth, height: video.videoHeight, duration: video.duration });
-    // Unreadable is not the same as too big: a host that blocks us still builds
-    // fine, so anything we cannot measure is allowed through.
-    video.onerror = () => finish(null);
-    window.setTimeout(() => finish(null), 8000);
-    video.src = url;
-  });
-}
 
 interface ProjectFormProps {
   showModelSelector?: boolean;
@@ -103,12 +49,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [mode] = useState<SiteMode>("CLASSIC");
   const [model, setModel] = useState<string>(COMPOSER_MODELS[0].value);
-  const [motion, setMotion] = useState<VideoMotion>("SCROLL");
-  const [videoSource, setVideoSource] = useState<VideoSource>("AUTO");
-  const [videoPrompt, setVideoPrompt] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
@@ -224,44 +165,6 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
       return;
     }
 
-    // A chosen video source that carries no value would build a site with no
-    // video and no explanation, so it is caught before anything is charged.
-    if (mode === "CINEMATIC" && videoSource === "URL") {
-      const trimmed = videoUrl.trim();
-      const valid = /^https?:\/\/\S+$/i.test(trimmed);
-      if (!valid) {
-        toast.error("Enter a video URL starting with http:// or https://");
-        return;
-      }
-
-      // Scroll-scrubbing decodes the whole clip into memory, so an oversized
-      // one is refused before it can take the browser down with it.
-      if (motion === "SCROLL") {
-        const meta = await probeVideo(trimmed);
-        if (meta && meta.width > 0 && Number.isFinite(meta.duration)) {
-          // 30fps assumed: the element does not expose a frame rate, and
-          // over-estimating is the safe direction.
-          const frames = Math.ceil(meta.duration) * 30;
-          const bytes = meta.width * meta.height * 4 * frames;
-
-          if (bytes > SCRUB_MEMORY_BUDGET_BYTES) {
-            toast.error(
-              `That clip is ${meta.width}x${meta.height} and ${Math.round(meta.duration)}s, which needs about ` +
-              `${(bytes / 1024 ** 3).toFixed(1)}GB of memory to scrub — enough to crash the browser. ` +
-              "Use a shorter or lower-resolution video (1080p or below), or switch to Looping, which has no such limit.",
-              { duration: 15000 },
-            );
-            return;
-          }
-        }
-      }
-    }
-
-    if (mode === "CINEMATIC" && videoSource === "PROMPT" && !videoPrompt.trim()) {
-      toast.error("Describe the video you want, or switch back to Auto video.");
-      return;
-    }
-
     setIsRedirecting(true); // lock the button immediately, before any async work
 
     // The prompt and the image go with the mutation that starts the build, so
@@ -281,26 +184,11 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
     }
 
     try {
-      await createProject.mutateAsync({
-        value: values.value,
-        imageDataUrl,
-        mode,
-        ...(mode === "CINEMATIC"
-          ? {
-            motion,
-            videoSource,
-            videoPrompt: videoSource === "PROMPT" ? videoPrompt.trim() : undefined,
-            videoUrl: videoSource === "URL" ? videoUrl.trim() : undefined,
-          }
-          : {}),
-      });
+      await createProject.mutateAsync({ value: values.value, imageDataUrl });
     } catch {
       // Error is handled in the mutation's onError callback
     }
   };
-
-  const motionOption = VIDEO_MOTIONS.find((o) => o.value === motion) ?? VIDEO_MOTIONS[0];
-  const sourceOption = VIDEO_SOURCES.find((o) => o.value === videoSource) ?? VIDEO_SOURCES[0];
 
   const isPending = createProject.isPending || isRedirecting;
   const isButtonDisabled = isPending || (!form.formState.isValid && !uploadedImage);
@@ -380,43 +268,6 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
             )}
           />
 
-          {/* ── Video detail ──
-              Only the two sources that need something from the user get a
-              field. Dismissing it returns the source to Auto rather than
-              leaving a chip that promises input the build will never receive. */}
-          {mode === "CINEMATIC" && videoSource !== "AUTO" && (
-            <div className="flex items-center gap-2 rounded-[10px] border border-white-8 px-3 py-2">
-              <i className={`${sourceOption.icon} shrink-0 text-base text-white-50`} />
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm leading-[20px] text-white-85 outline-none placeholder:text-white-50"
-                disabled={isPending}
-                onChange={(e) =>
-                  videoSource === "URL" ? setVideoUrl(e.target.value) : setVideoPrompt(e.target.value)
-                }
-                placeholder={
-                  videoSource === "URL"
-                    ? "Paste your video URL"
-                    : "Slow aerial drift over foggy peaks, 35mm grain..."
-                }
-                type={videoSource === "URL" ? "url" : "text"}
-                value={videoSource === "URL" ? videoUrl : videoPrompt}
-              />
-              <button
-                aria-label="Remove"
-                className="shrink-0 text-white-50 transition-colors hover:text-white"
-                disabled={isPending}
-                onClick={() => {
-                  setVideoSource("AUTO");
-                  setVideoUrl("");
-                  setVideoPrompt("");
-                }}
-                type="button"
-              >
-                <i className="ri-close-line text-base" />
-              </button>
-            </div>
-          )}
-
           {/* Bottom toolbar */}
           <div className="flex items-center">
             <input
@@ -445,40 +296,6 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 menuPlacement={isLandingPage ? "up-on-desktop" : "down"}
                 value={model}
               />
-            )}
-
-            {showModelSelector && mode === "CINEMATIC" && (
-              <>
-                <span aria-hidden className="h-5 w-px shrink-0 bg-white-8" />
-                <ComposerChipMenu
-                  ariaLabel="How the video behaves"
-                  chipIcon={motionOption.icon}
-                  chipLabel={motionOption.label}
-                  disabled={isPending}
-                  onChange={setMotion}
-                  options={VIDEO_MOTIONS.map((o) => ({ ...o, title: o.label }))}
-                  value={motion}
-                />
-                <ComposerChipMenu
-                  ariaLabel="Where the video comes from"
-                  chipIcon={sourceOption.icon}
-                  chipLabel={sourceOption.label}
-                  disabled={isPending}
-                  onChange={(next) => {
-                    // One visible field, two pieces of state. Without this,
-                    // typing a URL and then switching the chip to "Video URL"
-                    // leaves the URL stranded in videoPrompt and submits it as
-                    // a description of footage to generate — which is exactly
-                    // how a pasted link ended up at the video model.
-                    const typed = videoSource === "URL" ? videoUrl : videoPrompt;
-                    if (next === "URL") setVideoUrl(typed);
-                    else if (next === "PROMPT") setVideoPrompt(typed);
-                    setVideoSource(next);
-                  }}
-                  options={VIDEO_SOURCES}
-                  value={videoSource}
-                />
-              </>
             )}
 
             <div className="flex gap-2 ml-auto shrink-0">

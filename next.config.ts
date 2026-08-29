@@ -37,7 +37,11 @@ const nextConfig: NextConfig = {
   // the dev server rewrites the manifest underneath it. Setting this lets a
   // build run beside a dev server instead of requiring you to stop yours.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
-  output: "standalone", // Required for Docker/Cloud Run deployment
+  // Required for the Docker/Cloud Run image, which runs `node server.js` from
+  // `.next/standalone`. Vercel builds its own function bundles and does not use
+  // this, so it is left off there rather than producing an output tree nothing
+  // reads. VERCEL=1 is set by the platform at build and at runtime.
+  ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
   serverExternalPackages: ["inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
   images: {
     formats: ["image/avif", "image/webp"],

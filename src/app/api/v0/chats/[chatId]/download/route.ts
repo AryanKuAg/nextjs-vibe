@@ -15,11 +15,17 @@ export const dynamic = "force-dynamic";
 /**
  * Zip of the current source.
  *
- * Repacked rather than streamed through: the vendor's zip carries its own app
+ * Repacked rather than passed through: the vendor's zip carries its own app
  * icon and a `generator` tag in the layout, and this download is a paid feature
- * customers open and read. Site sources are small — a few hundred KB of text
- * next to the node_modules they do not include — so buffering to rewrite them
- * costs little.
+ * customers open and read.
+ *
+ * The repacked zip is STREAMED back rather than buffered into one Response
+ * body. Serverless hosts cap a buffered response — Vercel at 4.5 MB, returning
+ * a 413 the browser shows as a failed download — and while a site's source is
+ * usually a few hundred KB of text, v0 puts generated images in `public/` and
+ * that is the sort of thing that crosses the line without warning. A streamed
+ * body has no such cap, so the size of the customer's own site stops being
+ * something this route can fail on.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
@@ -39,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
 
   const source = await result.response.arrayBuffer();
 
-  return new Response(await debrandZip(source), {
+  return new Response(await debrandedZipStream(source), {
     status: 200,
     headers: {
       "content-type": "application/zip",
@@ -48,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
   });
 }
 
-async function debrandZip(source: ArrayBuffer): Promise<ArrayBuffer> {
+async function debrandedZipStream(source: ArrayBuffer): Promise<ReadableStream<Uint8Array>> {
   const zip = await JSZip.loadAsync(source);
 
   const paths = Object.entries(zip.files)
@@ -71,5 +77,30 @@ async function debrandZip(source: ArrayBuffer): Promise<ArrayBuffer> {
 
   zip.file(sourceIconPathFor(paths), NEUTRAL_ICON_SVG);
 
-  return zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+  // JSZip's own streaming interface, adapted to a web ReadableStream. `pause`
+  // and `resume` are what make backpressure real: without them JSZip would
+  // deflate the whole archive into memory as fast as it can and the stream
+  // would only be a formality.
+  const chunks = zip.generateInternalStream({ type: "uint8array", compression: "DEFLATE" });
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      chunks
+        .on("data", (chunk: Uint8Array) => {
+          controller.enqueue(chunk);
+          // Stop producing until the consumer asks for more.
+          chunks.pause();
+        })
+        .on("end", () => controller.close())
+        .on("error", (error: Error) => controller.error(error));
+
+      chunks.resume();
+    },
+    pull() {
+      chunks.resume();
+    },
+    cancel() {
+      chunks.pause();
+    },
+  });
 }

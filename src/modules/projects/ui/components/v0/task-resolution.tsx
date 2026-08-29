@@ -127,7 +127,7 @@ function QuestionsTask({
     });
 
   return (
-    <TaskCard description="Answer each question so v0 can continue." title="Questions">
+    <TaskCard description="Answer each question so the build can continue." title="Questions">
       <div className="grid gap-4">
         {data.questions.map((question) => (
           <fieldset className="grid gap-2" disabled={disabled} key={question.id}>
@@ -262,7 +262,7 @@ function IntegrationTask({
 
   return (
     <TaskCard
-      description="Connect the requested services in your v0 account, then confirm to continue."
+      description="Connect the requested services, then confirm to continue."
       title="Connect services"
     >
       {requested.length > 0 ? (

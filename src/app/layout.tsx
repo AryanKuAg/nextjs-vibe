@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
-import { ClerkProvider, SignedOut } from "@clerk/nextjs";
-import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { Geist, Geist_Mono, Inconsolata, DM_Mono, Space_Grotesk, Onest } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 
-import { GoogleOneTap } from "@/components/google-one-tap";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
 import { CanonicalUrl } from "@/components/canonical-url";
@@ -44,6 +43,12 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+});
+
+const onest = Onest({
+  variable: "--font-onest",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -102,7 +107,7 @@ export default function RootLayout({
           </head>
           <body
             suppressHydrationWarning
-            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${dmMono.variable} ${spaceGrotesk.variable} antialiased`}
+            className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${dmMono.variable} ${spaceGrotesk.variable} ${onest.variable} antialiased`}
           >
             <CanonicalUrl />
             <Script
@@ -122,7 +127,6 @@ export default function RootLayout({
                 `,
               }}
             />
-            <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
             <Script
               id="fb-pixel"
               strategy="lazyOnload"
@@ -151,9 +155,6 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <Toaster />
-              <SignedOut>
-                <GoogleOneTap />
-              </SignedOut>
               <div id="clerk-captcha"></div>
               {children}
             </ThemeProvider>

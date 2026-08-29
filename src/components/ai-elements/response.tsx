@@ -17,9 +17,17 @@ export const Response = memo(({ className, ...props }: ResponseProps) => (
   <Streamdown
     className={cn(
       "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-      "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-6",
-      "[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:pl-6",
-      "[&_li]:pl-1 [&_li]:marker:text-muted-foreground/40",
+      // list-outside overrides the list-inside Streamdown sets on its own list
+      // elements. Inside markers sit in the text flow, so a wrapped line runs
+      // back to the margin under the bullet instead of hanging under the first
+      // line's text, and padding meant to separate bullet from text shifts the
+      // whole row instead. Outside puts the marker in the gutter, where the
+      // padding below is what actually sets the gap.
+      "[&_ul]:my-3 [&_ul]:list-outside [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
+      "[&_ol]:my-3 [&_ol]:list-outside [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5",
+      // Loose markdown lists wrap each item in a <p>; zeroing its margin keeps
+      // item spacing governed by space-y alone rather than doubling up.
+      "[&_li]:marker:text-white/30 [&_li>p]:my-0",
       "[&_a]:underline [&_a]:underline-offset-2",
       "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em]",
       "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted/40 [&_pre]:p-3",

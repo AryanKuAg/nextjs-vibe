@@ -8,7 +8,7 @@ const MAX_EDGE = 2048;
  * produces a data URL of several megabytes, which is large enough to be rejected
  * on the way to the server and far larger than any vision model needs. 2048px on
  * the longest edge is more than enough to read a layout from, and still good
- * enough to seed a 16:9 video frame.
+ * enough to serve as a 16:9 reference frame.
  */
 export const processImageFile = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {

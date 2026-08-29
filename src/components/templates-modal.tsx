@@ -67,7 +67,7 @@ export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalPro
                       className={`relative aspect-[16/9] rounded-[8px] overflow-hidden cursor-pointer border ${isSelected ? 'border-white' : 'border-white-8'} hover:border-white/50 transition-colors bg-[#1c1c1c]`}
                     >
                       <Image
-                        src={template.imgSrc}
+                        src={template.homescreenImgSrc}
                         alt={template.title}
                         fill
                         className="object-cover"

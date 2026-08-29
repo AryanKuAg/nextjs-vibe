@@ -22,28 +22,24 @@ import {
  *
  * v0 streams a turn as typed parts: reasoning, file reads and edits, searches,
  * shell commands, tool calls, agent actions. Two rules shape how they are
- * shown, both aimed at somebody who is not a developer:
+ * shown:
  *
- * 1. Say what happened, not which files. A build emits a dozen reads in a row,
- *    and "Read file app/page.tsx" twelve times is noise to a person who has
- *    never opened app/page.tsx. Consecutive parts of a kind collapse into one
- *    line with a count; the paths stay, one click away.
+ * 1. One line per action, and the line says what it touched. A read is
+ *    "Read file app/page.tsx", not a disclosure triangle hiding a path — the
+ *    transcript reads as a log you can skim without clicking anything.
  * 2. The running step shimmers. Otherwise the last line just sits there and a
  *    working build is indistinguishable from a hung one.
  * 3. Only the closing summary is shown as prose. v0 opens each turn by
  *    restating the request and describing its plan, which the list of steps
  *    below then shows actually happening.
+ *
+ * Consecutive reads used to collapse into "Explored 4 files" with the paths
+ * behind a disclosure. The design calls for the flat list instead.
  */
 
 type MessagePart = V0UIMessage["parts"][number];
 type FileEditPart = Extract<MessagePart, { type: "data-v0-file-edit" }>;
 type AgentActionPart = Extract<MessagePart, { type: "data-v0-agent-action" }>;
-
-/** Consecutive same-kind parts, merged into the row that will represent them. */
-type Row =
-  | { kind: "single"; part: MessagePart }
-  | { kind: "reads"; paths: string[] }
-  | { kind: "edits"; parts: FileEditPart[] };
 
 /**
  * Drops the agent's opening narration.
@@ -68,30 +64,6 @@ function withoutPreamble(parts: readonly MessagePart[]): MessagePart[] {
   if (lastActivity === -1) return [...parts];
 
   return parts.filter((part, index) => part.type !== "text" || index > lastActivity);
-}
-
-function groupParts(parts: readonly MessagePart[]): Row[] {
-  const rows: Row[] = [];
-
-  for (const part of parts) {
-    const previous = rows.at(-1);
-
-    if (part.type === "data-v0-file-read") {
-      if (previous?.kind === "reads") previous.paths.push(...part.data.paths);
-      else rows.push({ kind: "reads", paths: [...part.data.paths] });
-      continue;
-    }
-
-    if (part.type === "data-v0-file-edit") {
-      if (previous?.kind === "edits") previous.parts.push(part);
-      else rows.push({ kind: "edits", parts: [part] });
-      continue;
-    }
-
-    rows.push({ kind: "single", part });
-  }
-
-  return rows;
 }
 
 export function MessageParts({
@@ -123,67 +95,22 @@ export function MessageParts({
     );
   }
 
-  const rows = groupParts(withoutPreamble(message.parts));
-  // Only the final row can still be in flight, and only while the turn is open.
-  const activeIndex = isLive ? rows.length - 1 : -1;
+  const parts = withoutPreamble(message.parts);
+  // Only the final part can still be in flight, and only while the turn is open.
+  const activeIndex = isLive ? parts.length - 1 : -1;
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-2.5">
-      {rows.map((row, index) => (
-        <RowView
+      {parts.map((part, index) => (
+        <MessagePartView
+          isAssistant
           isActive={index === activeIndex}
           isStreaming={isStreaming}
           key={`${message.id}-${index}`}
-          row={row}
+          part={part}
         />
       ))}
     </div>
-  );
-}
-
-function RowView({
-  row,
-  isActive,
-  isStreaming,
-}: {
-  row: Row;
-  isActive: boolean;
-  isStreaming: boolean;
-}) {
-  if (row.kind === "reads") {
-    const count = new Set(row.paths).size;
-    return (
-      <Activity
-        icon={<EyeIcon />}
-        isActive={isActive}
-        title={count === 1 ? "Read a file" : `Explored ${count} files`}
-      >
-        {row.paths.join("\n")}
-      </Activity>
-    );
-  }
-
-  if (row.kind === "edits") {
-    const count = new Set(row.parts.map((part) => part.data.path)).size;
-    return (
-      <Activity
-        icon={<FileIcon />}
-        isActive={isActive}
-        title={count === 1 ? "Applied changes to a file" : `Applied changes to ${count} files`}
-      >
-        {row.parts
-          .map((part) =>
-            part.data.operation === "rename" && part.data.toPath
-              ? `${fileEditLabel(part.data.operation)}: ${part.data.path} → ${part.data.toPath}`
-              : `${fileEditLabel(part.data.operation)}: ${part.data.path}`,
-          )
-          .join("\n")}
-      </Activity>
-    );
-  }
-
-  return (
-    <MessagePartView isAssistant isActive={isActive} isStreaming={isStreaming} part={row.part} />
   );
 }
 
@@ -209,21 +136,55 @@ function MessagePartView({
       return <ThinkingPart isActive={isActive} isStreaming={isStreaming} part={part} />;
     case "file":
       return <Activity icon={<FileIcon />} isActive={false} title="Attached a file" />;
+    case "data-v0-file-read":
+      // One line per path: v0 emits reads in batches, and the design shows each
+      // file on its own row rather than a count you have to open.
+      return (
+        <div className="flex min-w-0 flex-col gap-2.5">
+          {part.data.paths.map((path, index) => (
+            <Activity
+              detail={path}
+              icon={<EyeIcon />}
+              isActive={isActive && index === part.data.paths.length - 1}
+              key={`${path}-${index}`}
+              mono
+              title="Read file"
+            />
+          ))}
+        </div>
+      );
+    case "data-v0-file-edit":
+      return (
+        <Activity
+          detail={
+            part.data.operation === "rename" && part.data.toPath
+              ? `${part.data.path} → ${part.data.toPath}`
+              : part.data.path
+          }
+          icon={<FileIcon />}
+          isActive={isActive}
+          mono
+          title={`${fileEditLabel(part.data.operation)} file`}
+        />
+      );
     case "data-v0-search":
       return (
         <Activity
+          detail={part.data.query}
           icon={<SearchIcon />}
           isActive={isActive}
           title={part.data.scope === "web" ? "Searched the web" : "Searched the codebase"}
-        >
-          {part.data.query}
-        </Activity>
+        />
       );
     case "data-v0-bash":
       return (
-        <Activity icon={<TerminalIcon />} isActive={isActive} title="Ran a command">
-          {[part.data.command, part.data.output].filter(Boolean).join("\n\n")}
-        </Activity>
+        <Activity
+          detail={part.data.command}
+          icon={<TerminalIcon />}
+          isActive={isActive}
+          mono
+          title="Ran a command"
+        />
       );
     case "data-v0-tool-call": {
       const failed = part.data.status === "error";
@@ -231,20 +192,24 @@ function MessagePartView({
         <Activity
           error={failed}
           icon={failed ? <CrossCircleIcon /> : <ToolIcon />}
+          detail={formatToolDetails(part.data.input, part.data.output)}
           isActive={isActive && !failed}
           title={failed ? `${humanize(part.data.name)} failed` : humanize(part.data.name)}
-        >
-          {formatToolDetails(part.data.input, part.data.output)}
-        </Activity>
+        />
       );
     }
     case "data-v0-agent-action":
       return (
-        <Activity icon={<AgentIcon />} isActive={isActive} title={humanize(part.data.name)}>
-          {part.data.data === undefined || isPendingAgentAction(part)
-            ? undefined
-            : formatValue(part.data.data)}
-        </Activity>
+        <Activity
+          detail={
+            part.data.data === undefined || isPendingAgentAction(part)
+              ? undefined
+              : formatValue(part.data.data)
+          }
+          icon={<AgentIcon />}
+          isActive={isActive}
+          title={humanize(part.data.name)}
+        />
       );
     default:
       return null;
@@ -295,15 +260,15 @@ function ThinkingPart({
   const thinking = isStreaming && part.state === "streaming";
 
   return (
-    <details className="group text-muted-foreground">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 py-0.5 text-xs font-medium hover:text-foreground [&::-webkit-details-marker]:hidden">
+    <details className="group text-white-50">
+      <summary className="flex cursor-pointer list-none items-center gap-2 py-0.5 text-xs leading-[16px] font-medium hover:text-white-85 [&::-webkit-details-marker]:hidden">
         <SparklesIcon className="size-3.5 shrink-0" />
         <span className={cn(thinking || isActive ? "shimmer-text" : undefined)}>
           {thinking || isActive ? "Thinking" : "Thought for a moment"}
         </span>
-        <ChevronDownIcon className="size-3.5 transition-transform group-open:rotate-180" />
+        <ChevronDownIcon className="size-3.5 shrink-0 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="mt-2 border-l border-border pl-3 text-xs leading-relaxed text-muted-foreground">
+      <div className="mt-2 border-l border-border pl-3 text-xs leading-[18px] text-white-50">
         <Markdown isStreaming={thinking}>{part.text}</Markdown>
       </div>
     </details>
@@ -324,38 +289,50 @@ function Markdown({ children, isStreaming }: { children: string; isStreaming: bo
 }
 
 /**
- * One line of "what the agent did". The detail — paths, queries, command
- * output — is deliberately not on this line; it lives behind the disclosure so
- * the transcript reads as a list of actions rather than a log.
+ * One line of "what the agent did", with what it touched alongside it.
+ *
+ * The detail sits on the same row rather than behind a disclosure — one glance
+ * tells you which file moved. It truncates, and the full value is on the row's
+ * `title` for anything that overflows.
  */
 function Activity({
   title,
+  detail,
   icon,
   isActive,
   error = false,
-  children,
+  mono = false,
 }: {
   title: string;
+  /** Path, query, command — whatever this action acted on. */
+  detail?: string;
   icon: ReactNode;
   isActive: boolean;
   error?: boolean;
-  children?: string;
+  /** Paths and commands read as code; prose details do not. */
+  mono?: boolean;
 }) {
-  const body = children?.trim() ? children : undefined;
+  const body = detail?.trim() ? detail.trim() : undefined;
 
-  const row = (
-    <div className="flex min-w-0 items-center gap-2 py-0.5 text-xs">
+  return (
+    // leading-[16px] on the row, and the icon in its own flex box: an inline SVG
+    // otherwise sits on a 20px baseline and pushes every row 4px taller than
+    // the 30px rhythm the design spaces them on.
+    <div
+      className="flex min-w-0 items-center gap-2 py-0.5 leading-[16px]"
+      title={body ? `${title} ${body}` : title}
+    >
       <span
         className={cn(
-          "shrink-0 [&>svg]:size-3.5",
-          error ? "text-destructive" : "text-muted-foreground",
+          "flex shrink-0 items-center [&>svg]:size-3.5",
+          error ? "text-destructive" : "text-white-85",
         )}
       >
         {icon}
       </span>
       <span
         className={cn(
-          "min-w-0 truncate font-medium",
+          "shrink-0 text-xs leading-[16px] font-medium text-white",
           error && "text-destructive",
           isActive && !error && "shimmer-text",
         )}
@@ -363,22 +340,16 @@ function Activity({
         {title}
       </span>
       {body ? (
-        <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        <span
+          className={cn(
+            "min-w-0 truncate text-[11px] leading-[15px] text-white-50",
+            mono && "font-mono",
+          )}
+        >
+          {body}
+        </span>
       ) : null}
     </div>
-  );
-
-  if (!body) return row;
-
-  return (
-    <details className="group min-w-0">
-      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        {row}
-      </summary>
-      <pre className="mt-1.5 max-h-48 overflow-auto rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
-        {body}
-      </pre>
-    </details>
   );
 }
 

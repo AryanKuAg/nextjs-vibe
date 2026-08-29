@@ -67,34 +67,47 @@ export function ConversationView({
   }, [messages, isStreaming, pendingUserMessage]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 text-[13px] leading-relaxed">
-        {visibleMessages.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground">No messages yet.</p>
-        ) : (
-          visibleMessages.map((message) => (
-            <ConversationMessage
-              isLive={liveMessageId === message.id}
-              isRestoring={restoringMessageId === message.id}
-              isStreaming={streamingMessageId === message.id}
-              key={message.id}
-              message={message}
-              onRejectPermission={
-                message.id === interactiveTaskMessageId ? onRejectPermission : undefined
-              }
-              onResolveTask={message.id === interactiveTaskMessageId ? onResolveTask : undefined}
-              onRestore={onRestoreMessage}
-              taskDisabled={taskDisabled}
-            />
-          ))
-        )}
-        {/* v0 can take a while to emit its first part. Without this the panel
-            sits empty after the user's message and the build looks stalled. */}
-        {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
-          <p className="shimmer-text py-0.5 text-xs font-medium">Working on it…</p>
-        ) : null}
-        <div ref={endRef} />
+    // The fade is a sibling of the scroller, not part of it, so it stays put
+    // while the transcript moves underneath.
+    <div className="relative min-h-0 flex-1">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 text-[14px] leading-[20px]">
+          {visibleMessages.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">No messages yet.</p>
+          ) : (
+            visibleMessages.map((message) => (
+              <ConversationMessage
+                isLive={liveMessageId === message.id}
+                isRestoring={restoringMessageId === message.id}
+                isStreaming={streamingMessageId === message.id}
+                key={message.id}
+                message={message}
+                onRejectPermission={
+                  message.id === interactiveTaskMessageId ? onRejectPermission : undefined
+                }
+                onResolveTask={message.id === interactiveTaskMessageId ? onResolveTask : undefined}
+                onRestore={onRestoreMessage}
+                taskDisabled={taskDisabled}
+              />
+            ))
+          )}
+          {/* v0 can take a while to emit its first part. Without this the panel
+              sits empty after the user's message and the build looks stalled. */}
+          {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
+            <p className="shimmer-text py-0.5 text-xs leading-[16px] font-medium">Working on it…</p>
+          ) : null}
+          {/* The scroll anchor is also the bottom gap. The fade below is h-60 of
+              solid --bg at its lower end, so a zero-height anchor would park the
+              last message underneath it and make the newest text unreadable.
+              Matching the fade's height lets "end" alignment land that message
+              clear of the gradient instead. */}
+          <div aria-hidden className="h-60 shrink-0" ref={endRef} />
+        </div>
       </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-60 bg-gradient-to-b from-transparent to-bg"
+      />
     </div>
   );
 }
@@ -123,8 +136,8 @@ function ConversationMessage({
       <MessageContent
         className={
           message.role === "user"
-            ? "group-[.is-user]:max-w-[80%] group-[.is-user]:rounded-2xl group-[.is-user]:border group-[.is-user]:border-border group-[.is-user]:bg-muted group-[.is-user]:px-3 group-[.is-user]:py-1.5 group-[.is-user]:text-[13px]"
-            : "w-full text-[13px] leading-relaxed"
+            ? "gap-2 group-[.is-user]:max-w-[86%] group-[.is-user]:rounded-[12px] group-[.is-user]:border-0 group-[.is-user]:bg-white-8 group-[.is-user]:px-3 group-[.is-user]:py-2 group-[.is-user]:text-[14px] group-[.is-user]:leading-[20px] group-[.is-user]:text-white"
+            : "w-full text-[14px] leading-[20px] text-white"
         }
       >
         <MessageParts isLive={isLive} isStreaming={isStreaming} message={message} />

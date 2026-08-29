@@ -1,29 +1,33 @@
 "use client";
 
-import { Loader } from "@/components/ai-elements/loader";
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
-import { ArrowUpIcon, StopIcon } from "@/lib/icons";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import TextareaAutosize from "react-textarea-autosize";
+import "remixicon/fonts/remixicon.css";
 
+import {
+  COMPOSER_MODELS,
+  ComposerModelMenu,
+} from "@/modules/home/ui/components/composer-model-menu";
+
+/**
+ * The builder's composer.
+ *
+ * Deliberately the same object as the one on the home page — same 12px box,
+ * same model chip, same round send button — because it is the same gesture in
+ * a different place. It resting one line tall (84px) rather than two is the
+ * only difference the design draws between them.
+ *
+ * The model chip is display only, exactly as on the home page: the follow-up
+ * route pins v0 Mini server-side and discards whatever the client asks for.
+ */
 export function PromptBox({
   onSubmit,
   onStop,
   isSubmitting = false,
   isStopping = false,
   isStreaming = false,
-  placeholder = "Describe what you want to build...",
+  placeholder = "Describe your website",
   autoFocus = false,
-  compact = false,
-  className,
-  defaultPrompt,
 }: {
   onSubmit?: (text: string) => void | Promise<void>;
   onStop?: () => void | Promise<void>;
@@ -32,53 +36,87 @@ export function PromptBox({
   isStreaming?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
-  compact?: boolean;
-  className?: string;
-  /** Seeds the (uncontrolled) textarea. Change the component's key to reseed. */
-  defaultPrompt?: string;
 }) {
-  const handleSubmit = (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    if (!text || !onSubmit || isSubmitting) return;
-    return onSubmit(text);
+  const [value, setValue] = useState("");
+  const [model, setModel] = useState<string>(COMPOSER_MODELS[0].value);
+
+  const canSend = value.trim().length > 0 && !isSubmitting && Boolean(onSubmit);
+
+  const send = () => {
+    if (!canSend) return;
+    const text = value.trim();
+    setValue("");
+    void onSubmit?.(text);
   };
 
   return (
-    <PromptInput
-      className={cn("rounded-2xl border-border bg-card shadow-sm", className)}
-      onSubmit={handleSubmit}
+    <form
+      className="relative flex min-h-[84px] w-full flex-col gap-3 rounded-[12px] bg-white-8 p-3 shadow-[0_25px_60px_-30px_rgba(0,0,0,0.35)]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        send();
+      }}
     >
-      <PromptInputBody>
-        <PromptInputTextarea
-          autoFocus={autoFocus}
-          className={cn(
-            "min-h-[52px] bg-transparent px-4 pt-3.5 text-base",
-            compact && "min-h-[44px] px-3 pt-3 text-sm",
-          )}
-          defaultValue={defaultPrompt}
+      <TextareaAutosize
+        autoFocus={autoFocus}
+        className="block w-full resize-none bg-transparent text-sm leading-[20px] font-onest font-medium text-white-85 outline-none placeholder:text-white-50"
+        disabled={isSubmitting}
+        maxRows={8}
+        minRows={1}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            send();
+          }
+        }}
+        placeholder={placeholder}
+        value={value}
+      />
+
+      <div className="flex items-center">
+        <ComposerModelMenu
           disabled={isSubmitting}
-          placeholder={placeholder}
+          menuPlacement="up"
+          onChange={setModel}
+          value={model}
         />
-      </PromptInputBody>
-      <PromptInputFooter className="justify-end px-2 pb-2">
-        <PromptInputTools>
-          <PromptInputSubmit
-            aria-label={isStreaming ? "Stop generating" : "Send message"}
-            className="size-8 rounded-lg"
-            disabled={isStreaming ? !onStop || isStopping : !onSubmit || isSubmitting}
-            onClick={isStreaming ? () => onStop?.() : undefined}
-            type={isStreaming ? "button" : "submit"}
-          >
-            {isStopping || (isSubmitting && !isStreaming) ? (
-              <Loader size={16} />
-            ) : isStreaming ? (
-              <StopIcon className="size-4" />
-            ) : (
-              <ArrowUpIcon className="size-4" />
-            )}
-          </PromptInputSubmit>
-        </PromptInputTools>
-      </PromptInputFooter>
-    </PromptInput>
+
+        <div className="ml-auto shrink-0">
+          {isStreaming ? (
+            <button
+              aria-label="Stop generating"
+              className="flex size-7 items-center justify-center rounded-full bg-white text-bg transition-transform hover:bg-white-85 active:scale-95 disabled:opacity-50"
+              disabled={!onStop || isStopping}
+              onClick={() => void onStop?.()}
+              type="button"
+            >
+              {isStopping ? (
+                <i className="ri-loader-4-line inline-block animate-spin" />
+              ) : (
+                <i className="ri-stop-fill text-base" />
+              )}
+            </button>
+          ) : (
+            <button
+              aria-label="Send message"
+              className={
+                canSend
+                  ? "flex size-7 items-center justify-center rounded-full bg-white text-bg transition-transform hover:bg-white-85 active:scale-95"
+                  : "flex size-7 items-center justify-center rounded-full bg-white-50 text-bg"
+              }
+              disabled={!canSend}
+              type="submit"
+            >
+              {isSubmitting ? (
+                <i className="ri-loader-4-line inline-block animate-spin" />
+              ) : (
+                <i className="ri-arrow-up-line text-base" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </form>
   );
 }

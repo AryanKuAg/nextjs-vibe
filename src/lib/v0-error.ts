@@ -21,6 +21,22 @@ export class V0RequestError extends Error {
 
 type V0Result = { error?: unknown; response: Response };
 
+/**
+ * The upstream message is shown to the customer verbatim — see the tRPC
+ * handlers, which forward `failure.message` as the error a toast renders. That
+ * is the right call for actionable text ("this build has no files yet") and the
+ * wrong one for the vendor's name, which tells the customer which API we resell.
+ * Scrubbing here rather than at each call site means no future handler can
+ * forward an unscrubbed one; "the build service" matches CAPACITY_MESSAGE.
+ */
+const VENDOR_NAME = /\bv0(?:\.(?:dev|app))?\b/gi;
+
+function scrubVendor(message: string): string {
+  return message.replace(VENDOR_NAME, (_match, offset: number) =>
+    offset === 0 ? "The build service" : "the build service",
+  );
+}
+
 export function v0Failure(result: V0Result, fallback: string): V0RequestError {
   const error = result.error;
   const message =
@@ -28,7 +44,7 @@ export function v0Failure(result: V0Result, fallback: string): V0RequestError {
       ? String((error as { message: unknown }).message)
       : null;
 
-  return new V0RequestError(message ?? fallback, result.response.status);
+  return new V0RequestError(scrubVendor(message ?? fallback), result.response.status);
 }
 
 /**

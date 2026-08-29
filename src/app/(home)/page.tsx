@@ -1,12 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { SignedIn, SignedOut, useSignIn, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import "remixicon/fonts/remixicon.css";
 import { ProjectForm } from "@/modules/home/ui/components/project-form";
 import { UserControl } from "@/components/user-control";
+import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
+import { useTRPC } from "@/trpc/client";
 import { TemplatesModal } from "@/components/templates-modal";
 import { useTemplateRemix } from "@/hooks/use-template-remix";
 import { useCheckoutReturn } from "@/hooks/use-checkout-return";
@@ -19,9 +23,58 @@ const SITES = TEMPLATE_REGISTRY.map((t) => ({
   id: t.id,
   title: t.title,
   href: t.demoUrl,
-  imgSrc: t.imgSrc,
+  landingImgSrc: t.landingImgSrc,
+  homescreenImgSrc: t.homescreenImgSrc,
   isTall: t.isTall,
 }));
+
+/** Templates shown inline on the dashboard — three full rows. The rest are
+ *  reachable through the See more modal, which gets the whole registry. */
+const DASHBOARD_TEMPLATE_COUNT = 9;
+
+/**
+ * Tall/short rhythm for the landing page's right-panel grid, one row of four
+ * per column. This is the reference layout's own stagger, not derived from
+ * each template's `isTall` flag — those two orderings don't agree.
+ */
+const RIGHT_PANEL_TALL_PATTERN: readonly boolean[][] = [
+  [true, false, false, true],
+  [true, false, false, true],
+  [false, true, true, false],
+];
+
+/**
+ * One slot in the landing page's right-panel grid.
+ *
+ * The tiles arrive one at a time rather than all at once: a dozen covers
+ * appearing together read as a layout that failed to load, whereas a cascade
+ * reads as content on its way in. `order` is the tile's position in that
+ * cascade, not its position in a column — the desktop grid is fed round-robin,
+ * so ordering by column would run three separate animations side by side.
+ * Feeding it the registry index instead sweeps the reveal row by row, left to
+ * right, which is the order the eye reads the grid in anyway.
+ */
+const REVEAL_STAGGER_SECONDS = 0.07;
+
+const RevealTile = ({ order, children }: { order: number; children: React.ReactNode }) => {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      // `false` rather than a hidden state: with reduced motion the tile should
+      // start where it ends, not fade from it.
+      initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay: reduceMotion ? 0 : order * REVEAL_STAGGER_SECONDS,
+        duration: 0.5,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 /* ─── Site Preview Card ─── */
 interface SitePreviewCardProps {
@@ -47,56 +100,120 @@ const SitePreviewCard = ({
   templateId,
   onRemix,
   isRemixPending,
-}: SitePreviewCardProps) => (
-  <a
-    href={href}
-    target="_blank"
-    rel="noopener noreferrer"
-    className={`group block rounded-[8px] font-sans overflow-hidden relative break-inside-avoid ${isLandingPage ? "opacity-80 hover:opacity-100 transition-opacity duration-300" : ""
-      }`}
-  >
-    <div
-      className={`relative w-full bg-grey-bg ${height ? "" : "aspect-[1280/720]"}`}
-      style={height ? { height } : undefined}
-    >
-      <Image
-        src={imgSrc}
-        alt={`${title} - 3D website template`}
-        fill
-        className="object-cover"
+}: SitePreviewCardProps) => {
+  // The cover fades in on decode instead of popping in: the tiles reveal on a
+  // stagger, and a cover landing after its tile has settled reads as a glitch.
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+
+  // Some registry entries are placeholders awaiting a deployed demo and cover
+  // image (see the TODO in registry.ts) — render the empty slot rather than
+  // asking next/image to fetch an empty src.
+  if (!imgSrc || !href) {
+    return (
+      <div
+        aria-hidden
+        className="w-full rounded-[12px] border border-white-8 bg-grey-bg break-inside-avoid"
+        style={height ? { height } : undefined}
       />
+    );
+  }
 
-      {!isLandingPage && (
-        <>
-          {/* Top Gradient */}
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`group block rounded-[12px] border border-white-8 font-sans overflow-hidden relative break-inside-avoid ${isLandingPage ? "opacity-80 hover:opacity-100 transition-opacity duration-300" : ""
+        }`}
+    >
+      <div
+        className={`relative w-full bg-grey-bg ${height ? "" : "aspect-[1280/720]"}`}
+        style={height ? { height } : undefined}
+      >
+        <Image
+          src={imgSrc}
+          alt={`${title} - 3D website template`}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          onLoad={() => setIsCoverLoaded(true)}
+          className={`object-cover transition-opacity duration-500 ease-out ${isCoverLoaded ? "opacity-100" : "opacity-0"
+            }`}
+        />
 
-          {/* Action pills */}
-          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-            <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
-              Preview
+        {!isLandingPage && (
+          <>
+            {/* Top Gradient */}
+            <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+
+            {/* Action pills */}
+            <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+              <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
+                Preview
+              </div>
+              {templateId && onRemix && (
+                <button
+                  type="button"
+                  disabled={isRemixPending}
+                  onClick={(e) => {
+                    // The card itself is the "open the demo" link — keep the pill
+                    // from following it.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemix(templateId);
+                  }}
+                  className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors disabled:opacity-50"
+                >
+                  {isRemixPending ? "Starting…" : "Remix"}
+                </button>
+              )}
             </div>
-            {templateId && onRemix && (
-              <button
-                type="button"
-                disabled={isRemixPending}
-                onClick={(e) => {
-                  // The card itself is the "open the demo" link — keep the pill
-                  // from following it.
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRemix(templateId);
-                }}
-                className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors disabled:opacity-50"
-              >
-                {isRemixPending ? "Starting…" : "Remix"}
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  </a>
+          </>
+        )}
+      </div>
+    </a>
+  );
+};
+
+/* ─── Upgrade pill ───
+   Sits beside the avatar in the dashboard header. Hidden on paid plans, whose
+   affordance is the credits bar inside the account menu instead. */
+const UpgradeButton = () => {
+  const trpc = useTRPC();
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+
+  // Nothing until the plan is known, so paid users never see the pill flash.
+  if (usage === undefined) return null;
+  if (usage?.plan && usage.plan !== "free") return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setIsPricingModalOpen(true)}
+        className="h-[28px] flex items-center gap-[6px] rounded-[8px] border border-white-12 bg-white-8 pl-[8px] pr-[10px] font-onest text-[13px] font-medium leading-[20px] text-white hover:bg-white-12 transition-colors"
+      >
+        <i className="ri-vip-diamond-fill text-[13px] text-white-85" />
+        <span className="[text-box:trim-both_cap_alphabetic]">Upgrade</span>
+      </button>
+      <CustomOutOfCreditsModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+      />
+    </>
+  );
+};
+
+/* ─── Dashboard grid backdrop ───
+   The dashed rule under the header and the pair of dashed verticals bracketing
+   the content column, both from the design. Decoration only. The verticals run
+   the full height and cross the rule — in the design they meet the top edge
+   rather than hanging off the rule, so only the horizontal is offset by 104px. */
+const DashboardGrid = () => (
+  <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div className="absolute inset-x-0 top-[104px] border-t border-dashed border-white/[0.07]" />
+    <div className="absolute inset-y-0 left-1/2 -ml-[520px] w-[1040px] border-x border-dashed border-white/[0.07]" />
+  </div>
 );
 
 /* ─── Logged In Dashboard ─── */
@@ -105,47 +222,57 @@ const LoggedInDashboard = () => {
   const { remix, isPending: isRemixPending } = useTemplateRemix();
   useCheckoutReturn();
   return (
-    // overflow-x-clip: the form's grid backdrop is 100vw wide, which is a hair
-    // wider than the content box wherever a classic scrollbar is present.
-    <main className="min-h-screen bg-bg font-sans flex flex-col overflow-x-clip">
-      {/* Top Navigation */}
-      <header className="flex items-center justify-between p-3 md:px-3">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Framerate" width={24} height={24} />
+    // overflow-x-clip: the grid backdrop is wider than the content box wherever
+    // a classic scrollbar is present.
+    <main className="relative min-h-screen bg-bg font-sans flex flex-col overflow-x-clip">
+      <DashboardGrid />
 
+      {/* Top Navigation */}
+      <header className="relative z-10 flex items-center justify-between p-3">
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Framerate" width={32} height={32} />
         </div>
-        <UserControl />
+        <div className="flex items-center gap-3">
+          <UpgradeButton />
+          <UserControl />
+        </div>
       </header>
 
       {/* Main Content (Centered) */}
-      <div className="flex-1 flex flex-col items-center mt-12 md:mt-24 px-4 w-full">
-        <h1 className="text-white-85 font-medium text-2xl mb-10 text-center">
-          Turn your idea into a stunning 3D website
+      <div className="relative z-10 flex-1 flex flex-col items-center mt-12 md:mt-20 px-4 w-full">
+        <h1 className="text-white-85 font-onest font-semibold text-[28px] leading-[36px] md:text-[38px] md:leading-[48px] text-center">
+          What do you want to create?
         </h1>
+        <p className="mt-3 mb-10 text-center text-sm leading-[20px] text-white-50 font-onest">
+          AI builds the design, motion, and experience from a simple prompt.
+        </p>
 
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-[680px]">
           <ProjectForm showModelSelector />
         </div>
 
-        {/* Templates Section */}
-        <div className="w-full max-w-[960px] mt-30 mb-12">
+        {/* Templates Section — 1008 wide, 24px padding and gap, white 4% on
+            both the fill and the border, per the design. */}
+        <div className="w-full max-w-[1008px] mt-[100px] mb-12 rounded-[24px] border border-white-4 bg-white-4 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-white/80 text-sm font-medium">Templates</h2>
+            <h2 className="text-white/80 text-sm font-onest font-medium">Templates</h2>
             <button
               onClick={() => setIsTemplatesModalOpen(true)}
-              className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
+              className="px-2 rounded-[8px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] font-onest hover:bg-white-8 disabled:opacity-50 h-[28px] font-medium leading-[20px]"
             >
               See more
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {SITES.map((site, idx) => (
+          {/* 960px of inner width: three 304px cards and two 24px gutters.
+              Three rows here; the rest of the registry lives behind See more. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+            {SITES.slice(0, DASHBOARD_TEMPLATE_COUNT).map((site, idx) => (
               <SitePreviewCard
                 key={`${site.title}-${idx}`}
                 title={site.title}
                 href={site.href}
-                imgSrc={site.imgSrc}
+                imgSrc={site.homescreenImgSrc}
                 templateId={site.id}
                 onRemix={remix}
                 isRemixPending={isRemixPending}
@@ -166,7 +293,6 @@ const LoggedInDashboard = () => {
 
 /* ─── Logged Out View ─── */
 const LoggedOutView = () => {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const { signIn, isLoaded } = useSignIn();
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
@@ -175,13 +301,6 @@ const LoggedOutView = () => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
 
-    try {
-
-      window.google?.accounts.id.cancel();
-    } catch {
-      // Ignore cancel errors
-    }
-
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -189,74 +308,90 @@ const LoggedOutView = () => {
     });
   };
 
-  useEffect(() => {
-    let animationFrameId: number;
-    let isHovered = false;
-
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const handleMouseEnter = () => (isHovered = true);
-    const handleMouseLeave = () => (isHovered = false);
-
-    container.addEventListener("mouseenter", handleMouseEnter);
-    container.addEventListener("mouseleave", handleMouseLeave);
-
-    const scroll = () => {
-      if (!isHovered && container) {
-        container.scrollTop += 0.5;
-        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
-          container.scrollTop = 0;
-        }
-      }
-      animationFrameId = requestAnimationFrame(scroll);
-    };
-
-    animationFrameId = requestAnimationFrame(scroll);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      container.removeEventListener("mouseenter", handleMouseEnter);
-      container.removeEventListener("mouseleave", handleMouseLeave);
-    };
-  }, []);
 
 
   return (
-    <main className="h-screen bg-bg font-sans flex flex-col md:flex-row overflow-hidden">
+    <main className="md:h-screen bg-bg font-sans flex flex-col md:flex-row md:overflow-hidden">
       {/* ── Left Panel (Fixed) ── */}
-      <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col flex-1 md:flex-none justify-between p-3 md:h-screen overflow-y-auto overflow-x-hidden">
+      <div className="w-full md:w-[320px] lg:w-[420px] shrink-0 flex flex-col justify-between py-3 px-4 md:p-3 md:h-screen md:overflow-y-auto md:overflow-x-hidden">
         {/* Top: Logo + Content */}
-        <div className="flex flex-col p-3">
+        <div className="flex flex-col py-3 md:p-3">
           {/* Logo */}
-          <div className="flex items-center gap-2 mb-10 md:mb-16">
-            <Image src="/logo.png" alt="Framerate" width={24} height={24} />
-            <span className="text-white font-medium text-base">Framerate</span>
+          <div className="flex items-center justify-between">
+            <Image src="/logo.png" alt="Framerate" width={50} height={32} />
+            {/* <span className="text-white font-medium text-base">Framerate</span> */}
+
+            {/* Mobile: compact auth pill next to the logo — the full-width
+                button below is desktop-only there. */}
+            <div className="flex md:hidden items-center">
+              <SignedOut>
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isPending}
+                  className="h-10 pl-3 pr-4 rounded-[8px] bg-white-12 text-white text-sm font-onest font-semibold flex items-center gap-2 disabled:opacity-70 hover:bg-white-16 transition-colors"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                    {isPending ? (
+                      <i className="ri-loader-4-line animate-spin text-xs" />
+                    ) : (
+                      <Image src="/google.svg" alt="Google" width={16} height={16} />
+                    )}
+                  </div>
+                  Sign up
+                </button>
+              </SignedOut>
+              <SignedIn>
+                <button
+                  onClick={() => router.push("/manage")}
+                  className="h-9 px-4 rounded-full bg-white text-black text-sm font-onest font-medium flex items-center gap-1.5"
+                >
+                  <i className="ri-arrow-right-line text-sm" />
+                  Dashboard
+                </button>
+              </SignedIn>
+            </div>
+          </div>
+
+          {/* Social proof pill */}
+          <div className="inline-flex items-center gap-1 border border-white-16 rounded-full h-[22px] pl-0.5 pr-2 mt-8 md:mt-20 w-fit">
+            {/* Overlapping avatars */}
+            <div className="flex items-center">
+              <div className="w-4 h-4 shrink-0 rounded-full overflow-hidden border-1 border-white relative z-30">
+                <Image src="/female_1.avif" alt="User" width={16} height={16} className="object-cover w-full h-full" />
+              </div>
+              <div className="w-4 h-4 shrink-0 rounded-full overflow-hidden border-1 border-white -ml-1.5 relative z-20">
+                <Image src="/male_1.avif" alt="User" width={16} height={16} className="object-cover w-full h-full" />
+              </div>
+              <div className="w-4 h-4 shrink-0 rounded-full overflow-hidden border-1 border-white -ml-1.5 relative z-10">
+                <Image src="/male_2.avif" alt="User" width={16} height={16} className="object-cover w-full h-full" />
+              </div>
+            </div>
+            <span className="text-white text-sm leading-none font-onest font-medium whitespace-nowrap">Trusted by 20k+ users</span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-[28px] lg:text-[32px] text-white leading-[36px] font-medium mb-4 font-sans mt-12">
-            Ship 3D websites in minutes with AI
+          <h1 className="text-[40px] text-white leading-[120%] font-bold mb-4 font-onest mt-4">
+            Build 3D Websites With AI
           </h1>
 
           {/* Description */}
-          <p className="text-sm text-white-50  leading-[20px] mb-8">
-            Just describe your vision and watch it turn into a live, interactive experience in few minutes.
+          <p className="text-2xl text-white-50 font-onest leading-[32px] mb-5 md:mb-12 font-medium">
+            Describe your vision and watch it turn into a live interactive experience in few minutes.
           </p>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 mb-8 md:mb-12">
+          {/* Action buttons — desktop only; mobile uses the compact pill by the logo. */}
+          <div className="hidden md:flex items-center gap-2 mb-8 md:mb-12">
             <SignedOut>
               <button
                 onClick={handleGoogleSignIn}
                 disabled={isPending}
-                className="px-3 py-2 rounded-[8px] border border-white-12 text-black text-xs font-medium  flex items-center gap-1.5 bg-white disabled:opacity-70 hover:opacity-80 transition-all duration-200"
+                className="h-[40px] px-[12px] rounded-[8px] border border-white-12 text-black text-sm font-onest font-semibold flex items-center gap-[8px] bg-white disabled:opacity-70 hover:opacity-80 transition-all duration-200 "
               >
-                <div className="w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                <div className="w-[20px] h-[20px] flex items-center justify-center shrink-0">
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin text-[12px] scale-125" />
                   ) : (
-                    <Image src="/google.svg" alt="Google" width={14} height={14} />
+                    <Image src="/google.svg" alt="Google" width={16} height={16} />
                   )}
                 </div>
                 Continue with Google
@@ -275,34 +410,49 @@ const LoggedOutView = () => {
         </div>
 
         {/* Bottom: Prompt Input */}
-        <div className="mt-auto">
-          <ProjectForm showModelSelector dropdownDirection="up" isLandingPage />
+        <div className="mb-14 md:mb-0 md:mt-auto">
+          <ProjectForm showModelSelector isLandingPage />
         </div>
       </div>
 
-      {/* ── Right Panel (Scrollable) ── */}
-      <div
-        ref={scrollRef}
-        className="hidden md:block flex-1 overflow-y-auto p-3 md:pl-0"
-        style={{ scrollBehavior: 'auto' }}
-      >
-        {/* Two explicit columns fed round-robin rather than a CSS `columns`
-            masonry: the heights alternate tall/short within each column, and
-            the second column starts on the short one so the two stagger. */}
-        <div className="flex flex-col md:flex-row gap-3">
-          {[0, 1].map((col) => (
+      {/* ── Right Panel ── */}
+      <div className="w-full md:flex-1 pt-3 pb-4 px-4 md:p-3 md:pl-0 md:overflow-y-auto">
+        {/* Mobile: the templates as one vertical column, in source order. */}
+        <div className="flex md:hidden flex-col gap-4">
+          {SITES.slice(0, 12).map((site, idx) => (
+            <RevealTile key={site.id} order={idx}>
+              <SitePreviewCard
+                title={site.title}
+                href={site.href}
+                imgSrc={site.landingImgSrc}
+                height={idx % 2 === 0 ? 238 : 189}
+                isLandingPage
+              />
+            </RevealTile>
+          ))}
+        </div>
+
+        {/* Desktop: three explicit columns fed round-robin rather than a CSS
+            `columns` masonry: the heights alternate tall/short within each
+            column, so the columns stagger against each other. `slotIdx * 3 +
+            col` undoes the round-robin, recovering each tile's registry index
+            so the reveal still runs across the row rather than down a column. */}
+        <div className="hidden md:flex md:flex-row gap-3">
+          {[0, 1, 2].map((col) => (
             <div key={col} className="flex-1 min-w-0 flex flex-col gap-3">
               {SITES
-                .filter((_, idx) => idx % 2 === col)
-                .map((site, idx) => (
-                  <SitePreviewCard
-                    key={`${site.title}-${col}-${idx}`}
-                    title={site.title}
-                    href={site.href}
-                    imgSrc={site.imgSrc}
-                    height={site.isTall ? 358 : 280}
-                    isLandingPage
-                  />
+                .filter((_, idx) => idx % 3 === col)
+                .slice(0, 4)
+                .map((site, slotIdx) => (
+                  <RevealTile key={site.id} order={slotIdx * 3 + col}>
+                    <SitePreviewCard
+                      title={site.title}
+                      href={site.href}
+                      imgSrc={site.landingImgSrc}
+                      height={RIGHT_PANEL_TALL_PATTERN[col][slotIdx] ? 238 : 189}
+                      isLandingPage
+                    />
+                  </RevealTile>
                 ))}
             </div>
           ))}

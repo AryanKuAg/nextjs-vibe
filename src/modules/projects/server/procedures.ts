@@ -2,14 +2,14 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
-import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, refundCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
-import { uploadMediaAsset } from "@/lib/media-storage";
+import { checkCredits, consumeCredits, refundCredits, AGENT_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { getTemplate } from "@/lib/templates/registry";
+import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
 import { startProjectBuild } from "@/lib/v0-start-build";
+import { type SiteBrief } from "@/lib/v0-site-prompt";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -58,9 +58,8 @@ export const projectsRouter = createTRPCRouter({
       const emptyProjectIds = projects.filter(p => {
         const hasMessages = p._count.messages > 0;
         const sceneUrls = Array.isArray(p.sceneImageUrls) ? p.sceneImageUrls : [];
-        const videos = Array.isArray(p.videoUrls) ? p.videoUrls : [];
-        // If it has no media, no messages, and is not currently generating anything
-        return !hasMessages && sceneUrls.length === 0 && videos.length === 0 && p.currentStage === "SCENE";
+        // No media, no messages, and nothing being generated — an abandoned shell.
+        return !hasMessages && sceneUrls.length === 0 && p.currentStage === "SCENE";
       }).map(p => p.id);
 
       if (emptyProjectIds.length > 0) {
@@ -87,6 +86,17 @@ export const projectsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      const template = input.templateId ? getTemplate(input.templateId) : null;
+      if (input.templateId && !template) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown template "${input.templateId}".`,
+        });
+      }
+
+      // Everything the user asked for, in the one shape the whole pipeline reads.
+      const brief: SiteBrief = { startPrompt: input.value };
+
       try {
         await checkCredits(AGENT_COSTS.CODE);
       } catch (error) {
@@ -96,12 +106,22 @@ export const projectsRouter = createTRPCRouter({
         });
       }
 
-      const template = input.templateId ? getTemplate(input.templateId) : null;
-      if (input.templateId && !template) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Unknown template "${input.templateId}".`,
-        });
+      // v0 fetches attachments itself, so a reference image has to be at a
+      // public URL before anything downstream can use it. Uploaded before the
+      // project exists so the brief is written complete, in one go.
+      const referenceImageUrl = await uploadDataUrlToStorage(
+        input.imageDataUrl,
+        `frames/${ctx.auth.userId}`,
+      );
+      if (referenceImageUrl) brief.referenceImageUrl = referenceImageUrl;
+
+      // The composer accepts an image with no words, and an empty string is not
+      // a brief: it reaches v0 as nothing but our build rule, and it fails to
+      // read back at all — leaving a project a retry could never restart.
+      if (!brief.startPrompt.trim()) {
+        brief.startPrompt = referenceImageUrl
+          ? "Build a website that matches the attached image."
+          : "Build a website.";
       }
 
       const count = await prisma.project.count({
@@ -116,7 +136,10 @@ export const projectsRouter = createTRPCRouter({
           status: "draft",
           currentStage: "SCENE",
           templateId: template?.id ?? null,
-          prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
+          // Always written. Everything downstream reads the build's brief back
+          // out of here — the v0 call and a retry — so a project without this
+          // row is a project that cannot be finished.
+          prompts: [brief],
         },
       });
 
@@ -126,11 +149,7 @@ export const projectsRouter = createTRPCRouter({
       await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
 
       try {
-        await startProjectBuild({
-          projectId: createdProject.id,
-          prompt: input.value,
-          imageDataUrl: input.imageDataUrl,
-        });
+        await startProjectBuild({ projectId: createdProject.id, brief });
       } catch (error) {
         // Fail loudly on the page the user is still looking at, where their
         // prompt is still in the box, rather than handing them a half-made
@@ -173,101 +192,5 @@ export const projectsRouter = createTRPCRouter({
         where: { id: input.id },
         data: { name: input.name.trim() },
       });
-    }),
-  updatePrompts: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      prompts: z.any(), // Array of { startPrompt, endPrompt, videoPrompt }
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existing = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-      return prisma.project.update({
-        where: { id: input.projectId },
-        data: { prompts: input.prompts },
-      });
-    }),
-  startVideoGeneration: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string().min(1),
-        prompt: z.string(),
-        imageUrl: z.string().optional(),
-        endImageUrl: z.string().optional(),
-        imageBase64: z.string().optional(),
-        model: z.string().optional(),
-        blockIndex: z.number().optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const cost = MODEL_COSTS[input.model || ""] || 25;
-      await checkCredits(cost);
-
-      let imageUrl = input.imageUrl;
-      let imageBase64 = input.imageBase64;
-
-      // Inngest payload limit is ~1MB. Upload base64 image to R2 first.
-      if (imageBase64) {
-        const match = imageBase64.match(/^data:(image\/[^;]+);/);
-        const mimeType = match ? match[1] : "image/jpeg";
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-        const buffer = Buffer.from(base64Data, "base64");
-        const ext = mimeType.split("/")[1] || "jpg";
-
-        const uploaded = await uploadMediaAsset({
-          buffer,
-          key: `frames/${input.projectId}/upload-${Date.now()}.${ext}`,
-          contentType: mimeType,
-        });
-        imageUrl = uploaded.url;
-
-        // Remove base64 so it doesn't get sent to Inngest
-        imageBase64 = undefined;
-      }
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: { currentStage: "GENERATING_VIDEO" },
-      });
-
-      await inngest.send({
-        name: "veo/generate",
-        data: {
-          projectId: input.projectId,
-          prompt: input.prompt,
-          imageUrl,
-          endImageUrl: input.endImageUrl,
-          imageBase64,
-          model: input.model || "bytedance/seedance-1.5-pro",
-          userId: ctx.auth.userId,
-          blockIndex: input.blockIndex,
-        },
-      });
-
-      return { success: true };
-    }),
-  cancelVideoGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().uuid(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: { currentStage: "SCENE" }
-      });
-
-      return { success: true };
     }),
 });

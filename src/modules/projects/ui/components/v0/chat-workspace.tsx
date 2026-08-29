@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ChatConversation } from "./chat-conversation";
 import { ChatHeader, type ChatView } from "./chat-header";
 import { CodeViewer } from "./code-editor";
-import { PreviewPane, type PreviewNavigation } from "./preview-pane";
+import { PreviewPane } from "./preview-pane";
 
 /**
  * The builder: conversation on the left, preview or code on the right.
@@ -20,24 +20,38 @@ import { PreviewPane, type PreviewNavigation } from "./preview-pane";
 export function ChatWorkspace({
   chat,
   messages,
+  openingPrompt,
+  previewOrigin,
+  projectId,
+  publishedUrl,
   title,
-  toolbar,
+  titleSlot,
+  accountSlot,
   accessToken,
 }: {
   chat: Chat;
   messages: Message[];
+  /** The user's own brief, shown instead of the composed opening message. */
+  openingPrompt?: string | null;
+  projectId: string;
+  /** Verified preview hostname for this chat, or null for the path proxy. */
+  previewOrigin?: string | null;
+  /** Where this project was last published, if it has been. */
+  publishedUrl?: string | null;
   title: string;
   /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
   accessToken: string;
-  /** Rendered at the top of the conversation column (project header, credits). */
-  toolbar?: ReactNode;
+  /** Logo and editable project name, shown in the header's left segment. */
+  titleSlot?: ReactNode;
+  /** Account menu, shown at the far right of the header. */
+  accountSlot?: ReactNode;
 }) {
   const [view, setView] = useState<ChatView>("preview");
   const [contentRevision, setContentRevision] = useState(0);
-  // Lifted out of the preview so the header's address bar can show where the
-  // framed site actually is, and move through its history.
-  const [navigation, setNavigation] = useState<PreviewNavigation | null>(null);
-  const handleNavigationChange = useCallback(setNavigation, [setNavigation]);
+  // Whether v0 has a turn open, so the preview can say "building" rather than
+  // accusing the site of having failed.
+  const [isBuilding, setIsBuilding] = useState(false);
+  const handleBusyChange = useCallback(setIsBuilding, [setIsBuilding]);
 
   // Whether v0 has ever finished a turn for this chat. Before that there is no
   // site to preview and no sandbox to wait on, so the pane says so plainly
@@ -62,22 +76,27 @@ export function ChatWorkspace({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFullscreen]);
 
-  const handleContentChange = () => {
+  // Stable identity: the conversation calls this from an effect, so a fresh
+  // function each render would re-run that effect on every render.
+  const handleContentChange = useCallback(() => {
     setHasBuild(true);
     setContentRevision((revision) => revision + 1);
-  };
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatHeader
         accessToken={accessToken}
+        accountSlot={accountSlot}
         chatId={chat.id}
-        navigation={navigation}
+        projectId={projectId}
+        publishedUrl={publishedUrl}
         isFullscreen={isFullscreen}
         onReloadPreview={handleContentChange}
         onToggleFullscreen={() => setIsFullscreen((current) => !current)}
         onViewChange={setView}
         title={title}
+        titleSlot={titleSlot}
         view={view}
       />
 
@@ -88,12 +107,13 @@ export function ChatWorkspace({
             isFullscreen && "hidden",
           )}
         >
-          {toolbar}
           <ChatConversation
             accessToken={accessToken}
             chatId={chat.id}
             messages={messages}
+            onBusyChange={handleBusyChange}
             onContentChange={handleContentChange}
+            openingPrompt={openingPrompt}
           />
         </div>
 
@@ -103,7 +123,8 @@ export function ChatWorkspace({
               accessToken={accessToken}
               chatId={chat.id}
               hasBuild={hasBuild}
-              onNavigationChange={handleNavigationChange}
+              isBuilding={isBuilding}
+              previewOrigin={previewOrigin}
               reloadKey={contentRevision}
             />
           </div>

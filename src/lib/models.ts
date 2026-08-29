@@ -25,7 +25,7 @@
  * the spin, and functions.ts throws a named error when both attempts write
  * nothing.
  *
- * `vision` and `utility` do not drive tools — one reads a frame, the other
+ * `vision` and `utility` do not drive tools — one reads an image, the other
  * writes titles and chat replies — so they stay on no reasoning effort, since
  * neither touches the generated site and reasoning there is latency the user
  * waits on for nothing.
@@ -37,7 +37,7 @@ export type ModelTask =
   | "brief"      // the creative director: palette, type, sections, composition
   | "code"       // builds the site
   | "fixer"      // repairs TypeScript errors
-  | "vision"     // reads a video frame
+  | "vision"     // reads an image
   | "utility";   // routing, sanitising, titles, chat replies
 
 interface ModelChoice {

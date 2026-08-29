@@ -21,17 +21,18 @@ interface Props {
 /**
  * The site builder.
  *
- * A project's v0 chat is opened by `projects.create`, so reaching this page
- * means the build is already running and the workspace can render it straight
- * away. The only other state is the failure case: creation succeeded but v0 did
- * not, leaving a project with no chat and a retry to offer.
+ * A project's chat is opened by `projects.create`, so reaching this page means
+ * the build is already running — unless it failed to start, which leaves a
+ * project with no chat and a retry to offer.
  */
 export const ProjectView = ({ projectId }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const { data: project } = useQuery(trpc.projects.getOne.queryOptions({ id: projectId }));
-  const { data: workspace, isLoading } = useQuery(trpc.v0.workspace.queryOptions({ projectId }));
+  const { data: workspace, isLoading } = useQuery(
+    trpc.v0.workspace.queryOptions({ projectId }),
+  );
 
   const retryBuild = useMutation(
     trpc.v0.retryBuild.mutationOptions({
@@ -44,7 +45,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
   if (!project) return null;
 
-  if (isLoading) {
+  if (isLoading || !workspace) {
     return (
       <div className="flex h-screen items-center justify-center gap-2 bg-bg text-sm text-muted-foreground">
         <Loader size={16} /> Loading your build…
@@ -52,13 +53,17 @@ export const ProjectView = ({ projectId }: Props) => {
     );
   }
 
-  if (!workspace) {
+  if (workspace.status === "preparing") {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          This project has no build yet — v0 could not be reached when it was created.
+        <p className="max-w-sm text-sm text-muted-foreground">
+          This project has no build yet — something went wrong when it was created.
         </p>
-        <Button disabled={retryBuild.isPending} onClick={() => retryBuild.mutate({ projectId })} size="sm">
+        <Button
+          disabled={retryBuild.isPending}
+          onClick={() => retryBuild.mutate({ projectId })}
+          size="sm"
+        >
           {retryBuild.isPending ? <Loader size={14} /> : null}
           {retryBuild.isPending ? "Starting…" : "Start the build"}
         </Button>
@@ -73,19 +78,19 @@ export const ProjectView = ({ projectId }: Props) => {
         chat={workspace.chat}
         key={workspace.chat.id}
         messages={workspace.messages}
+        openingPrompt={workspace.openingPrompt}
+        previewOrigin={workspace.previewOrigin}
+        projectId={projectId}
+        publishedUrl={workspace.publishedUrl}
         title={project.name}
-        toolbar={
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-            <ErrorBoundary fallback={<p className="text-xs text-destructive">Header error</p>}>
-              <Suspense fallback={null}>
-                <ProjectHeader projectId={projectId} />
-              </Suspense>
-            </ErrorBoundary>
-            <div className="ml-auto">
-              <UserControl />
-            </div>
-          </div>
+        titleSlot={
+          <ErrorBoundary fallback={<p className="text-xs text-destructive">Header error</p>}>
+            <Suspense fallback={null}>
+              <ProjectHeader projectId={projectId} />
+            </Suspense>
+          </ErrorBoundary>
         }
+        accountSlot={<UserControl />}
       />
     </div>
   );

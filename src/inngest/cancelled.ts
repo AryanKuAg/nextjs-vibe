@@ -90,7 +90,6 @@ export const runCancelledFunction = inngest.createFunction(
               in: [
                 PROJECT_STAGE.THINKING,
                 PROJECT_STAGE.GENERATING_SCENE,
-                PROJECT_STAGE.GENERATING_VIDEO,
                 PROJECT_STAGE.BUILDING_SITE,
               ],
             },

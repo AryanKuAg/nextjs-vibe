@@ -2,36 +2,35 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { PROJECT_STAGE } from "@/lib/project-stage";
-import { latestVideoUrl } from "@/lib/project-video";
 import { getTemplate } from "@/lib/templates/registry";
-import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { v0 } from "@/lib/v0-client";
 import { v0Failure } from "@/lib/v0-error";
 import { V0_MODEL_CONFIGURATION } from "@/lib/v0-model";
-import { buildSitePrompt, type SiteMode } from "@/lib/v0-site-prompt";
+import { buildSitePrompt, type SiteBrief } from "@/lib/v0-site-prompt";
+
+/**
+ * Getting a project from "created" to "v0 is working on it".
+ *
+ * One path now. There used to be two — a cinematic build ran the video agent
+ * first and opened the chat only once its clip landed — which is why the
+ * builder had a "no chat yet, but nobody has failed" state. With the video
+ * agent gone the chat is opened synchronously by whoever starts the build, so a
+ * project with no chat is a build that failed to start, and nothing else.
+ */
 
 /**
  * Opens a project's v0 chat.
  *
- * This runs as part of creating the project, so by the time the browser reaches
- * `/projects/:id` the chat already exists and the builder renders a live run.
- * There is deliberately no intermediate screen asking the user to confirm the
- * prompt they just typed.
- *
- * Throws on failure. The caller owns the credit refund, because it is the one
- * that charged.
+ * Throws on failure; the caller owns the credit refund, because the caller is
+ * the one that charged.
  */
 export async function startProjectBuild(input: {
   projectId: string;
-  prompt: string;
-  /** Only meaningful once the project has a video to place. */
-  mode?: SiteMode;
-  /** A reference image the user attached, as a data URL. */
-  imageDataUrl?: string;
+  brief: SiteBrief;
 }): Promise<{ chatId: string }> {
   const project = await prisma.project.findUnique({
     where: { id: input.projectId },
-    select: { id: true, name: true, templateId: true, videoUrls: true },
+    select: { id: true, name: true, templateId: true },
   });
 
   if (!project) throw new Error("Project not found");
@@ -64,30 +63,24 @@ export async function startProjectBuild(input: {
     return { chatId };
   }
 
-  // v0 fetches attachments itself, so a reference image has to be at a public
-  // URL — a data URL is not something it can pull.
-  const referenceImageUrl = await uploadDataUrlToStorage(
-    input.imageDataUrl,
-    `frames/${project.id}`,
-  );
-
   const created = await v0.chats.createAsync({
     // No systemPrompt: v0 already knows the stack and the conventions, so the
-    // whole instruction is the user's brief plus where the video goes.
-    message: buildSitePrompt({
-      mode: input.mode ?? "FULL_PAGE",
-      prompt: input.prompt,
-      videoUrl: latestVideoUrl(project.videoUrls),
-    }),
+    // whole instruction is the user's brief.
+    message: buildSitePrompt(input.brief),
     modelConfiguration: V0_MODEL_CONFIGURATION,
     privacy: "private",
-    ...(referenceImageUrl ? { attachments: [{ url: referenceImageUrl }] } : {}),
+    // v0 fetches attachments itself, so a reference image has to be at a public
+    // URL — a data URL is not something it can pull. Uploading happens when the
+    // project is created, so by here it is already one.
+    ...(input.brief.referenceImageUrl
+      ? { attachments: [{ url: input.brief.referenceImageUrl }] }
+      : {}),
   });
 
   if (created.error !== undefined || !created.data?.chatId) {
     // v0's own wording is far more useful than anything we could invent here —
     // "You have reached your daily message limit", for instance.
-    throw v0Failure(created, "v0 did not return a chat");
+    throw v0Failure(created, "The build service did not return a chat.");
   }
 
   await prisma.project.update({

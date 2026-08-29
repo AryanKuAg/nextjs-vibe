@@ -8,6 +8,9 @@
 // See ./README.md for the contract every template repo must satisfy.
 // ---------------------------------------------------------------------------
 
+/** R2 bucket `framerate`, served publicly at assets.framerate.space. */
+const ASSETS = "https://assets.framerate.space";
+
 export interface TemplateManifest {
   /** Stable slug. Persisted on Project.templateId — never rename in place. */
   id: string;
@@ -21,8 +24,16 @@ export interface TemplateManifest {
   subdir?: string;
   /** Live demo, also used as the gallery card link. */
   demoUrl: string;
-  /** Cover image for the gallery card. */
-  imgSrc: string;
+  /**
+   * Cover for the signed-out landing page grid — the taller, full-bleed crop
+   * ("landing page images/" in the bucket).
+   */
+  landingImgSrc: string;
+  /**
+   * Cover for the signed-in dashboard gallery and the See-more modal — the
+   * 16:9 card crop ("homescreen images/" in the bucket).
+   */
+  homescreenImgSrc: string;
   /** Whether the card is rendered with a taller height in the masonry grid */
   isTall?: boolean;
 }
@@ -31,162 +42,129 @@ export interface TemplateManifest {
 // exist yet. Create one repo per template following ./README.md, then replace
 // the owner/name here. Nothing else needs to change.
 export const TEMPLATE_REGISTRY: TemplateManifest[] = [
-  {
-    id: "beach-house",
-    title: "Beach House",
-    repo: "AryanKuAg/beach-house",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/Beach_House/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-Beach_House-index.html.png",
-    isTall: true,
-  },
-  {
-    id: "ai-trip-planner",
-    title: "AI Trip Planner",
-    repo: "AryanKuAg/ai-trip-planner",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
-    imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
-    isTall: false,
-  },
-  {
-    id: "orange-furry-creature",
-    title: "Orange Furry Creature",
-    repo: "AryanKuAg/orange-furry-creature",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/orange-furry-creature/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orange-furry-creature-index.html%20(1).png",
-    isTall: true,
-  },
-  {
-    id: "flower-and-plane",
-    title: "Flower and Plane",
-    repo: "AryanKuAg/flower-and-plane",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
-    isTall: true,
-  },
-  {
-    id: "ai-workflow-agents",
-    title: "Ai Workflow Agents",
-    repo: "AryanKuAg/ai-workflow-agents",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/ai-workflow-agents/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-ai-workflow-agents-index.html.png",
-    isTall: false,
-  },
-  {
-    id: "australia-beach-road",
-    title: "Australia Beach Road",
-    repo: "AryanKuAg/australia-beach-road",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
-    isTall: false,
-  },
-  {
-    id: "rotating-earth",
-    title: "Rotating Earth",
-    repo: "AryanKuAg/rotating-earth",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
-    isTall: false,
-  },
 
   {
-    id: "haunted-house",
-    title: "Haunted House",
-    repo: "AryanKuAg/haunted-house",
+    id: "backyard-pool",
+    title: "Backyard Pool",
+    repo: "AryanKuAg/backyard-pool",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
-    imgSrc:
-      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
-    isTall: true,
+    demoUrl: "https://sites.framerate.space/template-sites/backyard-pool/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Backyard%20Pool.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Backyard%20Pool.webp`,
+    isTall: false,
   },
-
-  // ---------------------------------------------------------------------------
-  // TODO: demoUrl and imgSrc are intentionally empty for the templates below.
-  // Fill each in once the demo is deployed to sites.framerate.space and the
-  // cover image is uploaded to assets.framerate.space.
-  // ---------------------------------------------------------------------------
-  {
-    id: "aeroforge-website",
-    title: "AeroForge",
-    repo: "AryanKuAg/aeroforge-website",
+  { // its stuck on the loading screen
+    id: "coast-house",
+    title: "Coast House",
+    repo: "AryanKuAg/coast-house",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/aeroforge-website/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-aeroforge-website-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/coast-house/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Coast%20House.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Coast%20House.webp`,
     isTall: false,
   },
   {
-    id: "atelier-viaggio-website",
-    title: "Atelier Viaggio",
-    repo: "AryanKuAg/atelier-viaggio-website",
+    id: "coworking-space",
+    title: "Coworking Space",
+    repo: "AryanKuAg/coworking-space",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/atelier-viaggio-website/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-atelier-viaggio-website-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/coworking-space/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Coworking%20Space.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Coworking%20Space.webp`,
     isTall: false,
   },
   {
-    id: "fableforge-site",
-    title: "FableForge",
-    repo: "AryanKuAg/fableforge-site",
+    id: "greece-view",
+    title: "Greece View",
+    repo: "AryanKuAg/greece-view",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/fableforge-site/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-fableforge-site-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/greece-view/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Greece%20View.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Greece%20View.webp`,
     isTall: false,
   },
   {
-    id: "horizon-house-website",
-    title: "Horizon House",
-    repo: "AryanKuAg/horizon-house-website",
+    id: "home-theatre",
+    title: "Home Theatre",
+    repo: "AryanKuAg/home-theatre",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/horizon-house-website/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-horizon-house-website-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/home-theatre/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Home%20Theatre.webp`,
+    // The homescreen crop of this one was uploaded as "image 84.webp" — same
+    // Atelier Noir hero, just never renamed in the bucket.
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/image%2084.webp`,
     isTall: false,
   },
   {
-    id: "nala-maldives-website",
-    title: "Nala Maldives",
-    repo: "AryanKuAg/nala-maldives-website",
+    id: "luxury-apartments",
+    title: "Luxury Apartments",
+    repo: "AryanKuAg/luxury-apartments",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/nala-maldives-website/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-nala-maldives-website-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/luxury-apartments/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Luxury%20Apartments.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Luxury%20Apartments.webp`,
+    isTall: false,
+  },
+  { // has issues
+    id: "luxury-kitchen",
+    title: "Luxury Kitchen",
+    repo: "AryanKuAg/luxury-kitchen",
+    branch: "main",
+    demoUrl: "https://sites.framerate.space/template-sites/luxury-kitchen/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Luxury%20Kitchen.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Luxury%20Kitchen.webp`,
     isTall: false,
   },
   {
-    id: "orbit-react",
-    title: "Orbit",
-    repo: "AryanKuAg/orbit-react",
+    id: "maldives-resort",
+    title: "Maldives Resort",
+    repo: "AryanKuAg/maldives-resort",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/orbit-react/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orbit-react-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/maldives-resort/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Maldives%20Resort.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Maldives%20Resort.webp`,
     isTall: false,
   },
   {
-    id: "relay-website",
-    title: "Relay",
-    repo: "AryanKuAg/relay-website",
+    id: "mediterranean-house",
+    title: "Mediterranean House",
+    repo: "AryanKuAg/mediterranean-house",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/relay-website/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-relay-website-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/mediterranean-house/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Mediterranean%20House.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Mediterranean%20House.webp`,
+    isTall: false,
+  },
+  { // its css is not loading
+    id: "retro-miami",
+    title: "Retro Miami",
+    repo: "AryanKuAg/retro-miami",
+    branch: "main",
+    demoUrl: "https://sites.framerate.space/template-sites/retro-miami/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Retro%20Miami.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Retro%20Miami.webp`,
     isTall: false,
   },
   {
-    id: "vesper-ai-react-vite",
-    title: "Vesper AI",
-    repo: "AryanKuAg/vesper-ai-react-vite",
+    id: "villa-jacuzzi",
+    title: "Villa Jacuzzi",
+    repo: "AryanKuAg/villa-jacuzzi",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/vesper-ai-react-vite/index.html",
-    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-vesper-ai-react-vite-index.html.png",
+    demoUrl: "https://sites.framerate.space/template-sites/villa-jacuzzi/index.html",
+    landingImgSrc: `${ASSETS}/landing%20page%20images/Villa%20Jacuzzi.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/Villa%20Jacuzzi.webp`,
+    isTall: false,
+  },
+  {
+    id: "northline-atelier",
+    title: "Northline Atelier",
+    repo: "AryanKuAg/northline-atelier",
+    branch: "main",
+    demoUrl: "https://sites.framerate.space/template-sites/northline-atelier/index.html",
+    // Both crops of this site sit in the bucket under "American Mansion" —
+    // the shot is the Northline Atelier hero.
+    landingImgSrc: `${ASSETS}/landing%20page%20images/American%20Mansion.webp`,
+    homescreenImgSrc: `${ASSETS}/homescreen%20images/American%20Mansion.webp`,
     isTall: false,
   },
 ];

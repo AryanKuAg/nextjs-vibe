@@ -23,7 +23,8 @@ const SITES = TEMPLATE_REGISTRY.map((t) => ({
   id: t.id,
   title: t.title,
   href: t.demoUrl,
-  imgSrc: t.imgSrc,
+  landingImgSrc: t.landingImgSrc,
+  homescreenImgSrc: t.homescreenImgSrc,
   isTall: t.isTall,
 }));
 
@@ -45,32 +46,33 @@ const RIGHT_PANEL_TALL_PATTERN: readonly boolean[][] = [
 /**
  * One slot in the landing page's right-panel grid.
  *
- * The slots arrive one at a time rather than all at once: a dozen empty boxes
+ * The tiles arrive one at a time rather than all at once: a dozen covers
  * appearing together read as a layout that failed to load, whereas a cascade
  * reads as content on its way in. `order` is the tile's position in that
  * cascade, not its position in a column — the desktop grid is fed round-robin,
  * so ordering by column would run three separate animations side by side.
+ * Feeding it the registry index instead sweeps the reveal row by row, left to
+ * right, which is the order the eye reads the grid in anyway.
  */
-const PLACEHOLDER_STAGGER_SECONDS = 0.07;
+const REVEAL_STAGGER_SECONDS = 0.07;
 
-const PlaceholderTile = ({ height, order }: { height: number; order: number }) => {
+const RevealTile = ({ order, children }: { order: number; children: React.ReactNode }) => {
   const reduceMotion = useReducedMotion();
 
   return (
     <motion.div
-      aria-hidden
-      className="w-full rounded-[12px] border border-white-12"
-      style={{ height }}
       // `false` rather than a hidden state: with reduced motion the tile should
       // start where it ends, not fade from it.
-      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
-        delay: reduceMotion ? 0 : order * PLACEHOLDER_STAGGER_SECONDS,
+        delay: reduceMotion ? 0 : order * REVEAL_STAGGER_SECONDS,
         duration: 0.5,
         ease: [0.22, 1, 0.36, 1],
       }}
-    />
+    >
+      {children}
+    </motion.div>
   );
 };
 
@@ -99,6 +101,10 @@ const SitePreviewCard = ({
   onRemix,
   isRemixPending,
 }: SitePreviewCardProps) => {
+  // The cover fades in on decode instead of popping in: the tiles reveal on a
+  // stagger, and a cover landing after its tile has settled reads as a glitch.
+  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
+
   // Some registry entries are placeholders awaiting a deployed demo and cover
   // image (see the TODO in registry.ts) — render the empty slot rather than
   // asking next/image to fetch an empty src.
@@ -128,7 +134,10 @@ const SitePreviewCard = ({
           src={imgSrc}
           alt={`${title} - 3D website template`}
           fill
-          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 33vw"
+          onLoad={() => setIsCoverLoaded(true)}
+          className={`object-cover transition-opacity duration-500 ease-out ${isCoverLoaded ? "opacity-100" : "opacity-0"
+            }`}
         />
 
         {!isLandingPage && (
@@ -263,7 +272,7 @@ const LoggedInDashboard = () => {
                 key={`${site.title}-${idx}`}
                 title={site.title}
                 href={site.href}
-                imgSrc={site.imgSrc}
+                imgSrc={site.homescreenImgSrc}
                 templateId={site.id}
                 onRemix={remix}
                 isRemixPending={isRemixPending}
@@ -411,21 +420,23 @@ const LoggedOutView = () => {
         {/* Mobile: the templates as one vertical column, in source order. */}
         <div className="flex md:hidden flex-col gap-4">
           {SITES.slice(0, 12).map((site, idx) => (
-            <PlaceholderTile
-              key={site.title}
-              height={idx % 2 === 0 ? 238 : 189}
-              order={idx}
-            />
+            <RevealTile key={site.id} order={idx}>
+              <SitePreviewCard
+                title={site.title}
+                href={site.href}
+                imgSrc={site.landingImgSrc}
+                height={idx % 2 === 0 ? 238 : 189}
+                isLandingPage
+              />
+            </RevealTile>
           ))}
         </div>
 
         {/* Desktop: three explicit columns fed round-robin rather than a CSS
             `columns` masonry: the heights alternate tall/short within each
-            column, so the columns stagger against each other.
-
-            TEMPORARY: real covers are switched off and every slot renders as
-            an empty bordered box, four per column. Restore by swapping this
-            block back to the SitePreviewCard render it replaced. */}
+            column, so the columns stagger against each other. `slotIdx * 3 +
+            col` undoes the round-robin, recovering each tile's registry index
+            so the reveal still runs across the row rather than down a column. */}
         <div className="hidden md:flex md:flex-row gap-3">
           {[0, 1, 2].map((col) => (
             <div key={col} className="flex-1 min-w-0 flex flex-col gap-3">
@@ -433,11 +444,15 @@ const LoggedOutView = () => {
                 .filter((_, idx) => idx % 3 === col)
                 .slice(0, 4)
                 .map((site, slotIdx) => (
-                  <PlaceholderTile
-                    key={`${site.title}-${col}-${slotIdx}`}
-                    height={RIGHT_PANEL_TALL_PATTERN[col][slotIdx] ? 238 : 189}
-                    order={slotIdx * 3 + col}
-                  />
+                  <RevealTile key={site.id} order={slotIdx * 3 + col}>
+                    <SitePreviewCard
+                      title={site.title}
+                      href={site.href}
+                      imgSrc={site.landingImgSrc}
+                      height={RIGHT_PANEL_TALL_PATTERN[col][slotIdx] ? 238 : 189}
+                      isLandingPage
+                    />
+                  </RevealTile>
                 ))}
             </div>
           ))}

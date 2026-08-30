@@ -86,7 +86,7 @@ export function PromptBox({
           {isStreaming ? (
             <button
               aria-label="Stop generating"
-              className="flex size-7 items-center justify-center rounded-full bg-white text-bg transition-transform hover:bg-white-85 active:scale-95 disabled:opacity-50"
+              className="flex size-7 items-center justify-center rounded-full bg-white-16 text-white transition-all hover:bg-white/25 active:scale-95 disabled:opacity-50"
               disabled={!onStop || isStopping}
               onClick={() => void onStop?.()}
               type="button"
@@ -94,7 +94,10 @@ export function PromptBox({
               {isStopping ? (
                 <i className="ri-loader-4-line inline-block animate-spin" />
               ) : (
-                <i className="ri-stop-fill text-base" />
+                // Drawn rather than an icon-font glyph: the design's stop mark
+                // is a 10px rounded square, and ri-stop-fill sits at its own
+                // proportions inside the line box.
+                <span className="size-[10px] rounded-[2px] bg-white" />
               )}
             </button>
           ) : (

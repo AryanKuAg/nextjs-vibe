@@ -81,9 +81,9 @@ export function PublishControl({
   return (
     <Popover onOpenChange={setIsOpen} open={isOpen && Boolean(url)}>
       <PopoverAnchor asChild>
-        <div className="flex h-8 items-stretch overflow-hidden rounded-[8px] border border-white-12">
+        <div className="flex h-7 items-stretch overflow-hidden rounded-[8px] border border-white-8 hover:bg-white-8 ">
           <button
-            className="flex items-center justify-center gap-1.5 px-[14px] text-sm leading-[20px] font-medium text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50"
+            className="flex items-center justify-center gap-1.5 px-[8px] text-sm leading-[20px] font-medium text-white-85 transition-colors disabled:opacity-50 "
             disabled={isPending}
             onClick={() => publish.mutate({ projectId })}
             title={url ? "Build and put the newest version online" : "Build this site and put it online"}

@@ -1,7 +1,7 @@
 "use client";
 
 import type { V0UIMessage } from "@v0-sdk/react";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useRef } from "react";
 
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { RefreshIcon, SpinnerIcon } from "@/lib/icons";
@@ -9,11 +9,15 @@ import { RefreshIcon, SpinnerIcon } from "@/lib/icons";
 import { MessageParts } from "./message-parts";
 import { TaskResolution, type ResolveTask } from "./task-resolution";
 
+/** How far from the bottom still counts as "following along". */
+const PIN_THRESHOLD_PX = 48;
+
 export function ConversationView({
   messages,
   isStreaming = false,
   isWorking = false,
   pendingUserMessage,
+  footer,
   onRejectPermission,
   onResolveTask,
   onRestoreMessage,
@@ -25,13 +29,33 @@ export function ConversationView({
   /** A turn is open, whether or not its first part has arrived yet. */
   isWorking?: boolean;
   pendingUserMessage?: string | null;
+  /**
+   * The composer, pinned to the foot of the transcript.
+   *
+   * It belongs inside the scroller rather than beside it: an overlay laid over
+   * the scroller spans its full width, and its own background then paints over
+   * the bottom of the scrollbar — which reads as the scrollbar being cut off
+   * short of the window. In here it sits within the content box, inset by the
+   * scrollbar's own gutter, so the bar stays visible all the way down.
+   */
+  footer?: ReactNode;
   onRejectPermission?: () => void | Promise<void>;
   onResolveTask?: (task: ResolveTask) => void | Promise<void>;
   onRestoreMessage?: (messageId: string) => void;
   restoringMessageId?: string | null;
   taskDisabled?: boolean;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  // Whether the transcript should follow new content. Cleared the moment the
+  // reader scrolls away from the bottom, so an arriving reply cannot drag them
+  // back down mid-sentence.
+  const isPinnedRef = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    isPinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_THRESHOLD_PX;
+  }, []);
 
   const visibleMessages: V0UIMessage[] = pendingUserMessage
     ? [
@@ -62,52 +86,66 @@ export function ConversationView({
   const streamingMessageId = isStreaming ? newestAssistantId : null;
   const liveMessageId = isLive ? newestAssistantId : null;
 
+  /**
+   * Follow the tail of the transcript.
+   *
+   * A streaming reply rewrites `messages` on every token, so scrolling once per
+   * change meant dozens of scroll writes a second — which on overlay-scrollbar
+   * platforms flashes the scrollbar continuously, and elsewhere fights anyone
+   * trying to read further up. Coalescing to a single write per frame keeps the
+   * view pinned without the flicker, and the pin is dropped entirely once the
+   * reader scrolls away.
+   */
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, isStreaming, pendingUserMessage]);
+    if (!isPinnedRef.current) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [messages, isStreaming, isWorking, pendingUserMessage]);
 
   return (
-    // The fade is a sibling of the scroller, not part of it, so it stays put
-    // while the transcript moves underneath.
-    <div className="relative min-h-0 flex-1">
-      <div className="h-full overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 text-[14px] leading-[20px]">
-          {visibleMessages.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No messages yet.</p>
-          ) : (
-            visibleMessages.map((message) => (
-              <ConversationMessage
-                isLive={liveMessageId === message.id}
-                isRestoring={restoringMessageId === message.id}
-                isStreaming={streamingMessageId === message.id}
-                key={message.id}
-                message={message}
-                onRejectPermission={
-                  message.id === interactiveTaskMessageId ? onRejectPermission : undefined
-                }
-                onResolveTask={message.id === interactiveTaskMessageId ? onResolveTask : undefined}
-                onRestore={onRestoreMessage}
-                taskDisabled={taskDisabled}
-              />
-            ))
-          )}
-          {/* v0 can take a while to emit its first part. Without this the panel
-              sits empty after the user's message and the build looks stalled. */}
-          {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
-            <p className="shimmer-text py-0.5 text-xs leading-[16px] font-medium">Working on it…</p>
-          ) : null}
-          {/* The scroll anchor is also the bottom gap. The fade below is h-60 of
-              solid --bg at its lower end, so a zero-height anchor would park the
-              last message underneath it and make the newest text unreadable.
-              Matching the fade's height lets "end" alignment land that message
-              clear of the gradient instead. */}
-          <div aria-hidden className="h-60 shrink-0" ref={endRef} />
-        </div>
+    <div
+      className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+      onScroll={handleScroll}
+      ref={scrollerRef}
+    >
+      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-4 px-3 pt-4 text-[14px] leading-[20px]">
+        {visibleMessages.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">No messages yet.</p>
+        ) : (
+          visibleMessages.map((message) => (
+            <ConversationMessage
+              isLive={liveMessageId === message.id}
+              isRestoring={restoringMessageId === message.id}
+              isStreaming={streamingMessageId === message.id}
+              key={message.id}
+              message={message}
+              onRejectPermission={
+                message.id === interactiveTaskMessageId ? onRejectPermission : undefined
+              }
+              onResolveTask={message.id === interactiveTaskMessageId ? onResolveTask : undefined}
+              onRestore={onRestoreMessage}
+              taskDisabled={taskDisabled}
+            />
+          ))
+        )}
+        {/* v0 can take a while to emit its first part. Without this the panel
+            sits empty after the user's message and the build looks stalled. */}
+        {isWorking && visibleMessages.at(-1)?.role !== "assistant" ? (
+          <p className="shimmer-text py-0.5 text-xs leading-[16px] font-medium">Working on it…</p>
+        ) : null}
+        {/* `mt-auto` puts it at the bottom when the transcript is too short
+            to fill the pane; `sticky` holds it there once the transcript is
+            long enough to scroll. Taking real space at the end of the content
+            means the last message can never come to rest underneath it. */}
+        {footer ? (
+          <div className="sticky bottom-0 -mx-3 mt-auto bg-bg px-3 pt-2 pb-3">{footer}</div>
+        ) : null}
       </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-60 bg-gradient-to-b from-transparent to-bg"
-      />
     </div>
   );
 }

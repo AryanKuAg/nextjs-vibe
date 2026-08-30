@@ -54,7 +54,7 @@ export const AccountSettingsModal = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 font-sans"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 font-onest"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}

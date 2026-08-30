@@ -7,6 +7,12 @@ const globalForPrisma = globalThis as unknown as {
   pgPool: Pool
 }
 
+// DATABASE_URL is the pooled connection (Supabase's Supavisor on 6543), not the
+// database host itself — see env.example. `max` is per serverless instance, so
+// the load the pooler actually sees is this times however many instances Vercel
+// has warm; if connections start being refused under traffic, this is the knob.
+// The 15s connect timeout below was set for Neon's scale-to-zero cold starts.
+// Supabase's compute is always on, so it is now just slack, and harmless.
 const pool = globalForPrisma.pgPool || new Pool({ 
   connectionString: process.env.DATABASE_URL,
   max: 10,

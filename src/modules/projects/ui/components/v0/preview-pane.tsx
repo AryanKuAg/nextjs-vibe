@@ -269,7 +269,7 @@ export function PreviewPane({
               <EyeIcon className="size-5 opacity-60" />
               <p className="font-medium text-foreground">Preview isn&rsquo;t up yet</p>
               <p className="max-w-xs text-xs">
-                v0 is still starting this site, or the last build did not finish. You can keep
+                This site is still starting, or the last build did not finish. You can keep
                 working in the chat — the code is on the Code tab.
               </p>
               <Button onClick={() => setManualReload((n) => n + 1)} size="sm" variant="outline">

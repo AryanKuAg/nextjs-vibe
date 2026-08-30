@@ -52,7 +52,7 @@ export async function startProjectBuild(input: {
 
     const chatId = imported.data?.chat?.id;
     if (imported.error !== undefined || !chatId) {
-      throw v0Failure(imported, "v0 could not import the template repository");
+      throw v0Failure(imported, "The build service could not import the template repository.");
     }
 
     await prisma.project.update({

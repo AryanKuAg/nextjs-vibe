@@ -58,7 +58,15 @@ export function ChatWorkspace({
   // instead of spinning at a build that has not produced anything yet.
   const [hasBuild, setHasBuild] = useState(() =>
     toV0UIMessages(messages).some(
-      (message) => message.role === "assistant" && message.metadata?.finishReason != null,
+      (message) =>
+        message.role === "assistant" &&
+        message.metadata?.finishReason != null &&
+        // A turn that ended on its output limit wrote no files (see
+        // `abandonedTurn` in chat-conversation). Counting it as a build mounts
+        // the frame on a sandbox with nothing in it, where the upstream serves
+        // its own branded "generation will show here" page — so the pane shows
+        // our placeholder until a turn actually produces something.
+        message.metadata.finishReason !== "length",
     ),
   );
 
@@ -84,7 +92,7 @@ export function ChatWorkspace({
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col font-onest">
       <ChatHeader
         accessToken={accessToken}
         accountSlot={accountSlot}

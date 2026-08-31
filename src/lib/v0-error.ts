@@ -1,5 +1,7 @@
 import "server-only";
 
+import { scrubVendor } from "@/lib/vendor-name";
+
 /**
  * v0 SDK calls resolve to `{ data, error, response }` rather than throwing, so
  * a failure is easy to reduce to "something went wrong" on the way out. It was:
@@ -29,14 +31,6 @@ type V0Result = { error?: unknown; response: Response };
  * Scrubbing here rather than at each call site means no future handler can
  * forward an unscrubbed one; "the build service" matches CAPACITY_MESSAGE.
  */
-const VENDOR_NAME = /\bv0(?:\.(?:dev|app))?\b/gi;
-
-function scrubVendor(message: string): string {
-  return message.replace(VENDOR_NAME, (_match, offset: number) =>
-    offset === 0 ? "The build service" : "the build service",
-  );
-}
-
 export function v0Failure(result: V0Result, fallback: string): V0RequestError {
   const error = result.error;
   const message =

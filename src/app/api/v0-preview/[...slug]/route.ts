@@ -126,10 +126,14 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
     },
   });
 
+  const placeholder = await replaceUpstreamPlaceholder(upstream, waitUrl);
+
   // On its own host nothing needs rewriting — the site already owns the origin.
-  const response = ownsOrigin
-    ? await addPathReporter(upstream)
-    : await keepNavigationInsidePreview(upstream, chatId);
+  const response =
+    placeholder ??
+    (ownsOrigin
+      ? await addPathReporter(upstream)
+      : await keepNavigationInsidePreview(upstream, chatId));
 
   return withGrant(response, {
     chatId,
@@ -308,7 +312,37 @@ report();
 })();</script>`;
 }
 
-/** The frame's holding page while v0 boots the sandbox. Retries on its own. */
+/**
+ * The upstream's own "nothing generated yet" page.
+ *
+ * A chat with no generated version still resolves to a preview URL, and what
+ * that URL serves is the vendor's branded placeholder. Proxying it verbatim put
+ * their branding inside our builder, which is the one thing this app must never
+ * do. The frame gets our holding page instead, which also retries — so when the
+ * site does come up it appears on its own.
+ */
+function isUpstreamPlaceholder(html: string): boolean {
+  return /generation will show here/i.test(html);
+}
+
+/**
+ * Returns our holding page when the upstream answered with its placeholder, and
+ * null when it answered with a real page. Reading the body here is why the two
+ * rewriters below take the untouched response: only one of the three ever runs.
+ */
+async function replaceUpstreamPlaceholder(
+  response: Response,
+  retryTo: URL,
+): Promise<Response | null> {
+  if (!response.headers.get("content-type")?.includes("text/html")) return null;
+
+  const html = await response.clone().text();
+  if (!isUpstreamPlaceholder(html)) return null;
+
+  return holdingPage(retryTo.toString());
+}
+
+/** The frame's holding page while the sandbox boots. Retries on its own. */
 function holdingPage(retryTo: string) {
   return new Response(
     `<!doctype html>
@@ -360,15 +394,22 @@ function escapeHtml(value: string) {
  * to sit under the prefix, and a small script keeps client-side navigation
  * there too — a framework router calling `pushState('/about')` would otherwise
  * walk straight back out.
+ *
+ * Relative references need the other half of that. The frame's document sits at
+ * `/api/v0-preview/:chatId`, whose directory is `/api/v0-preview/` — so a site
+ * asking for `hero.mp4` rather than `/hero.mp4` resolved to a path with the
+ * chat id missing and got nothing back. A trailing slash on the frame URL would
+ * fix it, except Next 308s it straight off again, so the base href states the
+ * directory explicitly. Root-relative URLs ignore its path, which is why this
+ * and the rewriting above do not fight.
  */
 async function keepNavigationInsidePreview(response: Response, chatId: string) {
   if (!response.headers.get("content-type")?.includes("text/html")) return response;
 
   const prefix = `/api/v0-preview/${encodeURIComponent(chatId)}`;
-  const html = rewriteRootRelative(await response.text(), prefix).replace(
-    "</head>",
-    `${keepInsideScript(prefix)}</head>`,
-  );
+  const html = rewriteRootRelative(await response.text(), prefix)
+    .replace(/<head(\s[^>]*)?>/i, (head) => `${head}<base href="${prefix}/">`)
+    .replace("</head>", `${keepInsideScript(prefix)}</head>`);
 
   const headers = new Headers(response.headers);
   headers.delete("content-length"); // rewriting changed it

@@ -66,7 +66,7 @@ export function CodeViewer({
         <CodeIcon className="size-5 opacity-60" />
         <p className="font-medium text-foreground">No code yet</p>
         <p className="max-w-xs text-xs">
-          Your site&rsquo;s files will appear here once v0 has written them.
+          Your site&rsquo;s files will appear here once the build has written them.
         </p>
       </EmptyState>
     );

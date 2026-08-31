@@ -43,7 +43,7 @@ async function isPreviewHostReachable(): Promise<boolean> {
   } catch {
     reachable = false;
     console.warn(
-      `[v0] ${PREVIEW_HOST} has no wildcard DNS record — previews will use the ` +
+      `[build] ${PREVIEW_HOST} has no wildcard DNS record — previews will use the ` +
         "same-origin proxy. Create *." + previewHostname() + " to enable per-site hosts.",
     );
   }

@@ -160,7 +160,7 @@ export const projectsRouter = createTRPCRouter({
         // Always recorded in full: a capacity refusal is an incident for us,
         // and the visitor's sanitised message would otherwise be the only
         // trace that our v0 account had run out of quota.
-        console.error("[v0] build failed to start:", error);
+        console.error("[build] build failed to start:", error);
 
         // Our vendor quota is not something the visitor can act on, and telling
         // them to "upgrade your plan" would point at the wrong plan entirely.

@@ -13,6 +13,7 @@ import {
   SpinnerIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { scrubVendor } from "@/lib/vendor-name";
 
 import { withChatToken } from "./chat-token";
 import { PublishControl } from "./publish-control";
@@ -21,7 +22,7 @@ export type ChatView = "preview" | "code";
 
 /** The three plain actions and both halves of the view toggle share one shape. */
 const ICON_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-white-4 text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50";
+  "flex size-7 shrink-0 items-center justify-center rounded-[8px] text-white-85 transition-colors hover:bg-white-8 disabled:opacity-50 border border-white-8";
 
 /**
  * The builder's single top bar.
@@ -100,13 +101,13 @@ export function ChatHeader({
         {titleSlot}
       </div>
 
-      <div className="hidden h-full min-w-0 flex-1 items-center gap-2.5 px-3 md:flex">
-        <div className="flex shrink-0 items-center gap-0.5 rounded-[8px] bg-white-4 p-0.5">
+      <div className="hidden h-full min-w-0 flex-1 items-center gap-[5px] pr-3 md:flex">
+        <div className="flex h-7 shrink-0 items-center rounded-[8px] bg-white-8 p-[2px]">
           <button
             aria-label="Preview"
             aria-pressed={view === "preview"}
             className={cn(
-              "flex size-6 items-center justify-center rounded-[6px] transition-colors",
+              "flex h-6 w-7 items-center justify-center rounded-[6px] transition-colors",
               view === "preview" ? "bg-white-12 text-white" : "text-white-50 hover:text-white-85",
             )}
             onClick={() => onViewChange("preview")}
@@ -118,7 +119,7 @@ export function ChatHeader({
             aria-label="Code"
             aria-pressed={view === "code"}
             className={cn(
-              "flex size-6 items-center justify-center rounded-[6px] transition-colors",
+              "flex h-6 w-7 items-center justify-center rounded-[6px] transition-colors",
               view === "code" ? "bg-white-12 text-white" : "text-white-50 hover:text-white-85",
             )}
             onClick={() => onViewChange("code")}
@@ -180,7 +181,9 @@ export function ChatHeader({
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  // Scrubbed: the SDK's own failure wording names the vendor, and this string
+  // goes straight onto the screen.
+  return scrubVendor(error instanceof Error ? error.message : fallback);
 }
 
 function fileName(value: string) {

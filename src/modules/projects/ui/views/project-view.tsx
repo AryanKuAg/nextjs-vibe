@@ -47,7 +47,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
   if (isLoading || !workspace) {
     return (
-      <div className="flex h-screen items-center justify-center gap-2 bg-bg text-sm text-muted-foreground">
+      <div className="flex h-screen items-center justify-center gap-2 bg-bg font-onest text-sm text-muted-foreground">
         <Loader size={16} /> Loading your build…
       </div>
     );
@@ -55,7 +55,7 @@ export const ProjectView = ({ projectId }: Props) => {
 
   if (workspace.status === "preparing") {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-bg px-6 text-center font-onest">
         <p className="max-w-sm text-sm text-muted-foreground">
           This project has no build yet — something went wrong when it was created.
         </p>
@@ -72,7 +72,7 @@ export const ProjectView = ({ projectId }: Props) => {
   }
 
   return (
-    <div className="h-screen bg-bg">
+    <div className="h-screen bg-bg font-onest">
       <ChatWorkspace
         accessToken={workspace.accessToken}
         chat={workspace.chat}

@@ -10,11 +10,13 @@ import {
   type V0UIMessage,
 } from "@v0-sdk/react";
 import { useMessages, useResolveTask, useRestoreMessage, useStopMessage } from "@v0-sdk/react/swr";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { readV0Stream } from "v0/browser";
 
 import { Loader } from "@/components/ai-elements/loader";
 import { Button } from "@/components/ui/button";
+import { TEMPLATE_BUILD_PROMPT } from "@/lib/v0-site-prompt";
+import { scrubVendor } from "@/lib/vendor-name";
 
 import { withChatToken } from "./chat-token";
 import { ConversationView } from "./conversation-view";
@@ -62,6 +64,10 @@ export function ChatConversation({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const [isResolving, setIsResolving] = useState(false);
+  // A rewind is the only thing that legitimately shortens the transcript. Every
+  // other shrink is a poll that has not caught up yet, so the merge below
+  // refuses those unless this says otherwise.
+  const acceptsTruncationRef = useRef(false);
   const [resolvingMessageId, setResolvingMessageId] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false);
   const [restoringMessageId, setRestoringMessageId] = useState<string | null>(null);
@@ -190,20 +196,37 @@ export function ChatConversation({
   /**
    * Fold the polled transcript into what is on screen.
    *
-   * Between turns this is a straight replace. Mid-turn it is not: overwriting a
-   * streaming message with its half-written persisted copy makes it flicker, so
-   * the polled copy is only adopted when it is strictly richer than what has
-   * rendered. That is what rescues a stream which attached but has delivered
-   * nothing — the symptom being a blank panel that suddenly fills in at the end
-   * — while a healthy stream, always ahead of the poll, is left alone.
+   * Mid-turn, overwriting a streaming message with its half-written persisted
+   * copy makes it flicker, so the polled copy is only adopted when it is
+   * strictly richer than what has rendered. That is what rescues a stream which
+   * attached but has delivered nothing — the symptom being a blank panel that
+   * suddenly fills in at the end — while a healthy stream, always ahead of the
+   * poll, is left alone.
+   *
+   * Between turns the server is authoritative, but only once its answer has
+   * caught up. This used to be a straight replace, and the moment a turn closed
+   * it ran against whatever poll was in hand: `onFinish` refreshes
+   * asynchronously and the interval poll is switched off between turns, so that
+   * was routinely a transcript from *before* the exchange that had just
+   * streamed. The pair would blank out and reappear a beat later when the
+   * refresh landed. A poll strictly poorer than what is rendered is now taken
+   * as stale rather than as truth.
    */
   useEffect(() => {
     if (isResolving) return;
 
     const polled = toV0UIMessages(persistedMessages);
+    const allowTruncation = acceptsTruncationRef.current;
 
     if (!chatIsBusy) {
-      setMessages(polled);
+      setMessages((current) => {
+        // `>=` rather than `>`: an equal-length poll still carries metadata the
+        // stream may not have (finishReason above all), so it should win.
+        if (countParts(polled) >= countParts(current)) return polled;
+        if (!allowTruncation) return current;
+        acceptsTruncationRef.current = false;
+        return polled;
+      });
       return;
     }
 
@@ -232,6 +255,8 @@ export function ChatConversation({
     try {
       await restoreMessageMutation.trigger({ messageId });
       onContentChange();
+      // The one shrink the merge above should believe.
+      acceptsTruncationRef.current = true;
       await refreshMessages();
     } catch (error) {
       setActionError(errorMessage(error, "Failed to restore message."));
@@ -341,61 +366,65 @@ export function ChatConversation({
   // also what the transport replays and what every id and index here refers to;
   // rewriting it at the source would put our display copy back into the chat.
   const visibleMessages = useMemo(
-    () => withOriginalPrompt(uiMessages, openingPrompt),
+    // Order matters: rewriting runs first, so if the build instruction happens
+    // to BE the opening message it is relabelled rather than dropped, and the
+    // filter then only catches a second copy of it.
+    () => withoutBuildInstruction(withOriginalPrompt(uiMessages, openingPrompt)),
     [openingPrompt, uiMessages],
   );
 
   return (
-    <>
-      <ConversationView
-        isStreaming={isStreaming}
-        isWorking={isSubmitting || hasPendingRun}
-        messages={visibleMessages}
-        onRejectPermission={() => submitMessage("Do not run this action. Continue without it.")}
-        onResolveTask={resolveTask}
-        onRestoreMessage={restoreMessage}
-        restoringMessageId={restoringMessageId}
-        taskDisabled={isSubmitting || restoringMessageId !== null}
-      />
-      <div className="shrink-0 px-3 pb-3">
-        {/* A run that has gone quiet. Offered rather than done automatically:
-            v0 is occasionally just slow, and cancelling a turn that was about
-            to land would throw away the build the user paid for. */}
-        {!hasStalled && abandonedTurn ? (
-          <div className="mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-            <p className="text-xs text-muted-foreground">
-              v0 stopped part-way through this turn and did not write the site. Send a follow-up —
-              &ldquo;continue&rdquo; is usually enough — and it will pick up where it left off.
-            </p>
-          </div>
-        ) : null}
-        {hasStalled ? (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-              v0 has not sent anything for a few minutes. This build may have stalled.
-            </p>
-            <Button
-              className="shrink-0"
-              disabled={isStopping}
-              onClick={() => void stopMessage()}
-              size="sm"
-              variant="outline"
-            >
-              {isStopping ? <Loader size={14} /> : null}
-              {isStopping ? "Stopping…" : "Stop this run"}
-            </Button>
-          </div>
-        ) : null}
-        <PromptBox
-          isStopping={isStopping}
-          isStreaming={isStreaming}
-          isSubmitting={isSubmitting || restoringMessageId !== null}
-          onStop={stopMessage}
-          onSubmit={submitMessage}
-        />
-        {error ? <p className="mt-1.5 px-1 text-xs text-destructive">{error}</p> : null}
-      </div>
-    </>
+    <ConversationView
+      footer={
+        <>
+          {/* A run that has gone quiet. Offered rather than done automatically:
+              v0 is occasionally just slow, and cancelling a turn that was about
+              to land would throw away the build the user paid for. */}
+          {!hasStalled && abandonedTurn ? (
+            <div className="mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                The build stopped part-way through this turn and did not write the site. Send a
+                follow-up — &ldquo;continue&rdquo; is usually enough — and it will pick up where it
+                left off.
+              </p>
+            </div>
+          ) : null}
+          {hasStalled ? (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                Nothing has come back for a few minutes. This build may have stalled.
+              </p>
+              <Button
+                className="shrink-0"
+                disabled={isStopping}
+                onClick={() => void stopMessage()}
+                size="sm"
+                variant="outline"
+              >
+                {isStopping ? <Loader size={14} /> : null}
+                {isStopping ? "Stopping…" : "Stop this run"}
+              </Button>
+            </div>
+          ) : null}
+          <PromptBox
+            isStopping={isStopping}
+            isStreaming={isStreaming}
+            isSubmitting={isSubmitting || restoringMessageId !== null}
+            onStop={stopMessage}
+            onSubmit={submitMessage}
+          />
+          {error ? <p className="mt-1.5 px-1 text-xs text-destructive">{error}</p> : null}
+        </>
+      }
+      isStreaming={isStreaming}
+      isWorking={isSubmitting || hasPendingRun}
+      messages={visibleMessages}
+      onRejectPermission={() => submitMessage("Do not run this action. Continue without it.")}
+      onResolveTask={resolveTask}
+      onRestoreMessage={restoreMessage}
+      restoringMessageId={restoringMessageId}
+      taskDisabled={isSubmitting || restoringMessageId !== null}
+    />
   );
 }
 
@@ -442,6 +471,26 @@ function withOriginalPrompt(
   });
 }
 
+/**
+ * Drop the remix kick-off turn.
+ *
+ * Importing a template repo lands the files without running anything, so the
+ * build is started by a message of ours telling v0 to build the repo unchanged.
+ * That is machinery, not something the user wrote, and showing it back to them
+ * reads as the app talking to itself — the same reason the composed opening
+ * message is rewritten above. What they clicked is already named by the opening
+ * prompt sitting over it.
+ */
+function withoutBuildInstruction(messages: V0UIMessage[]): V0UIMessage[] {
+  return messages.filter((message) => {
+    if (message.role !== "user" || message.parts.length === 0) return true;
+
+    return !message.parts.every(
+      (part) => part.type === "text" && part.text.trim() === TEMPLATE_BUILD_PROMPT,
+    );
+  });
+}
+
 /** How much of a transcript has actually rendered, used to pick the richer copy. */
 function countParts(messages: V0UIMessage[]) {
   return messages.reduce((total, message) => total + message.parts.length, 0);
@@ -455,5 +504,7 @@ function upsertMessage(messages: V0UIMessage[], message: V0UIMessage) {
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  // Scrubbed: the SDK's own failure wording names the vendor, and this string
+  // goes straight onto the screen.
+  return scrubVendor(error instanceof Error ? error.message : fallback);
 }

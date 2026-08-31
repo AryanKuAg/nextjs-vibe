@@ -67,7 +67,7 @@ export const ProjectHeader = ({ projectId }: Props) => {
   return (
     <>
       <Link className="shrink-0" href="/">
-        <Image src="/logo.png" alt="framerate" width={28} height={28} />
+        <Image src="/logo.png" alt="framerate" width={24} height={24} />
       </Link>
 
       {isEditing ? (

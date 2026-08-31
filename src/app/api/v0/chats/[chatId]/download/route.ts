@@ -27,12 +27,16 @@ export const dynamic = "force-dynamic";
  * body has no such cap, so the size of the customer's own site stops being
  * something this route can fail on.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
+async function download(request: Request, { params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = await params;
   const authorized = await authorizeChat(chatId, request);
   if (!authorized.ok) return authorized.response;
 
-  const result = await v0.chats.downloadFiles({ chatId });
+  // `parseAs` matters: left on its default the SDK reads the body itself to
+  // build `result.data`, and the response handed back is already spent — so
+  // reading it here threw "Body is unusable" and every download 500'd. Asking
+  // for an arrayBuffer puts the bytes in `data` and leaves nothing to re-read.
+  const result = await v0.chats.downloadFiles({ chatId }, { parseAs: "arrayBuffer" });
 
   if (result.error !== undefined) {
     // Deliberately not `result.error`: the upstream body names the vendor, and
@@ -43,7 +47,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
     );
   }
 
-  const source = await result.response.arrayBuffer();
+  // Typed `unknown` by the SDK — the endpoint's 200 is a ZIP archive, and
+  // `parseAs` above decides the runtime shape.
+  const source = result.data as ArrayBuffer;
 
   return new Response(await debrandedZipStream(source), {
     status: 200,
@@ -104,3 +110,11 @@ async function debrandedZipStream(source: ArrayBuffer): Promise<ReadableStream<U
     },
   });
 }
+
+/**
+ * The client's download hook issues a GET; this route answered only POST, so
+ * every download came back 405. Both are exported rather than swapping one for
+ * the other, so anything already calling it keeps working.
+ */
+export const GET = download;
+export const POST = download;

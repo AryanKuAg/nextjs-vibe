@@ -61,7 +61,7 @@ export async function authorizeChat(
   }
 
   if (!userId) {
-    console.error(`[v0] authorizeChat refused ${chatId} — ${failure}`);
+    console.error(`[build] authorizeChat refused ${chatId} — ${failure}`);
     return {
       ok: false,
       response: Response.json(

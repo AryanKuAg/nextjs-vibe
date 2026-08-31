@@ -110,6 +110,15 @@ export default function RootLayout({
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${dmMono.variable} ${spaceGrotesk.variable} ${onest.variable} antialiased`}
           >
             <CanonicalUrl />
+            {/* Revenue attribution. Sets the first-party cookie the checkout
+                route forwards to Dodo as metadata, which is what ties a payment
+                back to the visit that produced it. */}
+            <Script
+              src="https://datafa.st/js/script.js"
+              data-website-id="dfid_sWZWVZNKhnn9GOFxqvu4y"
+              data-domain="framerate.space"
+              strategy="afterInteractive"
+            />
             <Script
               strategy="lazyOnload"
               src={`https://www.googletagmanager.com/gtag/js?id=G-EDJCD5QD81`}

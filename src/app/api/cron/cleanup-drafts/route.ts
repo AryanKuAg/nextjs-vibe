@@ -17,7 +17,16 @@ import { prisma } from "@/lib/db";
  */
 export async function GET(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
+  // Three ways in, because the caller differs by host. Vercel Cron cannot set a
+  // custom header: it sends `Authorization: Bearer $CRON_SECRET` and nothing
+  // else, so without that arm the scheduled run would 401 on every invocation.
+  // The other two are for Cloud Scheduler and for calling it by hand.
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const secret =
+    bearer ??
+    req.headers.get("x-cron-secret") ??
+    req.nextUrl.searchParams.get("secret");
+
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

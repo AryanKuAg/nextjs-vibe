@@ -144,4 +144,4 @@ If brief compilation fails, the code agent receives the raw request + skeleton a
 - **Never run `npm run dev` or `npm run build`** in the main project for testing — the user manages this manually.
 - Sandbox environments (E2B) are used for generated sites.
 - Inngest handles the agent orchestration pipeline.
-- OpenRouter + DeepSeek (`google/gemini-3.1-flash-lite`) for routing/sanitizing/brief-compiling/code generation; Grok for the fixer.
+- OpenRouter + DeepSeek (`google/gemini-3.5-flash-lite`) for routing/sanitizing/brief-compiling/code generation; Grok for the fixer.

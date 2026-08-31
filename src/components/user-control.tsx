@@ -26,6 +26,12 @@ export const UserControl = ({ showName }: Props) => {
   const trpc = useTRPC();
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  // Controlled so the Upgrade button below can close the menu as it opens the
+  // pricing modal. A DropdownMenuItem closes the menu itself on select; that
+  // button is a plain one, and a menu left open holds a dismissable layer over
+  // the page that swallows the next click — so the modal's buttons needed
+  // clicking twice, once to dismiss the menu and once to actually hit them.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user } = useUser();
   const { signOut } = useClerk();
   const [isMounted, setIsMounted] = useState(false);
@@ -45,7 +51,7 @@ export const UserControl = ({ showName }: Props) => {
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <DropdownMenuTrigger className="outline-none flex items-center gap-2">
           <Avatar className="h-[28px] w-[28px] rounded-[8px] transition-opacity hover:opacity-80">
             <AvatarImage src={user.imageUrl} />
@@ -54,7 +60,7 @@ export const UserControl = ({ showName }: Props) => {
             </AvatarFallback>
           </Avatar>
           {showName && (
-            <span className="text-sm text-white font-sans truncate max-w-[100px] hidden sm:inline-block">
+            <span className="text-sm text-white font-onest truncate max-w-[100px] hidden sm:inline-block">
               {user.fullName || user.firstName}
             </span>
           )}
@@ -62,7 +68,7 @@ export const UserControl = ({ showName }: Props) => {
         <DropdownMenuContent
           align="end"
           sideOffset={8}
-          className="w-[216px]  bg-[#2f2f2f] text-white font-sans rounded-[10px] shadow-xl border-0 p-0"
+          className="w-[216px]  bg-grey-bg text-white font-onest rounded-[10px] shadow-xl border-0 p-0"
         >
           {/* User info header */}
           <div className="flex items-start justify-between gap-2 p-3">
@@ -103,7 +109,13 @@ export const UserControl = ({ showName }: Props) => {
               </span>
             </div>
           ) : (
-            <button onClick={() => setIsPricingModalOpen(true)} className="block w-full mb-3 px-3 focus:outline-none ">
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                setIsPricingModalOpen(true);
+              }}
+              className="block w-full mb-3 px-3 focus:outline-none "
+            >
               <div className="w-full text-center text-xs font-medium text-white border-[0.5px] border-white-85 rounded-lg hover:bg-white-4 transition-colors cursor-pointer h-[28px] leading-[26px]">
                 Upgrade
               </div>
@@ -113,7 +125,7 @@ export const UserControl = ({ showName }: Props) => {
           <div className="border-t-[0.5px] border-white-8 p-1.5 flex flex-col gap-[3px]">
             <DropdownMenuItem
               onClick={() => router.push('/projects')}
-              className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 rounded-lg focus:text-white h-[28px] mb-[3px] group"
+              className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 rounded-lg focus:text-white h-[28px]  group"
             >
               <i className="ri-folder-line text-white-50 text-base group-hover:text-white-85" />
               <span className="text-[12px] text-white">Projects</span>

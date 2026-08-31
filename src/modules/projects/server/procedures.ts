@@ -2,14 +2,13 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db";
 import { TRPCError } from "@trpc/server";
-import { inngest } from "@/inngest/client";
 
-import { checkCredits, consumeCredits, MODEL_COSTS, AGENT_COSTS } from "@/lib/usage";
-import { uploadMediaAsset } from "@/lib/media-storage";
+import { checkCredits, consumeCredits, refundCredits, AGENT_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
-import { getTemplate } from "@/lib/templates/registry";
-import { PROJECT_STAGE } from "@/lib/project-stage";
 import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
+import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
+import { startProjectBuild } from "@/lib/v0-start-build";
+import { type SiteBrief } from "@/lib/v0-site-prompt";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -58,9 +57,8 @@ export const projectsRouter = createTRPCRouter({
       const emptyProjectIds = projects.filter(p => {
         const hasMessages = p._count.messages > 0;
         const sceneUrls = Array.isArray(p.sceneImageUrls) ? p.sceneImageUrls : [];
-        const videos = Array.isArray(p.videoUrls) ? p.videoUrls : [];
-        // If it has no media, no messages, and is not currently generating anything
-        return !hasMessages && sceneUrls.length === 0 && videos.length === 0 && p.currentStage === "SCENE";
+        // No media, no messages, and nothing being generated — an abandoned shell.
+        return !hasMessages && sceneUrls.length === 0 && p.currentStage === "SCENE";
       }).map(p => p.id);
 
       if (emptyProjectIds.length > 0) {
@@ -78,42 +76,45 @@ export const projectsRouter = createTRPCRouter({
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
         isAgentMode: z.boolean().default(false),
-        // Set when the project is created by remixing a gallery template. An
-        // unknown id is rejected rather than silently ignored — a project that
-        // claims a template it cannot download would fail mid-build.
-        templateId: z.string().optional(),
+        /** A reference image attached to the prompt, as a data URL. */
+        imageDataUrl: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      // Everything the user asked for, in the one shape the whole pipeline reads.
+      const brief: SiteBrief = { startPrompt: input.value };
+
       try {
-        await checkCredits(1);
-        await consumeCredits(0); // Project metadata creation is free; generation is charged separately
+        await checkCredits(AGENT_COSTS.CODE);
       } catch (error) {
-        if (error instanceof Error) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message
-          });
-        } else {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message: "You have run out of credits"
-          });
-        }
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: error instanceof Error ? error.message : "You have run out of credits",
+        });
       }
 
-      const template = input.templateId ? getTemplate(input.templateId) : null;
-      if (input.templateId && !template) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Unknown template "${input.templateId}".`,
-        });
+      // v0 fetches attachments itself, so a reference image has to be at a
+      // public URL before anything downstream can use it. Uploaded before the
+      // project exists so the brief is written complete, in one go.
+      const referenceImageUrl = await uploadDataUrlToStorage(
+        input.imageDataUrl,
+        `frames/${ctx.auth.userId}`,
+      );
+      if (referenceImageUrl) brief.referenceImageUrl = referenceImageUrl;
+
+      // The composer accepts an image with no words, and an empty string is not
+      // a brief: it reaches v0 as nothing but our build rule, and it fails to
+      // read back at all — leaving a project a retry could never restart.
+      if (!brief.startPrompt.trim()) {
+        brief.startPrompt = referenceImageUrl
+          ? "Build a website that matches the attached image."
+          : "Build a website.";
       }
 
       const count = await prisma.project.count({
         where: { userId: ctx.auth.userId },
       });
-      const name = template ? `${template.title} Remix` : `Project ${count + 1}`;
+      const name = `Project ${count + 1}`;
 
       const createdProject = await prisma.project.create({
         data: {
@@ -121,10 +122,43 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
-          templateId: template?.id ?? null,
-          prompts: input.value.trim() ? [{ startPrompt: input.value }] : [],
+          // Always written. Everything downstream reads the build's brief back
+          // out of here — the v0 call and a retry — so a project without this
+          // row is a project that cannot be finished.
+          prompts: [brief],
         },
       });
+
+      // The build starts here rather than on the project page. Creating a
+      // project IS asking for a site, so the redirect lands on a builder that
+      // is already running instead of a form asking for the prompt again.
+      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
+
+      try {
+        await startProjectBuild({ projectId: createdProject.id, brief });
+      } catch (error) {
+        // Fail loudly on the page the user is still looking at, where their
+        // prompt is still in the box, rather than handing them a half-made
+        // project with nothing in it.
+        await refundCredits(AGENT_COSTS.CODE, ctx.auth.userId).catch(() => {});
+        await prisma.project.delete({ where: { id: createdProject.id } }).catch(() => {});
+
+        // Always recorded in full: a capacity refusal is an incident for us,
+        // and the visitor's sanitised message would otherwise be the only
+        // trace that our v0 account had run out of quota.
+        console.error("[build] build failed to start:", error);
+
+        // Our vendor quota is not something the visitor can act on, and telling
+        // them to "upgrade your plan" would point at the wrong plan entirely.
+        if (isCapacityError(error)) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: CAPACITY_MESSAGE });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to start the build",
+        });
+      }
 
       return createdProject;
     }),
@@ -144,288 +178,5 @@ export const projectsRouter = createTRPCRouter({
         where: { id: input.id },
         data: { name: input.name.trim() },
       });
-    }),
-  updatePrompts: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      prompts: z.any(), // Array of { startPrompt, endPrompt, videoPrompt }
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existing = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-      return prisma.project.update({
-        where: { id: input.projectId },
-        data: { prompts: input.prompts },
-      });
-    }),
-  startVideoGeneration: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string().min(1),
-        prompt: z.string(),
-        imageUrl: z.string().optional(),
-        endImageUrl: z.string().optional(),
-        imageBase64: z.string().optional(),
-        model: z.string().optional(),
-        blockIndex: z.number().optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const cost = MODEL_COSTS[input.model || ""] || 25;
-      await checkCredits(cost);
-
-      let imageUrl = input.imageUrl;
-      let imageBase64 = input.imageBase64;
-
-      // Inngest payload limit is ~1MB. Upload base64 image to R2 first.
-      if (imageBase64) {
-        const match = imageBase64.match(/^data:(image\/[^;]+);/);
-        const mimeType = match ? match[1] : "image/jpeg";
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-        const buffer = Buffer.from(base64Data, "base64");
-        const ext = mimeType.split("/")[1] || "jpg";
-
-        const uploaded = await uploadMediaAsset({
-          buffer,
-          key: `frames/${input.projectId}/upload-${Date.now()}.${ext}`,
-          contentType: mimeType,
-        });
-        imageUrl = uploaded.url;
-
-        // Remove base64 so it doesn't get sent to Inngest
-        imageBase64 = undefined;
-      }
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: { currentStage: "GENERATING_VIDEO" },
-      });
-
-      await inngest.send({
-        name: "veo/generate",
-        data: {
-          projectId: input.projectId,
-          prompt: input.prompt,
-          imageUrl,
-          endImageUrl: input.endImageUrl,
-          imageBase64,
-          model: input.model || "bytedance/seedance-1.5-pro",
-          userId: ctx.auth.userId,
-          blockIndex: input.blockIndex,
-        },
-      });
-
-      return { success: true };
-    }),
-  buildSite: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      value: z.string(),
-      videoUrl: z.string().optional().nullable(),
-      frameCount: z.number().optional(),
-      model: z.string().optional(),
-      isFollowUp: z.boolean().optional(),
-      imageDataUrl: z.string().optional(),
-      isAgentMode: z.boolean().default(false),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      // Code generation is charged per user message, not per agent run.
-      await checkCredits(AGENT_COSTS.CODE);
-
-      const createdMessage = await prisma.message.create({
-        data: {
-          projectId: existingProject.id,
-          content: input.value,
-          role: "USER",
-          type: "RESULT",
-          stage: "SITE",
-        },
-      });
-
-      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
-
-      await inngest.send({
-        name: "code-agent/run",
-        data: {
-          value: input.value,
-          projectId: input.projectId,
-          videoUrl: input.videoUrl ?? undefined,
-          frameCount: input.frameCount,
-          model: input.model,
-          userId: ctx.auth.userId,
-          imageDataUrl: input.imageDataUrl,
-          isAgentMode: input.isAgentMode,
-          // Returned by the agent's onFailure handler if the run never completes.
-          refundOnFailure: AGENT_COSTS.CODE,
-        },
-      });
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          // The code agent flips this to BUILDING_SITE once it starts and back to
-          // SITE when it lands. Marking it THINKING here stops the previous turn's
-          // stage being read as this turn's status while the sandbox boots.
-          currentStage: PROJECT_STAGE.THINKING,
-        },
-      });
-
-      return createdMessage;
-    }),
-  startAutonomousGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().min(1),
-      prompt: z.string(),
-      model: z.string().optional(),
-      isAgentMode: z.boolean().default(false),
-      // An image the user attached to their prompt. What it is FOR — a start
-      // frame, a look to match, or a layout to copy — is classified by the agent
-      // from the prompt, not decided here.
-      imageDataUrl: z.string().optional(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      // A project that already produced a fragment has a live site — anything after
-      // that is a follow-up edit, which skips the wizard instead of rebuilding.
-      const existingFragment = await prisma.fragment.findFirst({
-        where: { message: { projectId: input.projectId } },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      const isFollowUp = Boolean(existingFragment);
-
-      // The original site request, so media agents regenerating a background still
-      // know what the site is about even when the follow-up message is just
-      // "make another video".
-      const firstUserMessage = await prisma.message.findFirst({
-        where: { projectId: input.projectId, role: "USER" },
-        orderBy: { createdAt: "asc" },
-        select: { content: true },
-      });
-
-      await checkCredits(AGENT_COSTS.CODE);
-
-      // Stored before the event is sent: a data URL is far too large for an
-      // Inngest payload, so only the resulting URL travels with the run.
-      const referenceImageUrl = await uploadDataUrlToStorage(
-        input.imageDataUrl,
-        `frames/${input.projectId}`,
-      );
-
-      const createdMessage = await prisma.message.create({
-        data: {
-          projectId: existingProject.id,
-          content: input.prompt,
-          role: "USER",
-          type: "RESULT",
-          stage: "SITE",
-        },
-      });
-
-      // Charged once per user message. The code agent may run several times for this
-      // message (template pass, lenient rebuild, retries) and must not charge again.
-      await consumeCredits(AGENT_COSTS.CODE, ctx.auth.userId);
-
-      await inngest.send({
-        name: "autonomous-agent/run",
-        data: {
-          prompt: input.prompt,
-          sitePrompt: firstUserMessage?.content || input.prompt,
-          projectId: input.projectId,
-          model: input.model,
-          userId: ctx.auth.userId,
-          isAgentMode: input.isAgentMode,
-          isFollowUp,
-          referenceImageUrl,
-          // Returned by the agent's onFailure handler if the run never completes.
-          // Only the code charge — image and video bill themselves on success.
-          refundOnFailure: AGENT_COSTS.CODE,
-        },
-      });
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          // A fresh build starts at the background step. A follow-up has no known
-          // step until an agent announces one — and it must not keep reporting the
-          // previous turn's stage, which is what made the status line look stuck.
-          currentStage: isFollowUp ? PROJECT_STAGE.THINKING : PROJECT_STAGE.SCENE,
-        },
-      });
-
-      return createdMessage;
-    }),
-  cancelGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().uuid(),
-    }))
-    .mutation(async ({ input }) => {
-      // Stop the Inngest run for both v1 and v2 autonomous agents
-      await inngest.send([
-        {
-          name: "code-agent/cancel",
-          data: { projectId: input.projectId }
-        },
-        {
-          name: "autonomous-agent/cancel",
-          data: { projectId: input.projectId }
-        },
-        {
-          name: "project.user.response",
-          data: { projectId: input.projectId, action: "CANCEL", payload: null }
-        }
-      ]);
-
-      // Inject a cancellation message to unblock the UI
-      await prisma.message.create({
-        data: {
-          projectId: input.projectId,
-          role: "ASSISTANT",
-          content: "Generation was manually stopped.",
-          type: "ERROR",
-          stage: "SITE"
-        }
-      });
-
-      return { success: true };
-    }),
-  cancelVideoGeneration: protectedProcedure
-    .input(z.object({
-      projectId: z.string().uuid(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
-        where: { id: input.projectId, userId: ctx.auth.userId },
-      });
-
-      if (!existingProject) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-      }
-
-      await prisma.project.update({
-        where: { id: input.projectId },
-        data: { currentStage: "SCENE" }
-      });
-
-      return { success: true };
     }),
 });

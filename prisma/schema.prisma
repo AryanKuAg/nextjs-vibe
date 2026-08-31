@@ -29,12 +29,28 @@ model Project {
   // so the manual-prompt path is unaffected by anything gated on it.
   templateId String? // matches TemplateManifest.id in src/lib/templates/registry.ts
 
+  // v0 Platform API state. The site is built by v0 rather than an E2B sandbox,
+  // so the chat is the durable handle to the build and its hosted preview.
+  v0ChatId String? // persists across turns — follow-ups reuse the same chat
+  // Set while a v0 run is in flight, cleared when its result is reconciled into
+  // a Message + Fragment. Doubles as the idempotency key for that reconcile.
+  v0PendingMessageId String?
+
+  // Set when the user publishes. The built site is uploaded to R2 under
+  // sites/<projectId>/, so this URL is stable across republishes.
+  publishedUrl String?
+  publishedAt  DateTime?
+
   // Visual pipeline state
-  currentStage   String @default("SCENE") // "SCENE" | "GENERATING_VIDEO" | "VIDEO" | "SITE"
-  videoUrls      Json   @default("[]") // Array of all generated cinematic videos
+  currentStage   String @default("SCENE") // "SCENE" | "GENERATING_SCENE" | "BUILDING_SITE" | "SITE" | "THINKING"
   sceneImageUrls Json   @default("[]") // Array of all generated scene image URLs
-  prompts        Json   @default("[]") // Array of prompts for each block
-  frameCount     Int?   // The total number of frames extracted for the project
+  prompts        Json   @default("[]") // The build brief — see SiteBrief in src/lib/v0-site-prompt.ts
+
+  // LEGACY, no longer written or read. Left in place deliberately: these are the
+  // only record of clips the removed video agent generated, and the files are
+  // still in R2. Drop them with a migration once that footage is written off.
+  videoUrls  Json @default("[]")
+  frameCount Int?
 
   messages Message[]
 }

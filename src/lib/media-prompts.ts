@@ -1,18 +1,18 @@
 /**
- * Prompt craft for the background image agent:
+ * Prompt craft for the two-stage background pipeline:
  *
- *   user's website request  ->  IMAGE agent  ->  background plate
+ *   user's website request  ->  IMAGE agent  ->  frame 1  ->  VIDEO agent  ->  scroll background
  *
- * NOTE ON THE WORDING BELOW. These prompts were written when the image was
- * frame one of a generated clip, so they still direct the composition as if a
- * camera were about to fly through it — an open centre, three depth layers,
- * deep focus. The video agent is gone, but the wording is left exactly as it
- * was: it is tuned copy that decides what the image model draws, and rewriting
- * it would change every background this app produces. Reword it as a deliberate
- * change to the look, not as part of a cleanup.
+ * The video model only ever sees the generated image as its first frame, so the
+ * image is what decides whether an FPV drone move is even possible. A flat,
+ * shallow-focus, or collage-like image gives the video model nothing to fly
+ * through, and it compensates with cuts, fades and morphs — the "cheap
+ * transition" look. These two system prompts are therefore written as a matched
+ * pair: the image prompt manufactures a flight path, the video prompt flies it.
  *
- * Only used when the user asked us to invent the prompt. A prompt the user wrote
- * themselves is passed through untouched — see `isDirectPrompt` in the agent.
+ * Only used when the user asked us to invent the prompt ("Let AI Create" /
+ * "Build it for me"). A prompt the user wrote themselves is passed through
+ * untouched — see `isDirectPrompt` in the agent graph.
  */
 
 /**
@@ -155,9 +155,107 @@ descriptive language, no preamble, no explanation, no markdown, no quotes, no
 labels.`;
 
 /**
+ * HERO_ONLY video. The clip loops, so the last frame has to hand back to the
+ * first without a visible jump. Any sustained camera translation guarantees a
+ * hard cut at the loop point, so the camera is held and the motion is ambient.
+ */
+export const HERO_VIDEO_PROMPT_SYSTEM = `You are a cinematographer directing a LOOPING HERO BACKGROUND. You write ONE
+prompt for an image-to-video model. The image you are given is already frame one.
+
+CRITICAL CONTEXT: this clip plays on repeat behind a website headline, forever.
+When it ends it jumps straight back to the beginning. If the camera has travelled
+anywhere, the composition at the end will not match the start and the viewer sees
+a hard jolt every few seconds. So the shot must end essentially where it began.
+
+${NO_MACHINE_RULE}
+
+Write the shot:
+- The camera is COMPLETELY STATIC. Locked off on a tripod, fixed, motionless for
+  the entire clip. State this plainly and first. There is no camera movement of
+  any kind — not forward, not sideways, not up or down, not even a slow drift or
+  push. The framing at the last frame is identical to the first frame.
+- ALL of the motion comes from a few small things inside the scene moving gently
+  on their own, in a natural repeating cycle: clouds drifting slowly, water
+  rippling and glinting, grass or leaves swaying in a light breeze, steam or smoke
+  curling upward, dust or particles floating, fabric stirring, light shifting
+  softly. Pick two or three such elements from the scene and animate only those.
+- Everything else is perfectly still. Architecture, terrain, horizon, subject
+  placement and composition do not move or change at all.
+- The overall feeling is calm, quiet, relaxed and almost still — a living
+  photograph. It plays behind a headline on repeat and must never pull focus,
+  never startle, and never make the viewer notice the moment it loops.
+
+NEVER produce, and state as excluded: camera movement, camera travel, flying,
+forward motion, dollying, tracking, panning, tilting, orbiting, zooming, push-in,
+pull-out, cuts, jump cuts, scene changes, shot changes, transitions, fades,
+dissolves, wipes, morphing, warping, time-lapse, fast motion, montage,
+split-screen, flashing, strobing, subtitles, captions, text overlays, logos and
+UI. Also state that the foreground is clear and nothing blocks the lens.
+
+OUTPUT: the video prompt only. One dense paragraph, roughly 50-100 words, plain
+descriptive language, no preamble, no explanation, no markdown, no quotes, no
+labels, and none of the forbidden words above.`;
+
+/** Hard constraints appended to every AI-authored HERO video prompt. */
+export const HERO_VIDEO_PROMPT_SUFFIX =
+  "Static locked-off camera, completely motionless fixed shot, tripod locked, no camera movement whatsoever. " +
+  "Single continuous uninterrupted take, seamless loop, framing identical at the start and the end. " +
+  "Only a few small elements inside the scene move gently and cyclically; everything else is perfectly still. " +
+  "Calm, quiet, subtle, like a living photograph. Clear unobstructed foreground, nothing blocking the lens. " +
+  "No camera motion, no camera travel, no forward motion, no flying, no dolly, no tracking, no pan, no tilt, no zoom, " +
+  "no cuts, no scene changes, no transitions, no fades, no dissolves, no morphing, no time-lapse, " +
+  "no split screen, no strobing, no text, no captions, no logos, no watermark, " +
+  "no machinery or equipment in frame, no people looking at camera.";
+
+export const VIDEO_PROMPT_SYSTEM = `You are an aerial camera operator. You write ONE prompt for an
+image-to-video model. The image you are given is already frame one — you are not
+describing the scene, you are describing HOW THE CAMERA MOVES THROUGH IT.
+
+${FPV_LOOK}
+
+Write the move:
+- One single continuous take. State that explicitly.
+- Continuous forward flight. The camera accelerates smoothly ahead, threads the
+  opening in the scene and keeps going into the space beyond it.
+- Name the specific thing it flies through, using the scene you were given —
+  "through the archway", "between the two towers", "under the low branch and out
+  over the water". Be concrete about the geography of the move.
+- Add subtle character to the flight: a gentle bank into the turn, a slight roll,
+  a small drift in altitude. Smooth and gliding, not shaky, not handheld.
+- Call out the parallax: foreground elements sweeping past the lens on both
+  sides, revealing depth as the camera advances.
+- Keep the world stable. Architecture, terrain and objects must stay solid and
+  consistent while the camera moves — the only motion is the camera plus natural
+  ambient movement (drifting dust, rising steam, moving water, swaying leaves).
+- Moderate, even speed that reads well as a slow scroll background.
+
+NEVER produce, and state as excluded: cuts, jump cuts, scene changes, shot
+changes, transitions, fades, dissolves, wipes, cross-fades, morphing, warping,
+teleporting, montage, split-screen, time-lapse, snap zooms, whip pans, flashing,
+strobing, subtitles, captions, text overlays, logos and UI. Also state that the
+foreground is clear and the view is unobstructed, with nothing blocking the lens.
+
+OUTPUT: the video prompt only. One dense paragraph, roughly 50-100 words, plain
+descriptive language, no preamble, no explanation, no markdown, no quotes, no
+labels, and none of the forbidden words above.`;
+
+/**
+ * Hard constraints appended verbatim to every AI-authored video prompt. The
+ * refiner is a small model and drifts; these are the non-negotiables that stop
+ * the transition artefacts, so they are concatenated rather than trusted to it.
+ */
+export const VIDEO_PROMPT_SUFFIX =
+  "Single continuous uninterrupted take, one shot, camera glides forward through the scene, " +
+  "smooth continuous first-person forward motion, consistent stable geometry, natural parallax, " +
+  "completely unobstructed view with a clear empty foreground and nothing blocking the lens. " +
+  "No cuts, no jump cuts, no scene changes, no transitions, no fades, no dissolves, no morphing, " +
+  "no split screen, no montage, no time-lapse, no strobing, no text, no captions, no logos, no watermark, " +
+  "no machinery or equipment in frame, no people looking at camera.";
+
+/**
  * Last line of defence. The refiner is a small model and can echo a banned word
- * straight from its own instructions; if "drone" reaches the image model, it
- * draws a drone. This strips machine vocabulary from any prompt before it is sent,
+ * straight from its own instructions; if "drone" reaches Seedance, Seedance draws
+ * a drone. This strips machine vocabulary from any prompt before it is sent,
  * including inside a negative phrase like "no drone visible" — deleting the whole
  * phrase is safer than leaving the noun in place.
  */
@@ -183,8 +281,8 @@ export function stripMachineWords(prompt: string): string {
 }
 
 /**
- * HERO_ONLY = a still plate behind a fixed hero → calm, composed in place.
- * FULL_PAGE = a plate for the whole scrolling page → depth, an opening, a way in.
+ * HERO_ONLY = looping banner behind a fixed hero → held shot, ambient motion.
+ * FULL_PAGE = video scrubs behind the whole scrolling page → FPV flight.
  * Anything unrecognised falls back to FULL_PAGE, which is the product default.
  */
 export type MediaMode = "HERO_ONLY" | "FULL_PAGE";
@@ -193,6 +291,12 @@ export const isHeroMode = (mode?: string | null): boolean => mode === "HERO_ONLY
 
 export const getImageSystemPrompt = (mode?: string | null): string =>
   isHeroMode(mode) ? HERO_IMAGE_PROMPT_SYSTEM : IMAGE_PROMPT_SYSTEM;
+
+export const getVideoSystemPrompt = (mode?: string | null): string =>
+  isHeroMode(mode) ? HERO_VIDEO_PROMPT_SYSTEM : VIDEO_PROMPT_SYSTEM;
+
+export const getVideoPromptSuffix = (mode?: string | null): string =>
+  isHeroMode(mode) ? HERO_VIDEO_PROMPT_SUFFIX : VIDEO_PROMPT_SUFFIX;
 
 /**
  * Builds the user-side message for the image refiner.
@@ -245,4 +349,27 @@ export function buildImageRefinerInput(
   }
 
   return parts.join("\n\n");
+}
+
+/**
+ * Builds the user-side message for the video refiner. The image prompt is the
+ * best description we have of frame one, so it is the primary anchor; the site
+ * request keeps the move tied to what the user actually asked for.
+ */
+export function buildVideoRefinerInput(
+  sitePrompt: string,
+  imagePrompt?: string | null,
+  mode?: string | null,
+): string {
+  const scene = imagePrompt?.trim();
+  const hero = isHeroMode(mode);
+  return [
+    `USER'S ORIGINAL REQUEST (what the website is about): ${sitePrompt}`,
+    scene
+      ? `THE IMAGE THAT IS FRAME ONE (${hero ? "animate exactly this scene in place" : "describe motion through exactly this scene"}): ${scene}`
+      : `No frame description available — infer a plausible scene from the request above.`,
+    hero
+      ? `This is a LOOPING HERO BACKGROUND. Write the held shot and its ambient motion.`
+      : `Write the camera move.`,
+  ].join("\n\n");
 }

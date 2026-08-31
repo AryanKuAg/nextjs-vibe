@@ -2,15 +2,10 @@
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 
-/* Streamdown renders the builder's markdown with Tailwind classes that live
-   inside its own dist bundle. Without this the scanner never sees them and
-   assistant messages render unstyled. Path is relative to this file. */
-@source "../../node_modules/streamdown/dist/*.js";
-
 :root {
   --black: #000000;
   --white: #ffffff;
-  --bg: #0A0A0A;
+  --bg: #181818;
   --grey-bg: #212121;
   --white-4: rgba(255, 255, 255, 0.04);
   --white-8: rgba(255, 255, 255, 0.08);
@@ -23,32 +18,6 @@
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --radius: 0.5rem;
-
-  /* Semantic shadcn tokens. The v0 builder UI (and every ui/* primitive we
-     already vendored) is written against these names; before they existed the
-     primitives resolved to nothing and had to be re-skinned by hand at every
-     call site. Values are the dark palette above, so the tokens describe the
-     look the app already had rather than introducing a second theme. */
-  --background: #181818;
-  --foreground: #ffffff;
-  --card: #1f1f1f;
-  --card-foreground: #ffffff;
-  --popover: #212121;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #181818;
-  --secondary: #262626;
-  --secondary-foreground: #ffffff;
-  --muted: #232323;
-  --muted-foreground: rgba(255, 255, 255, 0.5);
-  --accent: #2a2a2a;
-  --accent-foreground: #ffffff;
-  --destructive: #f87171;
-  --destructive-foreground: #181818;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.12);
-  --ring: rgba(255, 255, 255, 0.3);
-
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
@@ -73,26 +42,6 @@
   --color-white-85: var(--white-85);
   --color-purple: var(--purple);
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-
   --font-sans: "inter-variable", sans-serif;
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
@@ -101,7 +50,6 @@
 
   --font-dm-mono: var(--font-dm-mono);
   --font-space-grotesk: var(--font-space-grotesk);
-  --font-onest: var(--font-onest);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -138,32 +86,6 @@
   button:not([disabled]),
   [role="button"]:not([disabled]) {
     cursor: pointer;
-  }
-}
-
-/* A band of light travelling through text, for a step that is still running.
-   A static label reads as a stall — the same words shimmering read as work in
-   progress, which is the only signal the builder can give while v0 is thinking
-   and has produced nothing to show yet. */
-.shimmer-text {
-  background: linear-gradient(90deg,
-      var(--white-50) 0%,
-      var(--white-50) 35%,
-      var(--white) 50%,
-      var(--white-50) 65%,
-      var(--white-50) 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: var(--animate-shimmer);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .shimmer-text {
-    animation: none;
-    color: var(--white-85);
-    -webkit-text-fill-color: var(--white-85);
   }
 }
 
@@ -226,102 +148,5 @@
     100% {
       transform: translateY(-50%);
     }
-  }
-}
-
-/* ── Travelling beam border (project form) ──
-   Two comets of light orbit the card's 1px border, held --beam-gap apart: a
-   crisp ring plus a blurred halo underneath it. The position is driven by a
-   registered custom property so the conic gradient itself can be animated. */
-@property --beam-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@keyframes beam-orbit {
-
-  /* Angles are the beam's clockwise position measured from the top edge's
-     centre; the checkpoints are the four corners of a typical card. The
-     percentage gaps are deliberately uneven — the short left/right edges get
-     less time than their share of the sweep, so the beam picks up speed as it
-     runs down them and settles back to normal along the long edges. */
-  0% {
-    --beam-angle: 0deg;
-  }
-
-  21.2% {
-    --beam-angle: 70deg;
-    /* top-right corner */
-  }
-
-  28.8% {
-    --beam-angle: 110deg;
-    /* bottom-right corner — right edge taken quickly */
-  }
-
-  71.2% {
-    --beam-angle: 250deg;
-    /* bottom-left corner */
-  }
-
-  78.8% {
-    --beam-angle: 290deg;
-    /* top-left corner — left edge taken quickly */
-  }
-
-  100% {
-    --beam-angle: 360deg;
-  }
-}
-
-.beam-border {
-  /* how far the trailing comet sits behind the leading one */
-  --beam-gap: 0deg;
-  /* one comet over a full turn: white-hot head at 0deg/360deg, a ~90deg tail
-     running back behind it, and dark the rest of the way round */
-  --beam-stops:
-    #c9c7ff 0deg,
-    rgba(61, 56, 245, 0) 6deg,
-    rgba(61, 56, 245, 0) 268deg,
-    rgba(61, 56, 245, 0.28) 300deg,
-    rgba(93, 88, 255, 0.95) 350deg,
-    #c9c7ff 360deg;
-}
-
-.beam-border::before,
-.beam-border::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  /* the element's border box, so the ring lands on the border itself */
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  /* the same comet twice, the second one --beam-gap further along the orbit */
-  background:
-    conic-gradient(from calc(var(--beam-angle) + var(--beam-gap)) at 50% 50%, var(--beam-stops)),
-    conic-gradient(from var(--beam-angle) at 50% 50%, var(--beam-stops));
-  /* punch out the middle so only the border ring is painted */
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  animation: beam-orbit 4.5s linear infinite;
-}
-
-/* the halo — same comet, thicker and blurred, painted under the crisp ring */
-.beam-border::before {
-  inset: -2px;
-  padding: 3px;
-  filter: blur(6px);
-  opacity: 0.6;
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-  .beam-border::before,
-  .beam-border::after {
-    animation: none;
   }
 }

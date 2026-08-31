@@ -27,10 +27,11 @@ export const usageRouter = createTRPCRouter({
       select: {
         id: true,
         sceneImageUrls: true,
+        videoUrls: true,
       },
     });
 
-    // 2. Delete R2 assets (scene images, deployed sites)
+    // 2. Delete R2 assets (scene images, videos, deployed sites)
     try {
       for (const project of projects) {
         // Explicit keys taken from the stored public URLs. Assets from before the
@@ -39,16 +40,19 @@ export const usageRouter = createTRPCRouter({
         const sceneUrls = Array.isArray(project.sceneImageUrls)
           ? (project.sceneImageUrls as string[])
           : [];
-        const keys = sceneUrls
+        const videoUrls = Array.isArray(project.videoUrls)
+          ? (project.videoUrls as string[])
+          : [];
+
+        const keys = [...sceneUrls, ...videoUrls]
           .filter((u): u is string => typeof u === "string")
           .map(r2KeyFromUrl)
           .filter((k): k is string => Boolean(k));
 
         await deleteMediaAssets(keys);
 
-        // Whole folders: the deployed site and the project's frames. The
-        // `videos/` prefix is swept too — the video agent is gone, but clips it
-        // generated before it was removed are still sitting in the bucket.
+        // Whole folders: the deployed site, the project's frames, and any videos
+        // that were never recorded on the project row.
         await deleteMediaPrefix(`sites/${project.id}/`);
         await deleteMediaPrefix(`frames/${project.id}/`);
         await deleteMediaPrefix(`projects/${project.id}/`);

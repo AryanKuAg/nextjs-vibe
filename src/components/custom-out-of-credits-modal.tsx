@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { useAuth, useSignIn } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -79,7 +78,13 @@ const ModalPricingCard = ({
   const handleCheckout = async () => {
     if (!isSignedIn) {
       if (!isLoaded) return;
-      setLoading(true); await signIn.authenticateWithRedirect({
+      setLoading(true);
+      try {
+        window.google?.accounts.id.cancel();
+      } catch {
+        // Ignore
+      }
+      await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
         redirectUrlComplete: `${window.location.pathname}#pricing`,
@@ -120,45 +125,28 @@ const ModalPricingCard = ({
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-[10px] p-2 font-onest",
+        "flex flex-col rounded-[10px] p-2 font-sans",
         plan.isPopular
           ? "border-0 bg-white/[0.12]"
           : "border-[0.5px] border-white/[0.08] bg-transparent"
       )}
     >
-      {/* The design's three blurred ellipses at 40%, as stacked radial
-          gradients: a soft light rising off the bottom edge of the popular
-          plan and gone by its midpoint. */}
-      {plan.isPopular && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background: [
-              "radial-gradient(72% 42% at 50% 104%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 100%)",
-              "radial-gradient(120% 62% at 50% 116%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 100%)",
-              "radial-gradient(150% 80% at 50% 130%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 100%)",
-            ].join(", "),
-          }}
-        />
-      )}
-
-      <div className="relative flex flex-col p-1 pt-3 pb-4">
+      <div className="flex flex-col p-1 pt-3 pb-4">
 
         <h3 className="text-2xl font-medium text-white-85 mb-0.5 leading-[28px]">{plan.title}</h3>
         <p className="text-[12px] text-white-50 mb-4 leading-[18px]">{plan.desc}</p>
       </div>
 
-      <div className="relative flex items-end gap-2 mb-6 px-1">
+      <div className="flex items-end gap-2 mb-6 px-1">
         <span className="text-[36px] font-medium text-white-85 leading-[28px]">
           ${price}
         </span>
         <span className="text-[12px] text-white-50 mb-1.5 leading-[0px]">
-          Per Month
+          {billing === "monthly" ? "Billed monthly" : "per month, billed annually"}
         </span>
       </div>
 
-      <div className="relative flex flex-col gap-1 mb-12 flex-1 px-1">
+      <div className="flex flex-col gap-1 mb-12 flex-1 px-1">
         {plan.features.map((f, i) => (
           <div
             key={i}
@@ -174,7 +162,7 @@ const ModalPricingCard = ({
         onClick={handleCheckout}
         disabled={loading}
         className={cn(
-          "relative w-full h-[40px] rounded-[6px] text-[14px] font-medium flex items-center justify-center gap-2 disabled:opacity-70 transition-all leading-[20px]",
+          "w-full h-[40px] rounded-[6px] text-[14px] font-medium flex items-center justify-center gap-2 disabled:opacity-70 transition-all leading-[20px]",
           plan.isPopular
             ? "bg-white-12 hover:bg-white-16 text-white"
             : "bg-transparent border-[0.5px] border-white-8 hover:bg-white-8 text-white-85"
@@ -196,42 +184,9 @@ export const CustomOutOfCreditsModal = ({
   isOpen,
   onClose,
 }: CustomOutOfCreditsModalProps) => {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
-  // Every trigger for this modal sits inside some positioned, z-indexed shell
-  // (the dashboard header, the builder panels). A fixed overlay is still bound
-  // by that ancestor's stacking context, so sibling content painted later wins
-  // and the modal ends up underneath it. Portalling to the body escapes them all.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
 
-  // The dialog owns the viewport while it is open. Letting the page keep
-  // scrolling underneath detaches the backdrop from the content it is dimming
-  // and scrolls the trigger out from under the user. The padding makes up for
-  // the scrollbar the lock removes so the page behind does not jump sideways
-  // on open (a no-op wherever scrollbars are overlays, as on macOS).
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    const previousPaddingRight = body.style.paddingRight;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-
-    body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      const basePadding = parseFloat(window.getComputedStyle(body).paddingRight) || 0;
-      body.style.paddingRight = `${basePadding + scrollbarWidth}px`;
-    }
-
-    return () => {
-      body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPaddingRight;
-    };
-  }, [isOpen]);
-
-  if (!mounted) return null;
-
-  return createPortal(
+  return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -239,7 +194,7 @@ export const CustomOutOfCreditsModal = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/80"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -249,7 +204,7 @@ export const CustomOutOfCreditsModal = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="bg-grey-bg rounded-[16px] w-full max-w-[948px] p-4 relative overflow-y-auto max-h-[90vh] font-onest border-[0.5px] border-white-12"
+            className="bg-gray-bg rounded-[16px] w-full max-w-[948px] p-4 relative overflow-y-auto max-h-[90vh] font-sans bg-grey-bg! border-[0.5px] border-white-12"
             style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.25)" }}
           >
             {/* Header */}
@@ -303,7 +258,6 @@ export const CustomOutOfCreditsModal = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
 };

@@ -14,8 +14,8 @@ import { refundCredits } from "@/lib/usage";
  * payload has no such field, so a code-agent failure nested inside an autonomous
  * run refunds once (at the autonomous level) rather than twice.
  *
- * The image agent charges itself *after* delivering, so there is nothing to
- * refund for it — a failed image was never billed.
+ * Media agents charge themselves *after* delivering, so there is nothing to
+ * refund for them — a failed image or video was never billed.
  */
 export async function refundChargedCredits(
   // The `inngest/function.failed` event, which wraps the original trigger.

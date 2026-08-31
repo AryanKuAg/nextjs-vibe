@@ -2,14 +2,17 @@
 // Template registry — the source of truth for the remixable gallery templates.
 //
 // A template is a real, hand-built site living in a PUBLIC GitHub repo. When a
-// user remixes one, v0 imports that repo directly (chats.createFromRepo) and the
-// chat opens on it as the starting code.
+// user remixes one, the code agent downloads that repo into the E2B sandbox and
+// uses it as the starting code instead of the generic scaffold in src/templates/.
+//
+// The repo is fetched as a tarball over HTTPS (codeload) rather than cloned with
+// git: the E2B image (sandbox-templates/react/e2b.Dockerfile) installs curl but
+// NOT git, so `git clone` would fail inside the sandbox.
 //
 // See ./README.md for the contract every template repo must satisfy.
 // ---------------------------------------------------------------------------
 
-/** R2 bucket `framerate`, served publicly at assets.framerate.space. */
-const ASSETS = "https://assets.framerate.space";
+export type TemplateMode = "FULL_PAGE" | "HERO_ONLY";
 
 export interface TemplateManifest {
   /** Stable slug. Persisted on Project.templateId — never rename in place. */
@@ -22,149 +25,213 @@ export interface TemplateManifest {
   branch: string;
   /** Optional path within the repo if it is a monorepo (e.g. "sites/vaultone"). */
   subdir?: string;
+  /**
+   * Whether the background video plays behind the whole page or only the hero.
+   * MUST match how the repo is actually built — this drives the code agent's
+   * system prompt and the follow-up router's media handling.
+   */
+  mode: TemplateMode;
+  /**
+   * The video this template was designed around. Remixing does NOT generate a
+   * video — the user gets the template exactly as built, immediately. This URL
+   * is substituted into the repo's TEMPLATE_VIDEO_PLACEHOLDER at build time.
+   * Only when the user later asks for a different background does the media
+   * pipeline run and swap it. Falls back to DEFAULT_TEMPLATE_VIDEO if unset.
+   */
+  defaultVideoUrl?: string;
   /** Live demo, also used as the gallery card link. */
   demoUrl: string;
-  /**
-   * Cover for the signed-out landing page grid — the taller, full-bleed crop
-   * ("landing page images/" in the bucket).
-   */
-  landingImgSrc: string;
-  /**
-   * Cover for the signed-in dashboard gallery and the See-more modal — the
-   * 16:9 card crop ("homescreen images/" in the bucket).
-   */
-  homescreenImgSrc: string;
+  /** Cover image for the gallery card. */
+  imgSrc: string;
   /** Whether the card is rendered with a taller height in the masonry grid */
   isTall?: boolean;
 }
 
+/** Used when a template does not declare its own defaultVideoUrl. */
+export const DEFAULT_TEMPLATE_VIDEO = "https://assets.framerate.space/hero_bg_480p.mp4";
+
+// NOTE: the `repo` values below are placeholders — the template repos do not
+// exist yet. Create one repo per template following ./README.md, then replace
+// the owner/name here. Nothing else needs to change.
 export const TEMPLATE_REGISTRY: TemplateManifest[] = [
+  {
+    id: "beach-house",
+    title: "Beach House",
+    repo: "AryanKuAg/beach-house",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/Beach_House/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-Beach_House-index.html.png",
+    isTall: true,
+  },
+  {
+    id: "ai-trip-planner",
+    title: "AI Trip Planner",
+    repo: "AryanKuAg/ai-trip-planner",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/ai-trip-planner/index.html",
+    imgSrc: "https://assets.framerate.space/website/roamly%20(1).jpg",
+    isTall: false,
+  },
+  {
+    id: "orange-furry-creature",
+    title: "Orange Furry Creature",
+    repo: "AryanKuAg/orange-furry-creature",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/orange-furry-creature/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orange-furry-creature-index.html%20(1).png",
+    isTall: true,
+  },
+  {
+    id: "flower-and-plane",
+    title: "Flower and Plane",
+    repo: "AryanKuAg/flower-and-plane",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/flower-and-plane/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-flower-and-plane-index.html.png",
+    isTall: true,
+  },
+  {
+    id: "ai-workflow-agents",
+    title: "Ai Workflow Agents",
+    repo: "AryanKuAg/ai-workflow-agents",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/ai-workflow-agents/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-ai-workflow-agents-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "australia-beach-road",
+    title: "Australia Beach Road",
+    repo: "AryanKuAg/australia-beach-road",
+    branch: "main",
+    mode: "HERO_ONLY",
+    demoUrl: "https://sites.framerate.space/template-sites/australia-beach-road/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-australia-beach-road-index.html.png",
+    isTall: false,
+  },
+  {
+    id: "rotating-earth",
+    title: "Rotating Earth",
+    repo: "AryanKuAg/rotating-earth",
+    branch: "main",
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/rotating-earth/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-rotating-earth-index.html%20(1).png",
+    isTall: false,
+  },
 
   {
-    id: "backyard-pool",
-    title: "Backyard Pool",
-    repo: "AryanKuAg/backyard-pool",
+    id: "haunted-house",
+    title: "Haunted House",
+    repo: "AryanKuAg/haunted-house",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/backyard-pool/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Backyard%20Pool.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Backyard%20Pool.webp`,
-    isTall: false,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/haunted-house/index.html",
+    imgSrc:
+      "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-haunted-house-index.html.png",
+    isTall: true,
   },
-  { // its stuck on the loading screen
-    id: "coast-house",
-    title: "Coast House",
-    repo: "AryanKuAg/coast-house",
+
+  // ---------------------------------------------------------------------------
+  // TODO: demoUrl and imgSrc are intentionally empty for the templates below.
+  // Fill each in once the demo is deployed to sites.framerate.space and the
+  // cover image is uploaded to assets.framerate.space.
+  // ---------------------------------------------------------------------------
+  {
+    id: "aeroforge-website",
+    title: "AeroForge",
+    repo: "AryanKuAg/aeroforge-website",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/coast-house/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Coast%20House.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Coast%20House.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/aeroforge-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-aeroforge-website-index.html.png",
     isTall: false,
   },
   {
-    id: "coworking-space",
-    title: "Coworking Space",
-    repo: "AryanKuAg/coworking-space",
+    id: "atelier-viaggio-website",
+    title: "Atelier Viaggio",
+    repo: "AryanKuAg/atelier-viaggio-website",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/coworking-space/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Coworking%20Space.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Coworking%20Space.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/atelier-viaggio-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-atelier-viaggio-website-index.html.png",
     isTall: false,
   },
   {
-    id: "greece-view",
-    title: "Greece View",
-    repo: "AryanKuAg/greece-view",
+    id: "fableforge-site",
+    title: "FableForge",
+    repo: "AryanKuAg/fableforge-site",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/greece-view/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Greece%20View.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Greece%20View.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/fableforge-site/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-fableforge-site-index.html.png",
     isTall: false,
   },
   {
-    id: "home-theatre",
-    title: "Home Theatre",
-    repo: "AryanKuAg/home-theatre",
+    id: "horizon-house-website",
+    title: "Horizon House",
+    repo: "AryanKuAg/horizon-house-website",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/home-theatre/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Home%20Theatre.webp`,
-    // The homescreen crop of this one was uploaded as "image 84.webp" — same
-    // Atelier Noir hero, just never renamed in the bucket.
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/image%2084.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/horizon-house-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-horizon-house-website-index.html.png",
     isTall: false,
   },
   {
-    id: "luxury-apartments",
-    title: "Luxury Apartments",
-    repo: "AryanKuAg/luxury-apartments",
+    id: "nala-maldives-website",
+    title: "Nala Maldives",
+    repo: "AryanKuAg/nala-maldives-website",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/luxury-apartments/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Luxury%20Apartments.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Luxury%20Apartments.webp`,
-    isTall: false,
-  },
-  { // has issues
-    id: "luxury-kitchen",
-    title: "Luxury Kitchen",
-    repo: "AryanKuAg/luxury-kitchen",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/luxury-kitchen/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Luxury%20Kitchen.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Luxury%20Kitchen.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/nala-maldives-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-nala-maldives-website-index.html.png",
     isTall: false,
   },
   {
-    id: "maldives-resort",
-    title: "Maldives Resort",
-    repo: "AryanKuAg/maldives-resort",
+    id: "orbit-react",
+    title: "Orbit",
+    repo: "AryanKuAg/orbit-react",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/maldives-resort/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Maldives%20Resort.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Maldives%20Resort.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/orbit-react/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-orbit-react-index.html.png",
     isTall: false,
   },
   {
-    id: "mediterranean-house",
-    title: "Mediterranean House",
-    repo: "AryanKuAg/mediterranean-house",
+    id: "relay-website",
+    title: "Relay",
+    repo: "AryanKuAg/relay-website",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/mediterranean-house/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Mediterranean%20House.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Mediterranean%20House.webp`,
-    isTall: false,
-  },
-  { // its css is not loading
-    id: "retro-miami",
-    title: "Retro Miami",
-    repo: "AryanKuAg/retro-miami",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/retro-miami/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Retro%20Miami.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Retro%20Miami.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/relay-website/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-relay-website-index.html.png",
     isTall: false,
   },
   {
-    id: "villa-jacuzzi",
-    title: "Villa Jacuzzi",
-    repo: "AryanKuAg/villa-jacuzzi",
+    id: "vesper-ai-react-vite",
+    title: "Vesper AI",
+    repo: "AryanKuAg/vesper-ai-react-vite",
     branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/villa-jacuzzi/index.html",
-    landingImgSrc: `${ASSETS}/landing%20page%20images/Villa%20Jacuzzi.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/Villa%20Jacuzzi.webp`,
-    isTall: false,
-  },
-  {
-    id: "northline-atelier",
-    title: "Northline Atelier",
-    repo: "AryanKuAg/northline-atelier",
-    branch: "main",
-    demoUrl: "https://sites.framerate.space/template-sites/northline-atelier/index.html",
-    // Both crops of this site sit in the bucket under "American Mansion" —
-    // the shot is the Northline Atelier hero.
-    landingImgSrc: `${ASSETS}/landing%20page%20images/American%20Mansion.webp`,
-    homescreenImgSrc: `${ASSETS}/homescreen%20images/American%20Mansion.webp`,
+    mode: "FULL_PAGE",
+    demoUrl: "https://sites.framerate.space/template-sites/vesper-ai-react-vite/index.html",
+    imgSrc: "https://assets.framerate.space/website/https-sites.framerate.space-template-sites-vesper-ai-react-vite-index.html.png",
     isTall: false,
   },
 ];
+
+/** The token a template repo uses wherever the background video URL belongs. */
+export const TEMPLATE_VIDEO_PLACEHOLDER = "__FRAMERATE_VIDEO_URL__";
 
 /**
  * Prompt used when a user remixes a template without describing any changes.
@@ -188,15 +255,6 @@ export const getTemplate = (id: string | null | undefined): TemplateManifest | n
 export const templateTarballUrl = (t: TemplateManifest): string =>
   `https://codeload.github.com/${t.repo}/tar.gz/refs/heads/${t.branch}`;
 
-/**
- * Zip URL for a template repo, from the same codeload endpoint.
- *
- * This is what a remix imports from. The build service also offers a
- * "create from GitHub repo" call, and it is the obvious thing to reach for —
- * but on these repos it returns a chat whose file tree cannot be read back
- * (`getFiles` answers 500) and whose workspace the agent finds empty, so the
- * remix produced a chat with nothing in it. Handing over a zip skips their
- * GitHub importer entirely.
- */
-export const templateZipUrl = (t: TemplateManifest): string =>
-  `https://codeload.github.com/${t.repo}/zip/refs/heads/${t.branch}`;
+/** The video a fresh remix of this template is built with. */
+export const templateVideoUrl = (t: TemplateManifest): string =>
+  t.defaultVideoUrl || DEFAULT_TEMPLATE_VIDEO;

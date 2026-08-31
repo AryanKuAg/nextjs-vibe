@@ -25,6 +25,13 @@ const GoogleSignInButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
     if (!isLoaded || isPending) return;
     setIsPending(true);
 
+    // Cancel One Tap if it's showing to prevent AbortError conflict
+    try {
+      window.google?.accounts.id.cancel();
+    } catch {
+      // Ignore cancel errors
+    }
+
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",

@@ -13,12 +13,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import "remixicon/fonts/remixicon.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 
 
-import { COMPOSER_MODELS, ComposerModelMenu } from "./composer-model-menu";
 import { useTRPC } from "@/trpc/client";
 import { Form, FormField } from "@/components/ui/form";
-import { cn } from "@/lib/utils";
 
 
 const formSchema = z.object({
@@ -28,13 +27,22 @@ const formSchema = z.object({
     .max(100000, { message: "Value is too long" }),
 });
 
+const MODELS = [
+  // we're keeping the same deepseek model everything but on the frontend we're showing different models
+  { id: "google/gemini-3.1-flash-lite", label: "Fable 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "GPT-5.6 Sol", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Kimi K3", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Opus 5", emoji: "" },
+  { id: "google/gemini-3.1-flash-lite", label: "Sonnet 5", emoji: "" },
+];
 
 interface ProjectFormProps {
   showModelSelector?: boolean;
+  dropdownDirection?: "up" | "down";
   isLandingPage?: boolean;
 }
 
-export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }: ProjectFormProps) => {
+export const ProjectForm = ({ showModelSelector = false, dropdownDirection = "down", isLandingPage = false }: ProjectFormProps) => {
   const router = useRouter();
   const trpc = useTRPC();
   const clerk = useClerk();
@@ -49,9 +57,11 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [model, setModel] = useState<string>(COMPOSER_MODELS[0].value);
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].label);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Clean up object URLs
   useEffect(() => {
@@ -59,6 +69,22 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
+
+  // Click outside to close model dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+
+    if (modelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [modelDropdownOpen]);
 
   // Global drag-and-drop listeners for the fullscreen overlay
   useEffect(() => {
@@ -127,10 +153,11 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
 
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}`);
+        const url = `/projects/${data.id}${variables.value ? "?builderAutoSubmit=true" : ""}`;
+        router.push(url);
       },
       onError: (error) => {
         setIsRedirecting(false); // failed — let the user try again
@@ -139,11 +166,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
           return;
         }
 
-        // Only OUR credit system opens the upgrade modal. A build can also be
-        // refused because the v0 account behind it is out of quota, which is
-        // also TOO_MANY_REQUESTS but is nothing the visitor can buy their way
-        // out of — offering them an upgrade there would be a lie.
-        if (error.message?.toLowerCase().includes("credit")) {
+        if (error.data?.code === "TOO_MANY_REQUESTS" || error.message?.toLowerCase().includes("credits")) {
           setShowCreditsModal(true);
         } else {
           toast.error(error.message, { duration: Infinity });
@@ -167,24 +190,29 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
 
     setIsRedirecting(true); // lock the button immediately, before any async work
 
-    // The prompt and the image go with the mutation that starts the build, so
-    // there is nothing to carry across the redirect: by the time the project
-    // page loads, v0 is already working.
-    let imageDataUrl: string | undefined;
+    // Persist the selected model so the dashboard uses it
+    const actualModelId = MODELS.find(m => m.label === selectedModel)?.id || "google/gemini-3.1-flash-lite";
+    sessionStorage.setItem("pending_model", actualModelId);
+    sessionStorage.setItem("pending_builder_prompt", values.value);
+
+    // Carry the attached image across the redirect to the project page, which
+    // passes it to the first generation. Downscaled first: a full-size data URL
+    // routinely blows the ~5MB sessionStorage quota, and the write throws.
     if (uploadedImage) {
       try {
-        // Downscaled first — a full-size data URL is a large request body and
-        // v0 only needs it as a visual reference.
-        imageDataUrl = await processImageFile(uploadedImage);
+        const dataUrl = await processImageFile(uploadedImage);
+        sessionStorage.setItem("pending_image_base64", dataUrl);
+        sessionStorage.setItem("pending_image_name", uploadedImage.name);
+        sessionStorage.setItem("pending_image_type", uploadedImage.type);
       } catch (e) {
         // Losing the reference is not worth losing the build — carry on without it.
-        console.error("Failed to attach the reference image:", e);
+        console.error("Failed to carry the attached image across the redirect:", e);
         toast.error("Could not attach that image — continuing without it.");
       }
     }
 
     try {
-      await createProject.mutateAsync({ value: values.value, imageDataUrl });
+      await createProject.mutateAsync({ value: values.value });
     } catch {
       // Error is handled in the mutation's onError callback
     }
@@ -207,21 +235,11 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
           </div>
         </div>
       )}
-      <section className="relative space-y-6 w-full flex flex-col items-center">
+      <section className="space-y-6 w-full flex flex-col items-center">
         {/* ── Main input card ── */}
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className={cn(
-            "rounded-[12px] p-3 flex flex-col relative transition-all w-full",
-            isLandingPage
-              // Signed-out landing composer — pinned to the bottom of the left
-              // panel and deliberately left as it was.
-              ? "gap-2.5 max-w-[640px] min-h-[84px] bg-white-12 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
-              // Dashboard composer, to the design spec: 680 wide, 12px padding
-              // and gap, white 8% fill, a 1px fully-transparent top edge, and a
-              // 106px resting height (12 + 40 textarea + 12 + 28 toolbar + 12).
-              : "gap-3 max-w-[680px] min-h-[106px] bg-white-8 border-t border-white/0 shadow-[0_25px_60px_-30px_rgba(0,0,0,0.35)]",
-          )}
+          className={`rounded-[12px] p-3 space-y-3 relative transition-all w-full max-w-[640px] border focus-within:border-purple ${isLandingPage ? "bg-transparent border-white-8" : "bg-grey-bg border border-white-8 shadow-[0_4px_16px_rgba(0,0,0,0.25)] "}`}
           suppressHydrationWarning
         >
           {/* Image thumbnail preview */}
@@ -252,11 +270,9 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 {...field}
                 autoFocus={!isLandingPage}
                 disabled={isPending}
-                // The dashboard composer rests two lines tall so the box hugs
-                // to the 106px in the design; the landing one stays single-line.
-                minRows={isLandingPage ? 1 : 2}
-                maxRows={8}
-                className="block w-full bg-transparent text-sm leading-[20px] font-onest font-medium text-white-85 outline-none resize-none placeholder:text-white-50"
+                minRows={1}
+                maxRows={12}
+                className="w-full bg-transparent text-sm leading-[20px] text-white-85 outline-none resize-none min-h-[24px] placeholder:text-white-50 "
                 placeholder="Describe your website"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -269,7 +285,7 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
           />
 
           {/* Bottom toolbar */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-1 mt-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -283,19 +299,48 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={isPending}
-              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-full text-white-85 hover:bg-white-8 transition-colors cursor-pointer disabled:opacity-50 text-base"
+              className="w-7 h-7 flex shrink-0 items-center justify-center rounded-[8px] border border-white-8 text-white hover:bg-white-8 cursor-pointer disabled:opacity-50 text-base"
               title="Attach image"
             >
-              <i className="ri-add-line text-base [text-box:trim-both_cap_alphabetic]" />
+              <i className="ri-add-line text-base" />
             </button>
 
             {showModelSelector && (
-              <ComposerModelMenu
-                disabled={isPending}
-                onChange={setModel}
-                menuPlacement={isLandingPage ? "up-on-desktop" : "down"}
-                value={model}
-              />
+              <div className="relative" ref={dropdownRef}>
+                <div
+                  className="h-7 px-2 flex items-center gap-1 rounded-lg border border-white-8 text-sm leading-[20px] text-white-85 hover:bg-white-8 cursor-pointer"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setModelDropdownOpen((o) => !o)}
+                >
+                  <span className="whitespace-nowrap">{selectedModel}</span>
+                  <i className={`ri-arrow-${modelDropdownOpen ? 'up' : 'down'}-s-line text-white-85 text-xs`} />
+                </div>
+
+                <AnimatePresence>
+                  {modelDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: dropdownDirection === "up" ? 4 : -4, scale: 0.97 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className={`absolute ${dropdownDirection === "up" ? "bottom-9" : "top-9"} left-0 z-50 bg-grey-bg border border-white-4 rounded-[8px] overflow-hidden min-w-[180px] shadow-xl p-1 gap-[2px] flex flex-col`}
+                    >
+                      {MODELS.map((model) => (
+                        <button
+                          key={model.label}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSelectedModel(model.label); setModelDropdownOpen(false); }}
+                          className={`w-full flex items-center justify-between gap-3 px-2 py-2.5 text-sm font-sans rounded-[4px]  hover:bg-white-8 h-[28px] text-white-85`}
+                        >
+                          <span className="whitespace-nowrap">{model.label}</span>
+                          {selectedModel === model.label && <i className="ri-check-line text-white" />}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
 
             <div className="flex gap-2 ml-auto shrink-0">
@@ -303,14 +348,14 @@ export const ProjectForm = ({ showModelSelector = false, isLandingPage = false }
                 <button
                   type="submit"
                   disabled
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white-50 text-bg"
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white opacity-50"
                 >
                   <i className="ri-arrow-up-line text-base" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-bg hover:bg-white-85 active:scale-95 transition-transform duration-200"
+                  className="w-7 h-7 flex items-center justify-center rounded-full  bg-purple text-white hover:bg-purple/80 active:scale-95 transition-transform duration-200"
                 >
                   {isPending ? (
                     <i className="ri-loader-4-line animate-spin inline-block" />

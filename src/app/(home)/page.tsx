@@ -157,6 +157,8 @@ interface SitePreviewCardProps {
   isLandingPage?: boolean;
   /** Template id — enables the Download pill when provided. */
   templateId?: string;
+  /** Above the fold: fetched eagerly and preloaded rather than lazily. */
+  priority?: boolean;
   /** Fired once the cover has loaded or failed — drives the reveal queue. */
   onCoverSettled?: () => void;
 }
@@ -168,6 +170,7 @@ const SitePreviewCard = ({
   height,
   isLandingPage,
   templateId,
+  priority,
   onCoverSettled,
 }: SitePreviewCardProps) => {
   // The cover fades in on decode instead of popping in: the tiles reveal on a
@@ -212,6 +215,13 @@ const SitePreviewCard = ({
           alt={`${title} - 3D website template`}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
+          priority={priority}
+          // Straight from the CDN, not through the image optimizer. These covers
+          // are already WebP and 50-200 KB, so optimizing them buys almost
+          // nothing — and costs a round trip to our own origin plus an AVIF
+          // encode per image. Twelve of those on one screen is what made the
+          // gallery slow to appear; served directly they come from Cloudflare.
+          unoptimized
           onLoad={() => {
             setIsCoverLoaded(true);
             onCoverSettled?.();
@@ -265,6 +275,9 @@ const SitePreviewCard = ({
  * releases it. Tile and card are one component because the queue needs both
  * ends — the load event comes from the card, the reveal from the wrapper.
  */
+/** Covers on the first row are wanted immediately; the rest can wait. */
+const EAGER_TILES = 3;
+
 const RevealCard = ({ order, ...card }: { order: number } & SitePreviewCardProps) => {
   const reduceMotion = useReducedMotion();
   const { releasedCount, markSettled } = useContext(RevealQueueContext);
@@ -281,7 +294,7 @@ const RevealCard = ({ order, ...card }: { order: number } & SitePreviewCardProps
       animate={order < releasedCount ? shown : hidden}
       transition={{ duration: reduceMotion ? 0.2 : 0.5, ease: [0.22, 1, 0.36, 1] }}
     >
-      <SitePreviewCard {...card} onCoverSettled={onCoverSettled} />
+      <SitePreviewCard {...card} priority={order < EAGER_TILES} onCoverSettled={onCoverSettled} />
     </motion.div>
   );
 };

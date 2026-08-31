@@ -62,3 +62,20 @@ const BUILD_IN_THE_APP =
 export function buildSitePrompt(brief: SiteBrief): string {
   return [brief.startPrompt.trim(), "", BUILD_IN_THE_APP].join("\n");
 }
+
+/**
+ * The opening message of a remix.
+ *
+ * Importing a repo lands its files and nothing else — no turn runs, so the site
+ * is never built and never previewed. This is the turn that starts it, and it
+ * asks for as little as possible: a template is already the finished site, so
+ * the only work is getting it running unchanged. Without the "do not redesign"
+ * half, v0 reads an empty-looking request as an invitation to rewrite the page,
+ * and the remix stops being a copy of the template.
+ */
+export const TEMPLATE_BUILD_PROMPT = [
+  "Get this project running and produce a working preview of it.",
+  "It is already finished, so keep the design, copy, layout and assets exactly as they are —",
+  "do not redesign, restyle, rename or rewrite any part of it, and do not add pages or sections.",
+  "The only goal is a live preview of the site as it already stands.",
+].join(" ");

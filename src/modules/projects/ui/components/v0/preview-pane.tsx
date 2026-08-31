@@ -146,7 +146,7 @@ export function PreviewPane({
 
         window.setTimeout(() => {
           if (pendingNavRef.current !== href) return; // it arrived
-          console.warn(`[v0] preview navigation did not load: ${href}`);
+          console.warn(`[build] preview navigation did not load: ${href}`);
           setDeadLink(href);
         }, NAVIGATION_TIMEOUT_MS);
         return;
@@ -267,10 +267,15 @@ export function PreviewPane({
           {hasStalled ? (
             <>
               <EyeIcon className="size-5 opacity-60" />
-              <p className="font-medium text-foreground">Preview isn&rsquo;t up yet</p>
+              <p className="font-medium text-foreground">Preview isn&rsquo;t running</p>
+              {/* Nearly always a slept preview rather than a broken build: the
+                  server behind it shuts down once a project has sat idle, and
+                  there is no way to wake it from here — only a new turn in the
+                  chat starts it again. Saying so beats "still starting", which
+                  suggests waiting will fix it. */}
               <p className="max-w-xs text-xs">
-                This site is still starting, or the last build did not finish. You can keep
-                working in the chat — the code is on the Code tab.
+                Previews shut down while a project sits unused. Send a message in the chat to
+                start this one again — your code is safe, and it&rsquo;s on the Code tab.
               </p>
               <Button onClick={() => setManualReload((n) => n + 1)} size="sm" variant="outline">
                 Try again

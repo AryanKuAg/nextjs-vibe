@@ -38,9 +38,6 @@ export interface TemplateManifest {
   isTall?: boolean;
 }
 
-// NOTE: the `repo` values below are placeholders — the template repos do not
-// exist yet. Create one repo per template following ./README.md, then replace
-// the owner/name here. Nothing else needs to change.
 export const TEMPLATE_REGISTRY: TemplateManifest[] = [
 
   {
@@ -190,3 +187,16 @@ export const getTemplate = (id: string | null | undefined): TemplateManifest | n
  */
 export const templateTarballUrl = (t: TemplateManifest): string =>
   `https://codeload.github.com/${t.repo}/tar.gz/refs/heads/${t.branch}`;
+
+/**
+ * Zip URL for a template repo, from the same codeload endpoint.
+ *
+ * This is what a remix imports from. The build service also offers a
+ * "create from GitHub repo" call, and it is the obvious thing to reach for —
+ * but on these repos it returns a chat whose file tree cannot be read back
+ * (`getFiles` answers 500) and whose workspace the agent finds empty, so the
+ * remix produced a chat with nothing in it. Handing over a zip skips their
+ * GitHub importer entirely.
+ */
+export const templateZipUrl = (t: TemplateManifest): string =>
+  `https://codeload.github.com/${t.repo}/zip/refs/heads/${t.branch}`;

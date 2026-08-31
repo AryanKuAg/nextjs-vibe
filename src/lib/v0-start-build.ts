@@ -2,11 +2,11 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { PROJECT_STAGE } from "@/lib/project-stage";
-import { getTemplate } from "@/lib/templates/registry";
+import { getTemplate, templateZipUrl } from "@/lib/templates/registry";
 import { v0 } from "@/lib/v0-client";
 import { v0Failure } from "@/lib/v0-error";
 import { V0_MODEL_CONFIGURATION } from "@/lib/v0-model";
-import { buildSitePrompt, type SiteBrief } from "@/lib/v0-site-prompt";
+import { buildSitePrompt, TEMPLATE_BUILD_PROMPT, type SiteBrief } from "@/lib/v0-site-prompt";
 
 /**
  * Getting a project from "created" to "v0 is working on it".
@@ -35,17 +35,15 @@ export async function startProjectBuild(input: {
 
   if (!project) throw new Error("Project not found");
 
-  // A remix starts from somebody's finished repo rather than a blank page. v0
-  // imports it directly, which is what the sandbox used to do by downloading a
-  // tarball and unpacking it.
+  // A remix starts from somebody's finished repo rather than a blank page —
+  // the same job the sandbox did by downloading a tarball and unpacking it.
   const template = getTemplate(project.templateId);
 
   if (template) {
-    const imported = await v0.chats.createFromRepo({
-      repo: {
-        url: `https://github.com/${template.repo}`,
-        branch: template.branch,
-      },
+    // From a zip rather than the repo-import call: see `templateZipUrl` for why
+    // the latter produced chats with no readable files.
+    const imported = await v0.chats.createFromZip({
+      url: templateZipUrl(template),
       title: project.name,
       privacy: "private",
     });
@@ -55,9 +53,33 @@ export async function startProjectBuild(input: {
       throw v0Failure(imported, "The build service could not import the template repository.");
     }
 
+    // The import is only half of what the sandbox used to do in one step: it
+    // unpacked the repo AND ran it. Importing lands the files and stops — no
+    // turn runs, so nothing is built and nothing is previewed, and the builder
+    // opens on an empty chat with a preview that never arrives. This is the
+    // other half.
+    const started = await v0.messages.sendAsync({
+      chatId,
+      message: TEMPLATE_BUILD_PROMPT,
+      modelConfiguration: V0_MODEL_CONFIGURATION,
+    });
+
+    if (started.error !== undefined || !started.data?.messageId) {
+      throw v0Failure(
+        started,
+        "The build service imported the template but could not start the build.",
+      );
+    }
+
     await prisma.project.update({
       where: { id: project.id },
-      data: { v0ChatId: chatId, currentStage: PROJECT_STAGE.SITE },
+      data: {
+        v0ChatId: chatId,
+        // Same as the from-scratch path below: the builder reads this to know a
+        // run is already in flight when the page opens.
+        v0PendingMessageId: started.data.messageId,
+        currentStage: PROJECT_STAGE.SITE,
+      },
     });
 
     return { chatId };

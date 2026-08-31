@@ -238,12 +238,56 @@ function isPendingAgentAction(part: AgentActionPart) {
  */
 function visibleAssistantText(text: string) {
   const projectStart = text.indexOf("<CodeProject");
-  if (projectStart === -1) return text;
+  if (projectStart === -1) return withoutSandboxUrl(text);
 
   const projectEnd = text.indexOf("</CodeProject>", projectStart);
-  if (projectEnd === -1) return text.slice(0, projectStart).trim();
+  if (projectEnd === -1) return withoutSandboxUrl(text.slice(0, projectStart).trim());
 
-  return `${text.slice(0, projectStart)}${text.slice(projectEnd + "</CodeProject>".length)}`.trim();
+  return withoutSandboxUrl(
+    `${text.slice(0, projectStart)}${text.slice(projectEnd + "</CodeProject>".length)}`.trim(),
+  );
+}
+
+/**
+ * Take out the sandbox's own dev server address.
+ *
+ * The agent reports finishing by handing over `http://localhost:3000`, which is
+ * the address *inside* its build sandbox: on the reader's machine it resolves to
+ * nothing, or worse, to something of their own. The site it refers to is already
+ * on the right-hand side of the screen, so the URL is noise at best.
+ *
+ * Removing the URL alone is not enough. It arrives wrapped — in a markdown
+ * link, in bold, in backticks — and introduced by a lead-in that has nothing
+ * left to point at once it is gone, which is how "running at the live preview
+ * URL" ended up followed by a stray "**" on its own line.
+ */
+function withoutSandboxUrl(text: string): string {
+  if (!/localhost/i.test(text)) return text;
+
+  const stripped = text
+    // A markdown link pointing at the sandbox, with any emphasis or code ticks
+    // wrapped around it.
+    .replace(/[*_`]*\[[^\]]*\]\(\s*https?:\/\/localhost[^)]*\)[*_`]*/gi, "")
+    // The same address written bare, likewise unwrapped.
+    .replace(/[*_`]*https?:\/\/localhost(?::\d+)?[^\s)\]`*]*[*_`]*/gi, "");
+
+  return stripped
+    .split("\n")
+    .map((line) => {
+      const tidied = line
+        // "running at ." and "the preview URL:" — the lead-in outlives its target.
+        .replace(/[ \t]*\bat\b[ \t]*(?=[.,;:!?]|$)/gi, "")
+        .replace(/[ \t]*:[ \t]*$/, "")
+        .replace(/[ \t]+([.,;!?])/g, "$1")
+        .replace(/[ \t]{2,}/g, " ")
+        .trimEnd();
+
+      // A line that was nothing but the URL and its wrapping.
+      return /[A-Za-z0-9]/.test(tidied) ? tidied : "";
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function ThinkingPart({

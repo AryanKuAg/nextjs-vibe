@@ -13,6 +13,7 @@ import {
   SpinnerIcon,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { scrubVendor } from "@/lib/vendor-name";
 
 import { withChatToken } from "./chat-token";
 import { PublishControl } from "./publish-control";
@@ -180,7 +181,9 @@ export function ChatHeader({
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  // Scrubbed: the SDK's own failure wording names the vendor, and this string
+  // goes straight onto the screen.
+  return scrubVendor(error instanceof Error ? error.message : fallback);
 }
 
 function fileName(value: string) {

@@ -68,7 +68,7 @@ export const v0Router = createTRPCRouter({
 
       if (chat.error !== undefined) {
         const failure = v0Failure(chat, "Could not load this build from the build service.");
-        console.error("[v0] workspace load failed:", failure);
+        console.error("[build] workspace load failed:", failure);
         throw new TRPCError({
           code: isCapacityError(failure) ? "TOO_MANY_REQUESTS" : "INTERNAL_SERVER_ERROR",
           message: isCapacityError(failure) ? CAPACITY_MESSAGE : failure.message,
@@ -128,7 +128,7 @@ export const v0Router = createTRPCRouter({
       } catch (error) {
         // The user paid for a build that never started — hand it back.
         await refundCredits(AGENT_COSTS.CODE, ctx.auth.userId).catch(() => {});
-        console.error("[v0] retry failed to start a build:", error);
+        console.error("[build] retry failed to start a build:", error);
 
         if (isCapacityError(error)) {
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: CAPACITY_MESSAGE });

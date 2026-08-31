@@ -15,6 +15,8 @@ import { readV0Stream } from "v0/browser";
 
 import { Loader } from "@/components/ai-elements/loader";
 import { Button } from "@/components/ui/button";
+import { TEMPLATE_BUILD_PROMPT } from "@/lib/v0-site-prompt";
+import { scrubVendor } from "@/lib/vendor-name";
 
 import { withChatToken } from "./chat-token";
 import { ConversationView } from "./conversation-view";
@@ -364,7 +366,10 @@ export function ChatConversation({
   // also what the transport replays and what every id and index here refers to;
   // rewriting it at the source would put our display copy back into the chat.
   const visibleMessages = useMemo(
-    () => withOriginalPrompt(uiMessages, openingPrompt),
+    // Order matters: rewriting runs first, so if the build instruction happens
+    // to BE the opening message it is relabelled rather than dropped, and the
+    // filter then only catches a second copy of it.
+    () => withoutBuildInstruction(withOriginalPrompt(uiMessages, openingPrompt)),
     [openingPrompt, uiMessages],
   );
 
@@ -466,6 +471,26 @@ function withOriginalPrompt(
   });
 }
 
+/**
+ * Drop the remix kick-off turn.
+ *
+ * Importing a template repo lands the files without running anything, so the
+ * build is started by a message of ours telling v0 to build the repo unchanged.
+ * That is machinery, not something the user wrote, and showing it back to them
+ * reads as the app talking to itself — the same reason the composed opening
+ * message is rewritten above. What they clicked is already named by the opening
+ * prompt sitting over it.
+ */
+function withoutBuildInstruction(messages: V0UIMessage[]): V0UIMessage[] {
+  return messages.filter((message) => {
+    if (message.role !== "user" || message.parts.length === 0) return true;
+
+    return !message.parts.every(
+      (part) => part.type === "text" && part.text.trim() === TEMPLATE_BUILD_PROMPT,
+    );
+  });
+}
+
 /** How much of a transcript has actually rendered, used to pick the richer copy. */
 function countParts(messages: V0UIMessage[]) {
   return messages.reduce((total, message) => total + message.parts.length, 0);
@@ -479,5 +504,7 @@ function upsertMessage(messages: V0UIMessage[], message: V0UIMessage) {
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  // Scrubbed: the SDK's own failure wording names the vendor, and this string
+  // goes straight onto the screen.
+  return scrubVendor(error instanceof Error ? error.message : fallback);
 }

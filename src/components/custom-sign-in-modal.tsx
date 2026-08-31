@@ -35,12 +35,6 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
     if (!isLoaded || isPending) return;
     setIsPending(true);
 
-    try {
-      window.google?.accounts.id.cancel();
-    } catch {
-      // ignore
-    }
-
     await signIn.authenticateWithRedirect({
       strategy: "oauth_google",
       redirectUrl: "/sso-callback",
@@ -117,7 +111,7 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
                 {isPending ? (
                   <i className="ri-loader-4-line animate-spin text-[12px] scale-125" />
                 ) : (
-                  <Image src="/google.svg" alt="Google" width={14} height={14} />
+                  <Image src="/google.png" alt="Google" width={14} height={14} />
                 )}
               </div>
               Continue with Google

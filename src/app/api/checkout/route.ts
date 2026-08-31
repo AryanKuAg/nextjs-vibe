@@ -71,6 +71,13 @@ export async function POST(req: NextRequest) {
       }
     })();
 
+    // Revenue attribution: DataFast's script sets this first-party cookie on the
+    // browser, and Dodo forwards whatever is in `metadata` to the DataFast
+    // webhook, which is where the payment gets tied back to the visit that
+    // produced it. Omitted rather than sent empty when missing — a visitor with
+    // the script blocked has no id, and a blank one would attribute to nothing.
+    const datafastVisitorId = req.cookies.get("datafast_visitor_id")?.value;
+
     // Create a payment session/link
     const session = await dodo.checkoutSessions.create({
       ...(email && {

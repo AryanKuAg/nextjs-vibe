@@ -1,0 +1,146 @@
+"use client";
+
+import { toV0UIMessages, type Chat, type Message } from "@v0-sdk/react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
+
+import { ChatConversation } from "./chat-conversation";
+import { ChatHeader, type ChatView } from "./chat-header";
+import { CodeViewer } from "./code-editor";
+import { PreviewPane } from "./preview-pane";
+
+/**
+ * The builder: conversation on the left, preview or code on the right.
+ *
+ * `contentRevision` is the hinge between the two halves — when a turn finishes,
+ * bumping it remounts the preview and refetches the files, which is how the
+ * right-hand side learns that v0 changed something without polling for it.
+ */
+export function ChatWorkspace({
+  chat,
+  messages,
+  openingPrompt,
+  previewOrigin,
+  projectId,
+  publishedUrl,
+  title,
+  titleSlot,
+  accountSlot,
+  accessToken,
+}: {
+  chat: Chat;
+  messages: Message[];
+  /** The user's own brief, shown instead of the composed opening message. */
+  openingPrompt?: string | null;
+  projectId: string;
+  /** Verified preview hostname for this chat, or null for the path proxy. */
+  previewOrigin?: string | null;
+  /** Where this project was last published, if it has been. */
+  publishedUrl?: string | null;
+  title: string;
+  /** Signed pass minted by `v0.workspace`; stands in for a Clerk session. */
+  accessToken: string;
+  /** Logo and editable project name, shown in the header's left segment. */
+  titleSlot?: ReactNode;
+  /** Account menu, shown at the far right of the header. */
+  accountSlot?: ReactNode;
+}) {
+  const [view, setView] = useState<ChatView>("preview");
+  const [contentRevision, setContentRevision] = useState(0);
+  // Whether v0 has a turn open, so the preview can say "building" rather than
+  // accusing the site of having failed.
+  const [isBuilding, setIsBuilding] = useState(false);
+  const handleBusyChange = useCallback(setIsBuilding, [setIsBuilding]);
+
+  // Whether v0 has ever finished a turn for this chat. Before that there is no
+  // site to preview and no sandbox to wait on, so the pane says so plainly
+  // instead of spinning at a build that has not produced anything yet.
+  const [hasBuild, setHasBuild] = useState(() =>
+    toV0UIMessages(messages).some(
+      (message) =>
+        message.role === "assistant" &&
+        message.metadata?.finishReason != null &&
+        // A turn that ended on its output limit wrote no files (see
+        // `abandonedTurn` in chat-conversation). Counting it as a build mounts
+        // the frame on a sandbox with nothing in it, where the upstream serves
+        // its own branded "generation will show here" page — so the pane shows
+        // our placeholder until a turn actually produces something.
+        message.metadata.finishReason !== "length",
+    ),
+  );
+
+  // The conversation column is hidden with CSS rather than unmounted: taking it
+  // down would tear the streaming connection out from under an in-flight build.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen]);
+
+  // Stable identity: the conversation calls this from an effect, so a fresh
+  // function each render would re-run that effect on every render.
+  const handleContentChange = useCallback(() => {
+    setHasBuild(true);
+    setContentRevision((revision) => revision + 1);
+  }, []);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col font-onest">
+      <ChatHeader
+        accessToken={accessToken}
+        accountSlot={accountSlot}
+        chatId={chat.id}
+        projectId={projectId}
+        publishedUrl={publishedUrl}
+        isFullscreen={isFullscreen}
+        onReloadPreview={handleContentChange}
+        onToggleFullscreen={() => setIsFullscreen((current) => !current)}
+        onViewChange={setView}
+        title={title}
+        titleSlot={titleSlot}
+        view={view}
+      />
+
+      <div className="flex min-h-0 flex-1">
+        <div
+          className={cn(
+            "flex w-full shrink-0 flex-col border-r border-border md:w-96 md:max-w-[42%]",
+            isFullscreen && "hidden",
+          )}
+        >
+          <ChatConversation
+            accessToken={accessToken}
+            chatId={chat.id}
+            messages={messages}
+            onBusyChange={handleBusyChange}
+            onContentChange={handleContentChange}
+            openingPrompt={openingPrompt}
+          />
+        </div>
+
+        <div className={cn("hidden min-w-0 flex-1 md:block", isFullscreen && "block")}>
+          <div className={view === "preview" ? "h-full" : "hidden"}>
+            <PreviewPane
+              accessToken={accessToken}
+              chatId={chat.id}
+              hasBuild={hasBuild}
+              isBuilding={isBuilding}
+              previewOrigin={previewOrigin}
+              reloadKey={contentRevision}
+            />
+          </div>
+          <div className={view === "code" ? "h-full" : "hidden"}>
+            <CodeViewer accessToken={accessToken} chatId={chat.id} revision={contentRevision} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -17,13 +17,13 @@ const Page = async ({ params }: Props) => {
   const { projectId } = await params;
 
   const queryClient = getQueryClient();
-  await queryClient.prefetchQuery(trpc.messages.getMany.queryOptions({
-    projectId,
-    stage: "SITE",
-  }));
-  await queryClient.prefetchQuery(trpc.projects.getOne.queryOptions({
-    id: projectId,
-  }));
+  // The workspace round-trips to v0 for the chat and its transcript; prefetching
+  // it here means the builder renders with the conversation already in place
+  // instead of flashing a loader on every navigation.
+  await Promise.all([
+    queryClient.prefetchQuery(trpc.v0.workspace.queryOptions({ projectId })),
+    queryClient.prefetchQuery(trpc.projects.getOne.queryOptions({ id: projectId })),
+  ]);
 
   return ( 
     <HydrationBoundary state={dehydrate(queryClient)}>

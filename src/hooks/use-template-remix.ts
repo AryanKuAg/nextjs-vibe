@@ -26,7 +26,7 @@ export const useTemplateRemix = () => {
       onSuccess: (data) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-        router.push(`/projects/${data.id}?builderAutoSubmit=true`);
+        router.push(`/projects/${data.id}`);
       },
       onError: (error) => {
         setIsRedirecting(false);
@@ -44,14 +44,11 @@ export const useTemplateRemix = () => {
   const remix = async (templateId: string | null) => {
     if (!templateId || isPending) return;
 
-    // No description means "give me this template exactly" — a valid request the
-    // code agent recognises and satisfies without rewriting anything.
+    // No description means "give me this template exactly": a remix imports the
+    // repo as built, so the prompt is only what the project gets named after.
     const value = TEMPLATE_ASIS_PROMPT;
 
     setIsRedirecting(true);
-    // The project page reads these on mount and auto-submits the first build.
-    sessionStorage.setItem("pending_builder_prompt", value);
-    sessionStorage.setItem("pending_model", "google/gemini-3.1-flash-lite");
 
     try {
       await createProject.mutateAsync({ value, templateId });

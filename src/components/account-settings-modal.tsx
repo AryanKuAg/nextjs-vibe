@@ -3,7 +3,6 @@
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import "remixicon/fonts/remixicon.css";
 
@@ -19,7 +18,6 @@ export const AccountSettingsModal = ({
   isOpen,
   onClose,
 }: AccountSettingsModalProps) => {
-  const router = useRouter();
   const trpc = useTRPC();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -44,23 +42,8 @@ export const AccountSettingsModal = ({
     })
   );
 
-  const deleteAccountMutation = useMutation(trpc.usage.deleteAccount.mutationOptions());
-
   const handleSignOut = () => {
     signOut({ redirectUrl: "/" });
-  };
-
-  const handleDeleteAccount = async () => {
-    if (confirm("Are you sure you want to permanently delete your account & all data? This cannot be undone.")) {
-      try {
-        await deleteAccountMutation.mutateAsync();
-        await user?.delete();
-        toast.success("Account and data deleted successfully");
-        router.push("/");
-      } catch (error: unknown) {
-        toast.error((error as Error)?.message || "Failed to delete account", { duration: Infinity });
-      }
-    }
   };
 
   return (
@@ -71,7 +54,7 @@ export const AccountSettingsModal = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 font-sans"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 font-onest"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -100,19 +83,19 @@ export const AccountSettingsModal = ({
 
             {/* Content */}
             <div className="p-4 flex flex-col gap-4">
-              {/* Email */}
-              <div className="flex flex-col gap-[2px] pb-4 border-b-[0.5px] border-white-8">
-                <span className="text-[12px] text-white-50 leading-[18px]">Email</span>
-                <span className="text-sm leading-[20px] text-white-85">
-                  {user?.primaryEmailAddress?.emailAddress || <Skeleton className="h-4 w-48 bg-[#2A2A28]" />}
-                </span>
-              </div>
-
               {/* Name */}
               <div className="flex flex-col gap-[2px] pb-4 border-b-[0.5px] border-white-8">
                 <span className="text-[12px] text-white-50 leading-[18px]">Name</span>
                 <span className="text-sm leading-[20px] text-white-85">
                   {user?.fullName || <Skeleton className="h-4 w-32 bg-[#2A2A28]" />}
+                </span>
+              </div>
+
+              {/* Email */}
+              <div className="flex flex-col gap-[2px] pb-4 border-b-[0.5px] border-white-8">
+                <span className="text-[12px] text-white-50 leading-[18px]">Email</span>
+                <span className="text-sm leading-[20px] text-white-85">
+                  {user?.primaryEmailAddress?.emailAddress || <Skeleton className="h-4 w-48 bg-[#2A2A28]" />}
                 </span>
               </div>
 
@@ -133,26 +116,25 @@ export const AccountSettingsModal = ({
                 </button>
               </div>
 
-              {/* Sign out */}
+              {/* Contact */}
               <div className="flex items-center justify-between pb-4 border-b-[0.5px] border-white-8">
+                <span className="text-sm leading-[20px] text-white-85">Any question?</span>
+                <a
+                  href="mailto:teamframerate@gmail.com"
+                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px] flex items-center"
+                >
+                  Contact us
+                </a>
+              </div>
+
+              {/* Sign out */}
+              <div className="flex items-center justify-between pb-2">
                 <span className="text-sm leading-[20px] text-white-85">Sign out</span>
                 <button
                   onClick={handleSignOut}
                   className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
                 >
                   Sign out
-                </button>
-              </div>
-
-              {/* Delete account */}
-              <div className="flex items-center justify-between pb-2">
-                <span className="text-sm leading-[20px] text-white-85">Delete account</span>
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleteAccountMutation.isPending}
-                  className="px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
-                >
-                  {deleteAccountMutation.isPending ? "Deleting..." : "Delete account"}
                 </button>
               </div>
             </div>

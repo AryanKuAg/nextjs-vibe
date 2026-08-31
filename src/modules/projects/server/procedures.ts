@@ -5,7 +5,6 @@ import { TRPCError } from "@trpc/server";
 
 import { checkCredits, consumeCredits, refundCredits, AGENT_COSTS } from "@/lib/usage";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
-import { getTemplate } from "@/lib/templates/registry";
 import { uploadDataUrlToStorage } from "@/lib/upload-data-url";
 import { CAPACITY_MESSAGE, isCapacityError } from "@/lib/v0-error";
 import { startProjectBuild } from "@/lib/v0-start-build";
@@ -77,23 +76,11 @@ export const projectsRouter = createTRPCRouter({
       z.object({
         value: z.string().max(100000, { message: "Value is too long" }),
         isAgentMode: z.boolean().default(false),
-        // Set when the project is created by remixing a gallery template. An
-        // unknown id is rejected rather than silently ignored — a project that
-        // claims a template it cannot download would fail mid-build.
-        templateId: z.string().optional(),
         /** A reference image attached to the prompt, as a data URL. */
         imageDataUrl: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const template = input.templateId ? getTemplate(input.templateId) : null;
-      if (input.templateId && !template) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Unknown template "${input.templateId}".`,
-        });
-      }
-
       // Everything the user asked for, in the one shape the whole pipeline reads.
       const brief: SiteBrief = { startPrompt: input.value };
 
@@ -127,7 +114,7 @@ export const projectsRouter = createTRPCRouter({
       const count = await prisma.project.count({
         where: { userId: ctx.auth.userId },
       });
-      const name = template ? `${template.title} Remix` : `Project ${count + 1}`;
+      const name = `Project ${count + 1}`;
 
       const createdProject = await prisma.project.create({
         data: {
@@ -135,7 +122,6 @@ export const projectsRouter = createTRPCRouter({
           name,
           status: "draft",
           currentStage: "SCENE",
-          templateId: template?.id ?? null,
           // Always written. Everything downstream reads the build's brief back
           // out of here — the v0 call and a retry — so a project without this
           // row is a project that cannot be finished.

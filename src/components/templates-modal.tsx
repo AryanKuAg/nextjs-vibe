@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Image from "next/image";
 
-import { useTemplateRemix } from "@/hooks/use-template-remix";
 import { type TemplateManifest } from "@/lib/templates/registry";
 
 interface TemplatesModalProps {
@@ -16,9 +15,13 @@ interface TemplatesModalProps {
 export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
-  const { remix, isPending } = useTemplateRemix();
-
-  const handleRemix = () => remix(selectedTemplate);
+  // Templates are taken away and run elsewhere rather than started here, so
+  // the only thing this modal does with a selection is hand over its source.
+  // The response is an attachment, so navigating leaves the modal where it is.
+  const handleDownload = () => {
+    if (!selectedTemplate) return;
+    window.location.assign(`/api/templates/${encodeURIComponent(selectedTemplate)}/download`);
+  };
 
   return (
     <AnimatePresence>
@@ -82,11 +85,11 @@ export function TemplatesModal({ isOpen, onClose, templates }: TemplatesModalPro
             <div className="flex items-center justify-end gap-3 p-4 border-t-[0.5px] border-white-8 mt-auto shrink-0">
               <button
                 type="button"
-                onClick={handleRemix}
-                disabled={!selectedTemplate || isPending}
+                onClick={handleDownload}
+                disabled={!selectedTemplate}
                 className="shrink-0 px-2 rounded-[6px] border-[0.5px] border-white-12 bg-transparent text-white-85 text-[14px] hover:bg-white-8  disabled:opacity-50 h-[28px] font-medium leading-[20px]"
               >
-                {isPending ? "Starting…" : "Remix template"}
+                Download template
               </button>
             </div>
           </motion.div>

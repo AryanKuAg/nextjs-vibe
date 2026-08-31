@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
-// Template registry — the source of truth for the remixable gallery templates.
+// Template registry — the source of truth for the gallery templates.
 //
-// A template is a real, hand-built site living in a PUBLIC GitHub repo. When a
-// user remixes one, v0 imports that repo directly (chats.createFromRepo) and the
-// chat opens on it as the starting code.
+// A template is a real, hand-built site living in a PUBLIC GitHub repo. It is
+// something a customer previews and downloads, not something the builder starts
+// from: builds are made from a prompt. `/api/templates/[templateId]/download`
+// streams the repo's zip, so the archive is the whole integration.
 //
 // See ./README.md for the contract every template repo must satisfy.
 // ---------------------------------------------------------------------------
@@ -166,16 +167,6 @@ export const TEMPLATE_REGISTRY: TemplateManifest[] = [
   },
 ];
 
-/**
- * Prompt used when a user remixes a template without describing any changes.
- * Shown verbatim as their chat message, so keep it short and human.
- *
- * It doubles as a sentinel: the code agent compares against this exact constant
- * to recognise "change nothing" and treat a no-op build as success, since the
- * template is already a complete site.
- */
-export const TEMPLATE_ASIS_PROMPT = "Remix template";
-
 export const getTemplate = (id: string | null | undefined): TemplateManifest | null => {
   if (!id) return null;
   return TEMPLATE_REGISTRY.find((t) => t.id === id) ?? null;
@@ -191,12 +182,9 @@ export const templateTarballUrl = (t: TemplateManifest): string =>
 /**
  * Zip URL for a template repo, from the same codeload endpoint.
  *
- * This is what a remix imports from. The build service also offers a
- * "create from GitHub repo" call, and it is the obvious thing to reach for —
- * but on these repos it returns a chat whose file tree cannot be read back
- * (`getFiles` answers 500) and whose workspace the agent finds empty, so the
- * remix produced a chat with nothing in it. Handing over a zip skips their
- * GitHub importer entirely.
+ * What the download route streams to the customer. It stays server-side so the
+ * archive arrives from this application rather than from the repository it
+ * happens to be kept in.
  */
 export const templateZipUrl = (t: TemplateManifest): string =>
   `https://codeload.github.com/${t.repo}/zip/refs/heads/${t.branch}`;

@@ -21,7 +21,6 @@ import { UserControl } from "@/components/user-control";
 import { CustomOutOfCreditsModal } from "@/components/custom-out-of-credits-modal";
 import { useTRPC } from "@/trpc/client";
 import { TemplatesModal } from "@/components/templates-modal";
-import { useTemplateRemix } from "@/hooks/use-template-remix";
 import { useCheckoutReturn } from "@/hooks/use-checkout-return";
 import { TEMPLATE_REGISTRY } from "@/lib/templates/registry";
 
@@ -156,10 +155,8 @@ interface SitePreviewCardProps {
   height?: number;
   /** If true, uses a simpler opacity-only hover effect without overlays */
   isLandingPage?: boolean;
-  /** Template id — enables the Remix pill when provided. */
+  /** Template id — enables the Download pill when provided. */
   templateId?: string;
-  onRemix?: (templateId: string) => void;
-  isRemixPending?: boolean;
   /** Fired once the cover has loaded or failed — drives the reveal queue. */
   onCoverSettled?: () => void;
 }
@@ -171,8 +168,6 @@ const SitePreviewCard = ({
   height,
   isLandingPage,
   templateId,
-  onRemix,
-  isRemixPending,
   onCoverSettled,
 }: SitePreviewCardProps) => {
   // The cover fades in on decode instead of popping in: the tiles reveal on a
@@ -238,20 +233,23 @@ const SitePreviewCard = ({
               <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors">
                 Preview
               </div>
-              {templateId && onRemix && (
+              {templateId && (
                 <button
                   type="button"
-                  disabled={isRemixPending}
                   onClick={(e) => {
                     // The card itself is the "open the demo" link — keep the pill
-                    // from following it.
+                    // from following it. A plain navigation rather than a nested
+                    // <a>, which would be invalid inside that link; the response
+                    // is an attachment, so the page stays where it is.
                     e.preventDefault();
                     e.stopPropagation();
-                    onRemix(templateId);
+                    window.location.assign(
+                      `/api/templates/${encodeURIComponent(templateId)}/download`,
+                    );
                   }}
-                  className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors disabled:opacity-50"
+                  className="bg-black/40 backdrop-blur-md border border-white/10 text-white text-xs px-4 py-1.5 rounded-[10px] font-medium hover:bg-black/60 transition-colors"
                 >
-                  {isRemixPending ? "Starting…" : "Remix"}
+                  Download
                 </button>
               )}
             </div>
@@ -333,7 +331,6 @@ const DashboardGrid = () => (
 /* ─── Logged In Dashboard ─── */
 const LoggedInDashboard = () => {
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
-  const { remix, isPending: isRemixPending } = useTemplateRemix();
   useCheckoutReturn();
   return (
     // overflow-x-clip: the grid backdrop is wider than the content box wherever
@@ -398,8 +395,6 @@ const LoggedInDashboard = () => {
                   href={site.href}
                   imgSrc={site.homescreenImgSrc}
                   templateId={site.id}
-                  onRemix={remix}
-                  isRemixPending={isRemixPending}
                 />
               ))}
             </div>

@@ -1,5 +1,0 @@
-# Shell scripts must keep LF endings. compile_page.sh is the E2B sandbox start
-# command; with CRLF the shebang resolves to "/bin/bash\r" and the template build
-# fails with "cannot execute: required file not found". core.autocrlf=true on
-# Windows would otherwise convert it back on every checkout.
-*.sh text eol=lf

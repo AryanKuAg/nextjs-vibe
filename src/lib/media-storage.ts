@@ -7,7 +7,7 @@ import {
 import { getR2Client, isR2Configured, r2PublicBase, R2_BUCKET_NAME, r2PublicUrlLooksLikeApiEndpoint } from "@/lib/r2";
 
 /**
- * Generated media (scene images) is stored in Cloudflare R2,
+ * Generated media (scene images, background videos) is stored in Cloudflare R2,
  * the same bucket and client the built sites already deploy to.
  *
  * R2 is the only store, so an upload failure fails the generation — there is no

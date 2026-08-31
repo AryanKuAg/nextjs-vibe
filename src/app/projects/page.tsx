@@ -128,7 +128,7 @@ export default function ProjectsPage() {
 
 
   return (
-    <div className="min-h-screen bg-background text-white font-onest flex flex-col  selection:bg-[#F1336E]/30">
+    <div className="min-h-screen bg-background text-white font-sans flex flex-col  selection:bg-[#F1336E]/30">
       {/* Header */}
       <header className="flex items-center justify-between p-3">
         <div className="flex items-center gap-2 text-[14px] text-white/50 font-medium">

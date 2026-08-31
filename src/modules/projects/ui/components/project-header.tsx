@@ -62,34 +62,34 @@ export const ProjectHeader = ({ projectId }: Props) => {
     }
   };
 
-  // Rendered inline in the builder's header rather than as a bar of its own:
-  // the two stacked bars were collapsed into one.
   return (
-    <>
-      <Link className="shrink-0" href="/">
-        <Image src="/logo.png" alt="framerate" width={24} height={24} />
-      </Link>
+    <header className="p-2.5 flex justify-between items-center h-[52px] shrink-0">
+      <div className="flex items-center gap-6 pl-2">
+        <Link href="/">
+          <Image src="/logo.png" alt="framerate" width={28} height={28} />
+        </Link>
 
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          value={nameValue}
-          onChange={(e) => setNameValue(e.target.value)}
-          onBlur={commitRename}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          className="min-w-0 flex-1 border-b border-white/30 bg-transparent px-1 text-sm leading-[20px] text-white outline-none transition-colors focus:border-white/60"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={startEditing}
-          title="Click to rename"
-          className="min-w-0 flex-1 truncate text-left text-sm leading-[20px] text-white transition-colors hover:text-white/70"
-        >
-          {renameMutation.isPending ? nameValue : project.name}
-        </button>
-      )}
-    </>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            className="text-sm text-white bg-transparent border-b border-white/30 outline-none focus:border-white/60 px-1 min-w-0 w-[160px] max-w-[240px] transition-colors"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startEditing}
+            title="Click to rename"
+            className="text-sm text-white hover:text-white/70 transition-colors truncate max-w-[200px]"
+          >
+            {renameMutation.isPending ? nameValue : project.name}
+          </button>
+        )}
+      </div>
+    </header>
   );
 };

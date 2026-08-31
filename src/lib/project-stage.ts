@@ -8,11 +8,15 @@
 export const PROJECT_STAGE = {
   /** Resting: at the background step. */
   SCENE: "SCENE",
+  /** Resting: a video exists. */
+  VIDEO: "VIDEO",
   /** Resting: a site has been built. */
   SITE: "SITE",
 
   /** Active: the image agent is running. */
   GENERATING_SCENE: "GENERATING_SCENE",
+  /** Active: the video agent is running. */
+  GENERATING_VIDEO: "GENERATING_VIDEO",
   /** Active: the code agent is running. */
   BUILDING_SITE: "BUILDING_SITE",
 

@@ -14,40 +14,28 @@ import { chatIdFromHost, previewSubdomain } from '@/lib/preview-host';
  */
 const PREVIEW_PATH = /\/api\/v0-preview\/([^/?#]+)/;
 
-function previewChatIdFromReferer(referer: string | null, hosts: string[]) {
-  if (!referer) return null;
+function previewChatIdFromReferer(referer: string | null, host: string | null) {
+  if (!referer || !host) return null;
 
   try {
     const url = new URL(referer);
-    // Host rather than origin. `request.nextUrl.origin` is the origin the
-    // container was reached on, which behind a CDN in front of Cloud Run is
-    // neither the scheme nor the hostname the browser used — so the comparison
-    // never matched and this rewrite silently stopped happening in production.
-    // The preview's `/_next/*` chunks and the fonts named inside its CSS went
-    // to this application's own root and 404'd, with nothing in the log to say
-    // why. Clerk derives its own URLs from the forwarded headers for the same
-    // reason.
-    if (!hosts.includes(url.host.toLowerCase())) return null;
+    // The `Host` header, compared against the referer's host rather than its
+    // origin. `request.nextUrl.origin` is the origin the container was reached
+    // on: behind TLS termination its scheme is `http` though the browser used
+    // `https`, and its hostname is not the one the user typed either. So the
+    // comparison never matched, and this rewrite silently stopped happening in
+    // production — the preview's `/_next/*` chunks and the fonts named inside
+    // its CSS went to this application's own root and 404'd, with nothing in
+    // the log to say why.
+    //
+    // Deliberately not `X-Forwarded-Host`: the CDN in front passes a
+    // client-supplied one straight through, so trusting it would let a caller
+    // nominate the very hostname its own referer is then checked against.
+    if (url.host.toLowerCase() !== host.toLowerCase()) return null;
     return PREVIEW_PATH.exec(url.pathname)?.[1] ?? null;
   } catch {
     return null;
   }
-}
-
-/**
- * The hostnames a referer may legitimately carry.
- *
- * All three, because which one holds the address the user actually typed
- * depends on what sits in front: a Cloud Run domain mapping passes it straight
- * through as `host`, while a proxy pointed at the service URL leaves `host`
- * internal and puts the real one in `x-forwarded-host`.
- */
-function requestHosts(request: NextRequest): string[] {
-  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-
-  return [forwarded, request.headers.get("host"), request.nextUrl.host]
-    .filter((host): host is string => Boolean(host))
-    .map((host) => host.toLowerCase());
 }
 
 const isPublicRoute = createRouteMatcher([
@@ -114,7 +102,7 @@ export default function middleware(request: NextRequest, event: NextFetchEvent) 
   if (!request.nextUrl.pathname.startsWith("/api/v0-preview")) {
     const refererChatId = previewChatIdFromReferer(
       request.headers.get("referer"),
-      requestHosts(request),
+      request.headers.get("host"),
     );
 
     if (refererChatId) {

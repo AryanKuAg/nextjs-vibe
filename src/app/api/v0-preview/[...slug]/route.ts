@@ -113,13 +113,15 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
   const selfUrl = new URL(requestUrl);
   selfUrl.searchParams.delete(WAIT_MARKER);
 
+  const builder = builderOrigin(requestUrl, ownsOrigin);
+
   const preview = await resolvePreview(chatId);
 
   // Nothing to serve yet, or v0 just asked us to re-resolve. Either way the
   // frame gets a page that retries rather than an error it cannot recover from.
   // The marker is what stops a refresh signal becoming a tight redirect loop.
   if (!preview || requestUrl.searchParams.has(WAIT_MARKER)) {
-    return withGrant(holdingPage(selfUrl.toString()), {
+    return withGrant(holdingPage(selfUrl.toString(), builder), {
       chatId,
       cookieName,
       granted,
@@ -140,14 +142,14 @@ async function handle(request: Request, params: Promise<{ slug: string[] }>) {
     },
   });
 
-  const placeholder = await replaceUpstreamPlaceholder(upstream, waitUrl);
+  const placeholder = await replaceUpstreamPlaceholder(upstream, waitUrl, builder);
 
   // On its own host nothing needs rewriting — the site already owns the origin.
   const response =
     placeholder ??
     (ownsOrigin
-      ? await addPathReporter(upstream)
-      : await keepNavigationInsidePreview(upstream, chatId));
+      ? await addPathReporter(upstream, builder)
+      : await keepNavigationInsidePreview(upstream, chatId, builder));
 
   return withGrant(response, {
     chatId,
@@ -283,8 +285,25 @@ export async function OPTIONS(request: Request, ctx: { params: Promise<{ slug: s
   return handle(request, ctx.params);
 }
 
-/** Where the builder is, so the framed page can talk back to it and no further. */
-function parentOrigin() {
+/**
+ * Where the builder is, so the framed page can talk back to it and no further.
+ *
+ * `NEXT_PUBLIC_APP_URL` is baked in at build time and names exactly one host,
+ * and this deployment answers on two — the apex and `www`. A user on
+ * `www.framerate.space` was handed a script addressing `https://framerate.space`,
+ * so the browser dropped every `postMessage` for origin mismatch. The preview
+ * loaded in full, all 119 requests of it, and the pane still sat on "Preview
+ * isn’t running" — because the one message that lifts that overlay never
+ * arrived.
+ *
+ * Sharing an origin, the request is the authority: the frame and the builder
+ * are the same host by construction, whichever host that turns out to be. On a
+ * dedicated preview host they are two different hosts and only the configured
+ * app URL can name the parent.
+ */
+function builderOrigin(requestUrl: URL, ownsOrigin: boolean) {
+  if (!ownsOrigin) return requestUrl.origin;
+
   try {
     return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "").origin;
   } catch {
@@ -296,10 +315,10 @@ function parentOrigin() {
  * On a dedicated host nothing needs rewriting; the frame only has to say where
  * it is, so the builder's address bar and Back button mean something.
  */
-async function addPathReporter(response: Response) {
+async function addPathReporter(response: Response, builder: string | null) {
   if (!response.headers.get("content-type")?.includes("text/html")) return response;
 
-  const html = (await response.text()).replace("</head>", `${pathReporterScript()}</head>`);
+  const html = (await response.text()).replace("</head>", `${pathReporterScript(builder)}</head>`);
 
   const headers = new Headers(response.headers);
   headers.delete("content-length");
@@ -308,9 +327,9 @@ async function addPathReporter(response: Response) {
   return new Response(html, { status: response.status, statusText: response.statusText, headers });
 }
 
-function pathReporterScript() {
+function pathReporterScript(builder: string | null) {
   return `<script>(function(){
-var T=${JSON.stringify(parentOrigin() ?? "*")};
+var T=${JSON.stringify(builder ?? "*")};
 function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},T);}catch(e){}}
 var p=history.pushState,r=history.replaceState;
 history.pushState=function(){var v=p.apply(this,arguments);report();return v;};
@@ -347,17 +366,18 @@ function isUpstreamPlaceholder(html: string): boolean {
 async function replaceUpstreamPlaceholder(
   response: Response,
   retryTo: URL,
+  builder: string | null,
 ): Promise<Response | null> {
   if (!response.headers.get("content-type")?.includes("text/html")) return null;
 
   const html = await response.clone().text();
   if (!isUpstreamPlaceholder(html)) return null;
 
-  return holdingPage(retryTo.toString());
+  return holdingPage(retryTo.toString(), builder);
 }
 
 /** The frame's holding page while the sandbox boots. Retries on its own. */
-function holdingPage(retryTo: string) {
+function holdingPage(retryTo: string, builder: string | null) {
   return new Response(
     `<!doctype html>
 <html>
@@ -367,7 +387,7 @@ function holdingPage(retryTo: string) {
     <meta http-equiv="refresh" content="2;url=${escapeHtml(retryTo)}" />
     <script>
       var notify = function () {
-        try { parent.postMessage({ type: "v0-preview-loading" }, ${JSON.stringify(parentOrigin() ?? "*")}); } catch (e) {}
+        try { parent.postMessage({ type: "v0-preview-loading" }, ${JSON.stringify(builder ?? "*")}); } catch (e) {}
       };
       notify();
       setInterval(notify, 250);
@@ -417,13 +437,17 @@ function escapeHtml(value: string) {
  * directory explicitly. Root-relative URLs ignore its path, which is why this
  * and the rewriting above do not fight.
  */
-async function keepNavigationInsidePreview(response: Response, chatId: string) {
+async function keepNavigationInsidePreview(
+  response: Response,
+  chatId: string,
+  builder: string | null,
+) {
   if (!response.headers.get("content-type")?.includes("text/html")) return response;
 
   const prefix = `/api/v0-preview/${encodeURIComponent(chatId)}`;
   const html = rewriteRootRelative(await response.text(), prefix)
     .replace(/<head(\s[^>]*)?>/i, (head) => `${head}<base href="${prefix}/">`)
-    .replace("</head>", `${keepInsideScript(prefix)}</head>`);
+    .replace("</head>", `${keepInsideScript(prefix, builder)}</head>`);
 
   const headers = new Headers(response.headers);
   headers.delete("content-length"); // rewriting changed it
@@ -465,9 +489,9 @@ function rewriteRootRelative(html: string, prefix: string) {
   });
 }
 
-function keepInsideScript(prefix: string) {
+function keepInsideScript(prefix: string, builder: string | null) {
   return `<script>(function(){
-var P=${JSON.stringify(prefix)},T=${JSON.stringify(parentOrigin() ?? "*")};
+var P=${JSON.stringify(prefix)},T=${JSON.stringify(builder ?? "*")};
 function fix(u){if(typeof u!=="string")return u;if(u.indexOf(P)===0)return u;if(u.charAt(0)==="/"&&u.charAt(1)!=="/")return P+u;return u;}
 function report(){try{parent.postMessage({type:"v0-preview-path",path:location.pathname+location.search+location.hash},T);}catch(e){}}
 var p=history.pushState,r=history.replaceState;
@@ -510,7 +534,7 @@ function signedOutPage(status: number) {
     </style>
   </head>
   <body>
-    <strong>${expired ? "Your session expired" : "This preview isn\u2019t available"}</strong>
+    <strong>${expired ? "Your session expired" : "This preview isn’t available"}</strong>
     <p>${
       expired
         ? "Sign in again and this preview will come straight back \u2014 your site is safe."

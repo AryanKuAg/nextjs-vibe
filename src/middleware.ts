@@ -14,16 +14,40 @@ import { chatIdFromHost, previewSubdomain } from '@/lib/preview-host';
  */
 const PREVIEW_PATH = /\/api\/v0-preview\/([^/?#]+)/;
 
-function previewChatIdFromReferer(referer: string | null, origin: string) {
+function previewChatIdFromReferer(referer: string | null, hosts: string[]) {
   if (!referer) return null;
 
   try {
     const url = new URL(referer);
-    if (url.origin !== origin) return null;
+    // Host rather than origin. `request.nextUrl.origin` is the origin the
+    // container was reached on, which behind a CDN in front of Cloud Run is
+    // neither the scheme nor the hostname the browser used — so the comparison
+    // never matched and this rewrite silently stopped happening in production.
+    // The preview's `/_next/*` chunks and the fonts named inside its CSS went
+    // to this application's own root and 404'd, with nothing in the log to say
+    // why. Clerk derives its own URLs from the forwarded headers for the same
+    // reason.
+    if (!hosts.includes(url.host.toLowerCase())) return null;
     return PREVIEW_PATH.exec(url.pathname)?.[1] ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The hostnames a referer may legitimately carry.
+ *
+ * All three, because which one holds the address the user actually typed
+ * depends on what sits in front: a Cloud Run domain mapping passes it straight
+ * through as `host`, while a proxy pointed at the service URL leaves `host`
+ * internal and puts the real one in `x-forwarded-host`.
+ */
+function requestHosts(request: NextRequest): string[] {
+  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+
+  return [forwarded, request.headers.get("host"), request.nextUrl.host]
+    .filter((host): host is string => Boolean(host))
+    .map((host) => host.toLowerCase());
 }
 
 const isPublicRoute = createRouteMatcher([
@@ -90,7 +114,7 @@ export default function middleware(request: NextRequest, event: NextFetchEvent) 
   if (!request.nextUrl.pathname.startsWith("/api/v0-preview")) {
     const refererChatId = previewChatIdFromReferer(
       request.headers.get("referer"),
-      request.nextUrl.origin,
+      requestHosts(request),
     );
 
     if (refererChatId) {

@@ -44,11 +44,25 @@ async function resolvePreview(chatId: string): Promise<ChatsGetPreviewResponse> 
   if (cached && cached.expiresAt.getTime() - 60_000 > Date.now()) return cached;
 
   const response = await v0.chats.getPreview({ chatId });
-  if (response.error !== undefined) return null;
+
+  // Both ways of having nothing to serve end the same on screen: the frame sits
+  // on the holding page, retrying every two seconds, until the builder's stall
+  // timer gives up and reports that the preview is not running. They were also
+  // identical in the log, which recorded neither — so a v0 that was failing
+  // outright and a sandbox that was merely asleep could not be told apart from
+  // a deployment. They are named separately here for exactly that.
+  if (response.error !== undefined) {
+    console.error(`[build] getPreview failed for ${chatId}:`, response.error);
+    return null;
+  }
 
   const preview = response.data;
-  if (preview) previewCache.set(chatId, preview);
-  else previewCache.delete(chatId);
+  if (preview) {
+    previewCache.set(chatId, preview);
+  } else {
+    console.warn(`[build] no preview for ${chatId} yet — its sandbox is not up`);
+    previewCache.delete(chatId);
+  }
 
   return preview;
 }

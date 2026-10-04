@@ -1,21 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = {
-  title: "Compliance Overview – Framerate",
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Compliance Overview",
   description: "Framerate's commitments to data protection, security, and responsible AI usage.",
-  openGraph: {
-    title: "Compliance Overview – Framerate",
-    description: "Framerate's commitments to data protection, security, and responsible AI usage.",
-    url: "https://framerate.space/compliance",
-    siteName: "Framerate",
-  },
-  twitter: {
-    card: "summary",
-    title: "Compliance Overview – Framerate",
-    description: "Framerate's commitments to data protection, security, and responsible AI usage.",
-  },
-};
+  path: "/compliance",
+});
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-sans gap-4">

@@ -18,7 +18,7 @@ When designing cinematic 3D websites, the choice of typography is crucial. Hereâ
 
 - **Visual Hierarchy**: Fonts help establish a clear visual hierarchy, making it easier for users to navigate your content.
 - **Brand Identity**: The right font can reflect your brand's personality and values, resonating with your target audience.
-- **Emotional Impact**: Different fonts evoke different emotions; selecting a suitable font can enhance the storytelling aspect of your website.
+- **Emotional Impact**: Different fonts evoke different emotions; selecting a suitable font can enhance the [storytelling](/blog/interactive-3d-storytelling-for-brands) aspect of your website.
 
 ## Key Considerations for Choosing Fonts
 

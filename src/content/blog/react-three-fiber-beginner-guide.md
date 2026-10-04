@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## Introduction to React Three Fiber
 
-If you're looking to dive into the world of 3D web development, **React Three Fiber** is the perfect gateway. This beginner guide will take you through everything you need to know to start creating stunning 3D visuals for your web projects. With the power of React and Three.js combined, you can build immersive experiences that captivate your audience.
+If you're looking to dive into the world of 3D web development, **React Three Fiber** is the perfect gateway. This beginner guide will take you through everything you need to know to start creating stunning 3D visuals for your web projects. With the power of React and [Three.js](/blog/framerate-vs-threejs-comparison) combined, you can build immersive experiences that captivate your audience.
 
 ### What is React Three Fiber?
 

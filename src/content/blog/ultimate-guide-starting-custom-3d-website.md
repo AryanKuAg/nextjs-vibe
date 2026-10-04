@@ -31,16 +31,16 @@ A **custom website**, on the other hand, is tailored specifically to your audien
 If you look at the sites winning design awards today—Awwwards, FWA, CSS Design Awards—they almost all share one common trait: they are **3d websites**.
 
 ### What is a 3D Website?
-A 3D website goes beyond flat text and images. It incorporates spatial depth. This could be a 3D model of your product that users can rotate, a background that shifts in perspective as the user moves their mouse, or a **cinematic scroll** experience where text flies through a three-dimensional space.
+A 3D website goes beyond flat text and images. It incorporates spatial depth. This could be a 3D model of your product that users can rotate, a background that shifts in perspective as the user moves their mouse, or a **[cinematic scroll](/blog/how-ai-is-democratizing-cinematic-scroll)** experience where text flies through a three-dimensional space.
 
 ### Why Do 3D Websites Convert Better?
 1. **Dwell Time:** **Interactive websites** naturally keep users on the page longer. When a user is playing with a 3D model, they aren't hitting the back button.
 2. **Memorability:** A user might visit 10 software sites in a day. They will forget the 9 flat ones, but they will remember the one that felt like a video game.
-3. **Storytelling:** 3D allows you to tell a narrative. Instead of just listing features, you can guide the user on a visual journey.
+3. **[Storytelling](/blog/interactive-3d-storytelling-for-brands):** 3D allows you to tell a narrative. Instead of just listing features, you can guide the user on a visual journey.
 
 ## Chapter 3: How to Create Your Website Using Modern AI
 
-Historically, if you wanted to **create 3d website** experiences, you had to hire a team of specialized developers. You needed experts in Three.js, WebGL, and complex animation libraries. It cost tens of thousands of dollars and took months.
+Historically, if you wanted to **create 3d website** experiences, you had to hire a team of specialized developers. You needed experts in [Three.js](/blog/framerate-vs-threejs-comparison), WebGL, and complex animation libraries. It cost tens of thousands of dollars and took months.
 
 Now, you can leverage AI to **build your own website** in minutes.
 
@@ -53,7 +53,7 @@ When you use the right AI tool to **start a website**, it acts as your personal 
 ### Introducing Framerate
 If you are serious about building a **custom website** that incorporates 3D elements, you need a tool built specifically for this new era. **Framerate** is the ultimate solution. 
 
-While other AI builders give you flat, boring templates, Framerate is engineered to generate high-end, production-ready **3d websites**. You simply type in what you want, and Framerate writes the complex React and Three.js code under the hood. It allows anyone, regardless of technical skill, to **create 3d website** experiences that look like they cost $50,000 to develop.
+While other AI builders give you flat, boring templates, Framerate is engineered to generate high-end, production-ready **3d websites**. You simply type in what you want, and Framerate writes the React code under the hood, including Three.js when your design calls for real-time 3D. It allows anyone, regardless of technical skill, to **create 3d website** experiences that look like they cost $50,000 to develop.
 
 ## Chapter 4: Best Practices for Interactive Websites
 
@@ -63,7 +63,7 @@ Once you use a tool like Framerate to generate your site, you still need to ensu
 3D elements can be heavy. If your site takes 10 seconds to load, users will leave before they ever see your beautiful animations. Framerate automatically optimizes the generated code, but you should always ensure your textures and models are compressed.
 
 ### 2. Don't Hijack the Scroll
-A major mistake novices make when they **build a site** is scroll-hijacking (taking control of the user's mouse wheel). Modern 3D sites use *scroll-driven animations*, where the user's native scroll controls the timeline of the animation, but the scrolling itself feels natural.
+A major mistake novices make when they **build a site** is [scroll-hijacking](/blog/scroll-hijacking-vs-scroll-driven-animations) (taking control of the user's mouse wheel). Modern 3D sites use *[scroll-driven animations](/blog/scroll-driven-3d-animations-tutorial)*, where the user's native scroll controls the timeline of the animation, but the scrolling itself feels natural.
 
 ### 3. Mobile First, Always
 It is easy to design a massive 3D experience for a 27-inch monitor, but 60% of your traffic will be on mobile. A good AI builder will automatically handle responsive design, ensuring your 3D elements scale down or gracefully degrade on smaller screens.

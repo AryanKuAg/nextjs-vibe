@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## Introduction to WebGL Shader Programming for Beginners
 
-In the realm of 3D graphics, **WebGL shader programming for beginners** opens up a world of creativity and innovation. As the backbone of rendering stunning visual effects in web applications, mastering shaders allows artists and developers to breathe life into their projects. This guide will walk you through the fundamentals of WebGL shader programming, paving the way for your journey into immersive graphics.
+In the realm of 3D graphics, **[WebGL](/blog/webgl-performance-optimization-tips) shader programming for beginners** opens up a world of creativity and innovation. As the backbone of rendering stunning visual effects in web applications, mastering shaders allows artists and developers to breathe life into their projects. This guide will walk you through the fundamentals of WebGL shader programming, paving the way for your journey into immersive graphics.
 
 ## What is WebGL?
 
@@ -84,7 +84,7 @@ const fragmentShaderSource = `
 Once you have your basic setup, try experimenting with different effects:
 
 - Change colors dynamically.
-- Implement textures on 3D models.
+- Implement textures on [3D models](/blog/adding-3d-models-to-next-js-app-router).
 - Apply lighting calculations to enhance realism.
 
 ## Best Practices for Beginners
@@ -97,4 +97,4 @@ As you embark on your WebGL shader programming journey, keep these best practice
 
 ## Conclusion
 
-Mastering **WebGL shader programming for beginners** is a gateway to creating visually stunning web applications. By understanding the fundamentals and gradually expanding your skills, you can unlock endless possibilities in the world of 3D graphics. With tools like Framerate, transforming your ideas into cinematic experiences is easier than ever. So, dive in, experiment, and let your creativity shine!
+Mastering **WebGL shader programming for beginners** is a gateway to creating visually stunning web applications. By understanding the fundamentals and gradually expanding your skills, you can unlock endless possibilities in the world of 3D graphics. With tools like [Framerate](/), transforming your ideas into cinematic experiences is easier than ever. So, dive in, experiment, and let your creativity shine!

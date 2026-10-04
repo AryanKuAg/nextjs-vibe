@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## Adding 3D Models to Your Next.js App Router: A Comprehensive Guide
 
-In the ever-evolving landscape of web development, the integration of 3D models into your Next.js app router can significantly enhance user engagement and create immersive experiences. By leveraging the capabilities of Next.js alongside powerful 3D rendering libraries, developers can effortlessly add dynamic and visually appealing elements to their applications. This guide will walk you through the essential steps and considerations for adding 3D models to your Next.js app router.
+In the ever-evolving landscape of web development, the integration of 3D models into your [Next.js](/blog/next-js-3d-website-templates) app router can significantly enhance [user engagement](/blog/why-3d-websites-convert-better) and create immersive experiences. By leveraging the capabilities of Next.js alongside powerful 3D rendering libraries, developers can effortlessly add dynamic and visually appealing elements to their applications. This guide will walk you through the essential steps and considerations for adding 3D models to your Next.js app router.
 
 ### Why Choose Next.js for 3D Model Integration?
 

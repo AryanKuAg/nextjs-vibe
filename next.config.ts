@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 import { PREVIEW_HOST, previewHostPattern } from "./src/lib/preview-host";
+import { SITE_URL } from "./src/lib/site";
 
 // Node 22–25 exposes a sealed Proxy as global.localStorage during SSR.
 // You cannot mutate its properties. Shadow the entire global with a safe no-op
@@ -43,6 +44,12 @@ const nextConfig: NextConfig = {
   // reads. VERCEL=1 is set by the platform at build and at runtime.
   ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
   serverExternalPackages: ["inngest", "@inngest/agent-kit", "@e2b/code-interpreter"],
+  // The homepage renders per request (it reads the session) and lists blog
+  // guides read from disk. Every other page that reads the posts is built
+  // ahead of time, but this one needs them in the standalone image too.
+  outputFileTracingIncludes: {
+    "/": ["./src/content/blog/*.md"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -69,12 +76,25 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
+    // One host for the site. www answered with a full copy of every page; the
+    // canonical tags pointed at the apex, but a permanent redirect settles it
+    // for links, crawlers and anyone who types the www.
+    const apex = new URL(SITE_URL);
+    const canonicalHost = {
+      source: "/:path*",
+      // `has` values are patterns, so the dots are escaped.
+      has: [{ type: "host" as const, value: `www\\.${apex.host.replace(/\./g, "\\.")}` }],
+      destination: `${apex.origin}/:path*`,
+      permanent: true,
+    };
+
     // The path proxy needs a full navigation out of a preview sent back under
     // its prefix. On a dedicated host there is no prefix and nothing to send
     // back, so the rule only exists in fallback mode.
-    if (PREVIEW_HOST) return [];
+    if (PREVIEW_HOST) return [canonicalHost];
 
     return [
+      canonicalHost,
       {
         source: "/:path((?!api/v0-preview).*)",
         has: [
@@ -120,6 +140,23 @@ const nextConfig: NextConfig = {
           : {}),
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }],
       },
+      /**
+       * Previews are users' unpublished drafts. They must never appear in a
+       * search index under our domain, whichever way they are served.
+       */
+      {
+        source: "/api/v0-preview/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      ...(PREVIEW_HOST
+        ? [
+            {
+              source: "/:path*",
+              has: [{ type: "host" as const, value: previewHostPattern() }],
+              headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+            },
+          ]
+        : []),
     ];
   },
 };

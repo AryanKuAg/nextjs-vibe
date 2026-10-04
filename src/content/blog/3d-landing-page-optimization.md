@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## The Future of Web Design: 3D Landing Page Optimization
 
-In an era where user experience dictates the success of online businesses, **3D landing page optimization** has emerged as a game-changer. As digital landscapes evolve, integrating cinematic elements into web design not only captivates audiences but also enhances engagement and conversion rates. Framerate, an AI-powered builder, empowers creators to generate stunning 3D websites from text prompts in mere minutes, making the optimization of landing pages more accessible than ever.
+In an era where user experience dictates the success of online businesses, **3D landing page optimization** has emerged as a game-changer. As digital landscapes evolve, integrating cinematic elements into web design not only captivates audiences but also enhances engagement and [conversion rates](/blog/why-3d-websites-convert-better). [Framerate](/), an AI-powered builder, empowers creators to generate stunning 3D websites from text prompts in mere minutes, making the optimization of landing pages more accessible than ever.
 
 ### Why 3D Landing Pages?
 
@@ -57,7 +57,7 @@ Your headline should grab attention and communicate the value of your offering. 
 
 #### 2. Use Storytelling Techniques
 
-Leverage storytelling to guide users through your website. Create a narrative that connects with your audience emotionally, making your 3D landing page not just a source of information but an experience.
+Leverage [storytelling](/blog/interactive-3d-storytelling-for-brands) to guide users through your website. Create a narrative that connects with your audience emotionally, making your 3D landing page not just a source of information but an experience.
 
 #### 3. Include Clear Calls to Action (CTAs)
 

@@ -2,13 +2,21 @@ import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import { getAllPosts, getPostBySlug, getRelatedPosts } from "@/lib/blog";
+import { fitTitle, pageMetadata } from "@/lib/seo";
+import { blogPosting, breadcrumbList } from "@/lib/structured-data";
+import { JsonLd } from "@/components/json-ld";
+import { BlogPostCard, formatPostDate } from "@/modules/blog/ui/components/blog-post-card";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
+
+// Every post is known at build time; anything else is a 404 without touching
+// the filesystem.
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
@@ -29,26 +37,18 @@ export async function generateMetadata(
     };
   }
 
-  return {
-    title: `${post.title} – Framerate`,
+  return pageMetadata({
+    ...fitTitle(post.title),
     description: post.excerpt,
-    keywords: post.keywords,
-    openGraph: {
-      title: post.title,
-      description: post.excerpt,
-      type: "article",
+    path: `/blog/${slug}`,
+    ...(post.coverImage ? { image: { url: post.coverImage, alt: post.title } } : {}),
+    article: {
       publishedTime: post.date,
+      modifiedTime: post.updated,
       authors: [post.author],
-      url: `https://framerate.space/blog/${slug}`,
-      images: post.coverImage ? [post.coverImage] : [],
+      tags: post.keywords,
     },
-    twitter: {
-      card: "summary_large_image",
-      title: post.title,
-      description: post.excerpt,
-      images: post.coverImage ? [post.coverImage] : [],
-    },
-  };
+  });
 }
 
 export default async function BlogPost({ params }: Props) {
@@ -59,66 +59,30 @@ export default async function BlogPost({ params }: Props) {
     notFound();
   }
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": post.title,
-    "description": post.excerpt,
-    "image": post.coverImage ? [`https://framerate.space${post.coverImage}`] : [],
-    "datePublished": post.date,
-    "dateModified": post.date,
-    "author": {
-      "@type": "Organization",
-      "name": post.author,
-    },
-    "publisher": {
-      "@type": "Organization",
-      "name": "Framerate",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://framerate.space/logo.png"
-      }
-    },
-    "mainEntityOfPage": {
-      "@type": "WebPage",
-      "@id": `https://framerate.space/blog/${slug}`
-    }
-  };
-
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Home",
-        "item": "https://framerate.space"
-      },
-      {
-        "@type": "ListItem",
-        "position": 2,
-        "name": "Blog",
-        "item": "https://framerate.space/blog"
-      },
-      {
-        "@type": "ListItem",
-        "position": 3,
-        "name": post.title,
-        "item": `https://framerate.space/blog/${slug}`
-      }
-    ]
-  };
+  const relatedPosts = getRelatedPosts(slug);
+  const isRevised = post.updated !== post.date;
 
   return (
     <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-sans">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd
+        data={blogPosting({
+          slug,
+          title: post.title,
+          description: post.excerpt,
+          image: post.coverImage,
+          datePublished: post.date,
+          dateModified: post.updated,
+          author: post.author,
+          keywords: post.keywords,
+          wordCount: post.wordCount,
+        })}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      <JsonLd
+        data={breadcrumbList([
+          { name: "Home", path: "/" },
+          { name: "Blog", path: "/blog" },
+          { name: post.title, path: `/blog/${slug}` },
+        ])}
       />
 
       <PillNavbar />
@@ -136,9 +100,11 @@ export default async function BlogPost({ params }: Props) {
             <div className="flex flex-wrap items-center text-sm font-mono text-[#8A8A88] gap-4">
               <span>By {post.author}</span>
               <span className="hidden sm:inline">•</span>
-              <time dateTime={post.date}>
-                {new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-              </time>
+              {isRevised ? (
+                <time dateTime={post.updated}>Updated {formatPostDate(post.updated)}</time>
+              ) : (
+                <time dateTime={post.date}>{formatPostDate(post.date)}</time>
+              )}
               <span className="hidden sm:inline">•</span>
               <span>{post.readTime}</span>
             </div>
@@ -150,6 +116,7 @@ export default async function BlogPost({ params }: Props) {
                 src={post.coverImage}
                 alt={post.title}
                 fill
+                sizes="(max-width: 896px) 100vw, 896px"
                 className="object-cover"
                 priority
               />
@@ -161,6 +128,19 @@ export default async function BlogPost({ params }: Props) {
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
         </article>
+
+        {relatedPosts.length > 0 && (
+          <section aria-labelledby="keep-reading" className="mt-20">
+            <h2 id="keep-reading" className="text-2xl md:text-3xl font-[500] text-white mb-8">
+              Keep reading
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {relatedPosts.map((related) => (
+                <BlogPostCard key={related.slug} post={related} headingLevel="h3" />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

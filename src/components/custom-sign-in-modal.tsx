@@ -122,14 +122,14 @@ export const CustomSignInModal = ({ isOpen, onClose }: CustomSignInModalProps) =
           <p className="absolute bottom-6 w-full px-6 text-white/50 text-[12px] text-center leading-relaxed">
             By signing up, you agree to our{" "}
             <Link
-              href="/legal"
+              href="/terms"
               className="text-white-85"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
-              href="/legal?tab=privacy"
+              href="/privacy"
               className="text-white-85"
             >
               Privacy Policy

@@ -21,8 +21,8 @@ Unlike traditional videos that play passively, or standard websites where scroll
 ### The Technical Foundation
 
 Historically, building these experiences required complex tech stacks:
-- **WebGL / WebGPU:** For rendering the 3D graphics in the browser.
-- **Three.js:** To simplify the WebGL API.
+- **WebGL / [WebGPU](/blog/webgpu-vs-webgl-modern-web-design):** For rendering the 3D graphics in the browser.
+- **[Three.js](/blog/framerate-vs-threejs-comparison):** To simplify the WebGL API.
 - **GSAP (GreenSock):** For complex scroll-trigger animations.
 
 Today, AI generation platforms abstract all of this complexity away, generating the necessary underlying code automatically.
@@ -46,7 +46,7 @@ Implementing a 3D scroll-driven design isn't just about looking cool; it drives 
 
 - **Dwell Time:** Sites employing interactive 3D elements routinely see average session durations double or triple compared to 2D sites.
 - **Information Retention:** Users are 65% more likely to remember key brand messaging when it's presented in an interactive, spatial context.
-- **Conversion Rates:** By guiding users along a literal 3D path toward a CTA, brands report significant lifts in final conversion metrics.
+- **[Conversion Rates](/blog/why-3d-websites-convert-better):** By guiding users along a literal 3D path toward a CTA, brands report significant lifts in final conversion metrics.
 
 ## Common Pitfalls to Avoid
 
@@ -56,7 +56,7 @@ While 3D websites are powerful, they can be executed poorly. If you're building 
 Never break the default scroll behavior of the browser to force a specific animation speed. Always let the user scroll at their natural pace, and tie the animation progress smoothly to that natural scroll event.
 
 ### Performance Bloat
-Unoptimized 3D models and massive textures will crash mobile browsers and hurt your SEO via terrible Core Web Vitals (specifically LCP and INP). Always use compressed formats (like glTF/glb) and implement lazy loading. (Note: Platforms like Framerate handle this optimization automatically).
+Unoptimized 3D models and massive textures will crash mobile browsers and hurt your SEO via terrible [Core Web Vitals](/blog/improving-core-web-vitals-on-3d-sites) (specifically LCP and INP). Always use compressed formats (like glTF/glb) and implement lazy loading. (Note: Platforms like Framerate handle this optimization automatically).
 
 ### Content Obscurity
 Don't let the 3D visuals overpower the actual content. The 3D environment should support the copy, not make it unreadable. Ensure high contrast and clear typography.
@@ -69,4 +69,4 @@ Just a year ago, creating a scroll-driven 3D site meant hiring a specialized age
 
 ## Final Thoughts
 
-The web is moving from pages to places. Scroll-driven 3D experiences are at the forefront of this transition, offering unparalleled engagement and storytelling capabilities. As AI tools continue to lower the barrier to entry, we can expect this cinematic approach to become the new standard for digital experiences.
+The web is moving from pages to places. Scroll-driven 3D experiences are at the forefront of this transition, offering unparalleled engagement and [storytelling](/blog/interactive-3d-storytelling-for-brands) capabilities. As AI tools continue to lower the barrier to entry, we can expect this cinematic approach to become the new standard for digital experiences.

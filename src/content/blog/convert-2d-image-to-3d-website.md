@@ -1,6 +1,7 @@
 ---
 title: "Transform Your Vision: Convert 2D Images to 3D Websites in Minutes"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Discover how to convert 2D images to 3D websites effortlessly with Framerate, the AI-powered builder that creates stunning cinematic experiences."
 keywords: ["convert 2D image to 3D website", "AI website builder", "cinematic 3D websites"]
 coverImage: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## Introduction: The Future of Web Design
 
-In today’s digital age, creating visually captivating websites is essential for engaging visitors and enhancing user experience. If you're looking to **convert a 2D image to a 3D website**, Framerate is your go-to solution. This innovative AI-powered builder allows users to transform static images into dynamic, cinematic 3D websites in mere minutes. 
+In today’s digital age, creating visually captivating websites is essential for engaging visitors and enhancing user experience. If you're looking to **convert a 2D image to a 3D website**, [Framerate](/) is your go-to solution. This innovative AI-powered builder allows users to transform static images into dynamic, cinematic 3D websites in mere minutes. 
 
 ## Why Convert 2D Images to 3D Websites?
 
@@ -28,7 +29,7 @@ Framerate utilizes cutting-edge AI technology to streamline the process of conve
 
 ### Step-by-Step Process
 
-1. **Input Your Text Prompt**: Begin by describing your vision in a simple text prompt. The more detailed your description, the better the outcome.
+1. **Attach Your Image and Describe the Site**: Add your 2D image as a reference, then describe the website you want around it. The more detailed your description, the better the outcome.
    
 2. **AI Processing**: The AI analyzes your prompt, interpreting key elements to craft a 3D website that aligns with your vision.
 
@@ -46,8 +47,8 @@ Framerate utilizes cutting-edge AI technology to streamline the process of conve
 
 Converting 2D images to 3D websites can be beneficial across various industries:
 
-- **E-Commerce**: Showcase products in a 3D environment, providing customers with a more interactive shopping experience.
-- **Portfolio Websites**: Artists and designers can present their work in an engaging format that highlights their creativity.
+- **[E-Commerce](/blog/future-of-ecommerce-3d-product-viewers)**: Showcase products in a 3D environment, providing customers with a more interactive shopping experience.
+- **[Portfolio Websites](/blog/how-to-create-a-3d-portfolio-website)**: Artists and designers can present their work in an engaging format that highlights their creativity.
 - **Event Promotion**: Create immersive experiences for events, helping attendees visualize and engage with the event's theme.
 
 ## Best Practices for Creating 3D Websites

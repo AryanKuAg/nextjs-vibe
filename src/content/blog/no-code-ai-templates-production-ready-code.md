@@ -10,7 +10,7 @@ readTime: "6 min read"
 
 ## The Problem with Traditional Website Templates
 
-When you need to launch a project quickly, reaching for a **template website** is the traditional first step. Platforms offering generic **website templates** have been around for two decades, promising a fast route to getting online.
+When you need to launch a project quickly, reaching for a **template website** is the traditional first step. Platforms offering generic **[website templates](/templates)** have been around for two decades, promising a fast route to getting online.
 
 However, anyone who has used a standard **page builder** knows the painful reality. What starts as a quick process quickly devolves into frustration when you try to customize the design. You are boxed into rigid layouts. If you want a truly **custom website**, standard templates almost always fall short. You end up with a **template site** that looks exactly like thousands of other businesses online.
 
@@ -30,9 +30,9 @@ This means you get the speed of a **website templates** library, but with the un
 
 The biggest leap forward in AI web generation is the output. Older tools gave you a visual representation of a site, but the underlying code was an absolute mess—often referred to as "spaghetti code." It was impossible for a real developer to work with.
 
-The new standard is **production-ready code**. 
+The new standard is **[production-ready code](/blog/from-prompt-to-production-ready-code)**. 
 
-This is where **Framerate** completely dominates the landscape. Framerate isn't just a visual builder; it is an AI engineering tool. When you generate a site with Framerate, you aren't just getting a pretty picture. You get clean, modern, Next.js code. 
+This is where **[Framerate](/)** completely dominates the landscape. Framerate isn't just a visual builder; it is an AI engineering tool. When you generate a site with Framerate, you aren't just getting a pretty picture. You get clean, modern, Next.js code. 
 
 Framerate allows you to **export website** code instantly. This means you can generate a stunning 3D site with AI, export the entire codebase, and hand it straight to your engineering team. It is guaranteed to be clean, scalable, and fully **production-ready code**.
 

@@ -8,60 +8,12 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import "remixicon/fonts/remixicon.css";
+import { PLANS as MODAL_PLANS } from "@/lib/pricing";
 
 interface CustomOutOfCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const MODAL_PLANS = [
-  {
-    key: "plus",
-    title: "Plus",
-    desc: "Perfect for personal projects",
-    monthlyPrice: "10",
-    yearlyPrice: "8",
-    features: [
-      "100 credits",
-      "Standard AI models",
-      "Template gallary",
-      "Full site export",
-      "No coding required",
-      "Standard generation",
-    ],
-  },
-  {
-    key: "pro",
-    title: "Pro",
-    desc: "Built for active creators",
-    monthlyPrice: "20",
-    yearlyPrice: "16",
-    isPopular: true,
-    features: [
-      "500 credits",
-      "Frontier AI models",
-      "Template gallary",
-      "Full site export",
-      "No coding required",
-      "Priority generation",
-    ],
-  },
-  {
-    key: "max",
-    title: "Max",
-    desc: "Made for teams and studios",
-    monthlyPrice: "40",
-    yearlyPrice: "32",
-    features: [
-      "1,500 credits",
-      "Frontier AI models",
-      "Template gallary",
-      "Full site export",
-      "No coding required",
-      "Fastest generation",
-    ],
-  },
-];
 
 const ModalPricingCard = ({
   plan,

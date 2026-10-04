@@ -1,20 +1,21 @@
-import Link from "next/link";
-import Image from "next/image";
 import { Metadata } from "next";
 import { getAllPosts } from "@/lib/blog";
+import { pageMetadata } from "@/lib/seo";
+import { absoluteUrl, SITE_URL } from "@/lib/site";
+import { breadcrumbList, organizationNode } from "@/lib/structured-data";
+import { JsonLd } from "@/components/json-ld";
+import { BlogPostCard } from "@/modules/blog/ui/components/blog-post-card";
 import { PillNavbar } from "@/modules/home/ui/components/pill-navbar";
 import { Footer } from "@/modules/home/ui/components/footer";
 
-export const metadata: Metadata = {
-  title: "Blog – Framerate",
-  description: "Read the latest thoughts on AI web design, 3D websites, and the future of the internet from the Framerate team.",
-  openGraph: {
-    title: "Blog – Framerate",
-    description: "Read the latest thoughts on AI web design, 3D websites, and the future of the internet from the Framerate team.",
-    type: "website",
-    url: "https://framerate.space/blog",
-  },
-};
+const DESCRIPTION =
+  "Guides to building cinematic 3D websites with AI: scroll-driven design, WebGL performance, tool comparisons and how much a 3D website really costs.";
+
+export const metadata: Metadata = pageMetadata({
+  title: "3D Web Design & AI Website Guides",
+  description: DESCRIPTION,
+  path: "/blog",
+});
 
 export default function BlogIndex() {
   const posts = getAllPosts();
@@ -22,26 +23,32 @@ export default function BlogIndex() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    "name": "Framerate Blog",
-    "description": "Thoughts on AI web design, 3D websites, and the future of the internet.",
-    "url": "https://framerate.space/blog",
-    "blogPost": posts.map((post) => ({
+    "@id": `${SITE_URL}/blog#blog`,
+    name: "Framerate Blog",
+    description: DESCRIPTION,
+    url: absoluteUrl("/blog"),
+    inLanguage: "en",
+    publisher: organizationNode(),
+    blogPost: posts.map((post) => ({
       "@type": "BlogPosting",
-      "headline": post.title,
-      "datePublished": post.date,
-      "author": {
-        "@type": "Organization",
-        "name": post.author,
-      },
-      "url": `https://framerate.space/blog/${post.slug}`,
+      headline: post.title,
+      description: post.excerpt,
+      datePublished: post.date,
+      dateModified: post.updated,
+      ...(post.coverImage ? { image: absoluteUrl(post.coverImage) } : {}),
+      author: { "@type": "Organization", name: post.author, url: SITE_URL },
+      url: absoluteUrl(`/blog/${post.slug}`),
     })),
   };
 
   return (
     <div className="min-h-screen bg-background selection:bg-white/20 pb-0 flex flex-col font-sans">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd data={jsonLd} />
+      <JsonLd
+        data={breadcrumbList([
+          { name: "Home", path: "/" },
+          { name: "Blog", path: "/blog" },
+        ])}
       />
       <PillNavbar />
 
@@ -57,43 +64,7 @@ export default function BlogIndex() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => (
-            <article key={post.slug} className="group flex flex-col bg-[#282828] rounded-[16px] overflow-hidden hover:ring-1 hover:ring-white/20 transition-all">
-              <Link
-                href={`/blog/${post.slug}`}
-                className="flex flex-col flex-1"
-              >
-                <div className="relative aspect-[16/9] w-full bg-[#1a1a1a] overflow-hidden">
-                  {post.coverImage ? (
-                    <Image
-                      src={post.coverImage}
-                      alt={post.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/20">
-                      No Image
-                    </div>
-                  )}
-                </div>
-                <div className="p-6 flex flex-col flex-1">
-                  <header className="flex items-center text-xs text-[#8A8A88] mb-3 font-mono">
-                    <span>{new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
-                    <span className="mx-2">•</span>
-                    <span>{post.readTime}</span>
-                  </header>
-                  <h2 className="text-xl text-white font-[500] mb-3 group-hover:text-primary transition-colors">
-                    {post.title}
-                  </h2>
-                  <p className="text-sm text-[#CCCCCC] line-clamp-3 mb-4 flex-1">
-                    {post.excerpt}
-                  </p>
-                  <div className="flex items-center text-xs text-white font-mono mt-auto">
-                    Read Article &rarr;
-                  </div>
-                </div>
-              </Link>
-            </article>
+            <BlogPostCard key={post.slug} post={post} />
           ))}
         </div>
       </main>

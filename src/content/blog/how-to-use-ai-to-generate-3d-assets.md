@@ -1,7 +1,8 @@
 ---
 title: "Unlocking Creativity: How to Use AI to Generate 3D Assets"
 date: "2026-05-28"
-excerpt: "Discover how to use AI to generate 3D assets seamlessly, transforming ideas into stunning visuals with Framerate's innovative platform."
+updated: "2026-10-04"
+excerpt: "Learn how to use AI to generate 3D assets for the web, from writing effective prompts to building and publishing the website they live in with Framerate."
 keywords: ["AI 3D asset generation", "creating 3D assets", "AI in design"]
 coverImage: "https://images.unsplash.com/photo-1614729939124-032f0b56c9ce?q=80&w=1200"
 author: "Framerate Team"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## Introduction to AI in 3D Asset Generation
 
-In the rapidly evolving landscape of digital design, **how to use AI to generate 3D assets** has become a pivotal question for creators and developers alike. With advancements in artificial intelligence, the process of crafting intricate 3D models is now more accessible than ever. Framerate, an AI-powered builder, empowers users to create cinematic 3D websites from text prompts, significantly simplifying the design workflow.
+In the rapidly evolving landscape of digital design, **how to use AI to generate 3D assets** has become a pivotal question for creators and developers alike. With advancements in artificial intelligence, the process of crafting intricate [3D models](/blog/adding-3d-models-to-next-js-app-router) is now more accessible than ever. [Framerate](/), an AI-powered builder, empowers users to create cinematic 3D websites from text prompts, significantly simplifying the design workflow.
 
 ## The Benefits of Using AI for 3D Asset Creation
 
@@ -41,18 +42,18 @@ Once you have your concept, the next step is to craft effective text prompts. Th
 - **Use Context**: Provide context that helps the AI understand the environment or situation in which the asset exists.
 - **Iterate**: Don’t hesitate to refine your prompts based on initial outputs to achieve the desired results.
 
-### Step 3: Utilize Framerate’s AI Builder
+### Step 3: Build the Website Around Them with Framerate
 
-With your prompts ready, it’s time to leverage Framerate’s powerful AI builder. Here’s how to proceed:
+Framerate doesn't produce standalone 3D model files; it builds the website your visuals live in. Here's how to proceed:
 
-1. **Access the Platform**: Go to Framerate’s website and sign up or log in.
-2. **Input Your Prompts**: Enter your crafted text prompts into the designated field.
-3. **Generate Assets**: Click the generate button and watch as the AI transforms your ideas into stunning 3D models.
-4. **Review and Edit**: Examine the generated assets for alignment with your vision. Use editing tools if needed to adjust colors, textures, or shapes.
+1. **Access the Platform**: Go to [Framerate](https://framerate.space) and sign up or log in.
+2. **Describe the Site**: Enter a prompt describing the website and the scenes you want, and attach a reference image if you have one.
+3. **Generate the Site**: The AI designs and codes the site, including the motion and any real-time 3D scenes you ask for, and shows you a live preview.
+4. **Review and Refine**: Check the result against your vision, and ask for changes to colors, textures, layout or motion in follow-up prompts.
 
 ### Step 4: Export and Implement
 
-After finalizing your 3D assets, you can easily export them for use in your projects. Framerate supports various formats, making it compatible with different platforms and applications.
+When the site is ready, publish it to a live link or download its code. It's a standard Next.js and React project, so your developers can swap in final 3D assets, connect it to your systems, and host it anywhere.
 
 ## Best Practices for Effective AI-Generated 3D Assets
 
@@ -64,4 +65,4 @@ To maximize the potential of AI in generating 3D assets, consider these best pra
 
 ## Conclusion
 
-In conclusion, understanding **how to use AI to generate 3D assets** is a game changer for designers seeking efficiency and creativity. Framerate’s innovative platform offers a seamless way to transform text prompts into stunning 3D visuals, enabling users to bring their ideas to life in record time. Embrace the future of design and unlock your creative potential with AI-driven asset generation.
+In conclusion, understanding **how to use AI to generate 3D assets** is a game changer for designers seeking efficiency and creativity. Pair those assets with Framerate, which turns a text prompt into the website they live in, and you can take an idea from concept to a published 3D site in record time. Embrace the future of design and unlock your creative potential with AI-driven asset generation.

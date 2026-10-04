@@ -12,7 +12,7 @@ import {
   useState,
 } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { SignedIn, SignedOut, useSignIn, useUser } from "@clerk/nextjs";
+import { SignedIn, useAuth, useSignIn, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import "remixicon/fonts/remixicon.css";
@@ -284,15 +284,24 @@ const RevealCard = ({ order, ...card }: { order: number } & SitePreviewCardProps
   const onCoverSettled = useCallback(() => markSettled(order), [markSettled, order]);
 
   // With reduced motion the tile appears where it lands, rather than rising
-  // into place — the ordering is the point, the travel isn't.
-  const hidden = reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 };
-  const shown = reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 };
+  // into place — the ordering is the point, the travel isn't. The travel is
+  // dropped in the transition, not the targets: the grid is server-rendered,
+  // and `useReducedMotion` only knows the answer in the browser, so targets
+  // that depended on it would hydrate a different inline style than the
+  // server sent.
+  const hidden = { opacity: 0, y: 16, scale: 0.98 };
+  const shown = { opacity: 1, y: 0, scale: 1 };
+  const ease = [0.22, 1, 0.36, 1] as const;
 
   return (
     <motion.div
       initial={hidden}
       animate={order < releasedCount ? shown : hidden}
-      transition={{ duration: reduceMotion ? 0.2 : 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={
+        reduceMotion
+          ? { duration: 0.2, ease, y: { duration: 0 }, scale: { duration: 0 } }
+          : { duration: 0.5, ease }
+      }
     >
       <SitePreviewCard {...card} priority={order < EAGER_TILES} onCoverSettled={onCoverSettled} />
     </motion.div>
@@ -424,8 +433,20 @@ const LoggedInDashboard = () => {
 };
 
 
+/**
+ * Clerk's SignedOut renders nothing until Clerk has loaded, which on a
+ * server-rendered page means the sign-up button is missing from the HTML and
+ * then pops in, pushing the mobile header down. This renders it from the first
+ * frame and only withdraws it once a session is confirmed — by which point the
+ * dashboard is replacing this whole view anyway.
+ */
+const UnlessSignedIn = ({ children }: { children: React.ReactNode }) => {
+  const { isSignedIn } = useAuth();
+  return isSignedIn ? null : <>{children}</>;
+};
+
 /* ─── Logged Out View ─── */
-const LoggedOutView = () => {
+const LoggedOutView = ({ marketing }: { marketing?: React.ReactNode }) => {
   const { signIn, isLoaded } = useSignIn();
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
@@ -457,7 +478,7 @@ const LoggedOutView = () => {
             {/* Mobile: compact auth pill next to the logo — the full-width
                 button below is desktop-only there. */}
             <div className="flex md:hidden items-center">
-              <SignedOut>
+              <UnlessSignedIn>
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={isPending}
@@ -472,7 +493,7 @@ const LoggedOutView = () => {
                   </div>
                   Sign up
                 </button>
-              </SignedOut>
+              </UnlessSignedIn>
               <SignedIn>
                 <button
                   onClick={() => router.push("/manage")}
@@ -514,7 +535,7 @@ const LoggedOutView = () => {
 
           {/* Action buttons — desktop only; mobile uses the compact pill by the logo. */}
           <div className="hidden md:flex items-center gap-2 mb-8 md:mb-12">
-            <SignedOut>
+            <UnlessSignedIn>
               <button
                 onClick={handleGoogleSignIn}
                 disabled={isPending}
@@ -529,7 +550,7 @@ const LoggedOutView = () => {
                 </div>
                 Continue with Google
               </button>
-            </SignedOut>
+            </UnlessSignedIn>
             <SignedIn>
               <button
                 onClick={() => router.push("/manage")}
@@ -594,29 +615,37 @@ const LoggedOutView = () => {
             ))}
           </div>
         </RevealQueueProvider>
+
+        {marketing}
       </div>
     </main>
   );
 };
 
 
-/* ─── Main Page Export ─── */
-export default function Page() {
+/* ─── Home View ─── */
+interface HomeViewProps {
+  /** The server's read of the session, used until Clerk has loaded in the browser. */
+  signedIn: boolean;
+  /** Server-rendered content shown under the templates on the signed-out page. */
+  marketing?: React.ReactNode;
+}
+
+export function HomeView({ signedIn, marketing }: HomeViewProps) {
   const { user, isLoaded } = useUser();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted || !isLoaded) {
-    return <div className="min-h-screen bg-bg" />;
+  // Until Clerk loads, the server decides. A signed-out visitor — and every
+  // crawler — gets the landing page in the HTML itself rather than an empty
+  // frame that only fills once Clerk's script has run, which is all a crawler
+  // that doesn't execute JavaScript ever saw. A signed-in user still gets the
+  // blank frame while their dashboard loads, never a flash of the landing page.
+  if (!isLoaded) {
+    return signedIn ? <div className="min-h-screen bg-bg" /> : <LoggedOutView marketing={marketing} />;
   }
 
   if (user) {
     return <LoggedInDashboard />;
   }
 
-  return <LoggedOutView />;
+  return <LoggedOutView marketing={marketing} />;
 }
-

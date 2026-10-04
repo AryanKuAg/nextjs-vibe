@@ -38,10 +38,17 @@ function previewChatIdFromReferer(referer: string | null, host: string | null) {
   }
 }
 
+// Anything not listed here 404s for signed-out visitors and crawlers — which is
+// what had been happening to /llms.txt. New public pages must be added.
 const isPublicRoute = createRouteMatcher([
   "/",
   "/robots.txt",
   "/sitemap.xml",
+  "/llms.txt",
+  "/llms-full.txt",
+  "/pricing.md",
+  "/templates(.*)",
+  "/use-cases(.*)",
   "/api(.*)",
   "/pricing(.*)",
   "/sso-callback(.*)",

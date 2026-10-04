@@ -10,7 +10,7 @@ readTime: "11 min read"
 
 ## The Illusion of the Perfect Template
 
-If you have ever tried to **create your site**, you have likely started by browsing a library of **website templates**. On the surface, a **template website** looks like the perfect solution. The demo looks stunning, the placeholder images are gorgeous, and the layout seems flawless. 
+If you have ever tried to **create your site**, you have likely started by browsing a library of **[website templates](/templates)**. On the surface, a **template website** looks like the perfect solution. The demo looks stunning, the placeholder images are gorgeous, and the layout seems flawless. 
 
 But then you buy it. You upload it to your CMS, and you start replacing their content with yours. 
 
@@ -32,21 +32,21 @@ The solution to the template trap and the walled-garden page builder is AI. We a
 When you use modern AI to build **my website**, the AI isn't just dropping your text into a pre-existing box. It is dynamically generating the layout, the CSS, and the React components based specifically on the length and context of your content. 
 
 ### Why AI Generation is Superior
-- **Context-Aware Design:** The AI knows if you have a 3-word headline or a 15-word headline, and it adjusts the typography and spacing accordingly.
+- **Context-Aware Design:** The AI knows if you have a 3-word headline or a 15-word headline, and it adjusts the [typography](/blog/best-fonts-for-cinematic-3d-websites) and spacing accordingly.
 - **Unique Output:** Two companies can prompt the exact same AI and get two completely different, bespoke designs. You will never have an **own website create** moment where you realize your competitor is using the exact same theme.
 
 ## The Holy Grail: Production-Ready Code
 
 The biggest critique of early AI tools and **no code websites** was that they produced terrible code. They were great for prototyping, but you would never use them in a real business environment.
 
-That has completely changed. The new standard for AI web generation is **production-ready code**. 
+That has completely changed. The new standard for AI web generation is **[production-ready code](/blog/from-prompt-to-production-ready-code)**. 
 
 This means the code the AI writes is indistinguishable from code written by a Senior Frontend Engineer. It is clean, modular, accessible, and highly optimized. 
 
 ### Framerate: The Pioneer of Exportable Code
-If you are looking to escape the template trap, **Framerate** is the ultimate tool. Framerate is designed specifically to bridge the gap between AI generation and professional engineering. 
+If you are looking to escape the template trap, **[Framerate](/)** is the ultimate tool. Framerate is designed specifically to bridge the gap between AI generation and professional engineering. 
 
-With Framerate, you don't just get a visual preview of a site. You get a complete Next.js application. And crucially, Framerate allows you to **export website** files instantly. You own your code. You can deploy it anywhere, hand it off to your engineering team, or extend it manually. Framerate is the only AI builder that guarantees **production-ready code** on every single prompt, completely eliminating the need for a generic **template website**.
+With Framerate, you don't just get a visual preview of a site. You get a complete Next.js application. And crucially, Framerate allows you to **export website** files instantly. You own your code. You can deploy it anywhere, hand it off to your engineering team, or extend it manually. Framerate is built to produce **production-ready code** from every prompt, so you never have to start from a generic **template website**.
 
 ## Conclusion
 

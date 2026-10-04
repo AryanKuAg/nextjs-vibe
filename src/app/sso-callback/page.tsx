@@ -1,4 +1,12 @@
+import type { Metadata } from 'next'
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs'
+
+import { NO_INDEX } from '@/lib/seo'
+
+export const metadata: Metadata = {
+  title: 'Signing in',
+  robots: NO_INDEX,
+}
 
 export default function SSOCallbackPage() {
   return (

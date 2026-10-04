@@ -1,6 +1,7 @@
 ---
 title: "How to Create a Stunning 3D Portfolio Website in Minutes"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Discover how to create a 3D portfolio website effortlessly with Framerate's AI-powered builder, turning your ideas into a cinematic digital experience."
 keywords: ["3D portfolio website", "create portfolio", "AI website builder"]
 coverImage: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## How to Create a 3D Portfolio Website: A Step-by-Step Guide
 
-In today's digital landscape, having an engaging portfolio website is crucial for professionals in creative fields. But how to create a 3D portfolio website that stands out from the crowd? With Framerate's AI-powered builder, you can transform your ideas into a cinematic online experience in just minutes. This guide will walk you through the process of creating a 3D portfolio website that captivates your audience.
+In today's digital landscape, having an engaging portfolio website is crucial for professionals in creative fields. But how to create a 3D portfolio website that stands out from the crowd? With [Framerate](/)'s AI-powered builder, you can transform your ideas into a cinematic online experience in just minutes. This guide will walk you through the process of creating a 3D portfolio website that captivates your audience.
 
 ### Why Opt for a 3D Portfolio Website?
 
@@ -25,7 +26,7 @@ A 3D portfolio website offers several advantages:
 To create your 3D portfolio website, follow these steps:
 
 1. **Sign Up on Framerate**: Visit [Framerate](https://framerate.space) and create an account to access the AI-powered builder.
-2. **Choose a Theme**: Select a cinematic theme that resonates with your style and the message you want to convey.
+2. **Pick a Visual Direction**: Decide on the mood you want to convey, then browse the [template gallery](/templates) or find a reference image to show the AI.
 3. **Gather Your Content**: Prepare the images, videos, and text that reflect your work. This might include:
    - Project descriptions
    - High-quality visuals of your work
@@ -46,7 +47,7 @@ Framerate allows you to generate a 3D portfolio website from simple text prompts
 
 Once your site is generated, you can customize it to fit your brand:
 
-- **Adjust Colors and Fonts**: Align the aesthetics with your personal or business branding.
+- **Adjust Colors and [Fonts](/blog/best-fonts-for-cinematic-3d-websites)**: Align the aesthetics with your personal or business branding.
 - **Add Interactive Elements**: Incorporate animations or interactive components to enhance user engagement.
 - **Rearrange Layouts**: Experiment with different layouts to find the flow that best showcases your work.
 

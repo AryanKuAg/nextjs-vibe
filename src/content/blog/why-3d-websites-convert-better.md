@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## Why 3D Websites Convert Better
 
-In the fast-paced digital landscape, website conversion rates are paramount for success. One innovative approach that has gained traction is the use of 3D websites. This blog post explores **why 3D websites convert better**, highlighting their benefits, design elements, and the transformative potential of AI-powered tools like Framerate.
+In the fast-paced digital landscape, website conversion rates are paramount for success. One innovative approach that has gained traction is the use of 3D websites. This blog post explores **why 3D websites convert better**, highlighting their benefits, design elements, and the transformative potential of AI-powered tools like [Framerate](/).
 
 ### The Visual Appeal of 3D Websites
 
@@ -31,7 +31,7 @@ Understanding the components that contribute to better conversion rates in 3D we
 
 #### 2. Emotional Connection
 
-- **Storytelling Through Design**: 3D websites allow for storytelling elements that can evoke emotions. This emotional connection can be pivotal in guiding users toward making a purchase.
+- **[Storytelling](/blog/interactive-3d-storytelling-for-brands) Through Design**: 3D websites allow for storytelling elements that can evoke emotions. This emotional connection can be pivotal in guiding users toward making a purchase.
 - **Immersive Environments**: Creating a virtual environment that resonates with users can lead to stronger brand loyalty.
 
 #### 3. Modern Aesthetic

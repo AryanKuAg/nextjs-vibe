@@ -1,6 +1,7 @@
 ---
 title: "Mastering Scroll-Driven 3D Animations: A Comprehensive Tutorial"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Unlock the potential of scroll-driven 3D animations with our detailed tutorial. Learn how to create stunning, interactive experiences using Framerate's AI-powered tools."
 keywords: ["scroll-driven animations", "3D animations tutorial", "interactive web design"]
 coverImage: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## Introduction to Scroll-Driven 3D Animations
 
-In the world of web design, **scroll-driven 3D animations** are becoming an essential tool for creating immersive and engaging user experiences. By integrating these dynamic visuals, designers can enhance storytelling and provide visitors with an interactive journey through their content. In this tutorial, we will explore how to effectively implement scroll-driven 3D animations using Framerate, the AI-powered builder that transforms text prompts into cinematic 3D websites in just minutes.
+In the world of web design, **scroll-driven 3D animations** are becoming an essential tool for creating immersive and engaging user experiences. By integrating these dynamic visuals, designers can enhance [storytelling](/blog/interactive-3d-storytelling-for-brands) and provide visitors with an interactive journey through their content. In this tutorial, we will explore how to effectively implement scroll-driven 3D animations using [Framerate](/), the AI-powered builder that transforms text prompts into cinematic 3D websites in just minutes.
 
 ## Why Use Scroll-Driven 3D Animations?
 
@@ -27,7 +28,7 @@ Scroll-driven animations are not just a trend; they represent a shift towards mo
 To begin creating scroll-driven 3D animations, follow these steps:
 
 1. **Visit Framerate**: Navigate to [Framerate.space](https://framerate.space) and sign up for an account.
-2. **Choose a Template**: Select a template that suits your project or start from scratch.
+2. **Find a Reference (Optional)**: Browse the [template gallery](/templates) for a style close to yours, or attach a reference image to your prompt.
 3. **Input Your Text Prompt**: Describe the scene you envision. For example, "A serene forest with moving elements."
 
 ### Generating Your 3D Scene

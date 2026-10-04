@@ -12,7 +12,7 @@ readTime: "10 min read"
 
 If you have visited an Apple product launch page in the last five years, you know exactly what a **cinematic scroll** is. As you scroll down the page, elements don't just move up; they animate, rotate, fade, and scale. The website feels less like a document and more like a high-budget movie. It is the pinnacle of **interactive websites**.
 
-For years, this level of design was exclusive to massive corporations. To **build websites** with this level of polish required incredibly senior developers who understood complex mathematics, WebGL, and advanced **animation** libraries. 
+For years, this level of design was exclusive to massive corporations. To **build websites** with this level of polish required incredibly senior developers who understood complex mathematics, [WebGL](/blog/webgl-performance-optimization-tips), and advanced **animation** libraries. 
 
 Today, artificial intelligence is democratizing this technology. A single developer, marketer, or designer can now achieve the exact same effect in a fraction of the time.
 
@@ -20,7 +20,7 @@ Today, artificial intelligence is democratizing this technology. A single develo
 
 A cinematic scroll experience occurs when the user's scroll wheel is tied directly to the timeline of an animation. Instead of video auto-playing, the user controls the pacing. 
 
-This technique often blurs the line between traditional HTML and **video websites**. It keeps users hyper-engaged because they feel in control of the narrative. To achieve this, developers historically had to rely on a massive **3d scroll library** like GSAP or React Three Fiber, spending weeks fine-tuning the easing curves and performance optimization.
+This technique often blurs the line between traditional HTML and **video websites**. It keeps users hyper-engaged because they feel in control of the narrative. To achieve this, developers historically had to rely on a massive **3d scroll library** like GSAP or [React Three Fiber](/blog/react-three-fiber-beginner-guide), spending weeks fine-tuning the easing curves and performance optimization.
 
 ## The Bottleneck: Real-Time Editing
 
@@ -37,9 +37,9 @@ Instead of writing thousands of lines of code to orchestrate an animation timeli
 ### Framerate: The Ultimate 3D Scroll Library Alternative
 When evaluating **websites to create websites**, you need a tool that natively understands spatial design. This is where **Framerate** excels. 
 
-Framerate isn't just an AI website generator; it is a purpose-built **3d website builder**. It acts as your personal animation engineer. With Framerate, you get the absolute best of both worlds:
+Framerate isn't just an AI website generator; it is a purpose-built **[3d website builder](/)**. It acts as your personal animation engineer. With Framerate, you get the absolute best of both worlds:
 1. **The speed of AI:** Generate a massive, interactive 3D layout in seconds.
-2. **True Real-Time Editing:** Because Framerate understands the 3D space, you can tweak and iterate on your cinematic scroll instantly, without ever touching the underlying WebGL code. 
+2. **Chat-Based Editing:** Describe a change to your cinematic scroll and Framerate rewrites the code for you, so you can iterate without ever touching the underlying WebGL. 
 
 ## Conclusion
 

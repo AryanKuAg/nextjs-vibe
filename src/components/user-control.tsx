@@ -151,7 +151,7 @@ export const UserControl = ({ showName }: Props) => {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => window.open('/legal', '_blank')}
+              onClick={() => window.open('/terms', '_blank')}
               className="cursor-pointer py-[6px] px-[8px] flex items-center gap-2 hover:bg-white-8 rounded-lg focus:text-white h-[28px]  group"
             >
               <i className="ri-file-text-line text-white-50 text-base group-hover:text-white-85" />

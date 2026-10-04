@@ -198,17 +198,6 @@ export const PillNavbar = () => {
     }
   };
 
-  const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    if (typeof window !== "undefined" && window.location.pathname === "/") {
-      e.preventDefault();
-      const section = document.getElementById(id);
-      if (section) {
-        section.scrollIntoView({ behavior: "smooth" });
-      }
-      setIsMobileMenuOpen(false);
-    }
-  };
-
   const isPending = createProject.isPending;
   if (!isMounted) return null;
 
@@ -237,7 +226,7 @@ export const PillNavbar = () => {
             {/* Center: Links (Desktop) */}
             <div className="hidden md:flex items-center gap-4 text-white text-sm font-[500]">
               <Link href="/blog" className="">Blog</Link>
-              <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="">Templates</Link>
+              <Link href="/templates" className="">Templates</Link>
               <button type="button" onClick={() => setShowPricingModal(true)} className="cursor-pointer">Pricing</button>
               <Link href="mailto:teamframerate@gmail.com" className="">Contact</Link>
             </div>
@@ -291,7 +280,7 @@ export const PillNavbar = () => {
                 <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Blog
                 </Link>
-                <Link href="/#sites" onClick={(e) => handleScrollTo(e, "sites")} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
+                <Link href="/templates" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-left px-4 py-5 rounded-[12px] hover:bg-zinc-900 transition-colors">
                   Templates
                 </Link>
                 <button

@@ -10,19 +10,19 @@ readTime: "5 min read"
 
 ## How Much Does a 3D Website Cost?
 
-The digital landscape is evolving, and 3D websites are at the forefront of this transformation. If you're considering building a 3D website, you might be wondering, **how much does a 3D website cost?** Understanding the cost structure is essential for budgeting and ensuring you get the most out of your investment. In this guide, we will explore the various factors influencing 3D website costs and how Framerate can help streamline the process.
+The digital landscape is evolving, and 3D websites are at the forefront of this transformation. If you're considering [building a 3D website](/blog/how-to-build-a-3d-website), you might be wondering, **how much does a 3D website cost?** Understanding the cost structure is essential for budgeting and ensuring you get the most out of your investment. In this guide, we will explore the various factors influencing 3D website costs and how [Framerate](/) can help streamline the process.
 
 ### Factors Influencing the Cost of a 3D Website
 
 When determining the cost of a 3D website, several key factors come into play:
 
 #### 1. **Design Complexity**
-   - **Custom Designs:** A unique design tailored to your brand can significantly increase costs. Custom 3D models and animations require skilled designers and advanced tools.
+   - **Custom Designs:** A unique design tailored to your brand can significantly increase costs. Custom [3D models](/blog/adding-3d-models-to-next-js-app-router) and animations require skilled designers and advanced tools.
    - **Template-Based Designs:** Using pre-made templates can help reduce costs while still delivering a visually appealing website.
 
 #### 2. **Functionality Requirements**
    - **Basic Features:** A simple 3D website with standard features like navigation and content display is generally less expensive.
-   - **Advanced Interactive Features:** Incorporating complex functionalities such as e-commerce capabilities, user interactions, or animations will raise the price.
+   - **Advanced Interactive Features:** Incorporating complex functionalities such as [e-commerce](/blog/future-of-ecommerce-3d-product-viewers) capabilities, user interactions, or animations will raise the price.
 
 #### 3. **Development Platform**
    - **DIY Builders:** Platforms like Framerate allow users to generate 3D websites quickly and affordably using AI technology. This can significantly cut down the cost.

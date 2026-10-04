@@ -41,7 +41,7 @@ To successfully incorporate interactive 3D storytelling into your brand strategy
 
 #### 2. Choose the Right Platform
 
-- **AI-Powered Builders**: Platforms like Framerate allow you to create cinematic 3D websites from text prompts in minutes, making the process accessible even for those without technical skills.
+- **AI-Powered Builders**: Platforms like [Framerate](/) allow you to create cinematic 3D websites from text prompts in minutes, making the process accessible even for those without technical skills.
 - **Integration with Existing Channels**: Ensure that the 3D storytelling fits seamlessly into your existing marketing channels (social media, email campaigns, etc.).
 
 #### 3. Design Interactive Elements

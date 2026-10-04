@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## Scroll Hijacking vs Scroll-Driven Animations: Understanding the Differences
 
-In the evolving landscape of web design, the terms **scroll hijacking** and **scroll-driven animations** have become integral to creating engaging user experiences. Both techniques utilize the scroll action, but they serve different purposes and can lead to vastly different user interactions. In this article, we'll delve into the characteristics, benefits, and drawbacks of each method, allowing you to make informed decisions for your next project.
+In the evolving landscape of web design, the terms **scroll hijacking** and **[scroll-driven animations](/blog/scroll-driven-3d-animations-tutorial)** have become integral to creating engaging user experiences. Both techniques utilize the scroll action, but they serve different purposes and can lead to vastly different user interactions. In this article, we'll delve into the characteristics, benefits, and drawbacks of each method, allowing you to make informed decisions for your next project.
 
 ### What is Scroll Hijacking?
 
@@ -47,7 +47,7 @@ On the other hand, scroll-driven animations are designed to respond intuitively 
 
 **Pros**:
 - Can create unique and memorable user experiences.
-- Effective for storytelling through visual sequences.
+- Effective for [storytelling](/blog/interactive-3d-storytelling-for-brands) through visual sequences.
 
 **Cons**:
 - May lead to user frustration if not implemented thoughtfully.

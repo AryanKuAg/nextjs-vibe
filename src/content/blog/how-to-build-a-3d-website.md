@@ -1,6 +1,7 @@
 ---
 title: "How to Build a 3D Website in Minutes with AI Technology"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Discover how to build a 3D website effortlessly using Framerate's AI-powered builder, transforming text prompts into stunning cinematic experiences."
 keywords: ["3D website", "website builder", "AI technology"]
 coverImage: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## How to Build a 3D Website in Minutes with Framerate
 
-In an increasingly visual digital landscape, knowing **how to build a 3D website** can set you apart from the competition. With Framerate's innovative AI-powered builder, users can now transform simple text prompts into stunning, cinematic 3D websites in just minutes. This guide will walk you through the process, showcasing the ease and efficiency of creating immersive web experiences that captivate your audience.
+In an increasingly visual digital landscape, knowing **how to build a 3D website** can set you apart from the competition. With [Framerate](/)'s innovative AI-powered builder, users can now transform simple text prompts into stunning, cinematic 3D websites in just minutes. This guide will walk you through the process, showcasing the ease and efficiency of creating immersive web experiences that captivate your audience.
 
 ### Why Build a 3D Website?
 
@@ -24,8 +25,8 @@ In an increasingly visual digital landscape, knowing **how to build a 3D website
 
 Building a 3D website using Framerate is a straightforward process. Here’s how to get started:
 
-1. **Sign Up**: Create an account on Framerate (framerate.space) to access the AI-powered builder.
-2. **Choose Your Theme**: Select a theme that aligns with your vision. Framerate offers a variety of cinematic styles to choose from.
+1. **Sign Up**: Create an account on Framerate (framerate.space). Building with AI uses credits, which come with a paid plan starting at $10 a month.
+2. **Find a Reference (Optional)**: Browse the [template gallery](/templates) for a cinematic style close to your vision. You can attach a reference image to your prompt to steer the look.
 3. **Input Your Text Prompts**: Describe the elements you want to include in your 3D website. Be specific about the visuals, layouts, and functionalities.
 4. **Generate Your 3D Website**: Let the AI do the heavy lifting. Within minutes, Framerate will generate a stunning 3D website based on your input.
 
@@ -41,9 +42,9 @@ To maximize the effectiveness of the AI builder, consider the following tips whe
 
 Once your initial 3D website is generated, Framerate allows for customization:
 
-- **Edit Visual Elements**: Modify colors, shapes, and the layout to align with your brand identity.
-- **Add Multimedia**: Integrate videos, images, and audio to enrich the user experience.
-- **Optimize for Performance**: Ensure your site loads quickly and performs well across devices by following optimization guidelines provided by Framerate.
+- **Edit by Chatting**: Ask for changes to colors, [typography](/blog/best-fonts-for-cinematic-3d-websites) and layout in plain words, such as "make the hero darker and the headline larger," and the preview updates.
+- **Add Media**: Ask for video, imagery or new sections in a follow-up prompt to enrich the experience.
+- **Publish or Export**: Publish the site to a live link, or download its code and host it anywhere. Then test its speed with PageSpeed Insights; our guide to [Core Web Vitals on 3D sites](/blog/improving-core-web-vitals-on-3d-sites) explains what to look for.
 
 ### Best Practices for 3D Website Design
 

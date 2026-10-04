@@ -28,7 +28,7 @@ The integration of spatial computing into **web design** opens up a plethora of 
 
 By incorporating spatial computing elements into websites, designers can create more engaging experiences for users. For example:
 
-- **Interactive 3D Models:** Users can manipulate and explore 3D objects in real-time, providing a deeper understanding of products or concepts.
+- **Interactive [3D Models](/blog/adding-3d-models-to-next-js-app-router):** Users can manipulate and explore 3D objects in real-time, providing a deeper understanding of products or concepts.
 - **Immersive Environments:** Websites can offer virtual tours or simulations, making content more relatable and memorable.
 
 ### Improved Accessibility
@@ -37,7 +37,7 @@ Spatial computing can also improve accessibility in web design. Features such as
 
 ### Streamlined Design Processes
 
-With tools like Framerate, creating 3D websites has never been easier. Users can generate cinematic 3D websites from text prompts in minutes, allowing designers to focus on creativity rather than technical details. This efficiency not only saves time but also reduces costs, making high-quality web design accessible to more businesses.
+With tools like [Framerate](/), creating 3D websites has never been easier. Users can generate cinematic 3D websites from text prompts in minutes, allowing designers to focus on creativity rather than technical details. This efficiency not only saves time but also reduces costs, making high-quality web design accessible to more businesses.
 
 ## The Future of Spatial Computing in Web Design
 

@@ -10,7 +10,7 @@ readTime: "5 min read"
 
 ## The Future of Web Design: AI Generated Backgrounds for Websites
 
-In the rapidly evolving world of web design, **AI generated backgrounds for websites** are revolutionizing the way we create and experience digital spaces. These innovative backgrounds not only enhance the aesthetic appeal of a website but also provide a unique, immersive experience that captivates visitors. With Framerate, an AI-powered builder, crafting stunning 3D websites with custom backgrounds has never been easier.
+In the rapidly evolving world of web design, **AI generated backgrounds for websites** are revolutionizing the way we create and experience digital spaces. These innovative backgrounds not only enhance the aesthetic appeal of a website but also provide a unique, immersive experience that captivates visitors. With [Framerate](/), an AI-powered builder, crafting stunning 3D websites with custom backgrounds has never been easier.
 
 ### What Are AI Generated Backgrounds?
 

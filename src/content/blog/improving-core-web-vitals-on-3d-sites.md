@@ -1,6 +1,7 @@
 ---
 title: "Improving Core Web Vitals on 3D Sites: A Comprehensive Guide"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Discover effective strategies for improving Core Web Vitals on 3D sites and enhance user experience with Framerate's AI-powered tools."
 keywords: ["Core Web Vitals", "3D websites", "website performance"]
 coverImage: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## Improving Core Web Vitals on 3D Sites: A Comprehensive Guide
 
-In today’s digital landscape, ensuring optimal **Core Web Vitals** on 3D sites is essential for enhancing user experience and boosting search engine rankings. As an innovative platform, Framerate empowers users to create stunning cinematic 3D websites from simple text prompts. Yet, even with such advanced capabilities, the performance of these sites can significantly impact user engagement and satisfaction. This guide will explore effective methods for **improving Core Web Vitals on 3D sites**, ensuring that your visitors enjoy seamless interaction with your content.
+In today’s digital landscape, ensuring optimal **Core Web Vitals** on 3D sites is essential for enhancing user experience and boosting search engine rankings. As an innovative platform, [Framerate](/) empowers users to create stunning cinematic 3D websites from simple text prompts. Yet, even with such advanced capabilities, the performance of these sites can significantly impact user engagement and satisfaction. This guide will explore effective methods for **improving Core Web Vitals on 3D sites**, ensuring that your visitors enjoy seamless interaction with your content.
 
 ### Understanding Core Web Vitals
 
@@ -26,8 +27,8 @@ Improving these metrics on 3D sites requires a multi-faceted approach. Here are 
 
 #### Optimize 3D Assets
 
-- **Reduce File Sizes**: Use compression tools to minimize the size of 3D models and textures without sacrificing quality. Smaller file sizes lead to faster loading times.
-- **Leverage Lazy Loading**: Implement lazy loading for 3D assets to ensure that only the elements visible in the viewport load initially, improving LCP scores.
+- **Reduce File Sizes**: Use compression tools to minimize the size of [3D models](/blog/adding-3d-models-to-next-js-app-router) and textures without sacrificing quality. Smaller file sizes lead to faster loading times.
+- **Leverage Lazy Loading**: Implement lazy loading for [3D assets](/blog/how-to-use-ai-to-generate-3d-assets) to ensure that only the elements visible in the viewport load initially, improving LCP scores.
 
 #### Enhance Loading Performance
 
@@ -48,7 +49,7 @@ Improving these metrics on 3D sites requires a multi-faceted approach. Here are 
 
 Framerate's AI-driven capabilities not only enable the rapid creation of 3D websites but also assist in optimizing them for performance. Here’s how:
 
-- **Real-Time Performance Analysis**: Utilize Framerate's built-in tools to analyze your site's Core Web Vitals and receive actionable insights.
+- **Real-World Performance Analysis**: Run PageSpeed Insights or Lighthouse on your published site, and check the Core Web Vitals report in Google Search Console for data from real visitors.
 - **Automated Optimization**: Take advantage of AI-driven suggestions to streamline your 3D assets and improve loading times effortlessly.
 
 ### Conclusion

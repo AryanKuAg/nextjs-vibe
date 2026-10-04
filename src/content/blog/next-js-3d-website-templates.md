@@ -10,9 +10,9 @@ readTime: "5 min read"
 
 ## Elevate Your Digital Experience with Next.js 3D Website Templates
 
-In today's digital landscape, standing out requires more than just a standard website. Enter **Next.js 3D website templates**—a revolutionary approach to web design that combines the power of Next.js with stunning 3D visuals. This innovative blend allows creators to develop immersive, cinematic websites that captivate users and enhance engagement.
+In today's digital landscape, standing out requires more than just a standard website. Enter **Next.js [3D website templates](/templates)**—a revolutionary approach to web design that combines the power of Next.js with stunning 3D visuals. This innovative blend allows creators to develop immersive, cinematic websites that captivate users and enhance engagement.
 
-At Framerate, we harness the capabilities of AI to turn text prompts into visually striking 3D websites in minutes. Let’s explore how Next.js 3D website templates can transform your online presence and propel your projects to new heights.
+At [Framerate](/), we harness the capabilities of AI to turn text prompts into visually striking 3D websites in minutes. Let’s explore how Next.js 3D website templates can transform your online presence and propel your projects to new heights.
 
 ## Why Choose Next.js for 3D Website Templates?
 
@@ -28,10 +28,10 @@ These features not only improve user experience but also contribute to higher se
 
 ### Enhanced User Engagement
 
-3D website templates provide an interactive experience that traditional websites simply cannot match. By incorporating elements like animations, 3D models, and dynamic content, users are more likely to engage with your site. The immersive nature of 3D design can lead to:
+3D website templates provide an interactive experience that traditional websites simply cannot match. By incorporating elements like animations, [3D models](/blog/adding-3d-models-to-next-js-app-router), and dynamic content, users are more likely to engage with your site. The immersive nature of 3D design can lead to:
 
 - Increased time spent on site
-- Higher conversion rates
+- Higher [conversion rates](/blog/why-3d-websites-convert-better)
 - Enhanced brand recall
 
 ## Creating Stunning 3D Websites with Framerate
@@ -40,7 +40,7 @@ Framerate's AI-powered builder simplifies the process of creating Next.js 3D web
 
 ### Step 1: Craft Your Text Prompt
 
-Begin by writing a clear and concise text prompt that outlines your vision. Whether you’re aiming for a sleek portfolio, an engaging e-commerce site, or a captivating landing page, your prompt is the foundation of your 3D design.
+Begin by writing a clear and concise text prompt that outlines your vision. Whether you’re aiming for a sleek portfolio, an engaging [e-commerce](/blog/future-of-ecommerce-3d-product-viewers) site, or a captivating landing page, your prompt is the foundation of your 3D design.
 
 ### Step 2: Leverage AI Technology
 

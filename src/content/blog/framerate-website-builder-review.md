@@ -1,6 +1,7 @@
 ---
 title: "Framerate Website Builder Review: The Future of Cinematic Web Design"
 date: "2026-05-28"
+updated: "2026-10-04"
 excerpt: "Discover the innovative features and capabilities of the Framerate website builder in this comprehensive review, and see how it transforms text prompts into stunning 3D websites."
 keywords: ["Framerate website builder review", "3D website builder", "AI-powered web design"]
 coverImage: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200"
@@ -10,7 +11,7 @@ readTime: "5 min read"
 
 ## Introduction to the Framerate Website Builder
 
-In the rapidly evolving landscape of web design, the **Framerate website builder** stands out as an innovative solution that leverages artificial intelligence to create cinematic 3D websites from simple text prompts. This review delves into its features, usability, and overall effectiveness, aiming to provide you with a comprehensive understanding of what makes Framerate a game-changer in web design.
+In the rapidly evolving landscape of web design, the **[Framerate](/) website builder** stands out as an innovative solution that leverages artificial intelligence to create cinematic 3D websites from simple text prompts. This review delves into its features, usability, and overall effectiveness, aiming to provide you with a comprehensive understanding of what makes Framerate a game-changer in web design.
 
 ## What is Framerate?
 
@@ -23,7 +24,7 @@ Framerate is an AI-powered website builder designed to simplify the web creation
    - Offers customization options to refine the generated output.
 
 2. **User-Friendly Interface**  
-   - Intuitive drag-and-drop functionality.
+   - Chat-based editing: describe a change in plain words instead of dragging elements around.
    - Minimal learning curve, making it accessible for all skill levels.
 
 3. **Cinematic Quality**  
@@ -35,8 +36,8 @@ Framerate is an AI-powered website builder designed to simplify the web creation
    - Ensures optimal performance across desktops, tablets, and smartphones.
 
 5. **SEO Optimization**  
-   - Built-in tools to enhance search engine visibility.
-   - Supports metadata input and optimized loading times.
+   - Sites are built with Next.js, which renders real HTML that search engines can read.
+   - Ask for page titles, descriptions and other metadata in plain words.
 
 ## How to Use Framerate
 
@@ -52,11 +53,11 @@ Enter a text prompt that describes your desired website. This could be as simple
 
 ### Step 3: Customize Your Design
 
-Once the AI generates your website, you can customize elements such as colors, fonts, and layout to align with your vision.
+Once the AI generates your website, you can customize elements such as colors, [fonts](/blog/best-fonts-for-cinematic-3d-websites), and layout by describing the changes you want in follow-up prompts.
 
 ### Step 4: Preview and Publish
 
-Review the final product using the preview function, and once satisfied, publish your website with a click of a button.
+Review the final product in the live preview, and once satisfied, publish your website with a click of a button or download its code to host elsewhere.
 
 ## Pros and Cons of Framerate
 
@@ -64,12 +65,12 @@ Review the final product using the preview function, and once satisfied, publish
 
 - **Speedy Creation**: Generate a complete website in minutes.
 - **Cinematic Appeal**: Create visually striking 3D websites that captivate visitors.
-- **Versatile Applications**: Suitable for various industries, from portfolios to e-commerce.
+- **Versatile Applications**: Suitable for many industries, from [real estate](/use-cases/real-estate) and [hospitality](/use-cases/hotels-and-resorts) to [portfolios](/use-cases/portfolio).
 
 ### Cons
 
-- **Limited Control**: Advanced users may find the AI-generated designs somewhat restrictive.
-- **Learning Curve for Customization**: While the initial setup is easy, mastering the customization features may take time.
+- **Hands-On Changes Need the Code**: Advanced users who want pixel-level control will end up downloading the code and editing it directly.
+- **Credits and Prompting**: Building and editing use credits from a paid plan, starting at $10 a month, and it takes a little practice to write prompts that get exactly what you want.
 
 ## Conclusion: Is Framerate Right for You?
 

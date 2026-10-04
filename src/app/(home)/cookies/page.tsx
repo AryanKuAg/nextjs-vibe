@@ -1,21 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = {
-  title: "Cookie Policy – Framerate",
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Cookie Policy",
   description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
-  openGraph: {
-    title: "Cookie Policy – Framerate",
-    description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
-    url: "https://framerate.space/cookies",
-    siteName: "Framerate",
-  },
-  twitter: {
-    card: "summary",
-    title: "Cookie Policy – Framerate",
-    description: "Find out how Framerate uses cookies and similar technologies to improve your experience.",
-  },
-};
+  path: "/cookies",
+});
 
 const LegalFooter = () => (
   <div className="mt-40 pt-6 flex items-center justify-start text-sm text-[#CCCCCC] font-sans gap-4">

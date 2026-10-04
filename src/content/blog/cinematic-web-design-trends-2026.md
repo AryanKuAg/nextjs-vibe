@@ -10,18 +10,18 @@ readTime: "5 min read"
 
 ## Introduction to Cinematic Web Design Trends 2026
 
-As we step into 2026, **cinematic web design trends** are poised to redefine how we interact with the digital landscape. The fusion of advanced technology and creative design is making it possible to craft immersive experiences that captivate audiences. At Framerate, we harness the power of AI to enable users to generate cinematic 3D websites from simple text prompts in mere minutes. In this blog post, we will explore the leading trends that are shaping cinematic web design this year, ensuring your website stands out in a competitive online environment.
+As we step into 2026, **cinematic web design trends** are poised to redefine how we interact with the digital landscape. The fusion of advanced technology and creative design is making it possible to craft immersive experiences that captivate audiences. At [Framerate](/), we harness the power of AI to enable users to generate cinematic 3D websites from simple text prompts in mere minutes. In this blog post, we will explore the leading trends that are shaping cinematic web design this year, ensuring your website stands out in a competitive online environment.
 
 ## Key Cinematic Web Design Trends for 2026
 
 ### 1. Immersive 3D Experiences
 
-- **Enhanced Visual Storytelling**: Websites are increasingly utilizing 3D elements to create narratives that engage users. This trend allows brands to showcase their products in a dynamic and interactive manner.
+- **Enhanced Visual [Storytelling](/blog/interactive-3d-storytelling-for-brands)**: Websites are increasingly utilizing 3D elements to create narratives that engage users. This trend allows brands to showcase their products in a dynamic and interactive manner.
 - **Realistic Environments**: The integration of realistic 3D environments enhances user experience, making it feel as if visitors are stepping into a virtual world that reflects the brand's identity.
 
 ### 2. Dynamic Typography and Motion Graphics
 
-- **Kinetic Typography**: Text that moves and changes in response to user interaction grabs attention and conveys messages more effectively.
+- **Kinetic [Typography](/blog/best-fonts-for-cinematic-3d-websites)**: Text that moves and changes in response to user interaction grabs attention and conveys messages more effectively.
 - **Layered Motion Graphics**: Combining static and animated elements creates depth, drawing users deeper into the content.
 
 ### 3. Personalized User Experiences

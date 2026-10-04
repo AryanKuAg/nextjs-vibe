@@ -22,7 +22,7 @@ Suddenly, you didn't need to write HTML for every single page. You could write a
 
 ## The Drag-and-Drop Era (2011 - 2020)
 
-As the demand to **making websites** visually appealing grew, the industry shifted to visual page builders. Platforms like Squarespace, Wix, and eventually Webflow allowed designers to drag elements onto a canvas. 
+As the demand to **making websites** visually appealing grew, the industry shifted to visual page builders. Platforms like Squarespace, Wix, and eventually [Webflow](/blog/framerate-vs-webflow-comparison) allowed designers to drag elements onto a canvas. 
 
 This was the first time a non-developer could truly design a custom site. But it came with a heavy cost: performance. Visual builders generated notoriously terrible, bloated code. Furthermore, as the mobile web exploded, forcing a drag-and-drop canvas to be responsive became a nightmare. 
 
@@ -35,9 +35,9 @@ The question is no longer "How do I code this?" but rather, "How do I prompt thi
 When you use an **ai that creates websites**, you bypass the limitations of the previous three eras. You get the speed of a CMS, the visual control of a drag-and-drop builder, and the clean code of a hand-written site. 
 
 ### From Flat Pages to 3D Experiences
-The most exciting development in this current era is the shift toward spatial computing. **Build ai website** platforms are no longer just arranging 2D text boxes. 
+The most exciting development in this current era is the shift toward [spatial computing](/blog/spatial-computing-and-web-design). **Build ai website** platforms are no longer just arranging 2D text boxes. 
 
-The industry leader in this space is **Framerate**. Framerate represents the absolute cutting edge of the timeline. It is an **ai that creates websites** not by pasting text into templates, but by engineering bespoke, 3D interactive experiences. With Framerate, you can prompt an entire cinematic, scroll-driven website into existence in minutes, outputting perfect Next.js code.
+The industry leader in this space is **[Framerate](/)**. Framerate represents the absolute cutting edge of the timeline. It is an **ai that creates websites** not by pasting text into templates, but by engineering bespoke, 3D interactive experiences. With Framerate, you can prompt an entire cinematic, scroll-driven website into existence in minutes, outputting perfect Next.js code.
 
 ## Conclusion
 

@@ -123,9 +123,8 @@ export const Footer = () => {
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-4">
                     <a href="https://www.facebook.com/framerate.space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Facebook"><i className="ri-facebook-circle-fill text-lg"></i></a>
-                    <a href="https://twitter.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="X (Twitter)"><i className="ri-twitter-x-line text-lg"></i></a>
                     <a href="https://www.instagram.com/framerate.space" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="Instagram"><i className="ri-instagram-line text-lg"></i></a>
-                    <a href="https://linkedin.com/company/framerate.space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="LinkedIn"><i className="ri-linkedin-fill text-lg"></i></a>
+                    <a href="https://www.linkedin.com/company/framerate-space/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="LinkedIn"><i className="ri-linkedin-fill text-lg"></i></a>
                     <a href="https://www.youtube.com/channel/UCfrB9eKkVyu7ZT2Xdj-Amsg" target="_blank" rel="noopener noreferrer" className="text-white hover:text-[#CCCCCC]" aria-label="YouTube"><i className="ri-youtube-fill text-lg"></i></a>
                   </div>
                 </div>

@@ -7,23 +7,36 @@ import Script from "next/script";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
-import { CanonicalUrl } from "@/components/canonical-url";
+import {
+  DEFAULT_OG_IMAGE,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/site";
 
 import "./globals.css";
 
+// Only Onest and Stack Sans Notch appear on public pages. The rest keep their
+// @font-face rules for the screens that use them, but are not preloaded: seven
+// preloaded font files on every page compete with the page's own content for
+// the first round trips, and a font nothing renders is pure cost.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 const inconsolata = Inconsolata({
   variable: "--font-inconsolata",
   subsets: ["latin"],
+  preload: false,
 });
 
 const stackSansNotch = localFont({
@@ -37,12 +50,14 @@ const dmMono = DM_Mono({
   variable: "--font-dm-mono",
   subsets: ["latin"],
   weight: "400", // Using a single weight string instead of array
+  preload: false,
 });
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+  preload: false,
 });
 
 const onest = Onest({
@@ -51,40 +66,57 @@ const onest = Onest({
   weight: ["400", "500", "600", "700"],
 });
 
+/**
+ * Search Console offers the token in its DNS-record form too
+ * ("google-site-verification=…"); the meta tag wants the bare token.
+ */
+const googleSiteVerification = (process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "")
+  .replace(/^google-site-verification=/, "")
+  .trim();
+
 export const metadata: Metadata = {
-  title: "Framerate — Create & Export Full 3D Websites with AI",
-  description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
-  metadataBase: new URL("https://framerate.space"),
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  // No og:url here: a page without its own block would claim to be the
+  // homepage. Public pages set theirs through pageMetadata().
   openGraph: {
     type: "website",
-    url: "https://framerate.space/",
-    title: "Framerate — Create & Export Full 3D Websites with AI",
-    description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
-    siteName: "Framerate",
-    images: [
-      {
-        url: "/social_preview.png",
-        width: 2400,
-        height: 1260,
-        alt: "Framerate — Create & Export Full 3D Websites with AI",
-      },
-    ],
+    siteName: SITE_NAME,
+    locale: "en_US",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Framerate — Create & Export Full 3D Websites with AI",
-    description: "Just describe your vision to create, preview, and export a full 3D website instantly. Build with Framerate's AI and 3D scroll library.",
-    images: ["/social_preview.png"],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE.url],
   },
-  verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
+  ...(googleSiteVerification ? { verification: { google: googleSiteVerification } } : {}),
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -103,13 +135,13 @@ export default function RootLayout({
       <TRPCReactProvider>
         <html lang="en" suppressHydrationWarning>
           <head>
+            <link rel="preconnect" href="https://use.typekit.net" crossOrigin="anonymous" />
             <link rel="stylesheet" href="https://use.typekit.net/xvp3dbf.css" />
           </head>
           <body
             suppressHydrationWarning
             className={`${geistSans.variable} ${geistMono.variable} ${inconsolata.variable} ${stackSansNotch.variable} ${dmMono.variable} ${spaceGrotesk.variable} ${onest.variable} antialiased`}
           >
-            <CanonicalUrl />
             {/* Revenue attribution. Sets the first-party cookie the checkout
                 route forwards to Dodo as metadata, which is what ties a payment
                 back to the visit that produced it. */}
@@ -136,27 +168,6 @@ export default function RootLayout({
                 `,
               }}
             />
-            <Script
-              id="fb-pixel"
-              strategy="lazyOnload"
-              dangerouslySetInnerHTML={{
-                __html: `
-                  !function(f,b,e,v,n,t,s)
-                  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-                  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-                  n.queue=[];t=b.createElement(e);t.async=!0;
-                  t.src=v;s=b.getElementsByTagName(e)[0];
-                  s.parentNode.insertBefore(t,s)}(window, document,'script',
-                  'https://connect.facebook.net/en_US/fbevents.js');
-                  fbq('init', 'YOUR_PIXEL_ID_HERE');
-                  fbq('track', 'PageView');
-                `,
-              }}
-            />
-            <noscript>
-              <img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID_HERE&ev=PageView&noscript=1" alt="" />
-            </noscript>
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
